@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Project J · 家庭学习工作台</title>
+  <link rel="stylesheet" href="/styles.css"><script src="/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="mark">J<span></span></span><strong>Project J<small>家庭学习工作台</small></strong></a>
+    <div class="sidebar-label">学习空间</div>
+    <nav aria-label="主要导航">
+      <button class="nav active" data-tab="classroom"><span>◉</span> 课堂</button>
+      <button class="nav" data-tab="preparation"><span>▤</span> 备课</button>
+      <button class="nav" data-tab="review"><span>↗</span> 课后反馈</button>
+    </nav>
+    <div class="sidebar-note"><span class="small-dot"></span> 家长陪伴，一起探索<p>先尝试，需要时换一种帮助。把理解带回真实生活。</p></div>
+    <div class="sidebar-foot">JANE INSPIRED<br><span>从好奇，到理解。</span></div>
+  </aside>
+  <main>
+    <header class="topbar"><span id="breadcrumb">学习空间 / 课堂</span><span class="pill">成人开发检查</span></header>
+    <div id="error" class="error" role="alert" hidden></div>
+    <section id="tab-classroom" class="tab">
+      <div class="heading"><div><div class="eyebrow">ENGLISH × SCIENCE</div><h1>今天，读一个纸桥故事</h1><p>找出发生了什么，再用一点英语说出发现。</p></div><div class="lesson-number">01<span>起点观察</span></div></div>
+      <div class="workspace">
+        <div class="main-column">
+          <section id="welcome" class="card welcome">
+            <div class="bridge-art" aria-hidden="true"><div class="sun"></div><div class="book b1"></div><div class="book b2"></div><div class="paper"></div><div class="car"><i></i><i></i></div><div class="art-caption">THE PAPER BRIDGE</div></div>
+            <div class="welcome-body"><span class="tag">课程准备中</span><h2>一张纸，能搭起一座桥吗？</h2><p>读一个两次尝试的故事。观察事实、整理顺序，然后离屏读一个新故事。</p><div class="facts"><span>30 分钟课程设计</span><span>阅读 + 短英语表达</span><span>纸、书与小物件</span></div>
+            <div class="start-row"><label>回答判断<select id="provider"><option value="rules">本地规则 · 流程检查</option><option value="openai" disabled>OpenAI · 尚未配置</option></select></label><button id="start" class="primary">开始成人检查 <span>→</span></button></div>
+            <p class="caption">由成人扮演学生验证。材料与真实语音尚待验收，本版不开正式儿童课堂。</p></div>
+          </section>
+          <section id="classroom" class="card classroom" hidden>
+            <div class="classroom-top"><span class="tag" id="phase">开场</span><span id="elapsed">0:00</span></div>
+            <div class="teacher"><div class="avatar">J</div><div><strong>AI 学习老师</strong><span>温和引导 · 一次一个任务</span></div></div>
+            <p id="utterance" class="utterance" aria-live="polite"></p>
+            <div id="sequence-cards" class="sequence-cards"></div>
+            <div class="audio-row"><label>老师的声音<select id="voice"><option value="off">关闭</option><option value="browser">电脑朗读</option><option value="openai" disabled>OpenAI 语音 · 尚未配置</option></select></label><button id="speak" class="subtle">朗读当前回应</button><span id="audio-status" class="caption"></span></div>
+            <div id="answer-area">
+              <label for="answer">你的实际回答</label><textarea id="answer" rows="2" placeholder="可以说关键词、短句，或说明哪里需要帮助。"></textarea>
+              <div class="answer-row"><button id="mic" class="subtle" disabled>录音转写</button><span id="mic-status" class="caption">转写后先核对，再发送。</span><button id="send" class="primary">发送回答 ↑</button></div>
+            </div>
+            <div id="ack-area" hidden><label>本次确认<select id="delivery"><option value="read">我已实际读到</option><option value="heard">我已实际听到</option></select></label><button id="ack" class="primary">确认，继续 →</button></div>
+            <div id="action-area" hidden><label for="action-text">实际做了什么？</label><input id="action-text" placeholder="例如：把纸搭在两本书上了"><label class="check"><input type="checkbox" id="action-done"> 我确认动作实际做过</label><button id="action-send" class="primary">提交动作报告</button></div>
+            <div id="offscreen-area" hidden><p class="caption">离屏时停止录音。家长只用新短文，一次问一题，保留原答；两题结束后再反馈。</p><div id="offscreen-fields"></div><label>家长提供的内容帮助<select id="offscreen-help"><option value="unknown">未知</option><option value="independent">明确没有内容帮助</option><option value="scaffold">有词义、翻译或句框帮助</option><option value="model">有完整答案示范</option></select></label><label for="experiment">可选实物尝试的实际结果</label><input id="experiment" placeholder="没做可留空；桥没撑住也如实报告。"><label class="check"><input type="checkbox" id="offscreen-done"> 我确认两题实际离屏做过</label><button id="offscreen-send" class="primary">提交离屏报告</button></div>
+            <div class="controls"><button data-event="repeat">重复题干</button><button data-event="help">换一种帮助</button><button data-event="skip">跳过</button><button id="pause" data-event="pause">暂停</button><button data-event="close">收尾</button><button id="stop" class="stop">停止本课</button></div>
+            <div id="finished" hidden><p>本次检查已结束。关闭声音后，提交一次实际反馈。</p><button id="go-review" class="primary">整理课后反馈 →</button></div>
+          </section>
+          <section id="material" class="card reading" hidden><div class="reading-header"><span class="eyebrow">READ & EXPLORE</span><button id="print" class="subtle">打印当前材料</button></div><h2 id="material-title"></h2><p id="material-text"></p><span id="material-grade" class="caption"></span></section>
+        </div>
+        <aside class="right-column">
+          <section class="card goals"><span class="eyebrow">TODAY'S FOCUS</span><h3>今天关注什么</h3><div class="goal"><span>01</span><p>读懂事实与顺序<small>可以回文，也可以用中文说明理解。</small></p></div><div class="goal"><span>02</span><p>说出一个实际动作<small>短语也可以，理解与英语表达分开看。</small></p></div></section>
+          <section class="card flow"><h3>课堂路径</h3><ol id="flow"></ol></section>
+          <section class="card materials"><h3>摆在手边</h3><p>两本稳的书、两张同尺寸纸、小橡皮或玩具车。</p><p class="caption">新短文稍后出示。实际操作的结果可以与故事不同。</p></section>
+          <section class="card session-info"><h3>本次观察</h3><p><span id="sample-count">0</span> 个实际回答样本</p><p class="caption" id="help-info">其他帮助未知，不预填掌握结论。</p></section>
+        </aside>
+      </div>
+    </section>
+    <section id="tab-preparation" class="tab" hidden><div class="heading"><div><div class="eyebrow">PREPARE WITH PURPOSE</div><h1>备课检查</h1><p>先核对目标、材料、题卡和退回路径，再进入课堂。</p></div></div><div class="card padded"><h2>纸桥故事 · 课程包 0.1.0</h2><p>从 LearningWithAI 首课 1.9.0 导入原材料，重新建立执行流程。原演练结果不继承。</p><div id="prep-summary"></div><button id="prep-ai" class="primary" disabled>请 AI 审阅课程包</button><p class="caption">AI 审阅会列出内容与教学缺口，不自动把课程标为就绪。</p><div id="prep-ai-result" class="review-result" hidden></div></div></section>
+    <section id="tab-review" class="tab" hidden><div class="heading"><div><div class="eyebrow">REFLECT & ADJUST</div><h1>课后反馈</h1><p>保存实际发生的事，为下次学习选择一个小调整。</p></div></div><div class="card padded"><div id="review-wait">先结束本次成人检查，再提供实际反馈。</div><div id="review-form" hidden><label for="feedback">一句话也可以：实际做了什么，帮助是否有用，声音和收尾是否顺畅？</label><textarea id="feedback" rows="5" placeholder="没做的环节说没做，不确定的部分可留空。"></textarea><label class="check"><input id="review-ai" type="checkbox" disabled> 同时请 AI 整理评价与下节建议</label><button id="save-feedback" class="primary">保存本次成人反馈</button></div><div id="review-result" class="review-result" hidden></div><button id="export" class="subtle" hidden>导出成人检查报告 ↓</button><p class="caption">本次只形成成人备课检查。课堂中不存快照、不监控屏幕；结束反馈后一次保存。</p></div></section>
+    <footer>Project J <span>·</span> 让学习保持好奇，也留下依据。</footer>
+  </main>
+</body>
+</html>

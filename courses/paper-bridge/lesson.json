@@ -1,0 +1,741 @@
+{
+  "schema_version": 1,
+  "id": "J-PAPER-BRIDGE-001",
+  "version": "0.1.0",
+  "title": "纸桥故事 · 起点观察",
+  "primary_target": "理解短文中的事实、顺序和文本依据",
+  "secondary_target": "用短英语报告一件事",
+  "duration_minutes": 30,
+  "phase_minutes": {
+    "opening": 3,
+    "baseline": 7,
+    "listening_oral": 4,
+    "practice": 6,
+    "offscreen": 7,
+    "closing": 3
+  },
+  "teacher_reference": "TEACHER-DEFAULT/1.1.0",
+  "start": "P0",
+  "materials": {
+    "A": {
+      "title": "The Paper Bridge",
+      "text": "Mia has a toy car.\nShe wants a bridge for her car.\nShe puts two books on the table.\nThere is a space between the books.\n\nMia puts a piece of paper on the books.\nThe paper makes a bridge.\nShe puts her car on the paper.\nThe paper bends. The car falls.\n\n“Can I make a new bridge?” says Mia.\nShe folds a new piece of paper.\nShe puts it on the same books.\nShe tries the same car again.\n\nThis time, the car stays on the bridge.\nMia smiles.\nShe draws the two bridges for Dad.\n“This one holds my car,” she says.",
+      "grading": "自编，未测得Lexile或RAZ等级"
+    },
+    "B": {
+      "title": "Ben’s Bridge",
+      "text": "Ben has two toy buses.\nOne bus is small. One bus is big.\nHe makes a bridge with paper and two books.\n\nHe puts the small bus on the bridge.\nIt stays on the paper.\nBen takes the small bus off.\n\nHe puts the big bus on the bridge.\nThe paper bends. The big bus falls.",
+      "grading": "自编，未测得Lexile或RAZ等级"
+    },
+    "S": {
+      "title": "Mia’s Bridge",
+      "text": "Mia has a toy car.\nShe puts paper on two books.\nShe puts the car on the paper.\nThe car falls.\n\nMia folds new paper.\nShe puts it on the books.\nShe tries the same car again.\nThe car stays on the paper.",
+      "grading": "自编，未测得Lexile或RAZ等级"
+    }
+  },
+  "readiness": {
+    "status": "draft",
+    "checks": {
+      "content_review": {
+        "result": "not_tested",
+        "evidence_ref": null,
+        "course_hash": null
+      },
+      "runtime_tests": {
+        "result": "not_tested",
+        "evidence_ref": null,
+        "course_hash": null
+      },
+      "adult_voice_rehearsal": {
+        "result": "not_tested",
+        "evidence_ref": null,
+        "course_hash": null
+      },
+      "fallback_review": {
+        "result": "not_tested",
+        "evidence_ref": null,
+        "course_hash": null
+      }
+    }
+  },
+  "provenance": {
+    "source_project": "LearningWithAI",
+    "lesson_id": "L-C2026-01-001",
+    "lesson_version": "1.9.0",
+    "imported_on": "2026-10-11",
+    "assets": [
+      {
+        "path": "courses/packs/L-C2026-01-001/1.9.0/reading-main.md",
+        "sha256": "b061cf7acd8859b5b42df53032aceebc6bc3ca0de2a31e53eb1849baeab98373"
+      },
+      {
+        "path": "courses/packs/L-C2026-01-001/1.9.0/reading-transfer.md",
+        "sha256": "0a76412a02267065159c1b8b90c33378b40c061ad848a5d5f77d503874b7c0b4"
+      },
+      {
+        "path": "courses/packs/L-C2026-01-001/1.9.0/reading-short.md",
+        "sha256": "dd2ad8de654e79426b76453b5d0bc2d6906e5beec98f78b4f01f0a864f877bb6"
+      }
+    ],
+    "readiness_inherited": false
+  },
+  "tasks": [
+    {
+      "id": "P0",
+      "kind": "ack",
+      "phase": "opening",
+      "prompt": "你好，我是Project J的AI学习老师。本次只有成人参与。今天读纸桥故事，找事实和顺序，再用一点英语交流。请确认目标已读到或听到。",
+      "next": "READ"
+    },
+    {
+      "id": "READ",
+      "kind": "ack",
+      "phase": "baseline",
+      "material": "A",
+      "prompt": "请自己读主文A，可以一直看原文，不必朗读。读完后说读完了；有多词困难可先暂停，本版降阶由家长接手。",
+      "next": "R1"
+    },
+    {
+      "id": "R1",
+      "kind": "answer",
+      "phase": "baseline",
+      "prompt": "What does Mia want to make? 她想做什么？",
+      "next": "R2",
+      "material": "A",
+      "rubric": {
+        "expected": "bridge",
+        "accepted": [
+          "bridge",
+          "a bridge",
+          "a bridge for her car",
+          "桥",
+          "给车的桥",
+          "做桥"
+        ],
+        "rejected": [
+          "car",
+          "a car",
+          "车",
+          "汽车"
+        ],
+        "evidence": [
+          "A1:She wants a bridge for her car."
+        ]
+      },
+      "correction": "Mia已经有车；我们要找她想做的东西。回到She wants这一句。",
+      "help": [
+        {
+          "level": "cue",
+          "text": "找She wants所在的句子，先说一个关键词也可以。"
+        },
+        {
+          "level": "scaffold",
+          "text": "bridge是桥。再看她想做的东西。"
+        },
+        {
+          "level": "model",
+          "text": "她想做一座桥。答案可以是a bridge，愿意可以再试一次。"
+        }
+      ],
+      "defer_feedback": true,
+      "help_by_difficulty": {
+        "vocabulary": [
+          {
+            "level": "cue",
+            "text": "找She wants所在的句子，先说一个关键词也可以。"
+          },
+          {
+            "level": "scaffold",
+            "text": "bridge是桥。再看她想做的东西。"
+          },
+          {
+            "level": "model",
+            "text": "她想做一座桥。答案可以是a bridge，愿意可以再试一次。"
+          }
+        ],
+        "meaning": [
+          {
+            "level": "cue",
+            "text": "找She wants所在的句子，先说一个关键词也可以。"
+          },
+          {
+            "level": "scaffold",
+            "text": "bridge是桥。再看她想做的东西。"
+          },
+          {
+            "level": "model",
+            "text": "她想做一座桥。答案可以是a bridge，愿意可以再试一次。"
+          }
+        ],
+        "instruction": [
+          {
+            "level": "cue",
+            "text": "先只弄清要做什么：What does Mia want to make? 她想做什么？"
+          },
+          {
+            "level": "scaffold",
+            "text": "把任务缩成一步：bridge是桥。再看她想做的东西。"
+          },
+          {
+            "level": "model",
+            "text": "她想做一座桥。答案可以是a bridge，愿意可以再试一次。"
+          }
+        ],
+        "sentence": [
+          {
+            "level": "cue",
+            "text": "可以先用一个英语关键词，不要求完整句；理解可以用中文说明。"
+          },
+          {
+            "level": "scaffold",
+            "text": "先选出你想说的关键词，再用一个短词组表达。bridge是桥。再看她想做的东西。"
+          },
+          {
+            "level": "model",
+            "text": "她想做一座桥。答案可以是a bridge，愿意可以再试一次。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "R2",
+      "kind": "answer",
+      "phase": "baseline",
+      "prompt": "What happens to the car at first? 第一次，小车怎样了？",
+      "next": "R3",
+      "material": "A",
+      "rubric": {
+        "expected": "falls",
+        "accepted": [
+          "falls",
+          "it falls",
+          "the car falls",
+          "掉下来",
+          "掉了",
+          "车掉了"
+        ],
+        "rejected": [
+          "stays",
+          "the car stays",
+          "留在桥上",
+          "没掉"
+        ],
+        "evidence": [
+          "A2:The car falls."
+        ]
+      },
+      "correction": "你可能说了第二次结果。回到第一次放车那一段，找小车发生了什么。",
+      "help": [
+        {
+          "level": "cue",
+          "text": "回看第一次放车之后的句子。"
+        },
+        {
+          "level": "scaffold",
+          "text": "比较The car falls和The car stays，找第一次那一处。"
+        },
+        {
+          "level": "model",
+          "text": "第一次小车掉下来了：The car falls. 可以再说或指出一次。"
+        }
+      ],
+      "defer_feedback": true,
+      "help_by_difficulty": {
+        "vocabulary": [
+          {
+            "level": "cue",
+            "text": "回看第一次放车之后的句子。"
+          },
+          {
+            "level": "scaffold",
+            "text": "比较The car falls和The car stays，找第一次那一处。"
+          },
+          {
+            "level": "model",
+            "text": "第一次小车掉下来了：The car falls. 可以再说或指出一次。"
+          }
+        ],
+        "meaning": [
+          {
+            "level": "cue",
+            "text": "回看第一次放车之后的句子。"
+          },
+          {
+            "level": "scaffold",
+            "text": "比较The car falls和The car stays，找第一次那一处。"
+          },
+          {
+            "level": "model",
+            "text": "第一次小车掉下来了：The car falls. 可以再说或指出一次。"
+          }
+        ],
+        "instruction": [
+          {
+            "level": "cue",
+            "text": "先只弄清要做什么：What happens to the car at first? 第一次，小车怎样了？"
+          },
+          {
+            "level": "scaffold",
+            "text": "把任务缩成一步：比较The car falls和The car stays，找第一次那一处。"
+          },
+          {
+            "level": "model",
+            "text": "第一次小车掉下来了：The car falls. 可以再说或指出一次。"
+          }
+        ],
+        "sentence": [
+          {
+            "level": "cue",
+            "text": "可以先用一个英语关键词，不要求完整句；理解可以用中文说明。"
+          },
+          {
+            "level": "scaffold",
+            "text": "先选出你想说的关键词，再用一个短词组表达。比较The car falls和The car stays，找第一次那一处。"
+          },
+          {
+            "level": "model",
+            "text": "第一次小车掉下来了：The car falls. 可以再说或指出一次。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "R3",
+      "kind": "answer",
+      "phase": "baseline",
+      "prompt": "请按故事顺序排三张卡，可以说字母顺序。",
+      "next": "L1",
+      "material": "A",
+      "rubric": {
+        "expected": "B A C",
+        "accepted": [
+          "BAC",
+          "B A C",
+          "B→A→C",
+          "先掉下来再折纸再留住"
+        ],
+        "rejected": [
+          "ABC",
+          "A B C",
+          "ACB",
+          "CBA"
+        ],
+        "evidence": [
+          "A2:The car falls.",
+          "A3:She folds a new piece of paper.",
+          "A4:The car stays on the bridge."
+        ]
+      },
+      "correction": "先有第一次落车，Mia才折新纸，之后再次试车。请回文检查这两个事件的顺序。",
+      "help": [
+        {
+          "level": "cue",
+          "text": "先找第一次小车发生的事。"
+        },
+        {
+          "level": "scaffold",
+          "text": "先放B，再从A和C选下一张。"
+        },
+        {
+          "level": "model",
+          "text": "顺序是B、A、C：掉下、折新纸、再次留住。愿意可以重排一次。"
+        }
+      ],
+      "defer_feedback": true,
+      "cards": [
+        {
+          "id": "A",
+          "text": "Mia folds new paper. / 折新纸"
+        },
+        {
+          "id": "B",
+          "text": "The car falls. / 小车掉下"
+        },
+        {
+          "id": "C",
+          "text": "The car stays on the bridge. / 小车留住"
+        }
+      ],
+      "help_by_difficulty": {
+        "vocabulary": [
+          {
+            "level": "cue",
+            "text": "先找第一次小车发生的事。"
+          },
+          {
+            "level": "scaffold",
+            "text": "先放B，再从A和C选下一张。"
+          },
+          {
+            "level": "model",
+            "text": "顺序是B、A、C：掉下、折新纸、再次留住。愿意可以重排一次。"
+          }
+        ],
+        "meaning": [
+          {
+            "level": "cue",
+            "text": "先找第一次小车发生的事。"
+          },
+          {
+            "level": "scaffold",
+            "text": "先放B，再从A和C选下一张。"
+          },
+          {
+            "level": "model",
+            "text": "顺序是B、A、C：掉下、折新纸、再次留住。愿意可以重排一次。"
+          }
+        ],
+        "instruction": [
+          {
+            "level": "cue",
+            "text": "先只弄清要做什么：请按故事顺序排三张卡，可以说字母顺序。"
+          },
+          {
+            "level": "scaffold",
+            "text": "把任务缩成一步：先放B，再从A和C选下一张。"
+          },
+          {
+            "level": "model",
+            "text": "顺序是B、A、C：掉下、折新纸、再次留住。愿意可以重排一次。"
+          }
+        ],
+        "sentence": [
+          {
+            "level": "cue",
+            "text": "可以先用一个英语关键词，不要求完整句；理解可以用中文说明。"
+          },
+          {
+            "level": "scaffold",
+            "text": "先选出你想说的关键词，再用一个短词组表达。先放B，再从A和C选下一张。"
+          },
+          {
+            "level": "model",
+            "text": "顺序是B、A、C：掉下、折新纸、再次留住。愿意可以重排一次。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "L1",
+      "kind": "action",
+      "phase": "listening",
+      "prompt": "请转开文字提示，只听老师说：Put the paper on the books. 实际完成后由家长报告动作。",
+      "next": "O1",
+      "material": null,
+      "rubric": {
+        "expected": "把纸搭在两本书上",
+        "accepted": [
+          "把纸搭在两本书上了",
+          "纸放在书上了",
+          "我把纸放在书上了"
+        ],
+        "rejected": [
+          "指了纸",
+          "拿了书"
+        ],
+        "evidence": [
+          "task:Put the paper on the books."
+        ]
+      },
+      "correction": "这一步需要实际把纸放在书上；跟读不能代替动作。操作困难和听力理解分别保留。",
+      "help": [
+        {
+          "level": "cue",
+          "text": "先听要移动哪一样东西，实际做后报告。"
+        },
+        {
+          "level": "scaffold",
+          "text": "paper是纸，books是书。把纸放到书上。"
+        },
+        {
+          "level": "model",
+          "text": "请实际把纸搭在两本书上；家长可以帮操作，但要说明帮助。"
+        }
+      ],
+      "defer_feedback": false,
+      "help_by_difficulty": {
+        "vocabulary": [
+          {
+            "level": "cue",
+            "text": "先听要移动哪一样东西，实际做后报告。"
+          },
+          {
+            "level": "scaffold",
+            "text": "paper是纸，books是书。把纸放到书上。"
+          },
+          {
+            "level": "model",
+            "text": "请实际把纸搭在两本书上；家长可以帮操作，但要说明帮助。"
+          }
+        ],
+        "meaning": [
+          {
+            "level": "cue",
+            "text": "先听要移动哪一样东西，实际做后报告。"
+          },
+          {
+            "level": "scaffold",
+            "text": "paper是纸，books是书。把纸放到书上。"
+          },
+          {
+            "level": "model",
+            "text": "请实际把纸搭在两本书上；家长可以帮操作，但要说明帮助。"
+          }
+        ],
+        "instruction": [
+          {
+            "level": "cue",
+            "text": "先只弄清要做什么：请转开文字提示，只听老师说：Put the paper on the books. 实际完成后由家长报告动作。"
+          },
+          {
+            "level": "scaffold",
+            "text": "把任务缩成一步：paper是纸，books是书。把纸放到书上。"
+          },
+          {
+            "level": "model",
+            "text": "请实际把纸搭在两本书上；家长可以帮操作，但要说明帮助。"
+          }
+        ],
+        "sentence": [
+          {
+            "level": "cue",
+            "text": "可以先用一个英语关键词，不要求完整句；理解可以用中文说明。"
+          },
+          {
+            "level": "scaffold",
+            "text": "先选出你想说的关键词，再用一个短词组表达。paper是纸，books是书。把纸放到书上。"
+          },
+          {
+            "level": "model",
+            "text": "请实际把纸搭在两本书上；家长可以帮操作，但要说明帮助。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "O1",
+      "kind": "answer",
+      "phase": "oral",
+      "prompt": "Tell me one thing Mia does. 用一个英语词组或短句说她做的一件事。",
+      "next": "T",
+      "material": "A",
+      "rubric": {
+        "expected": "A中一个实际动作",
+        "accepted": [
+          "folds paper",
+          "she folds the paper",
+          "she folds paper",
+          "puts the car on the paper",
+          "she puts the car on the paper",
+          "draws bridges",
+          "she draws bridges"
+        ],
+        "rejected": [
+          "makes a new car",
+          "she makes a new car"
+        ],
+        "evidence": [
+          "A3:She folds a new piece of paper.",
+          "A2:She puts her car on the paper.",
+          "A4:She draws the two bridges for Dad."
+        ]
+      },
+      "correction": "请说故事中实际做过的动作。只说词组也可以，不要求完整句。",
+      "help": [
+        {
+          "level": "cue",
+          "text": "先选一个已经读懂的动作，只说动作词也可以。"
+        },
+        {
+          "level": "scaffold",
+          "text": "可以用She …，补一个读懂的动作；fold是折。"
+        },
+        {
+          "level": "model",
+          "text": "示范She folds the paper. 愿意跟说一次，然后可另选一个动作。"
+        }
+      ],
+      "defer_feedback": true,
+      "help_by_difficulty": {
+        "vocabulary": [
+          {
+            "level": "cue",
+            "text": "先选一个已经读懂的动作，只说动作词也可以。"
+          },
+          {
+            "level": "scaffold",
+            "text": "可以用She …，补一个读懂的动作；fold是折。"
+          },
+          {
+            "level": "model",
+            "text": "示范She folds the paper. 愿意跟说一次，然后可另选一个动作。"
+          }
+        ],
+        "meaning": [
+          {
+            "level": "cue",
+            "text": "先选一个已经读懂的动作，只说动作词也可以。"
+          },
+          {
+            "level": "scaffold",
+            "text": "可以用She …，补一个读懂的动作；fold是折。"
+          },
+          {
+            "level": "model",
+            "text": "示范She folds the paper. 愿意跟说一次，然后可另选一个动作。"
+          }
+        ],
+        "instruction": [
+          {
+            "level": "cue",
+            "text": "先只弄清要做什么：Tell me one thing Mia does. 用一个英语词组或短句说她做的一件事。"
+          },
+          {
+            "level": "scaffold",
+            "text": "把任务缩成一步：可以用She …，补一个读懂的动作；fold是折。"
+          },
+          {
+            "level": "model",
+            "text": "示范She folds the paper. 愿意跟说一次，然后可另选一个动作。"
+          }
+        ],
+        "sentence": [
+          {
+            "level": "cue",
+            "text": "可以先用一个英语关键词，不要求完整句；理解可以用中文说明。"
+          },
+          {
+            "level": "scaffold",
+            "text": "先选出你想说的关键词，再用一个短词组表达。可以用She …，补一个读懂的动作；fold是折。"
+          },
+          {
+            "level": "model",
+            "text": "示范She folds the paper. 愿意跟说一次，然后可另选一个动作。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "T",
+      "kind": "practice",
+      "phase": "practice",
+      "prompt": "选择一个实际困难，回文找依据并练一次。",
+      "candidates": [
+        "R1",
+        "R2",
+        "R3",
+        "O1"
+      ],
+      "default": "O1",
+      "next": "U"
+    },
+    {
+      "id": "U",
+      "kind": "offscreen",
+      "phase": "offscreen",
+      "material": "B",
+      "prompt": "现在离开屏幕，只用新短文B。由家长一次问一题，先收两题原答再反馈。实际做完后报告两题原答和帮助；没做可以跳过。",
+      "questions": [
+        {
+          "id": "U1",
+          "kind": "answer",
+          "phase": "transfer",
+          "prompt": "Which bus stays on the bridge?",
+          "next": null,
+          "material": "B",
+          "rubric": {
+            "expected": "small bus",
+            "accepted": [
+              "small bus",
+              "the small bus",
+              "small",
+              "小的",
+              "小巴士"
+            ],
+            "rejected": [
+              "big",
+              "big bus",
+              "大巴士"
+            ],
+            "evidence": [
+              "B2:He puts the small bus on the bridge. It stays on the paper."
+            ]
+          },
+          "correction": "小巴士留在桥上；请回到small那一段核对。",
+          "help": [
+            {
+              "level": "cue",
+              "text": "回到新短文B，找small和big两次尝试分别发生了什么。"
+            },
+            {
+              "level": "scaffold",
+              "text": "stays是留在上面。看看哪一辆巴士后面写着stays。"
+            },
+            {
+              "level": "model",
+              "text": "The small bus stays on the bridge. 这是小巴士；本题已有示范，不算独立理解。"
+            }
+          ],
+          "defer_feedback": true
+        },
+        {
+          "id": "U2",
+          "kind": "answer",
+          "phase": "transfer",
+          "prompt": "What happens to the big bus?",
+          "next": null,
+          "material": "B",
+          "rubric": {
+            "expected": "falls",
+            "accepted": [
+              "falls",
+              "it falls",
+              "the big bus falls",
+              "掉了",
+              "掉下来"
+            ],
+            "rejected": [
+              "stays",
+              "没掉",
+              "留住"
+            ],
+            "evidence": [
+              "B3:The big bus falls."
+            ]
+          },
+          "correction": "大巴士掉下来了；请回到big那一段核对。",
+          "help": [
+            {
+              "level": "cue",
+              "text": "回到big bus那一段，看它放到纸桥以后发生了什么。"
+            },
+            {
+              "level": "scaffold",
+              "text": "falls是掉下。看big bus之后的句子。"
+            },
+            {
+              "level": "model",
+              "text": "The big bus falls. 大巴士掉下来了；本题已有示范，不算独立理解。"
+            }
+          ],
+          "defer_feedback": true
+        }
+      ],
+      "next": "FEEL"
+    },
+    {
+      "id": "FEEL",
+      "kind": "experience",
+      "phase": "closing",
+      "prompt": "刚才哪种帮助有用？也可以说想换什么，或跳过。",
+      "next": "END"
+    },
+    {
+      "id": "END",
+      "kind": "summary",
+      "phase": "closing",
+      "prompt": "总结实际尝试并提供下节暂时建议，等待实际确认。",
+      "next": null
+    }
+  ]
+}
