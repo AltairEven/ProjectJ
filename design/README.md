@@ -1,6 +1,6 @@
 # Project J 模块设计入口
 
-版本：1.5.0；更新：2026年10月12日；阶段：产品与模块设计。
+版本：1.6.0；更新：2026年10月12日；阶段：产品与模块设计。
 
 Project J 采用家长工作台与学生课堂两种界面，串起准备下一课、备课预览、课堂互动、离屏活动、课后反馈、评价与下节调整。当前梳理职责、流程、输入输出和质量条件，不选择最终技术栈，也不继续实现应用功能。
 
@@ -13,7 +13,7 @@ Project J 采用家长工作台与学生课堂两种界面，串起准备下一�
 | [teacher/](teacher/README.md) | 唯一教师Jane的角色、通用规则、学科/课型策略和反馈迭代 | 有适用范围的教学配置、方法与改进版本 |
 | [curriculum/](curriculum/README.md) | 资料/资源/模板/课程包的版本、复用、呈现与历史更正 | 固定内容及依赖、使用引用、检查范围与更正限制 |
 | [classroom/](classroom/README.md) | 本堂教学核心、统一事件/动作/交付反馈、Harness与收尾 | 允许教学动作、本堂实际事件/条件与结束原因 |
-| [evaluation/](evaluation/README.md) | 课后反馈、事实整理、评价与下节建议 | 课堂报告、学习状态更新依据、下节预期 |
+| [evaluation/](evaluation/README.md) | 课后事实/评价、备课课堂对照、建议与更正回查 | 状态修订依据、下节预期、主责/关联改进与实际处理范围 |
 | [interface/](interface/README.md) | 家长/学生视图、入口适配、具体输入与呈现 | 统一输入/交付反馈、按允许动作呈现和即时控制 |
 | [platform/](platform/README.md) | 模型、语音、多模态、数据存储和通用运行能力 | 可替换的接入与存储能力、通用故障处理 |
 
@@ -28,6 +28,8 @@ Project J 采用家长工作台与学生课堂两种界面，串起准备下一�
 课程与教学内容已细分[分层组织](curriculum/organization.md)、[版本/生命周期](curriculum/versions-lifecycle.md)、[检索与复用](curriculum/discovery-reuse.md)、[素材呈现](curriculum/presentation-resources.md)、[历史与更正](curriculum/history-corrections.md)和[模块交接](curriculum/handoffs.md)。内容库和新状态系统未实现，不改写现有课程或真实历史。
 
 课堂已细分[职责与统一交接](classroom/boundaries-events.md)、[会话/开课](classroom/session-start.md)、[互动/Harness](classroom/interaction-harness.md)、[帮助纠错](classroom/guidance-correction.md)、[材料/离屏](classroom/materials-offscreen.md)、[时间/异常](classroom/time-exceptions.md)和[收尾/交接](classroom/closing-handoffs.md)。核心管理教学，interface适配最终输入/呈现，platform提供技术能力；仅设计，未接入或验证新版运行。
+
+评价已细分[输入/反馈](evaluation/inputs-feedback.md)、[事实/证据](evaluation/facts-evidence.md)、[任务判断](evaluation/assessment.md)、[备课课堂对照](evaluation/lesson-alignment.md)、[下节建议](evaluation/next-lesson.md)、[报告/修订](evaluation/reports-revisions.md)和[模块交接](evaluation/handoffs.md)。学生表现、教学行为与准备/实际差异分别解释，对照保留课前基线并反馈主责/关联；本轮仅设计，未评价真实孩子或实现下游更新。
 
 ## 使用流程与责任归属
 
@@ -58,6 +60,7 @@ platform为这些步骤提供能力，不决定教学目标、难度、评分或
 - 家长不重复填基本信息或手工给能力评级。AI按基础参考推算背景，依据真实反馈维护学习状态；重要方向与预算变化由家长决定。
 - 学习状态覆盖全部学科、跨学科学习能力和综合应用表现；英语优先只影响当前目标与投入。各维度保留实际帮助与证据，同一活动跨维度引用不能增加样本次数，未观察不判失败。
 - 学生学习状态与Jane教学行为分别维护；评价用实际证据支持两类调整。Jane改进兼顾独立能力、保持/迁移、体验与家庭投入，不以顺畅、喜好或完成量代替效果依据。
+- 评价维护有来源事实与任务判断，learning维护状态/计划，teacher维护Jane；备课与实际五维对照区分合理适配、设计/执行问题和未知，反馈主责/关联。覆盖率、顺畅与模型自信不证明效果，保存/下游落实分别报告，更正回查而不重复计样本。
 - LearningWithAI暂保留家庭档案与历史权威；本轮不迁移或回写。未来对接需明确来源、版本、数据责任和验证方法。
 
 ## 现有文件与后续实现
