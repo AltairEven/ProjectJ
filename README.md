@@ -1,6 +1,6 @@
 # Project J
 
-文档版本：1.10.1；原型版本：0.1.0；创建：2026年10月11日；更新：2026年10月12日。J 的灵感来自家长指定的《安德的游戏》中的 AI 智能体 Jane。
+文档版本：1.11.0；原型版本：0.1.0；创建：2026年10月11日；更新：2026年10月12日。J 的灵感来自家长指定的《安德的游戏》中的 AI 智能体 Jane。
 
 J是家长主导和陪伴的家庭AI学习工作台，以唯一教师Jane串起学习规划、备课、课堂、评价与下一课调整。八个模块各自维护业务对象，应用协调层组织完整用例；课堂核心保持教学状态和动作边界，模型在核实课程范围内理解并调整指导。
 
@@ -10,7 +10,8 @@ J是家长主导和陪伴的家庭AI学习工作台，以唯一教师Jane串起�
 - [共同规范](design/shared/README.md)：规范权威、当前阶段、真实数据权威与新旧设计关系。
 - [应用协调层](design/application/README.md)：备课、开课、结束封存、反馈、更正、复盘及失败接续。
 - [完整时序与异常案例](design/shared/end-to-end-cases.md)：E2E01逐步对象链和19个未来验收案例。
-- [产品范围](docs/product.md)、[验收标准](docs/acceptance.md)、[路线](docs/roadmap.md)。
+- [最小可用版本](docs/mvp.md)、[技术选型](docs/technology.md)、[分阶段实现计划](docs/roadmap.md)：已采用的首版范围、实施基线与阶段关卡。
+- [产品范围](docs/product.md)、[验收标准](docs/acceptance.md)：质量门槛与进入儿童试教的前提。
 
 目标设计采用课堂结束时封存已取得事实，家长当时或稍后追加反馈；事实保存、评价和计划更新分别显示。规则及失败边界只在[共同执行](design/shared/execution-recovery.md)维护，本次决定见[ADR-0010](decisions/ADR-0010.md)。
 
@@ -76,4 +77,4 @@ node --test tests/browser_control.test.js
 
 测试不调用真实模型或音频。运行状态只在内存，重启丢失；本版不做课中持久化或自动恢复。结束后报告保存在.data/adult，可另行导出。整个原型只用于成人检查，不维护孩子的能力或进度。
 
-当前从[模块设计](design/README.md)逐项梳理使用流程、职责、输入输出和质量标准，再决定技术实现。[开发路线](docs/roadmap.md)与[验收标准](docs/acceptance.md)保留参考；[原型架构](docs/architecture.md)和[开发验证报告](docs/validation-2026-10-11.md)只说明已有实验实现，产品范围见[产品说明](docs/product.md)。
+目标应用的[模块设计](design/README.md)、[首版范围](docs/mvp.md)及[技术基线](docs/technology.md)已采用，按[开发路线](docs/roadmap.md)逐阶段取得[验收依据](docs/acceptance.md)后推进；实施尚待启动。[原型架构](docs/architecture.md)和[开发验证报告](docs/validation-2026-10-11.md)只说明已有实验实现，产品范围见[产品说明](docs/product.md)。
