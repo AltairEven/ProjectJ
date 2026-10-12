@@ -1,6 +1,6 @@
 # 课堂输入提交规则
 
-版本：1.0.1；更新：2026年10月12日；范围：交互合同。
+版本：1.1.0；更新：2026年10月12日；范围：交互合同与P0提交字段。
 
 interface的输入适配器维护从采集到提交的唯一流程，platform提供技术信号，classroom接收已提交事件并解释教学含义。所有入口遵守本规则；识别片段、最终转写、已提交输入与语义完整回答是不同状态。
 
@@ -53,3 +53,19 @@ interface保留新输入身份、原任务联系和实际交付状态，不自�
 每次提交可追溯到输入身份、任务、策略版本、结束触发方式、最终识别范围、实际接收及更正；不新增原始音频归档。输入日志在课中仅必要内存，结束封存按[共同执行](../shared/execution-recovery.md)。
 
 检查覆盖一句自然回答自动提交、句中停顿继续说、最终识别迟到、改口、自我补充、重复网络请求、教师回声、切题后的旧转写、播放中停止和离屏返回。程序模拟与真实语音分别给出结果，见[异常案例](../shared/end-to-end-cases.md)。
+
+## P0提交接口最小字段
+
+`SubmittedInput`只承载已完成提交，识别片段使用独立技术事件，不可调用此入口。共同身份/来源按[共同合同](../shared/business-contracts.md#p0最小对象字段与版本关系)。
+
+| 字段组 | 最小字段与校验 |
+| --- | --- |
+| 固定联系 | event_id、activity_id、learner_id、realm/source_type、task_instance_id、wait_id、expected_core_revision、cancellation_epoch、client_sequence、input_policy_ref；顺序用于回查，去重用身份 |
+| 原取得内容 | modality、text或可获取content_ref、provider/actor_role及未知、occurred_at/received_at、用途intent（自然表达可unknown）；文字必须明确submit，动作/离屏必须实际报告 |
+| 完成依据 | completion_trigger（explicit/vad_window）、candidate_end_ms、window_elapsed、recognition_final、recognition_item_ids及revision、input_started_ms；仅语音自动路径同时要求窗口到期/最终齐/无续说取消，不以final单信号提交 |
+| 联系与更正 | relation（new/supplement/recognition_revision）、related_event_id、对应原语段的核对依据；补充/修订另有event_id保留原输入，关系由核心依实际交付裁定 |
+| 受理回执 | accepted_event_id、accepted/replayed/rejected/needs_clarification、核心当前引用、尝试引用或无尝试、原因及下一步；accepted不表示正确/独立 |
+
+适配器先在内存固定一份提交正文再发送，重复用同ID和正文；同ID不同正文拒绝，真正更正另建事件回连原输入。task/wait/core_revision过期时普通提交拒绝/核对；当前活动的明确停止单走控制接口，不受这些字段阻挡。
+
+提交后识别修订不重放评分控制器；核心核对原事件、当时任务与已交付帮助，只更正受影响解释。补充在原回应尚未交付时取消旧待动作，交付未知则澄清，不洗成独立初答。当前阶段P0只校验提交条件/字段，自动VAD与实际语音策略仍未验证。

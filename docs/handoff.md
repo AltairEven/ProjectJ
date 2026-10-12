@@ -1,12 +1,12 @@
 # 开发交接记录
 
-版本：1.0.0；更新：2026年10月12日。
+版本：1.1.0；更新：2026年10月12日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#双模型协作)。每批一节，只记范围、负责、文件、验收、状态和待解决问题；业务规则引用权威文件，不在此复制。主实现者维护本批内容；状态为“待审查”时由审查者追加审查小节，其余时间审查者不改本文件。
 
 ## P0 阶段0：确认边界与接入
 
-- 状态：待开始（2026年10月12日交接）。
+- 状态：进行中（2026年10月12日，家长已下达P0实现请求）。
 - 主实现与集成：GPT Sol；独立审查：Claude Opus，审查未进行。
 - 依据：[路线阶段0](roadmap.md#阶段0的具体产物)、[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)，以及家长下达的阶段0任务说明。
 
@@ -60,7 +60,13 @@ GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.m
 
 ### 进展
 
-（主实现者填写）
+- 接手核对：工作区干净，HEAD为1d4e2d0；CLAUDE.md确为AGENTS.md软链。未查阅或迁移原型，未访问旧项目真实资料。
+- 小批次安排：P0a细化共同对象/接口/恢复合同；P0b建立项目级Python环境、锁文件和离线合同/测量/探针检查；P0c复核接入事实、阶段1切片及交付范围。每批检查暂存差异后本地提交。
+- 验收：临时目录、明确模拟与mock；P0只验证合同与工具，不执行完整E2E01，不把SDK mock或计时样本称为实际接入。外部缺口最后集中登记。
+- 计划内具体文件：design/shared/{README,business-contracts,execution-recovery,end-to-end-cases}.md、design/application/README.md、design/interface/input-submission.md、design/classroom/boundaries-events.md、design/platform/{storage-lifecycle,configuration-permissions,realtime-voice}.md、docs/{technology,roadmap,acceptance,handoff}.md、README.md、AGENTS.md、project_j/**。根README同步实施状态；其余未列文件如需修改先登记。
+- 官方文档复核发现TTS已选快照存在2027年1月6日停用通知；不自行替换基线，接入核对中记录风险及最小待决定方案。
+- P0a：已在shared权威文件细化对象信封、E2E01各对象/版本/维护者、核心状态与发布核对、请求去重/回执未知/有限重试；在interface/classroom落实提交、动作、实际交付和优先停止字段。固定首课与C2参考输入，课程原件未改；存储路径确定，实际数据库未建。
+- P0a检查：Git差异及空白检查通过；跨文件逐项内容/引用核对，完整E2E01和真实接口未执行。
 
 ### 审查
 

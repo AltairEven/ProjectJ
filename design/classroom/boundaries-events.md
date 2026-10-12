@@ -1,6 +1,6 @@
 # 课堂核心、交互层与统一交接
 
-文档版本：1.3.1；更新：2026年10月12日；范围：逻辑设计，未实现。
+文档版本：1.4.0；更新：2026年10月12日；范围：逻辑设计与P0接口，课堂未实现。
 
 classroom管理教学含义与本堂状态，interface管理交互适配，platform提供技术能力。网页、手机、纯语音或未来其他入口可接入同一课堂核心。
 
@@ -63,3 +63,15 @@ interface不必须先替课堂判断自然语言意图；“我不知道”“�
 互动与异常见[interaction-harness.md](interaction-harness.md)、[time-exceptions.md](time-exceptions.md)，最终事实与交接见[closing-handoffs.md](closing-handoffs.md)。
 
 [基础服务交接](../platform/handoffs.md)提供同活动/任务/动作的实际结果、版本、权限、期限和取消；[语音路径](../platform/realtime-voice.md)把完成输入自动送核心，批准教学文本后合成，未允许片段不先发声。核心仍是状态权威，技术会话与教学活动分开，实际交付不自动确认收到。
+
+## P0动作、交付与控制接口
+
+接口逻辑使用[共同身份/核心修订](../shared/business-contracts.md#核心状态与等待对象)，从同一核心导出，HTTP/WS序列化不得另加教学规则。
+
+- `ModelProposal`连接model_request_id、A/Q/wait/core_revision/取消代次、输入修订，包含判断/核实依据/未知、一个回应目的及拟议动作。不能修改状态/等待、长期对象或材料权限。Harness拒绝越界、依据不够及过期提案；只有核对后的`AllowedAction`可交付。
+- `AllowedAction`包含action_id、上述绑定、文本/内容确切版本、受众/媒介、动作种类、帮助分维度及允许分支、执行依赖、下一等待和备用/取消。动作重发按action_id去重，重播须核心允许并另列实际交付身份；不新增尝试。
+- `DeliveryFeedback`包含delivery_event_id、delivery_id/action_id、A/Q、output_device_id、媒介和内容修订、started/partial/completed/failed/cancelled/interrupted/unknown、实际时间与delivered_range（已知内容单元或unknown）。按每个delivery递增sequence去重/排序，不能用较早completed覆盖较新interrupted；技术生成完成无已交付范围。停止后到达的报告仅回查真实范围，不再安排播放或转场。
+- `ControlRequest`包含event_id、activity_id、权限/来源、stop/pause/resume及明确识别依据。直接按钮与可靠明确语音控制无需教学模型；UI先停本端，再同步核心，分别回报local_cancelled/core_acknowledged/unknown。stop即刻结束教学并提高取消代次；pause仍为内存活动，不能偷偷封存；resume由核心检查原状态与实际能力，结束后不可恢复。
+- 收到确认经`SubmittedInput`关联必要动作/等待；理解依据任务尝试。播放完成不制造确认事件，确认也不制造理解结论。
+
+P0独立守卫只验证身份、过期、未批准与停止后交付条件；完整状态机、真实取消/播放反馈、按题分支及业务语义分别在阶段1—3实现验收。
