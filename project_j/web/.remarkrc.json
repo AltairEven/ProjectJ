@@ -1,0 +1,11 @@
+{
+  "plugins": [
+    [
+      "remark-validate-links",
+      {
+        "root": "../..",
+        "repository": false
+      }
+    ]
+  ]
+}

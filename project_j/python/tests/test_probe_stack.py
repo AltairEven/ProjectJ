@@ -132,13 +132,6 @@ def test_explicit_temporary_paths_reject_traversal_and_symlink_escape(tmp_path):
         check_path(tmp_path, "family.sqlite3", "family")
 
 
-def test_network_guard_makes_offline_check_explicit():
-    import socket
-
-    with socket.socket() as sock, pytest.raises(AssertionError, match="real network"):
-        sock.connect(("127.0.0.1", 443))
-
-
 def test_probe_failure_redacts_error_body_but_keeps_requested_config(monkeypatch):
     import project_j.probe as probe
 

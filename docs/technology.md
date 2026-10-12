@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.1.0；更新：2026年10月12日；状态：实施基线已采用，P0环境已验证，真实接入未验证。
+版本：1.1.1；更新：2026年10月12日；状态：实施基线已采用，P0环境已验证，真实接入未验证。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -74,10 +74,10 @@ Skills用于开发、备课及维护工序；运行时依赖版本化策略、�
 | 项目 | 固定版本/路径 | P0实际证据与限制 |
 | --- | --- | --- |
 | Python | CPython3.14.4；project_j/python/.python-version；project_j/.python及python/.venv | 实际安装、锁定同步、Ruff/pytest通过；不用系统3.9，不改全局设置 |
-| Python库 | FastAPI0.143.0、Pydantic2.14.1、SQLAlchemy2.1.4、Alembic1.20.0、OpenAI3.29.0；pytest9.1.1、Ruff0.17.0 | uv.lock锁全部传递依赖及hash；Pydantic/FastAPI导出、SDK mock、临时SQLite事务验证。尚无应用迁移/服务 |
+| Python库 | FastAPI0.143.0、Pydantic2.14.1、SQLAlchemy2.1.4、Alembic1.20.0、OpenAI3.29.0；开发测试依赖见uv.lock | uv.lock锁运行/开发依赖及hash；uv_build0.11.11在build-system精确固定，使用uv内置后端。Pydantic/FastAPI导出、SDK mock、临时SQLite事务验证；无应用迁移/服务 |
 | SQLite | 本解释器3.50.4 | 临时库回滚验证；正式存储、备份恢复待阶段1 |
-| Node/npm | Node26.11.1、npm11.20.0；project_j/.node-version及web/package.json | 实际读取版本；未更新本机全局工具 |
-| 页面基础库 | React/ReactDOM19.3.0、TypeScript7.0.2、Vite8.3.4、React类型19.3.0 | web/package-lock.json锁定；npm ci禁安装脚本、依赖导入和独立React类型编译通过；没有应用页或浏览器行为验收 |
+| Node/npm | Node26.11.1、npm11.20.0；web/package.json的devEngines（onFail=error） | 实际读取版本；未更新本机全局工具 |
+| 页面基础库 | React/ReactDOM19.3.0、TypeScript7.0.2、Vite8.3.4、React类型19.3.0 | web/package-lock.json锁定；React/ReactDOM为dependencies，类型/TypeScript/Vite及remark为devDependencies。npm ci禁安装脚本、tsconfig独立React类型检查；没有应用页或浏览器行为验收 |
 | 浏览器候选 | 本机macOS26.6.2/build25G83，Chrome154.0.8037.98 | 从本机系统/应用元数据读取；家长已选择内置麦克风＋内置扬声器；Chrome为本批拟定浏览器，实际许可/试听/回声与打断仍未验证，不能称声音已接入 |
 
 Python3.14仍为受维护系列；官方已经发布安全补丁3.14.8。本机uv0.11.11内置清单无3.14.8下载，尝试官方uv远端下载元数据路径返回404，故当前pin3.14.4只用于隔离P0/P1验证；真实接入前更新到可取得的最新安全补丁并重跑相关检查，不静默沿用旧补丁。[Python3.14.8发布](https://www.python.org/downloads/release/python-3148/)、[uv下载元数据设置](https://docs.astral.sh/uv/reference/settings/#python-downloads-json-url)
@@ -86,11 +86,11 @@ Python3.14仍为受维护系列；官方已经发布安全补丁3.14.8。本机u
 
 ### 独立探针与真实接入入口
 
-`project_j/scripts/probe.py`默认离线，不载入.env，不连接服务、不读取麦克风；只返回配置目标与密钥是否存在。显式真实入口在具备账号/权限后使用以下两条，每条一份固定虚构技术样本；标签是非秘密识别名，密钥从后端进程环境提供，不放命令正文或Git。
+`project-j-probe`默认离线，不载入.env，不连接服务、不读取麦克风；只返回配置目标与密钥是否存在。显式真实入口在具备账号/权限后使用以下两条，每条一份固定虚构技术样本；标签是非秘密识别名，密钥从后端进程环境提供，不放命令正文或Git。
 
 ```sh
-project_j/scripts/uv.sh run --offline --locked --project project_j/python python project_j/scripts/probe.py --live --effort low --account-label adult-dev --project-label project-j-dev
-project_j/scripts/uv.sh run --offline --locked --project project_j/python python project_j/scripts/probe.py --live --effort medium --account-label adult-dev --project-label project-j-dev
+project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-probe --live --effort low --account-label adult-dev --project-label project-j-dev
+project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-probe --live --effort medium --account-label adult-dev --project-label project-j-dev
 ```
 
 本批没有执行--live。SDK请求指定gpt-6.1-sol、reasoning.effort、default层级、store=false与结构化格式，自动重试关闭；输出请求/返回配置、UTC时间、样本、结果/未知、request_id、可取得用量和后台耗时。返回模型/effort/层级缺失或不符不能通过配置核验，不能靠提示词宣称Low。此单请求耗时不是声音延迟；完整参考题集语义验证、课堂总期限/取消和Medium实际内容核验另做。
@@ -115,3 +115,5 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python python
 官方停用表于2026年10月1日公告gpt-4o-mini-tts的2025-03-20和2025-12-15两个快照将于2027年1月6日停用，并推荐gpt-realtime-2.1-mini；TTS指南仍有原模型示例，当前alias的具体路由/账户可用性**未验证**。[停用公告](https://developers.openai.com/api/docs/deprecations)、[TTS指南](https://developers.openai.com/api/docs/guides/text-to-speech)
 
 最小提案：真实合成验证时增加该候选的成人对照，要求只能交付Harness已批准文本、实际内容/首播范围可核对、取消和迟到可靠，并重新核对费用/数据覆盖；取得结果后向家长提出具体替换配置。当前不替换gpt-4o-mini-tts、不引入自主语音教师，阶段1仍以模拟合成交付验证同一接口。此提案尚待家长确认，候选官方推荐不表示J条件已满足。
+
+P0-R1按Opus工程审查采用安装后的project-j-probe/project-j-measure入口，不修改src搜索路径；Python版本由.python-version维护。pytest-socket负责禁网，httpx2为显式开发依赖；文档检查交remark/unified-engine/remark-validate-links官方API，未配远程origin时关闭其repository探测，仍检查本地文件与标题。初试remark-cli时审计发现其监听依赖含无补丁braces告警，故删除CLI及监听依赖；不降级、不强制跨主版本覆盖、不恢复自制链接规则。实际检查和有限审查范围见[交接](handoff.md#p0-r1-工具清理)。

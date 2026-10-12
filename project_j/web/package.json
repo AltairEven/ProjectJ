@@ -4,16 +4,34 @@
   "private": true,
   "description": "P0 dependency baseline only; no application or lesson entry",
   "packageManager": "npm@11.20.0",
-  "engines": {
-    "node": "26.11.1",
-    "npm": "11.20.0"
-  },
   "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "26.11.1",
+      "onFail": "error"
+    },
+    "packageManager": {
+      "name": "npm",
+      "version": "11.20.0",
+      "onFail": "error"
+    }
+  },
+  "devDependencies": {
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
+    "remark": "^15.0.1",
+    "remark-validate-links": "^13.1.0",
     "typescript": "^7.0.2",
+    "unified-engine": "^11.2.2",
     "vite": "^8.3.4"
+  },
+  "scripts": {
+    "check:types": "tsc --noEmit -p tsconfig.json",
+    "test:docs": "node --test check_docs.test.mjs",
+    "check:docs": "node check_docs.mjs"
   }
 }

@@ -1,5 +1,7 @@
 """Opt-in, synthetic single-request Responses probe; no microphone or child inputs."""
 
+import argparse
+import json
 import os
 import time
 from datetime import UTC, datetime
@@ -124,3 +126,24 @@ def live_probe(effort: Literal["low", "medium"], account_label: str, project_lab
             "qualification": "not_granted",
         }
     return result | {"account_label": account_label, "project_label": project_label}
+
+
+def main() -> int:
+    """Offline by default; --live explicitly opts into one paid synthetic API request."""
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("--live", action="store_true")
+    parser.add_argument("--effort", choices=["low", "medium"], default="low")
+    parser.add_argument("--account-label")
+    parser.add_argument("--project-label")
+    args = parser.parse_args()
+    if args.live and (not args.account_label or not args.project_label):
+        parser.error(
+            "--live requires nonsecret --account-label and --project-label; no keys in labels"
+        )
+    result = (
+        live_probe(args.effort, args.account_label, args.project_label)
+        if args.live
+        else preflight()
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 2 if args.live and not result.get("api_smoke_ok") else 0

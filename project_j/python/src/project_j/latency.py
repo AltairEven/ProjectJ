@@ -1,6 +1,9 @@
 """Analyze post-run measurements. Never captures audio or estimates actual playback."""
 
+import argparse
+import json
 from math import ceil, isfinite
+from pathlib import Path
 from statistics import median
 from typing import Literal, Self
 
@@ -104,6 +107,7 @@ class MeasurementRun(Contract):
 
 def summarize(run: MeasurementRun) -> dict:
     values = sorted(r.effective_latency_ms for r in run.rounds)
+    # Nearest-rank P95 keeps failures (inf) in the denominator and slowest tail.
     p50, p95 = median(values), values[ceil(0.95 * len(values)) - 1]
     failed = sum(r.outcome != "effective" for r in run.rounds)
     timeout_control_ok = all(
@@ -150,3 +154,13 @@ def _ready(r: RoundMeasurement) -> float | None:
 
 def _elapsed(end: float | None, start: float | None) -> float | None:
     return None if end is None or start is None else end - start
+
+
+def main() -> int:
+    """Post-run analysis only; does not collect or write runtime data."""
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("measurements", type=Path)
+    args = parser.parse_args()
+    run = MeasurementRun.model_validate_json(args.measurements.read_text())
+    print(json.dumps(summarize(run), ensure_ascii=False, indent=2, allow_nan=False))
+    return 0
