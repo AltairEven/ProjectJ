@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.1.1；更新：2026年10月12日；状态：实施基线已采用，P0环境已验证，真实接入未验证。
+版本：1.2.0；更新：2026年10月13日；状态：实施基线已采用，P1隔离工程已实现，真实接入未验证。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -74,7 +74,7 @@ Skills用于开发、备课及维护工序；运行时依赖版本化策略、�
 | 项目 | 固定版本/路径 | P0实际证据与限制 |
 | --- | --- | --- |
 | Python | CPython3.14.4；project_j/python/.python-version；project_j/.python及python/.venv | 实际安装、锁定同步、Ruff/pytest通过；不用系统3.9，不改全局设置 |
-| Python库 | FastAPI0.143.0、Pydantic2.14.1、SQLAlchemy2.1.4、Alembic1.20.0、OpenAI3.29.0；开发测试依赖见uv.lock | uv.lock锁运行/开发依赖及hash；uv_build0.11.11在build-system精确固定，使用uv内置后端。Pydantic/FastAPI导出、SDK mock、临时SQLite事务验证；无应用迁移/服务 |
+| Python库 | FastAPI0.143.0、Pydantic2.14.1、SQLAlchemy2.1.4、Alembic1.20.0、OpenAI3.29.0；开发测试依赖见uv.lock | uv.lock锁运行/开发依赖及hash；uv_build0.11.11在build-system精确固定，使用uv内置后端。Pydantic/FastAPI导出、SDK mock、临时SQLite事务验证；P1有隔离Alembic迁移及loopback服务 |
 | SQLite | 本解释器3.50.4 | 临时库回滚验证；正式存储、备份恢复待阶段1 |
 | Node/npm | Node26.11.1、npm11.20.0；web/package.json的devEngines（onFail=error） | 实际读取版本；未更新本机全局工具 |
 | 页面基础库 | React/ReactDOM19.3.0、TypeScript7.0.2、Vite8.3.4、React类型19.3.0 | web/package-lock.json锁定；React/ReactDOM为dependencies，类型/TypeScript/Vite及remark为devDependencies。npm ci禁安装脚本、tsconfig独立React类型检查；没有应用页或浏览器行为验收 |
@@ -101,7 +101,7 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python projec
 
 | 项目 | 官方说明/实际状态 | 继续条件 |
 | --- | --- | --- |
-| Sol Low/Medium | 官方模型页支持两档及结构化输出；本机仅SDK mock通过，实际API**未验证** | API项目/密钥、模型权限/账单范围具备后分别运行探针；课堂参考题集与Medium内容另验 |
+| Sol Low/Medium | 官方模型页支持两档及结构化输出；本机仅SDK mock通过，实际API**未验证** | API项目/密钥、模型权限、费用归属与测试预算具备后分别运行探针；课堂参考题集与Medium内容另验 |
 | 服务层级 | 官方列fast=标准2倍、ultrafast=6倍；本批只声明default，实际计费/可用性**未验证** | 记录返回层级/用量；更高成本层级待家长按实际成本决定，不为延迟暗改 |
 | 转写WebRTC | 官方推荐gpt-live-transcribe，客户端commit且无server_vad/semantic_vad；本批未建音频连接 | 保留首选候选，成人实测临时凭据/连接/会话配置/最终item_id映射、客户端VAD和回声后再固定协议/窗口 |
 | 凭据/数据条件 | 官方WebRTC示例有client_secrets及calls；数据控制保留表未单列这些或transcription_sessions。该页区域服务清单提到transcription_sessions，不能由此推断ZDR覆盖 | 实际组织/项目ZDR批准与所选模型/端点/功能/地区覆盖**待核实**；儿童入口关闭 |
@@ -117,3 +117,15 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python projec
 最小提案：真实合成验证时增加该候选的成人对照，要求只能交付Harness已批准文本、实际内容/首播范围可核对、取消和迟到可靠，并重新核对费用/数据覆盖；取得结果后向家长提出具体替换配置。当前不替换gpt-4o-mini-tts、不引入自主语音教师，阶段1仍以模拟合成交付验证同一接口。此提案尚待家长确认，候选官方推荐不表示J条件已满足。
 
 P0-R1按Opus工程审查采用安装后的project-j-probe/project-j-measure入口，不修改src搜索路径；Python版本由.python-version维护。pytest-socket负责禁网，httpx2为显式开发依赖；文档检查交remark/unified-engine/remark-validate-links官方API，未配远程origin时关闭其repository探测，仍检查本地文件与标题。初试remark-cli时审计发现其监听依赖含无补丁braces告警，故删除CLI及监听依赖；不降级、不强制跨主版本覆盖、不恢复自制链接规则。实际检查和有限审查范围见[交接](handoff.md#p0-r1-工具清理)。
+
+## P1隔离运行与生成工具
+
+FastAPI单后端仅监听127.0.0.1，Vite产物和固定材料在课堂开始前读入内存；课堂中的数据库/固定文件/导出/备份访问禁止。家长临时访问能力和单活动学生访问能力分开，学生不获取简报/答案/帮助分支。配置由pydantic-settings载入PROJECT_J_前缀，默认不读.env，提供者和数据空间固定模拟；设置课堂low/课后medium只说明目标配置，不冒称真实请求参数已生效。
+
+Python新增pydantic-settings2.15.0、tenacity9.2.1、uvicorn0.54.0、websockets17.2，由uv.lock固定。保存使用SQLAlchemy/Alembic/SQLite约束；只有明确未提交的临时失败用tenacity限定次数与原期限，其他保存未知先查询。原P0 guards.py已删除，课堂判断与相关测试在真实调用的Harness边界。
+
+前端采用官方Vite react-ts模板；应用保留TypeScript7.0.2。类型生成需要编译器API，因此web/codegen单独锁TypeScript6.0.3/Hey API0.99.0；解析器同系列固定1.4.1，避免1.4.4的js-yaml4已知告警，不使用force、legacy-peer-deps或跨主版替换。它只读取本地导出JSON并生成类型；两份锁、生成/编译/构建及审计均需检查，完整证据见[交接](handoff.md)。
+
+当前模拟无需API账号、密钥或预算。未来“账号条件”指J实际调用所用的API组织/项目、调用凭据、模型/语音权限及费用归属；“账单范围”应理解为允许的调用与测试预算，不要求开放账单管理权限。账户的数据处理资格另验，开发代理的登录不自动授予J调用或儿童用途资格。
+
+本机工作台/单活动学生的临时访问令牌只用于J的loopback访问控制，不是服务商API密钥，不代表模型权限或产生模型调用费用。
