@@ -1,6 +1,6 @@
 # Project J 验收标准
 
-版本：1.10.0；更新：2026年10月12日。
+版本：1.10.1；更新：2026年10月12日。
 
 本文件维护检查层次与范围；验收报告、证据归属、资格及失效规则统一在[应用层验收管理](../design/application/acceptance.md)。项目阶段与数据权威见[共同入口](../design/shared/README.md)。以下0.1结果只描述已有原型，不证明新设计通过。
 
@@ -19,18 +19,19 @@
 
 ## 跨模块验收
 
-[完整时序及18个案例](../design/shared/end-to-end-cases.md)全部尚未执行。先在隔离模拟空间跑通E2E01的命名对象链，再验证异常；真实接口、声音与完整成人流程另取实际证据。
+[完整时序及19个案例](../design/shared/end-to-end-cases.md)全部尚未执行。先在隔离模拟空间跑通E2E01的命名对象链，再验证异常；真实接口、声音与完整成人流程另取实际证据。
 
 | 范围 | 案例/设计入口 | 必须验证 |
 | --- | --- | --- |
 | 完整闭环 | E2E01、02；[共同合同](../design/shared/business-contracts.md) | 原答、帮助、版本、建议采纳、有效状态/计划/需求和下一包可回查 |
 | 结束封存和部分失败 | E2E03—05、09 | 不等家长或模型；保存成功才承诺重启可读，停止不等保存，未知查原操作 |
 | 来源更正、内容适配、目录 | E2E06—08、10、12 | 原活动不重放/重复计样本，相关限制和解除有据，成人与真实数据隔离 |
-| 语义与输入 | E2E11、13；[提交规则](../design/interface/input-submission.md) | 合理变式/错误/未知，停顿/改口/回声/迟到不误评分，控制优先 |
+| 语义与输入 | E2E11、13；[提交规则](../design/interface/input-submission.md) | 合理变式/错误/未知，停顿/改口/回声/迟到不误评分；补充、帮助后再试、识别修订可区分，控制优先 |
 | 本次启动 | E2E14；[判定表](../design/classroom/session-start.md) | 来源、范围、版本冲突正确处理；必要失败不可由家长勾选覆盖 |
 | 计划和具体方案 | E2E15、16；[复盘](../design/learning/plan-review.md) | 到期不等于完成，分层调整，方案过期/并发与失败接续 |
 | 运行归因和资格 | E2E17；[验收管理](../design/application/acceptance.md) | 运行变化或未知纳入解释，受影响资格复核，不能归咎孩子 |
-| 待反馈继续 | E2E18 | 有据范围可更新；必要条件不明补问或换路径，后来反馈修订依赖 |
+| 待反馈继续与调用复用 | E2E18 | 仅明确稍后反馈且当前用途确需时评价；正常反馈不先评两次，重开复用，反馈并发不覆盖新来源 |
+| 学习者范围 | E2E19；[档案归属](../design/learning/profile.md) | 个人状态/复盘/待办和迟到结果隔离，共享内容/技术检查不转移个人资格 |
 
 模块细节场景继续由[学习](../design/learning/handoffs.md)、[Jane](../design/teacher/handoffs.md)、[备课](../design/preparation/readiness.md)、[内容](../design/curriculum/handoffs.md)、[课堂](../design/classroom/closing-handoffs.md)、[评价](../design/evaluation/handoffs.md)、[界面](../design/interface/handoffs.md)、[平台](../design/platform/handoffs.md)维护，本文件不复制其规则。
 
