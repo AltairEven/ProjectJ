@@ -1,0 +1,14 @@
+.python/
+.cache/
+private/
+.venv/
+.ruff_cache/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.sqlite3*
+*.db*
+*.egg-info/
+dist/
+build/
+node_modules/

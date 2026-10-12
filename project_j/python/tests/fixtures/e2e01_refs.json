@@ -1,0 +1,588 @@
+[
+  {
+    "object_id": "S1",
+    "revision": 1,
+    "kind": "state",
+    "owner": "learning",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "S2",
+    "revision": 1,
+    "kind": "state",
+    "owner": "learning",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "S1",
+        "revision": 1
+      },
+      {
+        "object_id": "E1",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "PL1",
+    "revision": 1,
+    "kind": "plan",
+    "owner": "learning",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "D1",
+    "revision": 1,
+    "kind": "demand",
+    "owner": "learning",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "S1",
+        "revision": 1
+      },
+      {
+        "object_id": "PL1",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "D2",
+    "revision": 1,
+    "kind": "demand",
+    "owner": "learning",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "S2",
+        "revision": 1
+      },
+      {
+        "object_id": "PL1",
+        "revision": 1
+      },
+      {
+        "object_id": "N1",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "J1",
+    "revision": 1,
+    "kind": "jane",
+    "owner": "teacher",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": null,
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "C1",
+    "revision": 1,
+    "kind": "course",
+    "owner": "curriculum",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "D1",
+        "revision": 1
+      },
+      {
+        "object_id": "S1",
+        "revision": 1
+      },
+      {
+        "object_id": "PL1",
+        "revision": 1
+      },
+      {
+        "object_id": "J1",
+        "revision": 1
+      },
+      {
+        "object_id": "B1",
+        "revision": 1
+      },
+      {
+        "object_id": "M1",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "C2",
+    "revision": 1,
+    "kind": "course",
+    "owner": "curriculum",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "D2",
+        "revision": 1
+      },
+      {
+        "object_id": "S2",
+        "revision": 1
+      },
+      {
+        "object_id": "PL1",
+        "revision": 1
+      },
+      {
+        "object_id": "J1",
+        "revision": 1
+      },
+      {
+        "object_id": "B2",
+        "revision": 1
+      },
+      {
+        "object_id": "M2",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "B1",
+    "revision": 1,
+    "kind": "brief",
+    "owner": "curriculum",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "D1",
+        "revision": 1
+      },
+      {
+        "object_id": "J1",
+        "revision": 1
+      },
+      {
+        "object_id": "M1",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "B2",
+    "revision": 1,
+    "kind": "brief",
+    "owner": "curriculum",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "D2",
+        "revision": 1
+      },
+      {
+        "object_id": "J1",
+        "revision": 1
+      },
+      {
+        "object_id": "M2",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "M1",
+    "revision": 1,
+    "kind": "material",
+    "owner": "curriculum",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": null,
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "M2",
+    "revision": 1,
+    "kind": "material",
+    "owner": "curriculum",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": null,
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "CFG1",
+    "revision": 1,
+    "kind": "config",
+    "owner": "platform",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": null,
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "IS1",
+    "revision": 1,
+    "kind": "input_policy",
+    "owner": "interface",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": null,
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "VR1",
+    "revision": 1,
+    "kind": "validation",
+    "owner": "application",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": null,
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "R1",
+    "revision": 1,
+    "kind": "start",
+    "owner": "classroom",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "D1",
+        "revision": 1
+      },
+      {
+        "object_id": "C1",
+        "revision": 1
+      },
+      {
+        "object_id": "CFG1",
+        "revision": 1
+      },
+      {
+        "object_id": "IS1",
+        "revision": 1
+      },
+      {
+        "object_id": "VR1",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "A1",
+    "revision": 1,
+    "kind": "activity",
+    "owner": "classroom",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "R1",
+        "revision": 1
+      },
+      {
+        "object_id": "C1",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "F1",
+    "revision": 1,
+    "kind": "fact",
+    "owner": "evaluation",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "A1",
+        "revision": 1
+      },
+      {
+        "object_id": "C1",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "FB1",
+    "revision": 1,
+    "kind": "feedback",
+    "owner": "evaluation",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "F1",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "E1",
+    "revision": 1,
+    "kind": "evaluation",
+    "owner": "evaluation",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "F1",
+        "revision": 1
+      },
+      {
+        "object_id": "FB1",
+        "revision": 1
+      },
+      {
+        "object_id": "C1",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "N1",
+    "revision": 1,
+    "kind": "suggestion",
+    "owner": "evaluation",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "E1",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  },
+  {
+    "object_id": "REP1",
+    "revision": 1,
+    "kind": "report",
+    "owner": "evaluation",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "isolated-reference-fixture",
+    "occurred_at": "2026-10-12T12:00:00+08:00",
+    "created_at": "2026-10-12T12:00:00+08:00",
+    "source_revision": 1,
+    "operation_id": "OP-fixture",
+    "dependency_refs": [
+      {
+        "object_id": "E1",
+        "revision": 1
+      },
+      {
+        "object_id": "S2",
+        "revision": 1
+      },
+      {
+        "object_id": "PL1",
+        "revision": 1
+      },
+      {
+        "object_id": "D2",
+        "revision": 1
+      },
+      {
+        "object_id": "C2",
+        "revision": 1
+      }
+    ],
+    "limitations": [
+      "Expected reference skeleton; not persisted or executed."
+    ]
+  }
+]

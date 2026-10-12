@@ -1,0 +1,82 @@
+[
+  {
+    "id": "R1-en",
+    "source_type": "simulated",
+    "question": "What does Mia want to make?",
+    "input": "a bridge",
+    "expected": "correct",
+    "reference": "She wants a bridge for her car."
+  },
+  {
+    "id": "R1-zh",
+    "source_type": "simulated",
+    "question": "What does Mia want to make?",
+    "input": "给车搭桥",
+    "expected": "correct",
+    "reference": "She wants a bridge for her car."
+  },
+  {
+    "id": "R1-variant",
+    "source_type": "simulated",
+    "question": "What does Mia want to make?",
+    "input": "She wants to build a bridge for her toy car.",
+    "expected": "correct",
+    "reference": "She wants a bridge for her car."
+  },
+  {
+    "id": "R1-wrong",
+    "source_type": "simulated",
+    "question": "What does Mia want to make?",
+    "input": "a car",
+    "expected": "incorrect",
+    "reference": "Mia has a toy car. She wants a bridge for her car."
+  },
+  {
+    "id": "R1-unclear",
+    "source_type": "simulated",
+    "question": "What does Mia want to make?",
+    "input": "that thing",
+    "expected": "unclear",
+    "reference": "No identifiable referent in the submitted answer."
+  },
+  {
+    "id": "R2-en",
+    "source_type": "simulated",
+    "question": "What did Mia do to the new paper before the successful try?",
+    "input": "She folded it.",
+    "expected": "correct",
+    "reference": "She folds a new piece of paper."
+  },
+  {
+    "id": "R2-zh",
+    "source_type": "simulated",
+    "question": "What did Mia do to the new paper before the successful try?",
+    "input": "把新纸折了",
+    "expected": "correct",
+    "reference": "She folds a new piece of paper."
+  },
+  {
+    "id": "R2-wrong",
+    "source_type": "simulated",
+    "question": "What did Mia do to the new paper before the successful try?",
+    "input": "added books",
+    "expected": "incorrect",
+    "reference": "She folds a new piece of paper. She puts it on the same books."
+  },
+  {
+    "id": "help-1",
+    "source_type": "simulated",
+    "question": "What does Mia want to make?",
+    "input": "帮我一下",
+    "expected": "help",
+    "reference": "Locate the wants sentence without giving the full answer."
+  },
+  {
+    "id": "help-2",
+    "source_type": "simulated",
+    "question": "What does Mia want to make?",
+    "input": "还是不懂，帮我一下",
+    "expected": "help",
+    "reference": "Use a different prepared support: She wants a ___."
+  }
+]

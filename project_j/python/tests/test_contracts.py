@@ -1,0 +1,133 @@
+import json
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+from project_j.contracts import ObjectEnvelope, SubmittedInput, validate_e2e01_reference_fixture
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def objects():
+    return json.loads((FIXTURES / "e2e01_refs.json").read_text())
+
+
+def submitted(**changes):
+    data = dict(
+        event_id="I1",
+        activity_id="A1",
+        learner_id="fictional-L1",
+        task_instance_id="Q1",
+        wait_id="W1",
+        expected_core_revision=2,
+        cancellation_epoch=0,
+        client_sequence=1,
+        input_policy_ref={"object_id": "IS1", "revision": 1},
+        realm="simulation",
+        source_type="simulated",
+        modality="transcript",
+        text="a bridge",
+        provider="simulated speaker",
+        intent="answer",
+        completion_trigger="vad_window",
+        candidate_end_ms=100,
+        window_elapsed=True,
+        recognition_final=True,
+        recognition_item_ids=["asr-1"],
+    )
+    return SubmittedInput.model_validate(data | changes)
+
+
+def test_reference_skeleton_reaches_c2_with_exact_dependencies():
+    validate_e2e01_reference_fixture([ObjectEnvelope.model_validate(x) for x in objects()])
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"owner": "interface"},
+        {"learner_id": None},
+        {"source_type": "child"},
+        {"realm": "family"},
+        {"revision": "latest"},
+        {"unknown_field": True},
+        {"created_at": "2026-10-12T12:00:00"},
+    ],
+)
+def test_reject_identity_scope_revision_and_unknown_field(change):
+    with pytest.raises(ValidationError):
+        ObjectEnvelope.model_validate(objects()[0] | change)
+
+
+def test_references_do_not_replace_missing_old_revision_with_latest():
+    data = objects()
+    data[0]["revision"] = 2
+    with pytest.raises(ValueError, match="exact revision"):
+        validate_e2e01_reference_fixture([ObjectEnvelope.model_validate(x) for x in data])
+
+
+def test_cross_learner_reference_is_rejected():
+    data = objects()
+    data[0]["learner_id"] = "fictional-L2"
+    with pytest.raises(ValueError, match="cross-learner"):
+        validate_e2e01_reference_fixture([ObjectEnvelope.model_validate(x) for x in data])
+
+
+def test_duplicate_revision_and_missing_c2_are_rejected():
+    data = [ObjectEnvelope.model_validate(x) for x in objects()]
+    with pytest.raises(ValueError, match="duplicate"):
+        validate_e2e01_reference_fixture(data + [data[0]])
+    with pytest.raises(ValueError, match="C2"):
+        validate_e2e01_reference_fixture([x for x in data if x.object_id != "C2"])
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"recognition_final": False},
+        {"window_elapsed": False},
+        {"speech_resumed_or_cancelled": True},
+        {"recognition_item_ids": []},
+        {"candidate_end_ms": None},
+        {"modality": "text"},
+        {"realm": "family"},
+        {"relation": "recognition_revision"},
+    ],
+)
+def test_fragments_slow_speech_and_unbound_revision_cannot_be_submitted(change):
+    with pytest.raises(ValidationError):
+        submitted(**change)
+
+
+def test_submission_and_technical_revision_preserve_two_input_identities():
+    original = submitted()
+    correction = submitted(event_id="I2", relation="recognition_revision", related_event_id="I1")
+    assert original.event_id != correction.event_id
+    assert correction.related_event_id == original.event_id
+    assert original.text == "a bridge"
+
+
+def test_explicit_text_submission_is_valid_without_voice_conditions():
+    event = submitted(modality="text", completion_trigger="explicit", recognition_item_ids=[])
+    assert event.modality == "text"  # No claim of natural voice qualification.
+
+
+def test_reference_answers_are_fixed_simulated_data_and_have_independent_sources():
+    samples = json.loads((FIXTURES / "reference_answers.json").read_text())
+    assert len({s["id"] for s in samples}) == 10
+    assert {s["expected"] for s in samples} == {"correct", "incorrect", "unclear", "help"}
+    assert all(s["source_type"] == "simulated" for s in samples)
+    text = (FIXTURES.parents[3] / "courses/paper-bridge/reading-main.md").read_text()
+    for sample in samples:
+        if sample["expected"] == "correct":
+            assert sample["reference"] in text
+
+
+def test_next_course_cannot_be_replaced_by_a_suggestion_with_the_same_label():
+    data = objects()
+    for obj in data:
+        if obj["object_id"] == "C2":
+            obj.update(kind="suggestion", owner="evaluation")
+    with pytest.raises(ValueError, match="typed C2"):
+        validate_e2e01_reference_fixture([ObjectEnvelope.model_validate(x) for x in data])

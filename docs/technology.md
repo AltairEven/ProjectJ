@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.0.1；更新：2026年10月12日；状态：实施基线已采用，依赖版本和实际接入待验证。
+版本：1.1.0；更新：2026年10月12日；状态：实施基线已采用，P0环境已验证，真实接入未验证。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -66,3 +66,31 @@ Skills用于开发、备课及维护工序；运行时依赖版本化策略、�
 ## 原型处理
 
 0.1原型已删除，删除前状态保存在本地Git标签prototype-0.1。其课程检查、帮助/再试、停止和迟到结果等规则与测试思路可只读查阅，按新合同重写并逐项验收，不作迁移基础。决定及取舍见[ADR-0011](../decisions/ADR-0011.md)和[ADR-0012](../decisions/ADR-0012.md)。
+
+## P0锁定环境与实际检查
+
+2026年10月12日，P0在本机建立独立环境，未运行应用或课堂。版本不是服务端可用性/教学资格证据。
+
+| 项目 | 固定版本/路径 | P0实际证据与限制 |
+| --- | --- | --- |
+| Python | CPython3.14.4；project_j/python/.python-version；project_j/.python及python/.venv | 实际安装、锁定同步、Ruff/pytest通过；不用系统3.9，不改全局设置 |
+| Python库 | FastAPI0.143.0、Pydantic2.14.1、SQLAlchemy2.1.4、Alembic1.20.0、OpenAI3.29.0；pytest9.1.1、Ruff0.17.0 | uv.lock锁全部传递依赖及hash；Pydantic/FastAPI导出、SDK mock、临时SQLite事务验证。尚无应用迁移/服务 |
+| SQLite | 本解释器3.50.4 | 临时库回滚验证；正式存储、备份恢复待阶段1 |
+| Node/npm | Node26.11.1、npm11.20.0；project_j/.node-version及web/package.json | 实际读取版本；未更新本机全局工具 |
+| 页面基础库 | React/ReactDOM19.3.0、TypeScript7.0.2、Vite8.3.4、React类型19.3.0 | web/package-lock.json锁定；npm ci禁安装脚本、依赖导入和独立React类型编译通过；没有应用页或浏览器行为验收 |
+| 浏览器候选 | 本机macOS26.6.2/build25G83，Chrome154.0.8037.98 | 从本机系统/应用元数据读取；家长已选择内置麦克风＋内置扬声器；Chrome为本批拟定浏览器，实际许可/试听/回声与打断仍未验证，不能称声音已接入 |
+
+Python3.14仍为受维护系列；官方已经发布安全补丁3.14.8。本机uv0.11.11内置清单无3.14.8下载，尝试官方uv远端下载元数据路径返回404，故当前pin3.14.4只用于隔离P0/P1验证；真实接入前更新到可取得的最新安全补丁并重跑相关检查，不静默沿用旧补丁。[Python3.14.8发布](https://www.python.org/downloads/release/python-3148/)、[uv下载元数据设置](https://docs.astral.sh/uv/reference/settings/#python-downloads-json-url)
+
+工程/数据库/私有文件布局唯一维护在[存储规则](../design/platform/storage-lifecycle.md#阶段0路径与阶段1保存单位)，操作身份/保存单位与有限重试在[共同执行](../design/shared/execution-recovery.md#p0操作身份保存与有限接续)。锁定安装与检查命令见AGENTS，检查只验证声明范围。
+
+### 独立探针与真实接入入口
+
+`project_j/scripts/probe.py`默认离线，不载入.env，不连接服务、不读取麦克风；只返回配置目标与密钥是否存在。显式真实入口在具备账号/权限后使用以下两条，每条一份固定虚构技术样本；标签是非秘密识别名，密钥从后端进程环境提供，不放命令正文或Git。
+
+```sh
+project_j/scripts/uv.sh run --offline --locked --project project_j/python python project_j/scripts/probe.py --live --effort low --account-label adult-dev --project-label project-j-dev
+project_j/scripts/uv.sh run --offline --locked --project project_j/python python project_j/scripts/probe.py --live --effort medium --account-label adult-dev --project-label project-j-dev
+```
+
+本批没有执行--live。SDK请求指定gpt-6.1-sol、reasoning.effort、default层级、store=false与结构化格式，自动重试关闭；输出请求/返回配置、UTC时间、样本、结果/未知、request_id、可取得用量和后台耗时。返回模型/effort/层级缺失或不符不能通过配置核验，不能靠提示词宣称Low。此单请求耗时不是声音延迟；完整参考题集语义验证、课堂总期限/取消和Medium实际内容核验另做。
