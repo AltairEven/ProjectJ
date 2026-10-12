@@ -1,6 +1,6 @@
 # 素材来源、呈现与使用边界
 
-文档版本：1.1.0；更新：2026年10月12日；范围：逻辑设计，未实现。
+文档版本：1.2.0；更新：2026年10月12日；范围：逻辑设计，未实现。
 
 资源具有实际内容、来源、用途和呈现条件。curriculum保存这些声明与版本，preparation负责生产/核验，classroom与interface按阶段呈现，platform提供获取与播放。资源存在不自动表示已核验或适合当前任务。
 
@@ -31,6 +31,8 @@
 classroom决定当前允许动作和材料，interface执行呈现，platform按绑定版本获取/播放并处理取消。停止或阶段变化后的迟到素材不能继续显示或发声；生成和播放完成不等于学生实际看到/听到。
 
 课堂按[统一教学动作](../classroom/boundaries-events.md)声明任务/对象/阶段与素材版本，interface适配具体呈现，platform提供媒介能力，交付反馈回到核心。媒介失败或切换不自行替换题意/答案，技术成功、学生收到与理解分开；指认/离屏按[实际报告条件](../classroom/materials-offscreen.md)处理。
+
+界面按[学生视图](../interface/student-classroom.md)和[角色许可](../interface/roles-devices.md)取得当前材料，家长详情不传学生后隐藏，进入帮助阶段才取对应支架。字幕/朗读/重播/语速等[适配](../interface/input-output-adapters.md)服从实际任务，变化保留支持/条件和交付范围；界面切换不改变固定版本或历史依据。
 
 ## 课堂生成与入库
 
