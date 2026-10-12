@@ -94,3 +94,24 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python python
 ```
 
 本批没有执行--live。SDK请求指定gpt-6.1-sol、reasoning.effort、default层级、store=false与结构化格式，自动重试关闭；输出请求/返回配置、UTC时间、样本、结果/未知、request_id、可取得用量和后台耗时。返回模型/effort/层级缺失或不符不能通过配置核验，不能靠提示词宣称Low。此单请求耗时不是声音延迟；完整参考题集语义验证、课堂总期限/取消和Medium实际内容核验另做。
+
+### P0官方事实复核与接入缺口
+
+以下在2026年10月12日重新打开官方页面核对；页面说明不等于本账户权限或配置通过。
+
+| 项目 | 官方说明/实际状态 | 继续条件 |
+| --- | --- | --- |
+| Sol Low/Medium | 官方模型页支持两档及结构化输出；本机仅SDK mock通过，实际API**未验证** | API项目/密钥、模型权限/账单范围具备后分别运行探针；课堂参考题集与Medium内容另验 |
+| 服务层级 | 官方列fast=标准2倍、ultrafast=6倍；本批只声明default，实际计费/可用性**未验证** | 记录返回层级/用量；更高成本层级待家长按实际成本决定，不为延迟暗改 |
+| 转写WebRTC | 官方推荐gpt-live-transcribe，客户端commit且无server_vad/semantic_vad；本批未建音频连接 | 保留首选候选，成人实测临时凭据/连接/会话配置/最终item_id映射、客户端VAD和回声后再固定协议/窗口 |
+| 凭据/数据条件 | 官方WebRTC示例有client_secrets及calls；数据控制保留表未单列这些或transcription_sessions。该页区域服务清单提到transcription_sessions，不能由此推断ZDR覆盖 | 实际组织/项目ZDR批准与所选模型/端点/功能/地区覆盖**待核实**；儿童入口关闭 |
+| Responses/合成/按轮转写保留 | 官方表列responses、audio/speech、audio/transcriptions与realtime有ZDR资格，带适用限制；本账户资格**未验证** | 按实际发送范围核对全部所选路径，store=false不代账户批准 |
+| 声音与设备 | 家长选择当前Mac内置麦克风＋内置扬声器，Chrome候选已记录版本；未请求麦克风或播放声音 | 成人在场授权设备、试听中英固定声音；回声/插话/停止/延迟实测，不能移用其他设备检查 |
+
+上述事实来源：[Sol模型页](https://developers.openai.com/api/docs/models/gpt-6.1-sol)、[实时转写](https://developers.openai.com/api/docs/guides/realtime-transcription)、[WebRTC](https://developers.openai.com/api/docs/guides/voice-webrtc?voice-api=realtime)、[数据控制](https://developers.openai.com/api/docs/guides/your-data)。实际API调用样本数为0、语音操作样本数为0；账号条件缺失可继续隔离阶段1，不能把文档核对当接口通过。
+
+### 合成维护风险与最小待决定方案
+
+官方停用表于2026年10月1日公告gpt-4o-mini-tts的2025-03-20和2025-12-15两个快照将于2027年1月6日停用，并推荐gpt-realtime-2.1-mini；TTS指南仍有原模型示例，当前alias的具体路由/账户可用性**未验证**。[停用公告](https://developers.openai.com/api/docs/deprecations)、[TTS指南](https://developers.openai.com/api/docs/guides/text-to-speech)
+
+最小提案：真实合成验证时增加该候选的成人对照，要求只能交付Harness已批准文本、实际内容/首播范围可核对、取消和迟到可靠，并重新核对费用/数据覆盖；取得结果后向家长提出具体替换配置。当前不替换gpt-4o-mini-tts、不引入自主语音教师，阶段1仍以模拟合成交付验证同一接口。此提案尚待家长确认，候选官方推荐不表示J条件已满足。
