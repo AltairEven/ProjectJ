@@ -1,0 +1,177 @@
+[
+  {
+    "schema_version": 1,
+    "revision": 1,
+    "owner": "learning",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": null,
+    "scope": "explicit shared fictional conditions",
+    "occurred_at": null,
+    "received_at": "2026-10-12T12:00:00Z",
+    "created_at": "2026-10-12T12:00:00Z",
+    "source_revision": 1,
+    "operation_id": "sim-setup-op",
+    "limitations": [
+      "明确模拟的初始条件，没有真实学习观察。"
+    ],
+    "object_id": "sim-household-1",
+    "kind": "household",
+    "body": {
+      "status": "checked",
+      "raw_report": "模拟：有30分钟、纸、同一本书和小车，家长可陪伴。",
+      "provider": "模拟家长",
+      "reported_at": "2026-10-12T12:00:00Z",
+      "applies_to": [
+        "fictional-L1"
+      ],
+      "limitations": [
+        "只用于隔离模拟；不代表真实设备或家庭条件。"
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "revision": 1,
+    "owner": "learning",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "P1a isolated fictional learner",
+    "occurred_at": null,
+    "received_at": "2026-10-12T12:00:00Z",
+    "created_at": "2026-10-12T12:00:00Z",
+    "source_revision": 1,
+    "operation_id": "sim-setup-op",
+    "limitations": [
+      "明确模拟的初始条件，没有真实学习观察。"
+    ],
+    "object_id": "sim-state-l1",
+    "kind": "state",
+    "body": {
+      "status": "checked",
+      "dimensions": [
+        {
+          "dimension_id": "english.reading.facts",
+          "task_scope": "观察故事事实和顺序的理解及文本依据",
+          "judgment": "unknown",
+          "help": "unknown",
+          "material_condition": "尚未观察材料接触或熟悉度",
+          "observed_at": null,
+          "limitations": [
+            "没有实际样本，独立、保持与迁移均未知。"
+          ]
+        },
+        {
+          "dimension_id": "english.speaking.report",
+          "task_scope": "用短英语报告实际结果，帮助条件另记",
+          "judgment": "unknown",
+          "help": "unknown",
+          "material_condition": "尚未观察材料接触或熟悉度",
+          "observed_at": null,
+          "limitations": [
+            "没有实际样本，独立、保持与迁移均未知。"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "revision": 1,
+    "owner": "learning",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "P1a isolated fictional learner",
+    "occurred_at": null,
+    "received_at": "2026-10-12T12:00:00Z",
+    "created_at": "2026-10-12T12:00:00Z",
+    "source_revision": 1,
+    "operation_id": "sim-setup-op",
+    "limitations": [
+      "明确模拟的初始条件，没有真实学习观察。"
+    ],
+    "object_id": "sim-plan-l1",
+    "kind": "plan",
+    "body": {
+      "status": "checked",
+      "level": "week",
+      "parent_ref": null,
+      "main_goal": {
+        "dimension_id": "english.reading.facts",
+        "description": "观察故事事实和顺序的理解及文本依据"
+      },
+      "budget_minutes": 30,
+      "basis_refs": [
+        {
+          "object_id": "sim-state-l1",
+          "revision": 1
+        }
+      ],
+      "verification": "保留首次尝试与帮助后表现，下次另取新材料观察。",
+      "exit_conditions": "疲惫或明确停止时结束；不产生补课债务。",
+      "review_at": null,
+      "limitations": [
+        "P1a只建立本周模拟计划；上级计划尚未建立。"
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "revision": 1,
+    "owner": "learning",
+    "realm": "simulation",
+    "source_type": "simulated",
+    "learner_id": "fictional-L1",
+    "scope": "P1a isolated fictional learner",
+    "occurred_at": null,
+    "received_at": "2026-10-12T12:00:00Z",
+    "created_at": "2026-10-12T12:00:00Z",
+    "source_revision": 1,
+    "operation_id": "sim-setup-op",
+    "limitations": [
+      "明确模拟的初始条件，没有真实学习观察。"
+    ],
+    "object_id": "sim-demand-l1",
+    "kind": "demand",
+    "body": {
+      "status": "checked",
+      "state_ref": {
+        "object_id": "sim-state-l1",
+        "revision": 1
+      },
+      "plan_ref": {
+        "object_id": "sim-plan-l1",
+        "revision": 1
+      },
+      "household_ref": {
+        "object_id": "sim-household-1",
+        "revision": 1
+      },
+      "primary_goal": {
+        "dimension_id": "english.reading.facts",
+        "description": "观察故事事实和顺序的理解及文本依据"
+      },
+      "auxiliary_goal": {
+        "dimension_id": "english.speaking.report",
+        "description": "用短英语报告实际结果，帮助条件另记"
+      },
+      "budget_minutes": 30,
+      "prerequisites": [
+        "阅读与短表达先备均待观察，不预填成绩。"
+      ],
+      "sampling_requirements": [
+        "首答在内容提示前取得；实际帮助和再试分别保存。"
+      ],
+      "help_requirements": [
+        "两次求助提供不同指导；未知不默认独立。"
+      ],
+      "offscreen_requirements": "离屏停采集，返回取得实际报告；返回本身不算完成。",
+      "fallback": "只有经核实不依赖声音判断的任务才可使用文字备用。",
+      "gaps": [
+        "材料、时间及陪伴只为明确模拟声明；本次开课尚未检查。"
+      ]
+    }
+  }
+]

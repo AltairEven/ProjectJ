@@ -1,0 +1,337 @@
+import pytest
+from fastapi.testclient import TestClient
+from support import CONDITIONS, LEARNER
+
+from project_j.application.configuration import Settings
+from project_j.application.documents import document, identity
+from project_j.contracts import Document, RevisionRef
+from project_j.curriculum.corrections import correct, release
+from project_j.interface.api import create_app
+from project_j.learning.maintenance import decide, review
+from project_j.platform.storage import Conflict, Publication, SaveKey
+
+
+def test_E2E08_12_method_candidate_and_dimension_catalog_do_not_change_effective_evidence(
+    application,
+):
+    app = application
+    app.prepare("prepare", LEARNER)
+    jane = app.store.current(identity("shared", "jane"), LEARNER)
+    operation = app.request(
+        "candidate", LEARNER, "jane-candidate", {"jane_ref": jane.ref.model_dump()}
+    )
+    candidate = document(
+        "jane",
+        jane.object_id,
+        operation,
+        None,
+        jane.body | {"status": "candidate", "change": "模拟候选换表征"},
+        revision=2,
+        sources=(jane.ref,),
+    )
+    app.save_step(operation, LEARNER, "candidate", [candidate])
+    assert app.store.current(jane.object_id, LEARNER).ref == jane.ref
+    before = app.current(LEARNER, "state")
+    catalog = document(
+        "capability",
+        identity("shared", "science.catalog"),
+        "catalog-operation",
+        None,
+        {
+            "status": "checked",
+            "dimension_id": "science.observation.report",
+            "aliases": ["科学报告"],
+            "definition": "只报告实际条件，不凭语言表达推断科学理解。",
+        },
+    )
+    app.store.save(
+        SaveKey(operation_id="catalog-operation", step_id="catalog", source_revision=1),
+        LEARNER,
+        [catalog],
+    )
+    assert app.current(LEARNER, "state").ref == before.ref
+
+
+def test_E2E10_real_and_adult_sources_cannot_enter_simulation_or_family(application):
+    state = application.current(LEARNER, "state")
+    for values in (
+        {"source_type": "adult"},
+        {"source_type": "technical"},
+        {"realm": "family", "source_type": "child"},
+    ):
+        with pytest.raises(ValueError):
+            Document.model_validate(state.model_dump() | values)
+
+
+def test_E2E15_16_reviews_reuse_evidence_and_stale_proposals_do_not_apply(application):
+    app = application
+    before = app.current(LEARNER, "state")
+    for level in ("week", "stage", "annual", "long_term"):
+        result = review(app, f"review:{level}", LEARNER, level)
+        assert result["plan_effect"] == "reused"
+    assert app.current(LEARNER, "state").ref == before.ref
+    assert not app.store.list_current(LEARNER, "fact")
+    proposal = review(
+        app, "proposal", LEARNER, "week", {"verification": "在相近新材料中观察，不预填保持或迁移。"}
+    )
+    old_plan = app.current(LEARNER, "plan:week")
+    decision_ref = RevisionRef.model_validate(proposal["decision_ref"])
+    result = decide(app, "accept", LEARNER, decision_ref, "accept")
+    assert result["effect"] == "plan_effective"
+    assert app.current(LEARNER, "plan:week").revision == old_plan.revision + 1
+    second = review(app, "proposal2", LEARNER, "week", {"verification": "另一项模拟复查"})
+    old = app.current(LEARNER, "plan:week")
+    update = document(
+        "plan",
+        old.object_id,
+        "newer-plan",
+        LEARNER,
+        old.body,
+        revision=old.revision + 1,
+        refs=old.dependency_refs,
+    )
+    app.store.save(
+        SaveKey(operation_id="newer-plan", step_id="plan", source_revision=1),
+        LEARNER,
+        [update],
+        (Publication(ref=update.ref, expected_revision=old.revision, reason="明确模拟较新计划"),),
+    )
+    with pytest.raises(Conflict, match="baseline changed"):
+        decide(
+            app,
+            "accept-stale",
+            LEARNER,
+            RevisionRef.model_validate(second["decision_ref"]),
+            "accept",
+        )
+    assert app.current(LEARNER, "plan:week").ref == update.ref
+
+
+def test_E2E08_content_restriction_owner_and_versioned_release(application):
+    app = application
+    prepared = app.prepare("prepare", LEARNER)
+    target = RevisionRef.model_validate(prepared["course_ref"])
+    result = correct(
+        app, "correction", LEARNER, target, "模拟内容缺口，需原主责复核。", "curriculum"
+    )
+    restriction = RevisionRef.model_validate(result["restriction_refs"][0])
+    with pytest.raises(ValueError, match="owner"):
+        release(app, "wrong-owner", LEARNER, restriction, "platform", "无权解除")
+    released = release(
+        app,
+        "recheck",
+        LEARNER,
+        restriction,
+        "curriculum",
+        "模拟主责对固定版本完成复核，具体范围保留。",
+    )
+    assert app.store.read(restriction, LEARNER).body["restriction_state"] == "active"
+    assert (
+        app.store.read(RevisionRef.model_validate(released["restriction_ref"]), LEARNER).body[
+            "restriction_state"
+        ]
+        == "resolved"
+    )
+
+
+def test_E2E17_simulation_report_never_grants_real_interface_or_child_qualification(application):
+    dashboard = application.dashboard(LEARNER)
+    assert dashboard["qualification"] == "not_granted"
+    assert dashboard["actual_api"] == "未验证"
+    assert dashboard["actual_voice"] == "未验证"
+    settings = Settings()
+    with pytest.raises(ValueError):
+        Settings(provider="openai")
+    with pytest.raises(ValueError):
+        Settings(realm="family")
+    assert settings.classroom_effort == "low" and settings.evaluation_effort == "medium"
+
+
+def test_API_role_separation_unknown_start_and_stop_do_not_expose_teacher_material(application):
+    app = application
+    fastapi = create_app(Settings(), app)
+    with TestClient(fastapi) as client:
+        parent = {"Authorization": f"Bearer {app.parent_token}"}
+        assert client.get("/api/parent/dashboard").status_code == 403
+        prepared = client.post(
+            "/api/parent/prepare",
+            headers=parent,
+            json={"request_id": "prepare-api", "learner_id": LEARNER},
+        ).json()
+        response = client.post(
+            "/api/parent/start",
+            headers=parent,
+            json={
+                "request_id": "start-api",
+                "learner_id": LEARNER,
+                "course_ref": prepared["course_ref"],
+                "conditions": CONDITIONS,
+            },
+        )
+        assert response.status_code == 200
+        result = response.json()
+        student = {"Authorization": f"Bearer {result['student_token']}"}
+        assert client.get("/api/parent/dashboard", headers=student).status_code == 403
+        snapshot = client.get("/api/student/snapshot", headers=student).json()
+        assert not snapshot["materials"]
+        assert "acceptable_simulated" not in str(snapshot) and "supports" not in str(snapshot)
+        parent_during_class = client.get("/api/parent/dashboard", headers=parent).json()
+        assert parent_during_class["objects"] == [] and parent_during_class["active"]
+        stopped = client.post(
+            "/api/student/control",
+            headers=student,
+            json={"event_id": "stop-api", "command": "stop"},
+        )
+        assert stopped.status_code == 200 and stopped.json()["mode"] == "ended"
+        dashboard = client.get("/api/parent/dashboard", headers=parent).json()
+        assert any(doc["kind"] == "fact" for doc in dashboard["objects"])
+        assert (
+            client.post(
+                "/api/parent/prepare",
+                headers=parent,
+                json={"request_id": "family-attempt", "realm": "family"},
+            ).status_code
+            == 422
+        )
+
+
+def test_API_websocket_reconnect_reads_the_same_memory_core(application):
+    app = application
+    with TestClient(create_app(Settings(), app)) as client:
+        parent = {"Authorization": f"Bearer {app.parent_token}"}
+        prepared = client.post(
+            "/api/parent/prepare", headers=parent, json={"request_id": "prep-ws"}
+        ).json()
+        started = client.post(
+            "/api/parent/start",
+            headers=parent,
+            json={
+                "request_id": "start-ws",
+                "course_ref": prepared["course_ref"],
+                "conditions": CONDITIONS,
+            },
+        ).json()
+        protocol = f"project-j.{started['student_token']}"
+        with client.websocket_connect("/api/student/events", subprotocols=[protocol]) as socket:
+            assert (
+                socket.receive_json()["snapshot"]["activity_id"]
+                == started["snapshot"]["activity_id"]
+            )
+        with client.websocket_connect("/api/student/events", subprotocols=[protocol]) as socket:
+            assert (
+                socket.receive_json()["snapshot"]["activity_id"]
+                == started["snapshot"]["activity_id"]
+            )
+            socket.send_json(
+                {
+                    "id": "stop",
+                    "kind": "control",
+                    "payload": {"event_id": "stop-ws", "command": "stop"},
+                }
+            )
+            assert socket.receive_json()["snapshot"]["mode"] == "ended"
+
+
+def test_E2E12_scoped_aliases_and_split_do_not_duplicate_old_learning_evidence(application):
+    from project_j.learning.catalog import Capability, define, resolve
+
+    app = application
+    original = resolve(app, LEARNER, "english.reading", "故事排序")
+    assert original.body["dimension_id"] == "english.reading.facts"
+    state = app.current(LEARNER, "state")
+    math = Capability(
+        dimension_id="math.order.size",
+        subject="math",
+        name="大小排序",
+        definition="依据大小关系排序，不能用故事排序代替。",
+        aliases=("排序",),
+    )
+    define(app, "math-catalog", LEARNER, math)
+    assert resolve(app, LEARNER, "math", "排序").ref != original.ref
+    with pytest.raises(Conflict):
+        define(
+            app,
+            "wrong-alias",
+            LEARNER,
+            Capability(
+                dimension_id="english.reading.other",
+                subject="english.reading",
+                name="故事排序",
+                definition="同名不能创造新的能力身份。",
+            ),
+        )
+    detail = Capability(
+        dimension_id="english.reading.sequence",
+        subject="english.reading",
+        name="文本先后关系",
+        definition="限定文本先后关系的细分。",
+        split_from=original.ref,
+    )
+    define(app, "split-catalog", LEARNER, detail)
+    assert app.current(LEARNER, "state").ref == state.ref
+    assert all(row["dimension_id"] != detail.dimension_id for row in state.body["dimensions"])
+    assert not app.store.list_current(LEARNER, "fact")
+
+
+def test_old_student_socket_and_parent_control_cannot_access_the_next_activity(application):
+    from starlette.websockets import WebSocketDisconnect
+
+    app = application
+    with TestClient(create_app(Settings(), app)) as client:
+        parent = {"Authorization": f"Bearer {app.parent_token}"}
+        package = client.post(
+            "/api/parent/prepare", headers=parent, json={"request_id": "scope-prepare"}
+        ).json()
+        first = client.post(
+            "/api/parent/start",
+            headers=parent,
+            json={
+                "request_id": "scope-first",
+                "course_ref": package["course_ref"],
+                "conditions": CONDITIONS,
+            },
+        ).json()
+        student = {"Authorization": f"Bearer {first['student_token']}"}
+        with client.websocket_connect(
+            "/api/student/events", subprotocols=[f"project-j.{first['student_token']}"]
+        ) as socket:
+            socket.receive_json()
+            assert (
+                client.get(
+                    "/api/parent/dashboard?learner_id=fictional-L2", headers=parent
+                ).status_code
+                == 403
+            )
+            client.post(
+                "/api/student/control",
+                headers=student,
+                json={"event_id": "scope-stop", "command": "stop"},
+            )
+            second = client.post(
+                "/api/parent/start",
+                headers=parent,
+                json={
+                    "request_id": "scope-second",
+                    "course_ref": package["course_ref"],
+                    "conditions": CONDITIONS,
+                },
+            ).json()
+            assert second["decision"] == "allow_simulation"
+            old = client.post(
+                "/api/parent/control",
+                headers=parent,
+                json={
+                    "event_id": "old-parent-stop",
+                    "activity_id": first["snapshot"]["activity_id"],
+                    "command": "stop",
+                },
+            )
+            assert old.status_code == 409
+            socket.send_json(
+                {"kind": "control", "payload": {"event_id": "old-ws", "command": "stop"}}
+            )
+            with pytest.raises(WebSocketDisconnect) as closed:
+                socket.receive_json()
+            assert closed.value.code == 1008
+            assert app.core.activity_id == second["snapshot"]["activity_id"]
+            assert app.core.mode != "ended"

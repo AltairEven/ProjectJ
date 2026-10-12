@@ -1,11 +1,7 @@
 {
-  "compilerOptions": {
-    "noEmit": true,
-    "strict": true,
-    "target": "ES2022",
-    "module": "NodeNext"
-  },
-  "include": [
-    "fixtures/dependency-check.ts"
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
   ]
 }

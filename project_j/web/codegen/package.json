@@ -1,0 +1,29 @@
+{
+  "name": "project-j-schema-codegen",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.20.0",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "26.11.1",
+      "onFail": "error"
+    },
+    "packageManager": {
+      "name": "npm",
+      "version": "11.20.0",
+      "onFail": "error"
+    }
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "typescript": "6.0.3"
+  },
+  "scripts": {
+    "generate": "openapi-ts -f openapi-ts.config.mjs"
+  },
+  "overrides": {
+    "@hey-api/json-schema-ref-parser": "1.4.1"
+  }
+}

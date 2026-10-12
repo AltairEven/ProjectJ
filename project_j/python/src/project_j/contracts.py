@@ -2,7 +2,7 @@
 
 from typing import Literal, Self
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 
 class Contract(BaseModel):
@@ -18,6 +18,14 @@ OWNERS = {
     "state": "learning",
     "plan": "learning",
     "demand": "learning",
+    "household": "learning",
+    "review": "learning",
+    "decision": "learning",
+    "capability": "learning",
+    "preview": "preparation",
+    "content_check": "preparation",
+    "issue": "evaluation",
+    "restriction": "curriculum",
     "jane": "teacher",
     "course": "curriculum",
     "brief": "curriculum",
@@ -46,6 +54,12 @@ PERSONAL = {
     "report",
     "course",
     "brief",
+    "review",
+    "decision",
+    "preview",
+    "content_check",
+    "issue",
+    "restriction",
 }
 
 
@@ -60,12 +74,14 @@ class ObjectEnvelope(Contract):
     learner_id: str | None
     scope: str = Field(min_length=1)
     occurred_at: AwareDatetime | None
+    received_at: AwareDatetime | None = None
     created_at: AwareDatetime
     source_revision: int = Field(ge=1, strict=True)
     operation_id: str = Field(min_length=1)
     dependency_refs: tuple[RevisionRef, ...] = ()
     source_refs: tuple[RevisionRef, ...] = ()
     limitations: tuple[str, ...] = ()
+    supersedes: RevisionRef | None = None
 
     @model_validator(mode="after")
     def check_identity(self) -> Self:
@@ -86,6 +102,33 @@ class ObjectEnvelope(Contract):
     @property
     def ref(self) -> RevisionRef:
         return RevisionRef(object_id=self.object_id, revision=self.revision)
+
+
+class Document(ObjectEnvelope):
+    """Physical storage envelope; business modules validate their own body contracts."""
+
+    realm: Literal["simulation"] = "simulation"
+    source_type: Literal["simulated"] = "simulated"
+    body: dict[str, JsonValue]
+
+    @model_validator(mode="after")
+    def previous_revision(self) -> Self:
+        expected = (
+            RevisionRef(object_id=self.object_id, revision=self.revision - 1)
+            if self.revision > 1
+            else None
+        )
+        if self.supersedes != expected:
+            raise ValueError("a revision must retain its exact predecessor")
+        return self
+
+    @property
+    def references(self) -> tuple[RevisionRef, ...]:
+        return (
+            self.dependency_refs
+            + self.source_refs
+            + ((self.supersedes,) if self.supersedes else ())
+        )
 
 
 def validate_e2e01_reference_fixture(objects: list[ObjectEnvelope]) -> None:

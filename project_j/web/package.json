@@ -2,7 +2,7 @@
   "name": "project-j-p0-web-baseline",
   "version": "0.0.0",
   "private": true,
-  "description": "P0 dependency baseline only; no application or lesson entry",
+  "description": "Project J parent workbench and isolated fictional classroom",
   "packageManager": "npm@11.20.0",
   "dependencies": {
     "react": "^19.3.0",
@@ -27,11 +27,16 @@
     "remark-validate-links": "^13.1.0",
     "typescript": "^7.0.2",
     "unified-engine": "^11.2.2",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "@types/node": "^24.13.3",
+    "@vitejs/plugin-react": "^6.1.1"
   },
   "scripts": {
-    "check:types": "tsc --noEmit -p tsconfig.json",
+    "check:types": "tsc -b --pretty false && tsc --noEmit -p tsconfig.fixtures.json",
     "test:docs": "node --test check_docs.test.mjs",
-    "check:docs": "node check_docs.mjs"
-  }
+    "check:docs": "node check_docs.mjs",
+    "build": "tsc -b && vite build",
+    "generate:api": "npm --prefix codegen run generate"
+  },
+  "type": "module"
 }

@@ -1,0 +1,3027 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Project J 隔离模拟",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/parent/dashboard": {
+      "get": {
+        "summary": "Dashboard",
+        "operationId": "dashboard_api_parent_dashboard_get",
+        "parameters": [
+          {
+            "name": "learner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^fictional-[A-Za-z0-9_-]+$",
+              "default": "fictional-L1",
+              "title": "Learner Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/prepare": {
+      "post": {
+        "summary": "Prepare",
+        "operationId": "prepare_api_parent_prepare_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepareRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/start": {
+      "post": {
+        "summary": "Start",
+        "operationId": "start_api_parent_start_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/feedback": {
+      "post": {
+        "summary": "Feedback",
+        "operationId": "feedback_api_parent_feedback_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/later-feedback": {
+      "post": {
+        "summary": "Later",
+        "operationId": "later_api_parent_later_feedback_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/evaluate": {
+      "post": {
+        "summary": "Evaluate",
+        "operationId": "evaluate_api_parent_evaluate_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/next-course": {
+      "post": {
+        "summary": "Next Course",
+        "operationId": "next_course_api_parent_next_course_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/review": {
+      "post": {
+        "summary": "Review Plan",
+        "operationId": "review_plan_api_parent_review_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/decision": {
+      "post": {
+        "summary": "Decision",
+        "operationId": "decision_api_parent_decision_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/recheck-demand": {
+      "post": {
+        "summary": "Recheck Demand",
+        "operationId": "recheck_demand_api_parent_recheck_demand_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/correction": {
+      "post": {
+        "summary": "Correction",
+        "operationId": "correction_api_parent_correction_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/capability": {
+      "post": {
+        "summary": "Capability",
+        "operationId": "capability_api_parent_capability_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Resolve Capability",
+        "operationId": "resolve_capability_api_parent_capability_get",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Subject"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "learner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "fictional-L1",
+              "title": "Learner Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/release": {
+      "post": {
+        "summary": "Release Restriction",
+        "operationId": "release_restriction_api_parent_release_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/operation/{operation_id}": {
+      "get": {
+        "summary": "Operation",
+        "operationId": "operation_api_parent_operation__operation_id__get",
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Operation Id"
+            }
+          },
+          {
+            "name": "learner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "fictional-L1",
+              "title": "Learner Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/retry-seal": {
+      "post": {
+        "summary": "Retry Seal",
+        "operationId": "retry_seal_api_parent_retry_seal_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/export": {
+      "post": {
+        "summary": "Export",
+        "operationId": "export_api_parent_export_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/export-file": {
+      "get": {
+        "summary": "Export File",
+        "operationId": "export_file_api_parent_export_file_get",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/backup": {
+      "post": {
+        "summary": "Backup",
+        "operationId": "backup_api_parent_backup_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/restore": {
+      "post": {
+        "summary": "Restore",
+        "operationId": "restore_api_parent_restore_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/student/snapshot": {
+      "get": {
+        "summary": "Snapshot",
+        "operationId": "snapshot_api_student_snapshot_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/student/input": {
+      "post": {
+        "summary": "Submit",
+        "operationId": "submit_api_student_input_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InputResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/student/delivery": {
+      "post": {
+        "summary": "Delivery",
+        "operationId": "delivery_api_student_delivery_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryFeedback"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/student/control": {
+      "post": {
+        "summary": "Control",
+        "operationId": "control_api_student_control_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Control"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/control": {
+      "post": {
+        "summary": "Parent Control",
+        "operationId": "parent_control_api_parent_control_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Control"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/student/voice-signal": {
+      "post": {
+        "summary": "Voice Signal",
+        "operationId": "voice_signal_api_student_voice_signal_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceSignal"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InputResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{path}": {
+      "get": {
+        "summary": "Webpage",
+        "operationId": "webpage__path__get",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActivityRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "activity_id": {
+            "type": "string",
+            "title": "Activity Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "activity_id"
+        ],
+        "title": "ActivityRequest"
+      },
+      "AllowedAction": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "activity_id": {
+            "type": "string",
+            "title": "Activity Id"
+          },
+          "task_instance_id": {
+            "type": "string",
+            "title": "Task Instance Id"
+          },
+          "wait_id": {
+            "type": "string",
+            "title": "Wait Id"
+          },
+          "core_revision": {
+            "type": "integer",
+            "title": "Core Revision"
+          },
+          "cancellation_epoch": {
+            "type": "integer",
+            "title": "Cancellation Epoch"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "goal",
+              "question",
+              "feedback",
+              "help",
+              "clarification",
+              "offscreen",
+              "closing",
+              "repeat"
+            ],
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          },
+          "audience": {
+            "type": "string",
+            "const": "student",
+            "title": "Audience",
+            "default": "student"
+          },
+          "material_refs": {
+            "items": {
+              "$ref": "#/components/schemas/RevisionRef"
+            },
+            "type": "array",
+            "title": "Material Refs",
+            "default": []
+          },
+          "help": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Help",
+            "default": {}
+          },
+          "after_delivery": {
+            "type": "string",
+            "enum": [
+              "input",
+              "retry",
+              "clarification",
+              "next_task",
+              "offscreen",
+              "end_confirmation"
+            ],
+            "title": "After Delivery"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action_id",
+          "activity_id",
+          "task_instance_id",
+          "wait_id",
+          "core_revision",
+          "cancellation_epoch",
+          "kind",
+          "text",
+          "after_delivery"
+        ],
+        "title": "AllowedAction"
+      },
+      "Capability": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "checked",
+            "title": "Status",
+            "default": "checked"
+          },
+          "dimension_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Dimension Id"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Subject"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          },
+          "definition": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Definition"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases",
+            "default": []
+          },
+          "split_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RevisionRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations",
+            "default": [
+              "模拟目录；定义不构成学习观察或掌握。"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dimension_id",
+          "subject",
+          "name",
+          "definition"
+        ],
+        "title": "Capability"
+      },
+      "CatalogRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "capability": {
+            "$ref": "#/components/schemas/Capability"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "capability"
+        ],
+        "title": "CatalogRequest"
+      },
+      "Control": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "activity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Id"
+          },
+          "command": {
+            "type": "string",
+            "enum": [
+              "stop",
+              "pause",
+              "resume",
+              "return",
+              "skip",
+              "repeat",
+              "close",
+              "end_unconfirmed"
+            ],
+            "title": "Command"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "command"
+        ],
+        "title": "Control"
+      },
+      "CorrectionRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "target_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "target_ref",
+          "owner",
+          "note"
+        ],
+        "title": "CorrectionRequest"
+      },
+      "Dashboard": {
+        "properties": {
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "learner_id": {
+            "type": "string",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "qualification": {
+            "type": "string",
+            "const": "not_granted",
+            "title": "Qualification",
+            "default": "not_granted"
+          },
+          "actual_api": {
+            "type": "string",
+            "const": "未验证",
+            "title": "Actual Api",
+            "default": "未验证"
+          },
+          "actual_voice": {
+            "type": "string",
+            "const": "未验证",
+            "title": "Actual Voice",
+            "default": "未验证"
+          },
+          "verification": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Verification",
+            "default": {}
+          },
+          "objects": {
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            },
+            "type": "array",
+            "title": "Objects",
+            "default": []
+          },
+          "review_due": {
+            "items": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Review Due",
+            "default": []
+          },
+          "model_calls": {
+            "items": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Model Calls",
+            "default": []
+          },
+          "pending_seals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pending Seals",
+            "default": []
+          },
+          "seal_errors": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Seal Errors",
+            "default": {}
+          },
+          "active": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Snapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Dashboard"
+      },
+      "DecisionRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "decision_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "choice": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "reject"
+            ],
+            "title": "Choice"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "decision_ref",
+          "choice"
+        ],
+        "title": "DecisionRequest"
+      },
+      "DeliveryFeedback": {
+        "properties": {
+          "delivery_event_id": {
+            "type": "string",
+            "title": "Delivery Event Id"
+          },
+          "delivery_id": {
+            "type": "string",
+            "title": "Delivery Id"
+          },
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "activity_id": {
+            "type": "string",
+            "title": "Activity Id"
+          },
+          "task_instance_id": {
+            "type": "string",
+            "title": "Task Instance Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Sequence"
+          },
+          "output_device_id": {
+            "type": "string",
+            "title": "Output Device Id"
+          },
+          "modality": {
+            "type": "string",
+            "enum": [
+              "text",
+              "simulated_audio"
+            ],
+            "title": "Modality"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "started",
+              "partial",
+              "completed",
+              "failed",
+              "cancelled",
+              "interrupted",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "delivered_range": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Delivered Range"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "delivery_event_id",
+          "delivery_id",
+          "action_id",
+          "activity_id",
+          "task_instance_id",
+          "sequence",
+          "output_device_id",
+          "modality",
+          "status",
+          "delivered_range",
+          "occurred_at"
+        ],
+        "title": "DeliveryFeedback"
+      },
+      "Document": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "object_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Object Id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "learner_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Learner Id"
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Scope"
+          },
+          "occurred_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred At"
+          },
+          "received_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Received At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "source_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Source Revision"
+          },
+          "operation_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Operation Id"
+          },
+          "dependency_refs": {
+            "items": {
+              "$ref": "#/components/schemas/RevisionRef"
+            },
+            "type": "array",
+            "title": "Dependency Refs",
+            "default": []
+          },
+          "source_refs": {
+            "items": {
+              "$ref": "#/components/schemas/RevisionRef"
+            },
+            "type": "array",
+            "title": "Source Refs",
+            "default": []
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations",
+            "default": []
+          },
+          "supersedes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RevisionRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Body"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "object_id",
+          "revision",
+          "kind",
+          "owner",
+          "learner_id",
+          "scope",
+          "occurred_at",
+          "created_at",
+          "source_revision",
+          "operation_id",
+          "body"
+        ],
+        "title": "Document",
+        "description": "Physical storage envelope; business modules validate their own body contracts."
+      },
+      "EvaluationRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "activity_id": {
+            "type": "string",
+            "title": "Activity Id"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "next_course",
+              "workbench_evaluation",
+              "final_feedback"
+            ],
+            "title": "Purpose"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "activity_id",
+          "purpose"
+        ],
+        "title": "EvaluationRequest"
+      },
+      "FeedbackRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "activity_id": {
+            "type": "string",
+            "title": "Activity Id"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          },
+          "corrections": {
+            "items": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Corrections",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "activity_id",
+          "text"
+        ],
+        "title": "FeedbackRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InputResult": {
+        "properties": {
+          "ack": {
+            "type": "string",
+            "title": "Ack"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/Snapshot"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ack",
+          "snapshot"
+        ],
+        "title": "InputResult"
+      },
+      "JsonValue": {},
+      "ParentRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "title": "ParentRequest"
+      },
+      "PreparationResult": {
+        "properties": {
+          "course_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "preview_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "check_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "preparation": {
+            "type": "string",
+            "const": "fixed_simulation_checked",
+            "title": "Preparation"
+          },
+          "start": {
+            "type": "string",
+            "const": "pending",
+            "title": "Start"
+          },
+          "unverified": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unverified"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "course_ref",
+          "preview_ref",
+          "check_ref",
+          "preparation",
+          "start",
+          "unverified"
+        ],
+        "title": "PreparationResult"
+      },
+      "PrepareRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "next_course": {
+            "type": "boolean",
+            "title": "Next Course",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "title": "PrepareRequest"
+      },
+      "ReleaseRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "restriction_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner"
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "restriction_ref",
+          "owner",
+          "evidence"
+        ],
+        "title": "ReleaseRequest"
+      },
+      "RestoreRequest": {
+        "properties": {
+          "backup_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$",
+            "title": "Backup Id"
+          },
+          "new_run_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "New Run Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "backup_id",
+          "new_run_id"
+        ],
+        "title": "RestoreRequest"
+      },
+      "ReviewRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "week",
+              "stage",
+              "annual",
+              "long_term"
+            ],
+            "title": "Level"
+          },
+          "proposed_patch": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Patch"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "level"
+        ],
+        "title": "ReviewRequest"
+      },
+      "RevisionRef": {
+        "properties": {
+          "object_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Object Id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "object_id",
+          "revision"
+        ],
+        "title": "RevisionRef"
+      },
+      "Snapshot": {
+        "properties": {
+          "activity_id": {
+            "type": "string",
+            "title": "Activity Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "title": "Learner Id"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "activity_state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "offscreen",
+              "paused",
+              "closing",
+              "ended"
+            ],
+            "title": "Activity State"
+          },
+          "wait_kind": {
+            "type": "string",
+            "title": "Wait Kind"
+          },
+          "task_instance_id": {
+            "type": "string",
+            "title": "Task Instance Id"
+          },
+          "wait_id": {
+            "type": "string",
+            "title": "Wait Id"
+          },
+          "core_revision": {
+            "type": "integer",
+            "title": "Core Revision"
+          },
+          "cancellation_epoch": {
+            "type": "integer",
+            "title": "Cancellation Epoch"
+          },
+          "input_policy_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "pending_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AllowedAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count"
+          },
+          "elapsed_seconds": {
+            "type": "number",
+            "title": "Elapsed Seconds"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "actual_api": {
+            "type": "string",
+            "const": "未验证",
+            "title": "Actual Api"
+          },
+          "actual_voice": {
+            "type": "string",
+            "const": "未验证",
+            "title": "Actual Voice"
+          },
+          "materials": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Materials",
+            "default": {}
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "activity_id",
+          "learner_id",
+          "realm",
+          "source_type",
+          "mode",
+          "activity_state",
+          "wait_kind",
+          "task_instance_id",
+          "wait_id",
+          "core_revision",
+          "cancellation_epoch",
+          "input_policy_ref",
+          "pending_action",
+          "attempt_count",
+          "elapsed_seconds",
+          "end",
+          "actual_api",
+          "actual_voice"
+        ],
+        "title": "Snapshot"
+      },
+      "StartConditions": {
+        "properties": {
+          "materials": {
+            "type": "string",
+            "enum": [
+              "reported_available",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Materials"
+          },
+          "time": {
+            "type": "string",
+            "enum": [
+              "reported_30_minutes",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Time"
+          },
+          "accompaniment": {
+            "type": "string",
+            "enum": [
+              "reported_present",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Accompaniment"
+          },
+          "raw_report": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Raw Report"
+          },
+          "explicit_start": {
+            "type": "boolean",
+            "title": "Explicit Start"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "materials",
+          "time",
+          "accompaniment",
+          "raw_report",
+          "explicit_start"
+        ],
+        "title": "StartConditions"
+      },
+      "StartRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "course_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/StartConditions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "course_ref",
+          "conditions"
+        ],
+        "title": "StartRequest"
+      },
+      "StartResult": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "allow_simulation",
+              "waiting",
+              "blocked",
+              "interrupted_unknown"
+            ],
+            "title": "Decision"
+          },
+          "student_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Token"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Snapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing",
+            "default": []
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "unverified": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unverified",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "StartResult"
+      },
+      "TextInput": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          },
+          "intent": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "help",
+              "confirmation",
+              "report",
+              "unknown"
+            ],
+            "title": "Intent",
+            "default": "unknown"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "new",
+              "supplement"
+            ],
+            "title": "Relation",
+            "default": "new"
+          },
+          "related_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "text"
+        ],
+        "title": "TextInput"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VoiceSignal": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "start",
+              "fragment",
+              "candidate_end",
+              "resume",
+              "final",
+              "window_elapsed",
+              "cancel",
+              "revision"
+            ],
+            "title": "Kind"
+          },
+          "item_id": {
+            "type": "string",
+            "title": "Item Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "default": ""
+          },
+          "candidate_end_ms": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate End Ms"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "simulated_speaker",
+              "teacher_echo"
+            ],
+            "title": "Source",
+            "default": "simulated_speaker"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "item_id"
+        ],
+        "title": "VoiceSignal"
+      }
+    }
+  }
+}

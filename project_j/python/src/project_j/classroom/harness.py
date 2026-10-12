@@ -1,0 +1,596 @@
+"""Explicit state/action boundary. Providers propose; only this core can advance."""
+
+import asyncio
+import time
+from datetime import UTC, datetime
+from typing import Literal
+from uuid import uuid4
+
+from pydantic import AwareDatetime, Field
+
+from project_j.contracts import Contract, RevisionRef, SubmittedInput
+from project_j.platform.simulated import ModelProposal, SimulatedModel
+from project_j.platform.storage import Conflict, canonical, digest
+from project_j.preparation.contracts import CourseBody
+
+TRANSITIONS = {
+    "delivering": {"waiting_input", "delivering", "offscreen", "paused", "ended"},
+    "waiting_input": {"judging", "delivering", "paused", "ended"},
+    "judging": {"delivering", "waiting_input", "paused", "ended"},
+    "offscreen": {"delivering", "paused", "ended"},
+    "paused": {"delivering", "waiting_input", "offscreen", "ended"},
+    "ended": set(),
+}
+HELP_ORDER = {"none": 0, "light_prompt": 1, "scaffold": 2, "full_model": 3, "unknown": 4}
+
+
+class AllowedAction(Contract):
+    action_id: str
+    activity_id: str
+    task_instance_id: str
+    wait_id: str
+    core_revision: int
+    cancellation_epoch: int
+    kind: Literal[
+        "goal", "question", "feedback", "help", "clarification", "offscreen", "closing", "repeat"
+    ]
+    text: str = Field(min_length=1)
+    audience: Literal["student"] = "student"
+    material_refs: tuple[RevisionRef, ...] = ()
+    help: dict[str, str] = {}
+    after_delivery: Literal[
+        "input", "retry", "clarification", "next_task", "offscreen", "end_confirmation"
+    ]
+
+
+class DeliveryFeedback(Contract):
+    delivery_event_id: str
+    delivery_id: str
+    action_id: str
+    activity_id: str
+    task_instance_id: str
+    sequence: int = Field(ge=1, strict=True)
+    output_device_id: str
+    modality: Literal["text", "simulated_audio"]
+    status: Literal[
+        "started", "partial", "completed", "failed", "cancelled", "interrupted", "unknown"
+    ]
+    delivered_range: tuple[str, ...]
+    occurred_at: AwareDatetime
+
+
+class Harness:
+    def __init__(
+        self,
+        activity_id: str,
+        learner_id: str,
+        course_ref: RevisionRef,
+        course: CourseBody,
+        bindings: dict,
+        model: SimulatedModel,
+    ):
+        self.activity_id, self.learner_id = activity_id, learner_id
+        self.course_ref, self.course, self.bindings, self.model = (
+            course_ref,
+            course,
+            bindings,
+            model,
+        )
+        self.mode = "delivering"
+        self.wait_kind = "goal_confirmation"
+        self.revision, self.epoch, self.task_index = 1, 0, -1
+        self.task_instance_id, self.wait_id = str(uuid4()), str(uuid4())
+        self.started_at, self.started_clock = datetime.now(UTC), time.monotonic()
+        self.events: list[dict] = []
+        self.attempts: list[dict] = []
+        self.inputs: dict[str, dict] = {}
+        self.actions: dict[str, AllowedAction] = {}
+        self.pending: str | None = None
+        self.delivery_sequences: dict[str, int] = {}
+        self.delivery_events: dict[str, str] = {}
+        self.delivered: set[str] = set()
+        self.help_by_task: dict[str, dict] = {}
+        self.help_count: dict[str, int] = {}
+        self.jobs: set[asyncio.Task] = set()
+        self.paused_from: str | None = None
+        self.end: dict | None = None
+        self.last_response_event: str | None = None
+        self.closing_clock: float | None = None
+        self.budget_exhausted = False
+        self.action(
+            "goal",
+            "我是Jane。先读故事、找依据，再做纸桥短观察；可随时暂停或停止。请确认收到安排。",
+            "input",
+        )
+
+    def record(self, kind: str, payload: dict):
+        self.events.append(
+            {
+                "sequence": len(self.events) + 1,
+                "kind": kind,
+                "received_at": datetime.now(UTC).isoformat(),
+                "payload": payload,
+            }
+        )
+
+    def move(self, mode: str):
+        if mode not in TRANSITIONS[self.mode]:
+            raise ValueError(f"disallowed classroom transition {self.mode}->{mode}")
+        self.mode = mode
+        self.revision += 1
+
+    def invalidate(self):
+        self.epoch += 1
+        self.pending = None
+        for job in tuple(self.jobs):
+            job.cancel()
+
+    def action(self, kind: str, text: str, after: str, help_map=None, materials=()):
+        if self.mode in {"ended", "paused"}:
+            raise ValueError("action cannot be issued after stop or while paused")
+        if self.mode != "delivering":
+            self.move("delivering")
+        else:
+            self.revision += 1
+        action = AllowedAction(
+            action_id=str(uuid4()),
+            activity_id=self.activity_id,
+            task_instance_id=self.task_instance_id,
+            wait_id=self.wait_id,
+            core_revision=self.revision,
+            cancellation_epoch=self.epoch,
+            kind=kind,
+            text=text,
+            after_delivery=after,
+            help=help_map or {},
+            material_refs=materials,
+        )
+        self.actions[action.action_id] = action
+        self.pending = action.action_id
+        self.record("allowed_action", action.model_dump(mode="json"))
+        return action
+
+    def snapshot(self):
+        self.tick()
+        action = self.actions.get(self.pending) if self.pending else None
+        activity_state = (
+            "closing"
+            if self.wait_kind == "closing_confirmation" and self.mode not in {"ended", "paused"}
+            else self.mode
+            if self.mode in {"offscreen", "paused", "ended"}
+            else "running"
+        )
+        return {
+            "activity_id": self.activity_id,
+            "learner_id": self.learner_id,
+            "realm": "simulation",
+            "source_type": "simulated",
+            "mode": self.mode,
+            "activity_state": activity_state,
+            "wait_kind": self.wait_kind,
+            "task_instance_id": self.task_instance_id,
+            "wait_id": self.wait_id,
+            "core_revision": self.revision,
+            "cancellation_epoch": self.epoch,
+            "input_policy_ref": self.bindings["input_policy"],
+            "pending_action": action.model_dump(mode="json") if action else None,
+            "attempt_count": len(self.attempts),
+            "elapsed_seconds": time.monotonic() - self.started_clock,
+            "end": self.end,
+            "actual_api": "未验证",
+            "actual_voice": "未验证",
+        }
+
+    def delivery(self, feedback: DeliveryFeedback):
+        if feedback.activity_id != self.activity_id:
+            raise ValueError("wrong delivery activity")
+        fingerprint = digest(canonical(feedback))
+        if feedback.delivery_event_id in self.delivery_events:
+            if self.delivery_events[feedback.delivery_event_id] != fingerprint:
+                raise Conflict("same delivery event has different content")
+            return self.snapshot()
+        action = self.actions.get(feedback.action_id)
+        if action is None or action.task_instance_id != feedback.task_instance_id:
+            raise ValueError("delivery must refer to an approved action and its task")
+        previous = self.delivery_sequences.get(feedback.delivery_id, 0)
+        if feedback.sequence <= previous:
+            raise Conflict("out-of-order delivery feedback")
+        self.delivery_sequences[feedback.delivery_id] = feedback.sequence
+        self.delivery_events[feedback.delivery_event_id] = fingerprint
+        self.record("delivery", feedback.model_dump(mode="json"))
+        if feedback.delivered_range and feedback.status in {
+            "started",
+            "partial",
+            "completed",
+            "interrupted",
+        }:
+            self.delivered.add(action.action_id)
+            levels = self.help_by_task.setdefault(action.task_instance_id, {})
+            for dimension, level in action.help.items():
+                if HELP_ORDER[level] > HELP_ORDER[levels.get(dimension, "none")]:
+                    levels[dimension] = level
+        if (
+            self.mode in {"ended", "paused"}
+            or self.pending != action.action_id
+            or action.cancellation_epoch != self.epoch
+        ):
+            return self.snapshot()
+        if feedback.status in {"failed", "cancelled", "interrupted", "unknown"}:
+            self.pending = None
+            self.move("waiting_input")
+            self.wait_kind = "delivery_recovery"
+            return self.snapshot()
+        if feedback.status != "completed" or not feedback.delivered_range:
+            return self.snapshot()
+        self.pending = None
+        self.move("waiting_input")
+        if action.after_delivery == "next_task":
+            self.next_task()
+        elif action.after_delivery == "offscreen":
+            self.move("delivering")
+            self.move("offscreen")
+            self.wait_kind = "offscreen_return"
+        elif action.after_delivery == "end_confirmation":
+            self.wait_kind = "closing_confirmation"
+        else:
+            self.wait_kind = {"retry": "retry", "clarification": "clarification"}.get(
+                action.after_delivery, "goal_confirmation" if self.task_index < 0 else "answer"
+            )
+        return self.snapshot()
+
+    def next_task(self):
+        self.task_index += 1
+        self.wait_id, self.task_instance_id = str(uuid4()), str(uuid4())
+        if (
+            self.task_index >= len(self.course.tasks)
+            or time.monotonic() - self.started_clock >= 30 * 60
+        ):
+            self.wait_kind = "closing_confirmation"
+            return self.action(
+                "closing",
+                "我们保留实际回答、帮助和未观察项。下次可用新材料短观察；请确认收到小结。",
+                "end_confirmation",
+            )
+        task = self.course.tasks[self.task_index]
+        self.wait_kind = "answer"
+        self.record(
+            "task_started",
+            {
+                "task_id": task.task_id,
+                "task_instance_id": self.task_instance_id,
+                "dimension_id": task.dimension_id,
+                "purpose": task.purpose,
+            },
+        )
+        return self.action(
+            "offscreen" if task.purpose == "offscreen" else "question",
+            task.prompt,
+            "offscreen" if task.purpose == "offscreen" else "input",
+            materials=(task.material_ref,),
+        )
+
+    def control(self, event_id: str, command: str):
+        signature = {"event_id": event_id, "command": command}
+        previous = self.inputs.get(event_id)
+        if previous:
+            if previous["signature"] != signature:
+                raise Conflict("same control identity has different content")
+            return self.snapshot()
+        self.inputs[event_id] = {"signature": signature, "attempt_id": None}
+        self.record("control", signature)
+        if command == "stop":
+            if self.mode != "ended":
+                self.finish("explicit_stop")
+        elif command == "pause":
+            if self.mode not in {"paused", "ended"}:
+                self.paused_from = self.mode
+                self.invalidate()
+                self.move("paused")
+        elif command == "resume":
+            if self.mode != "paused":
+                raise ValueError("only the original paused activity can resume")
+            previous_mode = self.paused_from
+            self.move("offscreen" if previous_mode == "offscreen" else "delivering")
+            if previous_mode != "offscreen":
+                last = next(reversed(self.actions.values()))
+                self.action("repeat", last.text, last.after_delivery, last.help, last.material_refs)
+        elif command == "return":
+            if self.mode != "offscreen":
+                raise ValueError("return does not create an offscreen result")
+            self.move("delivering")
+            self.wait_kind = "offscreen_report"
+            self.action(
+                "question",
+                "请报告实际材料、改变、结果和帮助；没有观察的部分可以说不知道。",
+                "input",
+            )
+        elif command == "skip":
+            if self.mode in {"waiting_input", "delivering"}:
+                self.invalidate()
+                self.record("task_skipped", {"task_instance_id": self.task_instance_id})
+                self.next_task()
+        elif command == "repeat":
+            if self.mode in {"waiting_input", "delivering"}:
+                last = next(reversed(self.actions.values()))
+                self.action("repeat", last.text, last.after_delivery, last.help, last.material_refs)
+        elif command == "close":
+            if self.mode not in {"ended", "paused"}:
+                self.invalidate()
+                self.wait_kind = "closing_confirmation"
+                self.action(
+                    "closing",
+                    "我们只总结已发生范围，其余保持未知。请确认收到小结。",
+                    "end_confirmation",
+                )
+        elif command == "end_unconfirmed":
+            if self.mode != "ended":
+                self.finish("unconfirmed")
+        else:
+            raise ValueError("unknown control")
+        return self.snapshot()
+
+    def finish(self, reason: str):
+        self.invalidate()
+        self.move("ended")
+        self.end = {
+            "end_id": str(uuid4()),
+            "reason": {"explicit_stop": "stop", "normal_confirmed": "normal"}.get(reason, reason),
+            "ended_at": datetime.now(UTC).isoformat(),
+            "last_valid_event": len(self.events),
+            "core_revision": self.revision,
+            "unconfirmed": reason != "normal_confirmed",
+            "unfinished_tasks": [
+                task.task_id for task in self.course.tasks[max(self.task_index, 0) :]
+            ],
+        }
+        self.record("end", self.end)
+
+    def tick(self):
+        if self.mode in {"ended", "paused"}:
+            return
+        elapsed = time.monotonic() - self.started_clock
+        closing_seconds = self.course.budget["closing"] * 60
+        if elapsed >= 30 * 60:
+            self.finish("unconfirmed")
+        elif elapsed >= 30 * 60 - closing_seconds and not self.budget_exhausted:
+            self.budget_exhausted = True
+            self.invalidate()
+            self.record(
+                "budget_boundary", {"elapsed_seconds": elapsed, "remaining_scope": "closing"}
+            )
+            if self.mode == "offscreen":
+                self.move("delivering")
+            self.wait_kind = "closing_confirmation"
+            self.action(
+                "closing",
+                "时间接近约定边界，我们只收尾已发生范围。请确认收到小结；未做项目保持未知。",
+                "end_confirmation",
+            )
+
+    async def submit(self, submitted: SubmittedInput, deadline: float | None = None):
+        if submitted.activity_id != self.activity_id or submitted.learner_id != self.learner_id:
+            raise ValueError("input activity or learner mismatch")
+        if submitted.source_type != "simulated" or submitted.realm != "simulation":
+            raise ValueError("only explicitly fictional simulation inputs are allowed")
+        if submitted.input_policy_ref != RevisionRef.model_validate(self.bindings["input_policy"]):
+            raise ValueError("input policy does not match the fixed activity binding")
+        signature = submitted.model_dump(mode="json")
+        previous = self.inputs.get(submitted.event_id)
+        if previous:
+            if previous["signature"] != signature:
+                raise Conflict("same input identity has different content")
+            return {"ack": "replayed", "event_id": submitted.event_id, "snapshot": self.snapshot()}
+        if submitted.relation == "recognition_revision":
+            original = self.inputs.get(submitted.related_event_id)
+            if original is None or "modality" not in original["signature"]:
+                raise ValueError("recognition revision needs an original submitted segment")
+            if submitted.recognition_item_ids != tuple(
+                original["signature"]["recognition_item_ids"]
+            ):
+                raise ValueError("recognition revision must identify the same original segment")
+            self.inputs[submitted.event_id] = {
+                "signature": signature,
+                "attempt_id": original["attempt_id"],
+            }
+            self.record("recognition_revision", signature)
+            if (
+                self.mode == "judging"
+                and original["signature"]["task_instance_id"] == self.task_instance_id
+            ):
+                self.invalidate()
+                self.move("waiting_input")
+                self.action(
+                    "clarification", "原识别已更正，原答保留；请确认当前表达。", "clarification"
+                )
+            for attempt in self.attempts:
+                if attempt["attempt_id"] == original["attempt_id"]:
+                    attempt.setdefault("recognition_revisions", []).append(signature)
+                    attempt["judgment"] = "unclear"
+                    attempt["limitations"].append(
+                        "原识别已更正，解释待复核；原答和已交付帮助保留。"
+                    )
+            return {"ack": "accepted", "snapshot": self.snapshot()}
+        if submitted.relation == "supplement":
+            original = self.inputs.get(submitted.related_event_id)
+            if (
+                original is None
+                or original["signature"].get("task_instance_id") != self.task_instance_id
+            ):
+                raise ValueError("supplement needs the original current-task input")
+            if any(
+                action.action_id in self.delivered
+                and action.task_instance_id == self.task_instance_id
+                and action.action_id == original.get("response_action")
+                for action in self.actions.values()
+            ):
+                raise ValueError("delivered response cannot be washed into the first answer")
+            self.invalidate()
+            if self.mode in {"judging", "delivering"}:
+                self.move("waiting_input")
+        elif (
+            submitted.task_instance_id != self.task_instance_id
+            or submitted.wait_id != self.wait_id
+            or submitted.expected_core_revision != self.revision
+            or submitted.cancellation_epoch != self.epoch
+        ):
+            raise Conflict("stale input binding")
+        if self.mode != "waiting_input":
+            raise ValueError("core is not waiting for a completed input")
+        self.record("input", signature)
+        self.inputs[submitted.event_id] = {"signature": signature, "attempt_id": None}
+        if self.wait_kind == "goal_confirmation":
+            if submitted.intent == "confirmation" or any(
+                word in submitted.text for word in ("听到", "收到", "明白", "好的", "yes")
+            ):
+                self.record(
+                    "goal_received", {"event_id": submitted.event_id, "understanding": "unknown"}
+                )
+                self.next_task()
+            else:
+                self.action("clarification", "请确认是否收到本课安排；这不是知识测验。", "input")
+            return {"ack": "accepted", "snapshot": self.snapshot()}
+        if self.wait_kind == "closing_confirmation":
+            if submitted.intent == "confirmation" or any(
+                word in submitted.text for word in ("听到", "收到", "明白", "好的", "yes")
+            ):
+                self.record("closing_received", {"event_id": submitted.event_id})
+                self.finish("normal_confirmed")
+            else:
+                self.action(
+                    "clarification",
+                    "请确认收到小结；也可以直接结束并保留未确认。",
+                    "end_confirmation",
+                )
+            return {"ack": "accepted", "snapshot": self.snapshot()}
+        if self.wait_kind == "delivery_recovery":
+            raise ValueError("repeat or stop after a failed delivery; do not rescore the answer")
+        task = self.course.tasks[self.task_index]
+        is_help = submitted.intent == "help" or any(
+            word in submitted.text for word in ("帮我", "不懂", "help")
+        )
+        attempt = None
+        if not is_help:
+            if submitted.relation == "supplement":
+                original_id = self.inputs[submitted.related_event_id]["attempt_id"]
+                attempt = next((a for a in self.attempts if a["attempt_id"] == original_id), None)
+            if attempt is None:
+                attempt = {
+                    "attempt_id": str(uuid4()),
+                    "task_instance_id": self.task_instance_id,
+                    "task_id": task.task_id,
+                    "dimension_id": task.dimension_id,
+                    "purpose": task.purpose,
+                    "inputs": [],
+                    "help": dict(self.help_by_task.get(self.task_instance_id, {})),
+                    "external_help": "unknown",
+                    "judgment": "unclear",
+                    "limitations": ["明确模拟；外部帮助、保持与迁移未知。"],
+                }
+                self.attempts.append(attempt)
+            attempt["inputs"].append(signature)
+            self.inputs[submitted.event_id]["attempt_id"] = attempt["attempt_id"]
+        self.move("judging")
+        binding = dict(
+            activity_id=self.activity_id,
+            task_instance_id=self.task_instance_id,
+            wait_id=self.wait_id,
+            core_revision=self.revision,
+            cancellation_epoch=self.epoch,
+            event_id=submitted.event_id,
+        )
+        job = asyncio.create_task(
+            self.model.judge(
+                binding, task, submitted.text, self.help_count.get(self.task_instance_id, 0)
+            )
+        )
+        self.jobs.add(job)
+        try:
+            proposal = await asyncio.wait_for(
+                job, timeout=max(0, (deadline or time.monotonic() + 10) - time.monotonic())
+            )
+        except asyncio.CancelledError:
+            return {"ack": "cancelled", "snapshot": self.snapshot()}
+        except TimeoutError, RuntimeError:
+            if self.mode == "judging" and self.epoch == binding["cancellation_epoch"]:
+                self.move("waiting_input")
+                self.record(
+                    "model_failure", {"event_id": submitted.event_id, "deadline_seconds": 10}
+                )
+                self.action(
+                    "clarification",
+                    "模拟判断未取得。原输入已保留，可补充、跳过或停止。",
+                    "clarification",
+                )
+            return {"ack": "failed", "snapshot": self.snapshot()}
+        finally:
+            self.jobs.discard(job)
+        try:
+            self.approve(proposal)
+        except ValueError:
+            if self.mode == "judging" and self.epoch == binding["cancellation_epoch"]:
+                self.record("proposal_rejected", {"event_id": submitted.event_id})
+                self.move("waiting_input")
+                self.action(
+                    "clarification",
+                    "判断超出当前任务依据，原输入保留；可澄清、跳过或停止。",
+                    "clarification",
+                )
+            return {"ack": "rejected_proposal", "snapshot": self.snapshot()}
+        if attempt:
+            attempt["judgment"] = proposal.judgment
+            attempt["evidence"] = proposal.evidence
+        help_map = {}
+        if proposal.judgment == "incorrect":
+            help_map = task.supports[0].help
+        elif proposal.judgment == "help":
+            count = self.help_count.get(self.task_instance_id, 0)
+            self.help_count[self.task_instance_id] = count + 1
+            if count < len(task.supports):
+                help_map = task.supports[count].help
+        action = self.action(
+            "help" if help_map else "feedback",
+            proposal.text,
+            "next_task"
+            if proposal.judgment in {"correct", "reported"}
+            else "clarification"
+            if proposal.judgment == "unclear"
+            else "retry",
+            help_map,
+        )
+        self.inputs[submitted.event_id]["response_action"] = action.action_id
+        return {"ack": "accepted", "snapshot": self.snapshot()}
+
+    def approve(self, proposal: ModelProposal):
+        if (
+            self.mode != "judging"
+            or proposal.activity_id != self.activity_id
+            or proposal.task_instance_id != self.task_instance_id
+            or proposal.wait_id != self.wait_id
+            or proposal.core_revision != self.revision
+            or proposal.cancellation_epoch != self.epoch
+            or proposal.event_id not in self.inputs
+        ):
+            raise Conflict("expired or out-of-bound model proposal")
+        if proposal.evidence != self.course.tasks[self.task_index].evidence:
+            raise ValueError("model proposal does not use the fixed task evidence")
+        self.record("approved_proposal", proposal.model_dump(mode="json"))
+
+    def facts(self):
+        if self.mode != "ended" or self.end is None:
+            raise ValueError("facts can only be sealed after the fixed end boundary")
+        return {
+            "status": "checked",
+            "activity_id": self.activity_id,
+            "started_at": self.started_at.isoformat(),
+            "course_ref": self.course_ref.model_dump(),
+            "bindings": self.bindings,
+            "end": self.end,
+            "events": [
+                event
+                for event in self.events
+                if event["sequence"] <= self.end["last_valid_event"] + 1
+            ],
+            "attempts": self.attempts,
+            "qualification": "not_granted",
+            "limitations": ["明确模拟活动，不能作为儿童学习证据。"],
+        }
