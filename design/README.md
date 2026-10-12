@@ -1,6 +1,6 @@
 # Project J 模块设计入口
 
-版本：1.11.0；更新：2026年10月12日；阶段：产品与模块设计。
+版本：1.12.0；更新：2026年10月12日；阶段：产品与模块设计。
 
 J以家长工作台和学生课堂为入口，采用八个职责模块与一个显式应用协调层。模块是应用内部边界，不要求独立服务或多个Agent。共同含义、规范权威、当前阶段和真实数据范围统一见[shared](shared/README.md)。
 
@@ -51,4 +51,4 @@ flowchart TD
 
 ## 现有文件与未来代码
 
-design存设计；courses存课程及素材；project_j、web、scripts和tests保留0.1实验原型。应用协调层有明确逻辑归属，技术基线已采用[本机网页与Python后端方案](../docs/technology.md)，最终代码路径与依赖版本按[阶段0](../docs/roadmap.md)细化；[最小版本](../docs/mvp.md)限定首轮能力。开发从根[AGENTS](../AGENTS.md)和本入口按任务读取，不把完整档案、所有历史或全部设计送进每轮课堂模型。
+design存设计；courses存课程及素材；全部工程文件放在project_j，不同语言按需分子目录，0.1原型已删除（[ADR-0012](../decisions/ADR-0012.md)）。应用协调层有明确逻辑归属，技术基线已采用[本机网页与Python后端方案](../docs/technology.md)，project_j内子目录与依赖版本按[阶段0](../docs/roadmap.md)细化；[最小版本](../docs/mvp.md)限定首轮能力。开发从根[AGENTS](../AGENTS.md)和本入口按任务读取，不把完整档案、所有历史或全部设计送进每轮课堂模型。
