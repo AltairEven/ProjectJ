@@ -1,6 +1,6 @@
 # 课程内容的分层与关系
 
-文档版本：1.0.0；更新：2026年10月12日；范围：逻辑设计，未实现。
+文档版本：1.1.0；更新：2026年10月12日；范围：逻辑设计，未实现。
 
 内容库将备课成果组织为可追溯、可复用的对象，保证课堂与评价取得实际使用的内容。模块入口见[README.md](README.md)。本文件不规定物理文件布局、API或数据库。
 
@@ -48,4 +48,4 @@ flowchart LR
 
 teacher维护唯一Jane的角色与全局策略，模板和课程只引用实际版本及本课展开。learning维护档案/计划/状态，课程引用相关准备依据，不复制完整档案为持续更新的学生画像。evaluation维护真实事实与判断，成人开发数据不能通过课程库导入为儿童学习历史。
 
-索引与选择见[discovery-reuse.md](discovery-reuse.md)，版本见[versions-lifecycle.md](versions-lifecycle.md)，素材与历史见[presentation-resources.md](presentation-resources.md)、[history-corrections.md](history-corrections.md)。本轮只建立设计说明。
+索引与选择见[discovery-reuse.md](discovery-reuse.md)，版本见[versions-lifecycle.md](versions-lifecycle.md)，素材与历史见[presentation-resources.md](presentation-resources.md)、[history-corrections.md](history-corrections.md)。

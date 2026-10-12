@@ -1,6 +1,6 @@
 # 回答判断、分级帮助与纠错
 
-文档版本：1.0.0；更新：2026年10月12日；范围：逻辑设计，未实现。
+文档版本：1.1.0；更新：2026年10月12日；范围：逻辑设计，未实现。
 
 判断依据来自本课核实任务与材料，指导方法来自绑定Jane策略。当前反馈支持学习，最终跨课能力判断由evaluation/learning处理；一次答对、顺畅或完成不代表稳定掌握。
 
@@ -43,10 +43,10 @@
 4. 留一次适合的再试，按实际帮助判断结果；没有再试保留未观察。
 5. 根据结果继续、撤去适当支持、换指导或退出，不泛泛表扬错答或只宣布“错了”。
 
-合理变式与错误分别处理；未解决的内容/答案问题采用暂停、跳过或停止路径，结束反馈后走[内容更正](../curriculum/history-corrections.md)。不能热换答案依据后重放历史输入，也不能为了纠错改写孩子原回答。
+合理变式与错误分别处理；未解决的内容/答案问题采用暂停、跳过或停止路径，结束后走[内容更正](../curriculum/history-corrections.md)。不能热换答案依据后重放历史输入，也不能为了纠错改写孩子原回答。
 
 ## 教学调整权限
 
 课堂可选择已准备的方法、支持、降阶、挑战与备用，在任务和预算范围内调整措辞。改变主要目标、评价依据、独立条件或全局Jane配置不属于当堂自由调整；条件变化采用允许路径并记录，后续正式修订交对应模块。
 
-本轮不生成真实帮助材料、不评孩子能力或修改已有课程。交互与材料规则见[interaction-harness.md](interaction-harness.md)、[materials-offscreen.md](materials-offscreen.md)，统一交接见[closing-handoffs.md](closing-handoffs.md)。
+交互与材料规则见[interaction-harness.md](interaction-harness.md)、[materials-offscreen.md](materials-offscreen.md)，统一交接见[closing-handoffs.md](closing-handoffs.md)。
