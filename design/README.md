@@ -1,6 +1,6 @@
 # Project J 模块设计入口
 
-版本：1.3.0；更新：2026年10月12日；阶段：产品与模块设计。
+版本：1.4.0；更新：2026年10月12日；阶段：产品与模块设计。
 
 Project J 采用家长工作台与学生课堂两种界面，串起准备下一课、备课预览、课堂互动、离屏活动、课后反馈、评价与下节调整。当前梳理职责、流程、输入输出和质量条件，不选择最终技术栈，也不继续实现应用功能。
 
@@ -11,7 +11,7 @@ Project J 采用家长工作台与学生课堂两种界面，串起准备下一�
 | [learning/](learning/README.md) | 孩子档案、全学科能力状态、长期与短期计划及课后更新 | 下一课需求、计划调整、可追溯状态修订 |
 | [preparation/](preparation/README.md) | 将需求、状态和Jane方法转成核实课程、素材与简报 | 课程包、核验依据、家长预览、备课完成范围及启动要求 |
 | [teacher/](teacher/README.md) | 唯一教师Jane的角色、通用规则、学科/课型策略和反馈迭代 | 有适用范围的教学配置、方法与改进版本 |
-| [curriculum/](curriculum/README.md) | 课程包、教材与素材、评价依据及绑定的Jane版本与本课简报 | 可追溯的课程版本与教学资源 |
+| [curriculum/](curriculum/README.md) | 资料/资源/模板/课程包的版本、复用、呈现与历史更正 | 固定内容及依赖、使用引用、检查范围与更正限制 |
 | [classroom/](classroom/README.md) | 本堂会话、教学动作、Harness、帮助纠错和收尾 | 当前教学回应、本堂实际事件与帮助条件 |
 | [evaluation/](evaluation/README.md) | 课后反馈、事实整理、评价与下节建议 | 课堂报告、学习状态更新依据、下节预期 |
 | [interface/](interface/README.md) | 家长和孩子各自看到什么、怎样操作 | 两种界面及完整使用流程 |
@@ -24,6 +24,8 @@ Project J 采用家长工作台与学生课堂两种界面，串起准备下一�
 八个大模块中的teacher维护Jane唯一身份及其方法库。已细分[角色](teacher/role.md)、[通用规则](teacher/rules.md)、[学科策略](teacher/subject-strategies.md)、[课型策略](teacher/lesson-types.md)、[反馈与版本](teacher/improvement.md)和[模块交接](teacher/handoffs.md)。备课选择方法，课程保存绑定，课堂按允许范围应用，评价提供改进依据；模块尚未实现。
 
 备课已细分[输入与流程](preparation/inputs-workflow.md)、[课程包与简报](preparation/course-package.md)、[多模态素材](preparation/multimodal-materials.md)、[核验](preparation/verification.md)、[家长预览](preparation/parent-preview.md)、[两层就绪](preparation/readiness.md)和[版本/交接](preparation/versions-handoffs.md)。仅为设计，未生产真实课程或媒体、未接入原型。
+
+课程与教学内容已细分[分层组织](curriculum/organization.md)、[版本/生命周期](curriculum/versions-lifecycle.md)、[检索与复用](curriculum/discovery-reuse.md)、[素材呈现](curriculum/presentation-resources.md)、[历史与更正](curriculum/history-corrections.md)和[模块交接](curriculum/handoffs.md)。内容库和新状态系统未实现，不改写现有课程或真实历史。
 
 ## 使用流程与责任归属
 
@@ -46,6 +48,7 @@ platform为这些步骤提供能力，不决定教学目标、难度、评分或
 
 - 学习计划、课程设计、本堂实施事实、评价与状态修订分别维护并互相引用。下节建议不等于课程已备好，计划到期不等于已实施。
 - 备课是生产和核对内容的过程；curriculum维护该过程产出的课程版本与素材。原始材料不在各模块复制多个权威副本。
+- 课程生命周期、备课完成、本次启动条件和真实使用关系分别维护，固定或本地发布不表示可开课，课程用过一次不永久完成。复用看目标/条件/熟悉程度，更正保留原内容并回查相关评价与状态，停用/归档不自动删除历史依赖。
 - 目标和验证任务先行，必需素材提前核验，课堂生成限定用途且有备用。preparation提供备课完成依据；classroom/platform/interface核对本次设备、材料和家庭条件。预览与家长实际阅读分别记，不能以预览或格式检查替代就绪。
 - Jane始终是唯一教师。teacher维护全局角色与策略，preparation编制本课简报，curriculum保存实际绑定的版本与历史；学科、课型和模型变化不创建另一位教师。课堂不热更新全局教师规则。
 - Harness保持会话状态、允许的教学动作、帮助条件与停止规则；模型可在课程允许范围内理解和调整指导。程序通过不能替代内容与教学效果评价。
