@@ -1,6 +1,6 @@
 # Project J 模块设计入口
 
-版本：1.7.0；更新：2026年10月12日；阶段：产品与模块设计。
+版本：1.8.0；更新：2026年10月12日；阶段：产品与模块设计。
 
 Project J 采用家长工作台与学生课堂两种界面，串起准备下一课、备课预览、课堂互动、离屏活动、课后反馈、评价与下节调整。当前梳理职责、流程、输入输出和质量条件，不选择最终技术栈，也不继续实现应用功能。
 
@@ -15,7 +15,7 @@ Project J 采用家长工作台与学生课堂两种界面，串起准备下一�
 | [classroom/](classroom/README.md) | 本堂教学核心、统一事件/动作/交付反馈、Harness与收尾 | 允许教学动作、本堂实际事件/条件与结束原因 |
 | [evaluation/](evaluation/README.md) | 课后事实/评价、备课课堂对照、建议与更正回查 | 状态修订依据、下节预期、主责/关联改进与实际处理范围 |
 | [interface/](interface/README.md) | 家长/学生视图、预览反馈、媒介与角色/设备接续 | 统一事件与允许呈现/交付、真实状态和操作反馈 |
-| [platform/](platform/README.md) | 模型、语音、多模态、数据存储和通用运行能力 | 可替换的接入与存储能力、通用故障处理 |
+| [platform/](platform/README.md) | 模型、实时语音、多模态、配置/权限、同步、存储和故障 | 实际能力/配置/版本、受控交付和取消、保存与缺口 |
 
 每个模块先用README维护职责、输入输出和边界。后续需求、流程、接口与验证方案放进对应目录，出现实际需要后再细分。模块表示一个应用内部的职责，不要求拆成独立服务或多个Agent。
 
@@ -32,6 +32,8 @@ Project J 采用家长工作台与学生课堂两种界面，串起准备下一�
 评价已细分[输入/反馈](evaluation/inputs-feedback.md)、[事实/证据](evaluation/facts-evidence.md)、[任务判断](evaluation/assessment.md)、[备课课堂对照](evaluation/lesson-alignment.md)、[下节建议](evaluation/next-lesson.md)、[报告/修订](evaluation/reports-revisions.md)和[模块交接](evaluation/handoffs.md)。学生表现、教学行为与准备/实际差异分别解释，对照保留课前基线并反馈主责/关联；本轮仅设计，未评价真实孩子或实现下游更新。
 
 界面已细分[家长工作台](interface/parent-workbench.md)、[学生课堂](interface/student-classroom.md)、[预览/启动](interface/preview-start.md)、[反馈/报告](interface/feedback-reports.md)、[媒介适配](interface/input-output-adapters.md)、[角色/设备](interface/roles-devices.md)和[模块交接](interface/handoffs.md)。视图不自建评分/转场，媒介遵守任务条件，切换原会话、来源与权限分开，停止/同步状态如实呈现；仅设计，未实现新页面或多端。
+
+基础服务已细分[模型](platform/models.md)、[实时语音](platform/realtime-voice.md)、[多模态](platform/multimodal-materials.md)、[配置/权限与儿童数据](platform/configuration-permissions.md)、[会话同步](platform/sessions-sync.md)、[数据存储](platform/storage-lifecycle.md)、[故障/性能](platform/failures-performance.md)和[模块交接](platform/handoffs.md)。统一技术请求与结果，课堂核心先允许再发声，运行与业务版本相连，服务商留存与本地策略分别检查；仅设计，实际服务/账户和新版流程未验收。
 
 ## 使用流程与责任归属
 
@@ -64,6 +66,7 @@ platform为这些步骤提供能力，不决定教学目标、难度、评分或
 - 学生学习状态与Jane教学行为分别维护；评价用实际证据支持两类调整。Jane改进兼顾独立能力、保持/迁移、体验与家庭投入，不以顺畅、喜好或完成量代替效果依据。
 - 评价维护有来源事实与任务判断，learning维护状态/计划，teacher维护Jane；备课与实际五维对照区分合理适配、设计/执行问题和未知，反馈主责/关联。覆盖率、顺畅与模型自信不证明效果，保存/下游落实分别报告，更正回查而不重复计样本。
 - 家长/学生界面只取当前许可内容，角色标签不证明实际提供者；字幕/重播/语速及替代媒介按任务条件，核心收到交付反馈。切换页面/设备原会话接续，明确当前学习输入与语音输出；本端取消与核心同步分别显示，断网不承诺远端已停。
+- platform按用途调用必要能力，实际模型/参数、内容/运行版本和交付范围可核对，不把格式或接口成功当教学完成。活动/连接/服务商会话分开，取消/重连核对核心状态；保存与下游落实分别回报。儿童外发数据条件、本地内存策略、Git和服务商保留分别处理，缺口不靠配置声明覆盖。
 - LearningWithAI暂保留家庭档案与历史权威；本轮不迁移或回写。未来对接需明确来源、版本、数据责任和验证方法。
 
 ## 现有文件与后续实现
