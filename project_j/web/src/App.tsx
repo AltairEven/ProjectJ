@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { acknowledgePause, cancel, presentationCancelled, type Cancellation } from './cancellation'
+import { canConfirm } from './confirmation'
 import type { Snapshot, Dashboard, RevisionRef as Ref, Document as Doc, Control, StudentControl, DeliveryFeedback, TextInput, VoiceSignal, PreparationResult as PrepareResult, StartResult, InputResult as Ack } from './client/types.gen'
 
 const learner = 'fictional-L1'
@@ -233,7 +234,7 @@ function Student({ token }: { token: string }) {
       snapshot?.mode !== 'ended' && <section><label>你的虚构回答或报告<textarea value={text} onChange={event => setText(event.target.value)} disabled={localCancelled} /></label>
         <div className="row"><button disabled={busy || !text.trim() || localCancelled} onClick={() => void input(text)}>提交</button>
           <button className="quiet" disabled={busy || localCancelled} onClick={() => void input('帮我一下', 'help')}>帮我一下</button>
-          <button className="quiet" disabled={busy || localCancelled} onClick={() => void input('听到了，收到当前说明。', 'confirmation')}>确认收到说明</button>
+          {canConfirm(snapshot) && <button className="quiet" disabled={busy || localCancelled} onClick={() => void input('听到了，收到当前说明。', 'confirmation')}>确认收到说明</button>}
           <button className="quiet" disabled={!lastInput || !text.trim() || localCancelled} onClick={() => void input(text, 'unknown', true)}>还没说完，补充</button>
           <button className="quiet" onClick={() => void control('repeat')}>重复当前内容</button></div></section>}
     {snapshot?.mode === 'ended' && <section><h2>本堂已结束</h2><p>只保留已发生范围；事实封存独立进行，家长可随后反馈。</p></section>}

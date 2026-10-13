@@ -1,0 +1,177 @@
+"""Manual-debug regressions using simulated providers and pytest temporary stores."""
+
+import asyncio
+
+import pytest
+from fastapi.testclient import TestClient
+from support import CONDITIONS, LEARNER, answer, deliver_all, start
+
+from project_j.application.configuration import Settings
+from project_j.contracts import RevisionRef
+from project_j.interface.api import create_app
+
+
+@pytest.mark.parametrize("text", ["she wants a bridge", "She wants a bridge for her car."])
+def test_first_question_accepts_the_filled_sentence_frame_after_help(application, text):
+    async def scenario():
+        core = start(application)
+        deliver_all(core)
+        await answer(application, "收到", "confirmation")
+        await answer(application, "a car")
+        assert core.task_index == 0 and core.attempts[0]["judgment"] == "incorrect"
+        await answer(application, "帮我一下", "help")
+        await answer(application, "还是不懂，帮我一下", "help")
+        await answer(application, text)
+        assert core.task_index == 1
+        assert core.attempts[-1]["judgment"] == "correct"
+        assert core.attempts[-1]["inputs"][0]["text"] == text
+        assert core.attempts[-1]["help"]["english.reading.facts"] == "scaffold"
+        core.control("stop", "stop")
+        application.seal()
+
+    asyncio.run(scenario())
+
+
+def test_all_template_sentence_frames_and_saved_c2_follow_the_corrected_flow(application):
+    app = application
+
+    async def scenario():
+        core = start(app)
+        deliver_all(core)
+        await answer(app, "收到", "confirmation")
+        await answer(app, "that thing")
+        assert core.task_index == 0 and core.attempts[-1]["judgment"] == "unclear"
+        await answer(app, "she wants a bridge")
+        await answer(app, "She folded a new piece of paper.")
+        assert core.task_index == 2
+        await answer(app, "我指的是折过的纸。", "report")
+        core.control("returned", "return")
+        deliver_all(core)
+        await answer(app, "同一本书和同一辆车，纸折后车没有掉。", "report")
+        await answer(app, "收到小结", "confirmation")
+        assert core.mode == "ended"
+        fact = app.seal()
+        app.feedback("feedback", LEARNER, core.activity_id, "明确模拟：无额外补充")
+        result = await app.next_course("next", LEARNER, core.activity_id)
+        course_ref = RevisionRef.model_validate(result["next_package"]["course_ref"])
+        course = app.store.read(course_ref, LEARNER)
+        assert course.body["demand_ref"] == app.current(LEARNER, "demand").ref.model_dump()
+        assert (
+            app.start("c2-start", LEARNER, course_ref, CONDITIONS)["decision"] == "allow_simulation"
+        )
+        next_core = app.core
+        deliver_all(next_core)
+        await answer(app, "收到", "confirmation")
+        await answer(app, "He first tries the small bus.")
+        await answer(app, "The paper bends and the big bus falls.")
+        assert next_core.task_index == 2
+        assert all(attempt["judgment"] == "correct" for attempt in next_core.attempts)
+        next_core.control("next-stop", "stop")
+        app.seal()
+        assert app.store.read(fact.ref, LEARNER).body == fact.body
+
+    asyncio.run(scenario())
+
+
+def test_wrong_phase_confirmation_is_not_an_attempt_and_cannot_cancel_judgment(application):
+    app = application
+
+    async def scenario():
+        core = start(app)
+        deliver_all(core)
+        await answer(app, "收到", "confirmation")
+        revision, epoch, events = core.revision, core.epoch, len(core.events)
+        with pytest.raises(ValueError, match="当前不需要确认"):
+            await app.adapter.text("unexpected", "听到了，收到当前说明。", "confirmation")
+        assert not core.attempts and not app.model.calls
+        assert (core.revision, core.epoch, len(core.events)) == (revision, epoch, events)
+        assert "unexpected" not in core.inputs
+        app.model.delay_seconds = 0.03
+        pending = asyncio.create_task(app.adapter.text("answer", "a bridge"))
+        await asyncio.sleep(0.005)
+        assert core.mode == "judging"
+        epoch = core.epoch
+        with pytest.raises(ValueError, match="当前不需要确认"):
+            await app.adapter.text("bad-supplement", "收到", "confirmation", "supplement", "answer")
+        assert core.epoch == epoch and core.mode == "judging"
+        assert (await pending)["ack"] == "accepted"
+        deliver_all(core)
+        assert len(core.attempts) == len(app.model.calls) == 1 and core.task_index == 1
+        core.control("stop", "stop")
+        app.seal()
+
+    asyncio.run(scenario())
+
+
+def test_legal_confirmation_replays_and_closes_without_learning_attempts(application):
+    app = application
+
+    async def scenario():
+        core = start(app)
+        deliver_all(core)
+        await app.adapter.text("goal-receipt", "听到了，收到当前说明。", "confirmation")
+        deliver_all(core)
+        assert (await app.adapter.text("goal-receipt", "听到了，收到当前说明。", "confirmation"))[
+            "ack"
+        ] == "replayed"
+        assert core.task_index == 0 and not core.attempts and not app.model.calls
+        core.control("close", "close")
+        deliver_all(core)
+        await app.adapter.text("closing-receipt", "收到小结", "confirmation")
+        assert core.mode == "ended" and core.end["reason"] == "normal"
+        assert not core.attempts and not app.model.calls
+        assert app.seal().body["attempts"] == []
+
+    asyncio.run(scenario())
+
+
+def test_api_rejects_confirmation_at_answer_wait_without_a_model_call(application):
+    app = application
+    with TestClient(create_app(Settings(), app)) as client:
+        parent = {"Authorization": f"Bearer {app.parent_token}"}
+        prepared = client.post(
+            "/api/parent/prepare",
+            headers=parent,
+            json={"request_id": "prepare", "learner_id": LEARNER},
+        ).json()
+        started = client.post(
+            "/api/parent/start",
+            headers=parent,
+            json={
+                "request_id": "start",
+                "learner_id": LEARNER,
+                "course_ref": prepared["course_ref"],
+                "conditions": CONDITIONS,
+            },
+        ).json()
+        student = {"Authorization": f"Bearer {started['student_token']}"}
+        deliver_all(app.core)
+        assert (
+            client.post(
+                "/api/student/input",
+                headers=student,
+                json={"event_id": "goal", "text": "收到", "intent": "confirmation"},
+            ).status_code
+            == 200
+        )
+        deliver_all(app.core)
+        wrong = client.post(
+            "/api/student/input",
+            headers=student,
+            json={"event_id": "wrong", "text": "收到", "intent": "confirmation"},
+        )
+        assert wrong.status_code == 400
+        assert "当前不需要确认" in wrong.json()["message"]
+        assert not app.core.attempts and not app.model.calls
+        assert (
+            client.post(
+                "/api/student/input",
+                headers=student,
+                json={"event_id": "answer", "text": "she wants a bridge"},
+            ).status_code
+            == 200
+        )
+        assert app.core.attempts[-1]["judgment"] == "correct"
+        client.post(
+            "/api/student/control", headers=student, json={"event_id": "stop", "command": "stop"}
+        )

@@ -410,6 +410,11 @@ class Harness:
                         "原识别已更正，解释待复核；原答和已交付帮助保留。"
                     )
             return {"ack": "accepted", "snapshot": self.snapshot()}
+        if submitted.intent == "confirmation" and self.wait_kind not in {
+            "goal_confirmation",
+            "closing_confirmation",
+        }:
+            raise ValueError("当前不需要确认收到；请回答或补充当前问题。")
         if submitted.relation == "supplement":
             original = self.inputs.get(submitted.related_event_id)
             if (
