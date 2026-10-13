@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 from fastapi.testclient import TestClient
 from support import CONDITIONS, LEARNER
@@ -6,6 +8,7 @@ from project_j.application.configuration import Settings
 from project_j.application.documents import document, identity
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.corrections import correct, release
+from project_j.interface import api
 from project_j.interface.api import create_app
 from project_j.learning.maintenance import decide, review
 from project_j.platform.storage import Conflict, Publication, SaveKey
@@ -145,6 +148,22 @@ def test_E2E17_simulation_report_never_grants_real_interface_or_child_qualificat
     with pytest.raises(ValueError):
         Settings(realm="family")
     assert settings.classroom_effort == "low" and settings.evaluation_effort == "medium"
+
+
+def test_serve_uses_explicit_simulation_root_and_keeps_default(monkeypatch, tmp_path):
+    started = []
+    monkeypatch.setattr(api.uvicorn, "run", lambda app, **_: started.append(app))
+    root = tmp_path / "simulation"
+    monkeypatch.setattr(
+        sys, "argv", ["project-j-serve", "--run-id", "r1", "--simulation-root", str(root)]
+    )
+    api.main()
+    assert started and (root / "r1" / "project_j.sqlite3").is_file()
+    default = Settings()
+    assert (
+        default.project_root / default.simulation_root
+        == default.project_root / "project_j/private/simulation"
+    )
 
 
 def test_API_role_separation_unknown_start_and_stop_do_not_expose_teacher_material(application):

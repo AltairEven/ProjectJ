@@ -1,6 +1,6 @@
 # 数据存储与生命周期
 
-文档版本：1.5.0；更新：2026年10月13日；范围：存储设计及P1隔离实现。
+文档版本：1.6.0；更新：2026年10月13日；范围：存储设计及P1隔离实现。
 
 存储服务承载保存、读取、版本依赖、导出和恢复。业务模块定义数据含义及有效更新，平台维护物理可获取性、访问和保存结果；数据库事务或文件成功不能证明评价正确或所有下游已落实。
 
@@ -54,7 +54,7 @@
 
 | 分区 | 确定路径（相对于项目根） | 创建条件 |
 | --- | --- | --- |
-| 模拟运行 | `project_j/private/simulation/<run_id>/project_j.sqlite3`及`assets/`、`exports/`、`backups/` | 阶段1隔离入口；P0检查仅使用系统临时目录 |
+| 模拟运行 | 默认`project_j/private/simulation/<run_id>/project_j.sqlite3`及`assets/`、`exports/`、`backups/`；启动参数`--simulation-root`可显式指定另一名为`simulation`的根目录，同样0700/0600并拒绝其他分区与符号链接 | 阶段1隔离入口；P0检查仅使用系统临时目录 |
 | 成人实际检查 | `project_j/private/adult_checks/<run_id>/`，只有技术/成人报告，实际声音缓冲不落盘 | 账号/成人设备条件具备且实际操作；不能包含儿童状态 |
 | 未来家庭私有区 | `project_j/private/family/project_j.sqlite3`及`assets/`、`exports/`、`backups/` | 阶段5数据切换及真实入口验收后创建，P0—4入口不得访问/创建 |
 | 凭据 | 后端进程环境变量；若未来采用文件则`project_j/private/credentials/`并限制本地访问 | 不从浏览器/普通配置传长期密钥，不自动加载或导出；P0没有密钥文件 |

@@ -1,10 +1,10 @@
 # 开发交接记录
 
-版本：1.8.1；更新：2026年10月13日。
+版本：1.9.0；更新：2026年10月13日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
-自2026年10月13日[DOC-C1](#doc-c1-共建协作规则更新)起，GPT与Opus不再要求互相审查。此前批次中的审查角色、请求和“待审查/待复审”等表述保留为当时的历史记录，不构成当前继续条件；已有审查证据和发现的问题仍按实际范围保留，不补写未取得的审查通过。当前P1-R3已完成修复与自测，后续隔离模拟调试和测试由Opus接续。
+自2026年10月13日[DOC-C1](#doc-c1-共建协作规则更新)起，GPT与Opus不再要求互相审查。此前批次中的审查角色、请求和“待审查/待复审”等表述保留为当时的历史记录，不构成当前继续条件；已有审查证据和发现的问题仍按实际范围保留，不补写未取得的审查通过。当前P1-R3已完成修复与自测，后续隔离模拟调试和测试由Opus接续，按[TEST-C1](#test-c1-调试与测试规范)的目录与规则进行。
 
 ## P0 阶段0：确认边界与接入
 
@@ -304,3 +304,20 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 原人工模拟F1已封存并保留，新C1已准备但尚未开课。当前两个课包是原C1与修复后C1，不能计作C2；人工流程尚无课后反馈、评价或状态/需求更新。
 - 接续重点：由家长显式开始新包，检查完整句作答、错误/帮助后的新尝试、确认按钮、暂停恢复及停止；结束封存后追加模拟反馈，继续到实际保存下一课程包C2，并记录浏览器结果与失败接续。活动课堂期间不运行工程检查或Git。
 - 真实API、语音、成人五分钟/30分钟、儿童入口与教学效果仍未验证；固定模拟答案集有限，不能将通过的自动测试扩大为真实模型语义或完整浏览器验收。
+
+## TEST-C1 调试与测试规范
+
+- 状态：已完成（2026年10月13日）。家长在开始调试前约定调试/测试规范：单元测试按惯例随工程管理，其余调试和测试内容全部放project_j/test/，不污染工程，第一版正式版发布后删除该目录。
+- 负责人/集成：Claude Opus；起点f856a59，工作区干净。
+- 家长确认的决定：整个project_j/test/只留本机、不进Git；调试和UI测试的模拟运行数据放该目录，工程只增加通用的`--simulation-root`启动参数，默认路径不变；课中观察例外仅限数据根在project_j/test/simulation的模拟运行。规则正文在[AGENTS调试与测试](../AGENTS.md#调试与测试)。
+- 文件边界：AGENTS.md、project_j/{.gitignore,README.md}、project_j/python/src/project_j/{application/configuration.py,interface/api.py}、project_j/python/tests/test_maintenance_api.py、design/platform/storage-lifecycle.md、docs/handoff.md；不改业务合同、依赖或运行数据。
+- 不做：UI测试子工程的工具选型与搭建另行确认；private/simulation下既有p1-r2-debug-20261013与ui-inspection运行目录原样保留（前者为P1-R3交接证据，8765服务仍在使用）。
+- 验收：新增参数先有失败测试；显式根目录生效且默认路径不变；工程、登记检查和docs不依赖project_j/test/；AGENTS全部登记命令通过。
+
+### 检查证据
+
+- 新增测试test_serve_uses_explicit_simulation_root_and_keeps_default先因argparse不识别参数失败，实现后通过；Settings新增相对项目根的simulation_root，api.py两处写死路径改为读取设置，备份恢复本就跟随当前存储根，未改。
+- AGENTS全部登记命令通过：锁定sync、两份npm ci/audit（各0项已知告警）、统一check（132项pytest、6项前端回归、Ruff/格式、OpenAPI/类型生成与检查、Vite构建、文档自测/本地链接）、默认离线probe及模拟measure。检查UTC 2026-10-13T13:14:34.902783+00:00，工程摘要dfc8fbcb3afc5abfd542cc928f05b60803cad3d2eb6ac37c7bc5fd487cde3faa，simulation_only/not_granted。
+- 本机冒烟：start.sh加`--simulation-root project_j/test/simulation`在127.0.0.1:8799启动，页面HTTP 200，数据库只落在project_j/test/simulation/test-c1-smoke（目录0700、文件0600），private/simulation无新增；SIGINT后端口释放，未开课、无模型调用。8765上的既有服务未受影响。
+- 依赖核对：受检文档无指向project_j/test/的链接，工程源码、脚本和前端不引用该目录；project_j/.gitignore以`/test/`忽略整个目录。
+- 继续入口：调试和UI测试按AGENTS调试与测试进行；UI测试子工程的工具选型尚待家长确认。真实API、语音、成人时长、儿童入口和教学效果仍未验证。

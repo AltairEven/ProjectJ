@@ -205,9 +205,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
     @asynccontextmanager
     async def lifespan(app):
         app.state.coordinator = coordinator or Coordinator(
-            SimulationStore(
-                settings.project_root / "project_j/private/simulation", settings.run_id
-            ),
+            SimulationStore(settings.project_root / settings.simulation_root, settings.run_id),
             settings.project_root,
         )
         app.state.coordinator.initialize()
@@ -659,10 +657,10 @@ def main():
     )
     parser.add_argument("--run-id", default="local-simulation")
     parser.add_argument("--port", type=int, default=8765)
-    args = parser.parse_args()
-    settings = Settings(run_id=args.run_id, port=args.port)
+    parser.add_argument("--simulation-root", type=Path, default=argparse.SUPPRESS)
+    settings = Settings(**vars(parser.parse_args()))
     coordinator = Coordinator(
-        SimulationStore(settings.project_root / "project_j/private/simulation", settings.run_id),
+        SimulationStore(settings.project_root / settings.simulation_root, settings.run_id),
         settings.project_root,
     )
     print(f"隔离模拟工作台：http://127.0.0.1:{settings.port}/#parent={coordinator.parent_token}")
