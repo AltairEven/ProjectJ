@@ -671,11 +671,29 @@ def main():
     parser.add_argument("--run-id", default="local-simulation")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--simulation-root", type=Path, default=argparse.SUPPRESS)
+    debug = "调试用，只作用于模拟提供者和存储："
+    parser.add_argument(
+        "--model-delay",
+        type=float,
+        default=argparse.SUPPRESS,
+        help=f"{debug}每次模拟模型调用等待秒数",
+    )
+    parser.add_argument(
+        "--fail-once",
+        default=argparse.SUPPRESS,
+        help=f"{debug}注入一次失败，如fact:before_commit、after_commit、ledger或model",
+    )
     settings = Settings(**vars(parser.parse_args()))
     coordinator = Coordinator(
         SimulationStore(settings.project_root / settings.simulation_root, settings.run_id),
         settings.project_root,
     )
+    coordinator.model.delay_seconds = settings.model_delay
+    coordinator.model.fail_next = settings.fail_once == "model"
+    if settings.fail_once != "model":
+        coordinator.store.fail_at = settings.fail_once
+    if settings.model_delay or settings.fail_once:
+        print(f"调试注入：模型延迟{settings.model_delay}秒；一次失败{settings.fail_once or '无'}。")
     print(f"隔离模拟工作台：http://127.0.0.1:{settings.port}/#parent={coordinator.parent_token}")
     print("真实API/声音/儿童入口未验证且关闭；不加载.env、不调用麦克风。")
     uvicorn.run(

@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,3 +20,9 @@ class Settings(BaseSettings):
     classroom_effort: Literal["low"] = "low"
     preparation_effort: Literal["medium"] = "medium"
     evaluation_effort: Literal["medium"] = "medium"
+    # Debug-only switches for the simulated provider and store; both default to off.
+    model_delay: float = Field(default=0, ge=0)
+    fail_once: str | None = Field(
+        default=None,
+        pattern=r"^(?:(?:[a-z_]+:)?(?:before_publish|before_commit|after_commit)|ledger|model)$",
+    )

@@ -246,7 +246,7 @@ def test_invalid_structured_proposal_retains_input_and_offers_clarification(
         deliver_all(core)
         await answer(application, "收到", "confirmation")
 
-        async def wrong_evidence(binding, task, text, count):
+        async def wrong_evidence(binding, task, text, count, is_help):
             return ModelProposal(
                 **binding,
                 judgment="correct",

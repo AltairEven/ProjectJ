@@ -8,8 +8,12 @@ from project_j.learning.contracts import DemandBody, PlanBody
 from project_j.platform.storage import Conflict, Publication
 
 
-def applicable_plan(body: dict) -> PlanBody:
+def applicable_plan(app, learner_id: str, body: dict) -> PlanBody:
     data = PlanBody.model_validate(body)
+    known = {doc.body["dimension_id"] for doc in app.store.list_current(learner_id, "capability")}
+    if data.main_goal.dimension_id not in known:
+        # Rewording a goal never creates a capability; new identities go through the catalog.
+        raise ValueError("plan goal must use an established capability identity")
     if data.budget_minutes != 30:
         raise ValueError(
             "the adopted MVP remains 30 minutes; "
@@ -29,7 +33,7 @@ def review(app, request_id: str, learner_id: str, level: str, proposed_patch: di
     plan = app.current(learner_id, f"plan:{level}")
     if proposed_patch:
         # A proposal that can never be applied is rejected before anyone can accept it.
-        applicable_plan(plan.body | proposed_patch)
+        applicable_plan(app, learner_id, plan.body | proposed_patch)
     state = app.current(learner_id, "state")
     evaluations = app.store.list_current(learner_id, "evaluation")
     operation = app.request(
@@ -132,7 +136,7 @@ def decide(app, request_id: str, learner_id: str, decision_ref: RevisionRef, cho
     ):
         raise Conflict("proposal baseline changed; a new concrete proposal must be confirmed")
     if choice == "accept":
-        applicable_plan(plan.body | proposal.body["patch"])
+        applicable_plan(app, learner_id, plan.body | proposal.body["patch"])
     decided = app.saved_step(operation, learner_id, "decision")
     if decided is None:
         obj = document(
@@ -167,7 +171,9 @@ def decide(app, request_id: str, learner_id: str, decision_ref: RevisionRef, cho
         changed = app.saved_step(operation, learner_id, "plan")
         if changed is None:
             data = applicable_plan(
-                plan.body | proposal.body["patch"] | {"decision_ref": decided[0].ref.model_dump()}
+                app,
+                learner_id,
+                plan.body | proposal.body["patch"] | {"decision_ref": decided[0].ref.model_dump()},
             )
             obj = document(
                 "plan",

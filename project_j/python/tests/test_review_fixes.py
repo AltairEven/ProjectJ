@@ -68,6 +68,9 @@ def test_two_fixed_courses_alternate_and_label_familiar_material(application):
             prompt = course["tasks"][0]["prompt"]
             seen.append((prompt, course["lesson_type"], course["parent_preview"]["story"]))
             fact = await teach(app, f"start{number}", course_ref, answers[prompt])
+            opening = next(a.text for a in app.core.actions.values() if a.kind == "goal")
+            # Jane does not present an already-read story as a first reading.
+            assert ("复习" in opening) == (course["lesson_type"] == "review")
             activity = fact.body["activity_id"]
             app.feedback(f"feedback{number}", LEARNER, activity, "无额外补充")
             result = await app.next_course(f"next{number}", LEARNER, activity)

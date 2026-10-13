@@ -140,8 +140,9 @@ class SimulationStore:
             with connection.begin():
                 yield connection
 
-    def fault(self, point: str):
-        if self.fail_at == point:
+    def fault(self, point: str, step: str | None = None):
+        # "point" fails at any step; "step:point" only at that save step.
+        if self.fail_at in {point, f"{step}:{point}"}:
             self.fail_at = None
             raise OSError(f"injected simulation failure at {point}")
 
@@ -392,7 +393,7 @@ class SimulationStore:
                             target_revision=ref.revision,
                         )
                     )
-            self.fault("before_publish")
+            self.fault("before_publish", key.step_id)
             if self.fail_at == "temporary_save":
                 from project_j.platform.retries import UncommittedTransientSave
 
@@ -425,8 +426,8 @@ class SimulationStore:
                     raise Conflict(
                         "effective revision CAS conflict", self.head(connection, doc.object_id)
                     )
-            self.fault("before_commit")
-        self.fault("after_commit")
+            self.fault("before_commit", key.step_id)
+        self.fault("after_commit", key.step_id)
         return receipt
 
     def list_current(self, learner_id: str, kind: str | None = None) -> list[Document]:

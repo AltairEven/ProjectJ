@@ -28,7 +28,9 @@ class SimulatedModel:
         self.delay_seconds = 0.0
         self.fail_next = False
 
-    async def judge(self, binding: dict, task: TaskDefinition, text: str, help_count: int):
+    async def judge(
+        self, binding: dict, task: TaskDefinition, text: str, help_count: int, is_help: bool
+    ):
         self.calls.append(
             {
                 "purpose": "classroom",
@@ -43,7 +45,7 @@ class SimulatedModel:
             self.fail_next = False
             raise RuntimeError("simulated model failure")
         normalized = text.casefold().strip().rstrip(".!。！")
-        if any(word in text for word in ("帮我", "不懂", "不会", "help")):
+        if is_help:  # The core decides what is a help request; the model only words the support.
             judgment = "help"
             response = (
                 task.supports[help_count].text

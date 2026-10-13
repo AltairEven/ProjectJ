@@ -1,6 +1,7 @@
 """Explicit state/action boundary. Providers propose; only this core can advance."""
 
 import asyncio
+import re
 import time
 from datetime import UTC, datetime
 from typing import Literal
@@ -21,6 +22,10 @@ TRANSITIONS = {
     "paused": {"delivering", "waiting_input", "offscreen", "ended"},
     "ended": set(),
 }
+# A bare plea: nothing is left once help words, fillers and punctuation are removed.
+PLEA = re.compile(
+    r"帮帮我|帮我|帮助|需要|一下|还是|请|能|可以|吗|我|不懂|不会|help|please|need|can|you|me|i|[\W_]+"
+)
 HELP_ORDER = {"none": 0, "light_prompt": 1, "scaffold": 2, "full_model": 3, "unknown": 4}
 
 
@@ -99,9 +104,11 @@ class Harness:
         self.last_response_event: str | None = None
         self.closing_clock: float | None = None
         self.budget_exhausted = False
+        # A review lesson must not present an already-read story as a first reading.
+        reading = "先复习读过的故事" if self.course.lesson_type == "review" else "先读故事"
         self.action(
             "goal",
-            "我是Jane。先读故事、找依据，再做纸桥短观察；可随时暂停或停止。请确认收到安排。",
+            f"我是Jane。{reading}、找依据，再做纸桥短观察；可随时暂停或停止。请确认收到安排。",
             "input",
         )
 
@@ -268,12 +275,16 @@ class Harness:
                 "purpose": task.purpose,
             },
         )
-        return self.action(
-            "offscreen" if task.purpose == "offscreen" else "question",
-            task.prompt,
-            "offscreen" if task.purpose == "offscreen" else "input",
-            materials=(task.material_ref,),
-        )
+        if task.purpose == "offscreen":
+            # The offscreen action itself carries its budget and the way back.
+            minutes = self.course.budget["offscreen"]
+            return self.action(
+                "offscreen",
+                f"{task.prompt}这一段约{minutes}分钟；做完点“返回”，再说实际结果。",
+                "offscreen",
+                materials=(task.material_ref,),
+            )
+        return self.action("question", task.prompt, "input", materials=(task.material_ref,))
 
     def control(self, event_id: str, command: str):
         signature = {"event_id": event_id, "command": command}
@@ -311,7 +322,8 @@ class Harness:
                 "input",
             )
         elif command == "skip":
-            if self.mode in {"waiting_input", "delivering"}:
+            # Skipping is the way out of a slow judgment or an offscreen task, not only of a wait.
+            if self.mode in {"waiting_input", "delivering", "judging", "offscreen"}:
                 self.invalidate()
                 self.record("task_skipped", {"task_instance_id": self.task_instance_id})
                 self.next_task()
@@ -479,8 +491,11 @@ class Harness:
         if self.wait_kind == "delivery_recovery":
             raise ValueError("repeat or stop after a failed delivery; do not rescore the answer")
         task = self.course.tasks[self.task_index]
-        is_help = submitted.intent == "help" or any(
-            word in submitted.text for word in ("帮我", "不懂", "help")
+        is_help = submitted.intent == "help" or (
+            # A report task asks what help was used, so there only a bare plea is a help request.
+            not PLEA.sub("", submitted.text.casefold())
+            if task.purpose in {"point", "offscreen"}
+            else any(word in submitted.text for word in ("帮我", "不懂", "help"))
         )
         attempt = None
         if not is_help:
@@ -514,7 +529,11 @@ class Harness:
         )
         job = asyncio.create_task(
             self.model.judge(
-                binding, task, submitted.text, self.help_count.get(self.task_instance_id, 0)
+                binding,
+                task,
+                submitted.text,
+                self.help_count.get(self.task_instance_id, 0),
+                is_help,
             )
         )
         self.jobs.add(job)

@@ -110,6 +110,13 @@ def test_E2E15_16_reviews_reuse_evidence_and_stale_proposals_do_not_apply(applic
     assert app.current(LEARNER, "plan:week").ref == update.ref
 
 
+def test_a_proposed_goal_outside_the_capability_catalog_is_rejected(application):
+    patch = {"main_goal": {"dimension_id": "no.such.dimension", "description": "换个说法的新目标"}}
+    with pytest.raises(ValueError, match="established capability identity"):
+        review(application, "unknown-goal", LEARNER, "week", patch)
+    assert not application.store.list_current(LEARNER, "decision")
+
+
 def test_E2E08_content_restriction_owner_and_versioned_release(application):
     app = application
     prepared = app.prepare("prepare", LEARNER)

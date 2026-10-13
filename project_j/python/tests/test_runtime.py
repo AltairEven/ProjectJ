@@ -4,6 +4,7 @@ import pytest
 from support import CONDITIONS, LEARNER, answer, complete_story, deliver_all, start
 
 from project_j.application.coordinator import Coordinator
+from project_j.classroom.harness import PLEA
 from project_j.contracts import RevisionRef
 from project_j.learning.contracts import DemandBody
 from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
@@ -127,6 +128,84 @@ def test_E2E04_seal_failure_or_lost_receipt_retries_same_fact_without_model(appl
     assert application.activity_facts(core.activity_id, LEARNER).ref == fact.ref
     assert application.seal().ref == fact.ref
     assert not application.model.calls
+
+
+def test_parent_skip_works_while_the_model_is_slow_and_while_offscreen(application):
+    async def scenario():
+        core = start(application)
+        deliver_all(core)
+        await answer(application, "收到", "confirmation")
+        first = core.task_instance_id
+        application.model.delay_seconds = 5
+        work = asyncio.create_task(application.adapter.text("slow-answer", "a bridge"))
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        assert core.mode == "judging"
+        core.control("skip-slow", "skip")
+        assert core.task_instance_id != first and core.mode == "delivering"
+        assert (await work)["ack"] == "cancelled"
+        application.model.delay_seconds = 0
+        deliver_all(core)
+        await answer(application, "She folded it.")
+        await answer(application, "我指的是折过的纸。")
+        assert core.mode == "offscreen"
+        # The offscreen action names its own budget and the way back.
+        assert "约7分钟" in core.snapshot()["presented_action"]["text"]
+        core.control("skip-offscreen", "skip")
+        deliver_all(core)
+        assert core.wait_kind == "closing_confirmation"
+        approved = [e["payload"] for e in core.events if e["kind"] == "approved_proposal"]
+        assert all(item["event_id"] != "slow-answer" for item in approved)
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    ("text", "plea"),
+    [
+        ("还是不懂，帮我一下", True),
+        ("我需要帮助", True),
+        ("能帮我吗？", True),
+        ("I need help.", True),
+        ("Can you help me?", True),
+        ("妈妈帮我扶了书。", False),
+        ("不知道", False),
+        ("第二次纸折了，车没掉。", False),
+    ],
+)
+def test_report_tasks_treat_only_a_bare_plea_as_help(text, plea):
+    assert (not PLEA.sub("", text.casefold())) is plea
+
+
+def test_a_typed_report_mentioning_help_is_a_report_and_a_bare_plea_is_help(application):
+    async def scenario():
+        core = start(application)
+        deliver_all(core)
+        await answer(application, "听到了。", "confirmation")
+        await answer(application, "a bridge")
+        await answer(application, "She folded it.")
+        assert core.course.tasks[core.task_index].task_id == "point-paper"
+        await answer(application, "还是不懂，帮我一下")
+        assert core.help_count[core.task_instance_id] == 1
+        await answer(application, "妈妈帮我指了那张折过的纸。")
+        assert core.course.tasks[core.task_index].task_id == "paper-experiment"
+        core.control("return1", "return")
+        deliver_all(core)
+        await answer(application, "第二次纸折了，车没掉，妈妈帮我扶了书。")
+        assert core.wait_kind == "closing_confirmation"
+        reports = [a["judgment"] for a in core.attempts if a["purpose"] in {"point", "offscreen"}]
+        assert reports == ["reported", "reported"]
+
+    asyncio.run(scenario())
+
+
+def test_step_scoped_debug_fault_skips_other_saves_and_fails_only_the_seal_once(application):
+    application.store.fail_at = "fact:before_commit"
+    core = start(application)
+    core.control("stop", "stop")
+    with pytest.raises(OSError):
+        application.seal()
+    assert application.seal().body["end"]["reason"] == "stop"
 
 
 def test_E2E04_progress_failure_cannot_undo_successful_fact(application):
