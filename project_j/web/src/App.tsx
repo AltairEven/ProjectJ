@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { acknowledgePause, cancel, presentationCancelled, type Cancellation } from './cancellation'
 import type { Snapshot, Dashboard, RevisionRef as Ref, Document as Doc, Control, StudentControl, DeliveryFeedback, TextInput, VoiceSignal, PreparationResult as PrepareResult, StartResult, InputResult as Ack } from './client/types.gen'
 
 const learner = 'fictional-L1'
@@ -146,8 +147,7 @@ function Student({ token }: { token: string }) {
   const [text, setText] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
-  // Local stop/pause wins at once; only a newer core revision that is running lifts it.
-  const [cancelledAt, setCancelledAt] = useState<number>()
+  const [cancellation, setCancellation] = useState<Cancellation>()
   const [voiceItem, setVoiceItem] = useState('')
   const [voiceText, setVoiceText] = useState('')
   const [lastInput, setLastInput] = useState('')
@@ -155,7 +155,7 @@ function Student({ token }: { token: string }) {
   const [failedDelivery, setFailedDelivery] = useState<DeliveryFeedback>()
   const delivered = useRef(new Set<string>())
   const setCurrent = useCallback((value: Snapshot) => setSnapshot(old => old && old.core_revision > value.core_revision ? old : value), [])
-  const localCancelled = cancelledAt !== undefined && !(snapshot && snapshot.core_revision > cancelledAt && snapshot.mode !== 'paused' && snapshot.mode !== 'ended')
+  const localCancelled = presentationCancelled(cancellation, snapshot)
   useEffect(() => {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const socket = new WebSocket(`${protocol}//${location.host}/api/student/events`, `project-j.${token}`)
@@ -179,9 +179,11 @@ function Student({ token }: { token: string }) {
     finally { setBusy(false) }
   }
   const control = async (command: StudentControl['command']) => {
-    if (command === 'stop' || command === 'pause') setCancelledAt(snapshot?.core_revision ?? 0)
+    const eventId = uid()
+    if (command === 'stop' || command === 'pause') setCancellation(current => cancel(current, eventId, command))
     try {
-      const value = await api<Snapshot>(token, 'student/control', { event_id: uid(), command })
+      const value = await api<Snapshot>(token, 'student/control', { event_id: eventId, command })
+      if (command === 'pause') setCancellation(current => acknowledgePause(current, eventId, value))
       setCurrent(value)
     } catch (error) { setMessage(`本端已停止呈现；核心回执未取得：${(error as Error).message}`) }
   }

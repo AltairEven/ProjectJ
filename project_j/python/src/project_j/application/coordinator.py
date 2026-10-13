@@ -14,7 +14,7 @@ from project_j.application.ledger import Ledger, Request, Step
 from project_j.classroom.harness import Harness
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.content import check_content
-from project_j.curriculum.corrections import restrict_affected
+from project_j.curriculum.corrections import active_restrictions, restrict_affected
 from project_j.evaluation.assessment import interpret, next_suggestion
 from project_j.interface.submission import InputAdapter
 from project_j.learning.adoption import adopt_demand, adopt_state, review_due
@@ -119,6 +119,15 @@ class Coordinator:
                 replace_unfinished=True,
             )
             return [self.store.read(ref, learner_id) for ref in receipt.records]
+        for row in self.ledger.steps(operation_id, learner_id):
+            if row["step_id"] == step_id and (
+                source_revision is None or row["source_revision"] == source_revision
+            ):
+                step = Step.model_validate(row["payload"])
+                if step.execution == "complete":
+                    if step.save != "not_requested" or not step.effect_refs:
+                        raise Conflict("completed save step has no durable receipt")
+                    return [self.store.read(ref, learner_id) for ref in step.effect_refs]
         return None
 
     def save_step(
@@ -143,6 +152,13 @@ class Coordinator:
             execution="complete",
             generation="generated",
             save="succeeded",
+        )
+        # Validate step identity/inputs before any business revision can become effective.
+        self.ledger.checkpoint(
+            operation_id,
+            learner_id,
+            step.model_copy(update={"execution": "running", "save": "not_requested"}),
+            replace_unfinished=True,
         )
         try:
             receipt, attempts = retry_save(
@@ -362,6 +378,13 @@ class Coordinator:
     def prepare(self, request_id: str, learner_id: str):
         completed = self.ledger.completed_request(request_id, learner_id, "prepare", {})
         if completed:
+            course = self.store.read(
+                RevisionRef.model_validate(completed["course_ref"]), learner_id
+            )
+            if active_restrictions(self, learner_id, (course.ref, *course.dependency_refs)):
+                raise Conflict(
+                    "saved preparation has restricted dependencies; owner recheck required"
+                )
             return completed
         demand = self.current(learner_id, "demand")
         body = DemandBody.model_validate(demand.body)
@@ -372,6 +395,8 @@ class Coordinator:
         for obj in (state, plan, household):
             if self.store.current(obj.object_id, learner_id).ref != obj.ref:
                 raise Conflict("demand must be rechecked against current effective dependencies")
+        if active_restrictions(self, learner_id, (demand.ref, state.ref, plan.ref, household.ref)):
+            raise Conflict("preparation dependencies are restricted; owner recheck required")
         operation = self.request(
             request_id,
             learner_id,
@@ -384,6 +409,8 @@ class Coordinator:
         if completed:
             return completed
         jane = self.store.current(identity("shared", "jane"), learner_id)
+        if jane and active_restrictions(self, learner_id, (jane.ref,)):
+            raise Conflict("selected Jane version is restricted; owner recheck required")
         if jane is None:
             jane = document("jane", identity("shared", "jane"), operation, None, JANE)
             self.save_step(
@@ -582,11 +609,17 @@ class Coordinator:
             for doc in self.store.list_current(learner_id, "content_check")
             if course.ref in doc.dependency_refs
         ]
-        restrictions = [
-            doc
-            for doc in self.store.list_current(learner_id, "restriction")
-            if doc.body.get("restriction_state") == "active" and course.ref in doc.dependency_refs
-        ]
+        restrictions = active_restrictions(
+            self,
+            learner_id,
+            (
+                course.ref,
+                *baseline_refs,
+                data.brief_ref,
+                *data.material_refs,
+                *(doc.ref for doc in checks),
+            ),
+        )
         if not checks or restrictions:
             return {
                 "decision": "blocked",
@@ -1239,9 +1272,33 @@ class Coordinator:
             raise LookupError("saved candidate suggestion of this evaluation is missing")
         demand = self.saved_step(operation, learner_id, "demand", current_revision)
         if demand is None:
+            for row in self.ledger.steps(operation, learner_id):
+                if (
+                    row["step_id"].startswith("demand-recheck:")
+                    and row["source_revision"] == current_revision
+                ):
+                    demand = self.saved_step(
+                        operation, learner_id, row["step_id"], current_revision
+                    )
+                    if demand is not None:
+                        break
+        if demand is None:
             old = self.current(learner_id, "demand")
             data = adopt_demand(
                 DemandBody.model_validate(old.body), state.ref, plan.ref, suggestion
+            )
+            baselines = (old.ref, state.ref, plan.ref, data.household_ref)
+            input_digest = digest(canonical([ref.model_dump() for ref in baselines]))
+            previous = [
+                row["payload"]
+                for row in self.ledger.steps(operation, learner_id)
+                if row["step_id"] == "demand" and row["source_revision"] == current_revision
+            ]
+            # A changed baseline is a new recheck step, not a rewrite of the failed inputs.
+            step_id = (
+                f"demand-recheck:{input_digest}"
+                if previous and previous[0]["input_digest"] != input_digest
+                else "demand"
             )
             obj = document(
                 "demand",
@@ -1258,7 +1315,7 @@ class Coordinator:
             demand = self.save_step(
                 operation,
                 learner_id,
-                "demand",
+                step_id,
                 [obj],
                 source_revision=current_revision,
                 publications=(
@@ -1268,7 +1325,7 @@ class Coordinator:
                         reason="综合当前状态/计划，采用建议并记录理由",
                     ),
                 ),
-                baselines=(old.ref, state.ref, plan.ref, data.household_ref),
+                baselines=baselines,
             )
         return self.ledger.finish(
             operation,

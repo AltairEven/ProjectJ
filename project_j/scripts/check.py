@@ -47,6 +47,7 @@ def main() -> int:
         ],
         ["npm", "run", "--prefix", str(ROOT / "project_j/web"), "generate:api"],
         ["npm", "run", "--prefix", str(ROOT / "project_j/web"), "check:types"],
+        ["npm", "run", "--prefix", str(ROOT / "project_j/web"), "test:interface"],
         ["npm", "run", "--prefix", str(ROOT / "project_j/web"), "build"],
         ["npm", "run", "--prefix", str(ROOT / "project_j/web"), "test:docs"],
         ["npm", "run", "--prefix", str(ROOT / "project_j/web"), "check:docs"],

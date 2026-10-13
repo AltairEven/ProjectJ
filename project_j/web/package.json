@@ -32,6 +32,7 @@
     "@vitejs/plugin-react": "^6.1.1"
   },
   "scripts": {
+    "test:interface": "node --test tests/*.test.mjs",
     "check:types": "tsc -b --pretty false && tsc --noEmit -p tsconfig.fixtures.json",
     "test:docs": "node --test check_docs.test.mjs",
     "check:docs": "node check_docs.mjs",

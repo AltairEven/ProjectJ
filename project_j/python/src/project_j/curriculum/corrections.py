@@ -8,6 +8,17 @@ from project_j.platform.storage import Publication
 NOT_RESTRICTED = {"fact", "feedback", "restriction", "issue"}
 
 
+def active_restrictions(app, learner_id: str, selected_refs):
+    # Check selected versions; superseded history is not a dependency to be used again.
+    selected = set(selected_refs)
+    return [
+        doc
+        for doc in app.store.list_current(learner_id, "restriction")
+        if doc.body.get("restriction_state") == "active"
+        and selected.intersection(doc.dependency_refs)
+    ]
+
+
 def affected(app, target: RevisionRef, learner_id: str):
     app.store.ensure_idle()
     table = app.store.tables["references"]
