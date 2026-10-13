@@ -227,3 +227,16 @@ Opus请只读审查f63f9a6起的实际工程和文档差异，重点查共同合
 ### 独立审查
 
 待GPT依据98f2495..本批提交的实际差异审查；Opus为本批主实现者，不自审为通过，不写双模型审查通过。
+
+#### GPT独立复审（2026年10月13日）
+
+- 范围：实际提交98f2495..04dcdaa，共22个文件；复审开始及结束检查前工作区均干净。按本文件约定，GPT只追加本审查小节，不修改Opus工程文件、批次状态或其他入口；主实现者据下列结果维护状态及后续修复。
+- 结论：未通过，3项高优先级问题仍需修复，不记双模型审查通过。以下均依据现有共同合同，不提出业务规则、数据边界或技术基线变更。
+- 实际检查：在04dcdaa的Git导出临时副本中运行全部AGENTS登记命令，锁定同步、两份npm ci、两份npm audit（各0项已知告警）、统一check、默认离线probe及模拟measure均退出0。统一check含120项pytest、Ruff/格式、OpenAPI导出与类型生成、TypeScript7、Vite构建、文档自测及本地链接。检查记录UTC 2026-10-13T02:21:39.131754+00:00，工程摘要e759f4231a6300078b25b4e777a7e110fab7a20cc00442efbfd6955f1367fbb9，与Opus记录一致；导入路径已核对为临时副本。首次离线sync因缓存缺Ruff等包失败，随后按登记命令联网下载锁定工程依赖后成功；没有调用模型或语音服务。
+- 补充反例：临时副本project_j/.cache/review_edges.py内3项测试均按预期的不变量失败（pytest退出1，0.64秒），使用原测试fixture、明确模拟提供者、临时SQLite/文件目录及禁网规则；前端反例只执行App.tsx实际判断表达式，不冒称浏览器完整课堂验证。脚本及review-edges.xml保留在临时副本/private/tmp/project-j-p1r1-review-lqvj12hr，不提交运行数据，也不将补充反例混入原120项通过结果。
+
+1. **P1-R1-01（高）：较新普通响应会解除本端停止。** App.tsx:158只要求snapshot.core_revision大于cancelledAt且mode非paused/ended，就将localCancelled置为false。停止/暂停请求尚未获得回执时，先前输入请求或WebSocket的普通较新快照仍会经setCurrent进入该判断；例如取消时修订10、迟到快照修订11/mode=delivering，实际计算false，随后呈现/交付回执效应恢复。违反[停止与取消](../design/shared/execution-recovery.md#p0操作身份保存与有限接续)。须保留控制请求的取消状态，停止不能由普通响应解除；暂停只能在核对该次暂停及家长明确恢复后解除。补测应覆盖输入/交付/连接响应乱序和控制请求失败。
+2. **P1-R1-02（高）：沿用状态步骤失败接续会覆盖较新状态。** coordinator.py:1164—1184把无变化状态登记为complete，但saved_step只查询SaveReceipt，读不到没有业务写入的成功沿用步骤。已沿用S2后D保存失败、随后第二堂模拟课发布S3，再用原request_id重发：实际先用第一堂旧评价发布S4，再由ledger报successful step cannot be run or rewritten again；S3已被S4替代，后面的保留较新状态分支来不及执行。违反[成功步骤不重做及采用接续](../design/shared/execution-recovery.md#e2e01执行与发布核对点)。须先读取成功沿用回执/步骤，再复核当前基线，不能在进度冲突后才发现业务对象已发布；补测同时核对状态指针、证据引用、需求接续和步骤身份。
+3. **P1-R1-03（高）：重新备课可以绕过来源更正限制。** feedback已限制派生E/S/D/C，但prepare仅核对版本，start仅查询直接以当前course.ref为目标的限制。反例中家长更正后旧C2确实blocked，原D2仍为active限制；用新request_id重新prepare得到新包，仍引用受限D2，却可以allow_simulation，没有复核或解除限制。违反[已知关键疑点限制后续使用](../design/shared/execution-recovery.md#失败接续与更正)。须在备课和启动消费受限依赖的实际范围，不能依靠更正发生时已存在对象的遍历；补测新包、旧成功备课请求重放及主责复核后的合法继续。
+
+继续入口：由Opus在既有P1-R1文件边界内补修上述3项、纳入永久回归并同步当前状态描述；完成后再交GPT依据新增实际差异复审。真实API、麦克风/语音、成人五分钟/30分钟、儿童入口和教学效果仍未验证；本次未运行start.sh或浏览器完整课堂。
