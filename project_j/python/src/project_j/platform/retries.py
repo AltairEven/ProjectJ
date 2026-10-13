@@ -24,10 +24,14 @@ def retry_save(action, deadline: float):
         stop=stop_after_attempt(3) | stop_before_delay(max(0, deadline - time.monotonic())),
         reraise=True,
     )
-    for attempt in policy:
-        with attempt:
-            if time.monotonic() >= deadline:
-                raise TimeoutError("original save deadline elapsed")
-            attempts += 1
-            result = action()
+    try:
+        for attempt in policy:
+            with attempt:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("original save deadline elapsed")
+                attempts += 1
+                result = action()
+    except Exception as error:
+        error.attempts = attempts  # Lets the caller record the actual tries of a failed step.
+        raise
     return result, attempts

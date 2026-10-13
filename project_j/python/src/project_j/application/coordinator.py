@@ -2,9 +2,11 @@
 
 import asyncio
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from secrets import token_urlsafe
+
+from sqlalchemy.exc import SQLAlchemyError
 
 from project_j.application.acceptance import simulation_evidence
 from project_j.application.documents import document, identity
@@ -12,6 +14,7 @@ from project_j.application.ledger import Ledger, Request, Step
 from project_j.classroom.harness import Harness
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.content import check_content
+from project_j.curriculum.corrections import restrict_affected
 from project_j.evaluation.assessment import interpret, next_suggestion
 from project_j.interface.submission import InputAdapter
 from project_j.learning.adoption import adopt_demand, adopt_state, review_due
@@ -113,6 +116,7 @@ class Coordinator:
                     result_refs=receipt.records,
                     effect_refs=receipt.activated,
                 ),
+                replace_unfinished=True,
             )
             return [self.store.read(ref, learner_id) for ref in receipt.records]
         return None
@@ -128,30 +132,71 @@ class Coordinator:
         baselines=(),
     ):
         key = SaveKey(operation_id=operation_id, step_id=step_id, source_revision=source_revision)
-        receipt, attempts = retry_save(
-            lambda: self.store.save(
-                key, learner_id, records, tuple(publications), tuple(baselines)
-            ),
-            time.monotonic() + 10,
+        step = Step(
+            step_id=step_id,
+            source_revision=source_revision,
+            owner=records[0].owner,
+            input_digest=digest(canonical([ref.model_dump() for ref in baselines])),
+            input_refs=tuple(baselines),
+            attempts=1,
+            deadline=datetime.now(UTC) + timedelta(seconds=10),
+            execution="complete",
+            generation="generated",
+            save="succeeded",
         )
+        try:
+            receipt, attempts = retry_save(
+                lambda: self.store.save(
+                    key, learner_id, records, tuple(publications), tuple(baselines)
+                ),
+                time.monotonic() + 10,
+            )
+        except (OSError, SQLAlchemyError) as error:
+            # Unknown result: query the save unit first; only a missing receipt is a failure.
+            attempts = getattr(error, "attempts", 1)
+            try:
+                receipt, save = self.store.receipt(key, learner_id), "failed"
+            except OSError, SQLAlchemyError:
+                receipt, save = None, "unknown"
+            if receipt is None:
+                self.note_failure(
+                    operation_id, learner_id, step, attempts, save, type(error).__name__
+                )
+                raise
         self.ledger.checkpoint(
             operation_id,
             learner_id,
-            Step(
-                step_id=step_id,
-                source_revision=source_revision,
-                owner=records[0].owner,
-                input_digest=digest(canonical([ref.model_dump() for ref in baselines])),
-                input_refs=tuple(baselines),
-                attempts=attempts,
-                execution="complete",
-                generation="generated",
-                save="succeeded",
-                result_refs=receipt.records,
-                effect_refs=receipt.activated,
+            step.model_copy(
+                update={
+                    "attempts": attempts,
+                    "result_refs": receipt.records,
+                    "effect_refs": receipt.activated,
+                }
             ),
+            replace_unfinished=True,
         )
         return records
+
+    def note_failure(self, operation_id, learner_id, step, attempts, save, failure):
+        try:
+            self.ledger.checkpoint(
+                operation_id,
+                learner_id,
+                step.model_copy(
+                    update={
+                        "attempts": attempts,
+                        "execution": "failed",
+                        "generation": "generated",
+                        "save": save,
+                        "failure": failure,
+                        "next_step": step.step_id,
+                        "required_input": ("用同一request_id重发；成功步骤不重做。",),
+                    }
+                ),
+                replace_unfinished=True,
+            )
+        except OSError, SQLAlchemyError:
+            pass  # The ledger shares the failing store; the caller still receives the error.
 
     def current(self, learner_id: str, label: str) -> Document:
         current = self.store.current(identity(learner_id, label), learner_id)
@@ -314,10 +359,8 @@ class Coordinator:
             operation, learner_id, {"demand_ref": demand[0].ref.model_dump(), "realm": "simulation"}
         )
 
-    def prepare(self, request_id: str, learner_id: str, next_course=False):
-        completed = self.ledger.completed_request(
-            request_id, learner_id, "prepare", {"next_course": next_course}
-        )
+    def prepare(self, request_id: str, learner_id: str):
+        completed = self.ledger.completed_request(request_id, learner_id, "prepare", {})
         if completed:
             return completed
         demand = self.current(learner_id, "demand")
@@ -333,7 +376,7 @@ class Coordinator:
             request_id,
             learner_id,
             "prepare",
-            {"demand_ref": demand.ref.model_dump(), "next_course": next_course},
+            {"demand_ref": demand.ref.model_dump()},
             sources=(demand.ref,),
             baselines=(demand.ref, state.ref, plan.ref, household.ref),
         )
@@ -352,7 +395,7 @@ class Coordinator:
             )
         material = self.saved_step(operation, learner_id, "material")
         if material is None:
-            source, text = material_source(self.root, next_course)
+            source, text = material_source(self.root, body)
             asset = self.files.asset(text)
             obj = document(
                 "material",
@@ -377,7 +420,7 @@ class Coordinator:
             course_ref = RevisionRef(object_id=identity(operation, "course"), revision=1)
             brief_ref = RevisionRef(object_id=identity(operation, "brief"), revision=1)
             course = compile_course(
-                body, demand.ref, jane.ref, brief_ref, material.ref, next_course
+                body, demand.ref, jane.ref, brief_ref, material.ref, material.body["source"]
             )
             brief = document(
                 "brief",
@@ -425,7 +468,7 @@ class Coordinator:
                 identity(operation, "content-check"),
                 operation,
                 learner_id,
-                check_content(CourseBody.model_validate(course.body), material, self.files),
+                check_content(CourseBody.model_validate(course.body), body, material, self.files),
                 refs=(course.ref, brief.ref, material.ref),
             )
             checked = self.save_step(
@@ -483,8 +526,13 @@ class Coordinator:
         if request_id in self.start_requests:
             if self.start_requests[request_id]["signature"] != signature:
                 raise Conflict("same start identity has different content")
-            if self.core and self.core.mode != "ended":
-                return self.start_requests[request_id]["result"]
+            original = self.start_requests[request_id]["result"]
+            if (
+                self.core
+                and self.core.mode != "ended"
+                and self.core.activity_id == original["snapshot"]["activity_id"]
+            ):
+                return original
             raise Conflict("original start ended; an explicit new request is required")
         if self.core and self.core.mode != "ended":
             raise Conflict("only one in-memory activity can run")
@@ -715,7 +763,7 @@ class Coordinator:
             self.ledger.finish(
                 operation, core.learner_id, {"fact_ref": fact.ref.model_dump(), "save": "succeeded"}
             )
-        except OSError:
+        except OSError, SQLAlchemyError:
             # Facts already have a durable receipt; progress failure cannot undo them.
             pass
         return fact
@@ -915,12 +963,12 @@ class Coordinator:
                     Publication(ref=obj.ref, reason="追加原活动来源，不制造新活动或尝试"),
                 ),
             )
-        if corrections:
-            for evaluation in self.store.list_current(learner_id, "evaluation"):
-                if evaluation.body["activity_id"] == activity_id:
-                    self.restrict(
-                        operation, learner_id, evaluation, "新更正影响旧解释，待同活动来源复核。"
-                    )
+        evaluation = self.store.current(identity(activity_id, "evaluation"), learner_id)
+        if corrections and evaluation:
+            # Derived state/demand/course stay limited until the owners recheck the new source.
+            restrict_affected(
+                self, operation, learner_id, [evaluation], "新更正影响旧解释，待同活动来源复核。"
+            )
         return self.ledger.finish(
             operation,
             learner_id,
@@ -968,13 +1016,9 @@ class Coordinator:
     async def evaluate(self, request_id: str, learner_id: str, activity_id: str, purpose: str):
         fact = self.activity_facts(activity_id, learner_id)
         source_revision, feedbacks = self.source_revision(activity_id, learner_id)
-        existing = [
-            doc
-            for doc in self.store.list_current(learner_id, "evaluation")
-            if doc.body["activity_id"] == activity_id and doc.source_revision == source_revision
-        ]
-        if existing:
-            return existing[-1]
+        current = self.store.current(identity(activity_id, "evaluation"), learner_id)
+        if current and current.source_revision == source_revision:
+            return current
         for (owner, activity, _), active in tuple(self.evaluation_jobs.items()):
             if (
                 owner == learner_id
@@ -1007,16 +1051,17 @@ class Coordinator:
             saved = self.saved_step(operation, learner_id, "evaluation", source_revision)
             if saved:
                 return saved[0]
-            prior = [
-                doc
-                for doc in self.store.list_current(learner_id, "evaluation")
-                if doc.body["activity_id"] == activity_id
-            ]
-            no_new_facts = bool(feedbacks) and all(
-                fb.body["text"].strip() == "无额外补充" and not fb.body["corrections"]
-                for fb in feedbacks
+            prior = self.store.current(identity(activity_id, "evaluation"), learner_id)
+            same_fact = prior is not None and prior.body["fact_ref"] == fact.ref.model_dump()
+            no_new_facts = (
+                bool(feedbacks)
+                and same_fact
+                and all(
+                    fb.body["text"].strip() == "无额外补充" and not fb.body["corrections"]
+                    for fb in feedbacks
+                )
             )
-            if not (prior and no_new_facts):
+            if not no_new_facts:
                 await self.model.evaluate(activity_id, source_revision)
             current_revision, current_feedback = self.source_revision(activity_id, learner_id)
             if current_revision != source_revision:
@@ -1024,9 +1069,11 @@ class Coordinator:
                 return await self.evaluate(
                     f"{request_id}:source:{current_revision}", learner_id, activity_id, purpose
                 )
+            prior = self.store.current(identity(activity_id, "evaluation"), learner_id)
+            prior_suggestion = self.store.current(identity(activity_id, "suggestion"), learner_id)
             obj = document(
                 "evaluation",
-                identity(activity_id, f"evaluation:{source_revision}"),
+                identity(activity_id, "evaluation"),
                 operation,
                 learner_id,
                 interpret(
@@ -1037,16 +1084,18 @@ class Coordinator:
                 ),
                 refs=(fact.ref, RevisionRef.model_validate(fact.body["course_ref"])),
                 sources=tuple(fb.ref for fb in current_feedback),
+                revision=prior.revision + 1 if prior else 1,
                 source_revision=source_revision,
                 occurred_at=fact.occurred_at,
             )
             suggestion = document(
                 "suggestion",
-                identity(activity_id, f"suggestion:{source_revision}"),
+                identity(activity_id, "suggestion"),
                 operation,
                 learner_id,
                 next_suggestion(obj),
                 refs=(obj.ref,),
+                revision=prior_suggestion.revision + 1 if prior_suggestion else 1,
                 source_revision=source_revision,
                 occurred_at=fact.occurred_at,
             )
@@ -1057,8 +1106,16 @@ class Coordinator:
                 [obj, suggestion],
                 source_revision=source_revision,
                 publications=(
-                    Publication(ref=obj.ref, reason="当前来源的限定范围解释"),
-                    Publication(ref=suggestion.ref, reason="候选建议，不能直接成为需求"),
+                    Publication(
+                        ref=obj.ref,
+                        expected_revision=prior.revision if prior else None,
+                        reason="当前来源的限定范围解释",
+                    ),
+                    Publication(
+                        ref=suggestion.ref,
+                        expected_revision=prior_suggestion.revision if prior_suggestion else None,
+                        reason="候选建议，不能直接成为需求",
+                    ),
                 ),
             )
             self.evaluation_calls.append(
@@ -1110,6 +1167,22 @@ class Coordinator:
             next_body = adopt_state(LearningState.model_validate(old.model_dump()), evaluation)
             if canonical(next_body) == canonical(old.body):
                 state = [old]
+                self.ledger.checkpoint(
+                    operation,
+                    learner_id,
+                    Step(
+                        step_id="state",
+                        source_revision=current_revision,
+                        owner="learning",
+                        input_digest=digest(canonical([old.ref.model_dump()])),
+                        input_refs=(old.ref,),
+                        attempts=1,
+                        execution="complete",
+                        effect_refs=(old.ref,),
+                        required_input=("无变化：沿用当前有效状态。",),
+                    ),
+                    replace_unfinished=True,
+                )
             else:
                 obj = document(
                     "state",
@@ -1160,10 +1233,10 @@ class Coordinator:
             ),
         )
         suggestion = self.store.current(
-            identity(evaluation.body["activity_id"], f"suggestion:{current_revision}"), learner_id
+            identity(evaluation.body["activity_id"], "suggestion"), learner_id
         )
-        if suggestion is None:
-            raise LookupError("saved candidate suggestion missing")
+        if suggestion is None or suggestion.body["evaluation_ref"] != evaluation.ref.model_dump():
+            raise LookupError("saved candidate suggestion of this evaluation is missing")
         demand = self.saved_step(operation, learner_id, "demand", current_revision)
         if demand is None:
             old = self.current(learner_id, "demand")
@@ -1219,7 +1292,7 @@ class Coordinator:
             f"{request_id}:evaluate", learner_id, activity_id, "next_course"
         )
         adopted = self.adopt(f"{request_id}:adopt", learner_id, evaluation)
-        package = self.prepare(f"{request_id}:prepare", learner_id, next_course=True)
+        package = self.prepare(f"{request_id}:prepare", learner_id)
         operation = self.request(
             request_id,
             learner_id,

@@ -9,16 +9,35 @@ from project_j.learning.contracts import (
     SuggestionChoice,
 )
 
+HELP_ORDER = ("none", "light_prompt", "scaffold", "full_model")
+
 
 def adopt_state(current: LearningState, evaluation: Document) -> StateBody:
     dimensions = {item.dimension_id: item for item in current.body.dimensions}
+    observed: dict[str, list[dict]] = {}
     for task in evaluation.body["tasks"]:
-        previous = dimensions.get(task["dimension_id"])
-        judgment = task["working_judgment"]
-        level = task["help"].get(task["dimension_id"], "unknown")
-        dimensions[task["dimension_id"]] = DimensionState(
-            dimension_id=task["dimension_id"],
-            task_scope=f"模拟任务{task['task_id']}及当前材料条件",
+        observed.setdefault(task["dimension_id"], []).append(task)
+    # All tasks of one dimension are merged; their order in the lesson never decides the result.
+    for dimension_id, tasks in observed.items():
+        previous = dimensions.get(dimension_id)
+        supported = [task for task in tasks if task["working_judgment"] != "unknown"]
+        judgments = {task["working_judgment"] for task in supported}
+        judgment = (
+            "unknown"
+            if not judgments
+            else judgments.pop()
+            if len(judgments) == 1
+            else "inconsistent"
+        )
+        levels = [task["help"].get(dimension_id, "unknown") for task in supported]
+        known = [level for level in levels if level in HELP_ORDER]
+        level = (
+            max(known, key=HELP_ORDER.index) if known and len(known) == len(levels) else "unknown"
+        )
+        names = "、".join(sorted({task["task_id"] for task in tasks}))
+        dimensions[dimension_id] = DimensionState(
+            dimension_id=dimension_id,
+            task_scope=f"模拟任务{names}及当前材料条件",
             judgment=judgment,
             evidence_refs=(evaluation.ref,),
             help=level,
@@ -26,7 +45,8 @@ def adopt_state(current: LearningState, evaluation: Document) -> StateBody:
             observed_at=evaluation.occurred_at,
             retention=previous.retention if previous else None,
             transfer=previous.transfer if previous else None,
-            limitations=tuple(task["limitations"]) + ("不因当堂正确填独立或长期掌握。",),
+            limitations=tuple(sorted({item for task in tasks for item in task["limitations"]}))
+            + ("不因当堂正确填独立或长期掌握。",),
         )
     return StateBody(status="checked", dimensions=tuple(dimensions.values()))
 

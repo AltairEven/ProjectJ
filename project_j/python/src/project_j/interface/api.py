@@ -40,10 +40,6 @@ class ParentRequest(Contract):
     source_type: Literal["simulated"] = "simulated"
 
 
-class PrepareRequest(ParentRequest):
-    next_course: bool = False
-
-
 class StartConditions(Contract):
     materials: Literal["reported_available", "unavailable", "unknown"]
     time: Literal["reported_30_minutes", "unavailable", "unknown"]
@@ -111,6 +107,13 @@ class Control(Contract):
     command: Literal[
         "stop", "pause", "resume", "return", "skip", "repeat", "close", "end_unconfirmed"
     ]
+
+
+class StudentControl(Contract):
+    """Student role: stop/pause at once, ask to repeat, report return; flow control is parental."""
+
+    event_id: str
+    command: Literal["stop", "pause", "return", "repeat"]
 
 
 class VoiceSignal(Contract):
@@ -367,8 +370,8 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
     @app.post(
         "/api/parent/prepare", dependencies=[Depends(parent)], response_model=PreparationResult
     )
-    async def prepare(request: PrepareRequest):
-        return controller().prepare(request.request_id, request.learner_id, request.next_course)
+    async def prepare(request: ParentRequest):
+        return controller().prepare(request.request_id, request.learner_id)
 
     @app.post("/api/parent/start", dependencies=[Depends(parent)], response_model=StartResult)
     async def start(request: StartRequest):
@@ -472,6 +475,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
     @app.post("/api/parent/retry-seal", dependencies=[Depends(parent)])
     async def retry_seal():
         result = controller().seal()
+        seal_errors.pop(result.body["activity_id"], None)
         return {"fact_ref": result.ref.model_dump(), "save": "succeeded"}
 
     @app.post("/api/parent/export", dependencies=[Depends(parent)])
@@ -548,7 +552,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
         return controller().student_view(core)
 
     @app.post("/api/student/control", response_model=Snapshot)
-    async def control(request: Control, background: BackgroundTasks, core: StudentCore):
+    async def control(request: StudentControl, background: BackgroundTasks, core: StudentCore):
         core.control(request.event_id, request.command)
         ended(core, background)
         return controller().student_view(core)
@@ -596,7 +600,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
                         request.related_event_id,
                     )
                 elif message["kind"] == "control":
-                    request = Control.model_validate(message["payload"])
+                    request = StudentControl.model_validate(message["payload"])
                     core.control(request.event_id, request.command)
                 elif message["kind"] == "delivery":
                     feedback = DeliveryFeedback.model_validate(message["payload"])

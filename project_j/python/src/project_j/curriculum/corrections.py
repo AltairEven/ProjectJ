@@ -4,6 +4,9 @@ from project_j.application.documents import document, identity
 from project_j.contracts import RevisionRef
 from project_j.platform.storage import Publication
 
+# Facts and source reports stay historical truth; restriction records and issues are not uses.
+NOT_RESTRICTED = {"fact", "feedback", "restriction", "issue"}
+
 
 def affected(app, target: RevisionRef, learner_id: str):
     app.store.ensure_idle()
@@ -23,11 +26,22 @@ def affected(app, target: RevisionRef, learner_id: str):
                     continue
                 seen.add(candidate)
                 doc = app.store.load(connection, candidate, None)
-                if doc.learner_id not in {None, learner_id}:
+                if doc.learner_id not in {None, learner_id} or doc.kind in NOT_RESTRICTED:
                     continue
                 result.append(doc)
                 pending.append(candidate)
     return result
+
+
+def restrict_affected(app, operation_id: str, learner_id: str, targets, reason: str):
+    docs = {doc.ref: doc for doc in targets}
+    for target in targets:
+        docs |= {doc.ref: doc for doc in affected(app, target.ref, learner_id)}
+    return [
+        app.restrict(operation_id, learner_id, doc, reason).ref.model_dump()
+        for doc in docs.values()
+        if doc.learner_id is not None and doc.kind not in NOT_RESTRICTED
+    ]
 
 
 def correct(app, request_id: str, learner_id: str, target: RevisionRef, note: str, owner: str):
@@ -69,11 +83,7 @@ def correct(app, request_id: str, learner_id: str, target: RevisionRef, note: st
             publications=(Publication(ref=obj.ref, reason="有版本和主责的更正问题"),),
         )
     impacted = affected(app, target, learner_id)
-    restrictions = [
-        app.restrict(operation, learner_id, doc, note).ref.model_dump()
-        for doc in [original] + impacted
-        if doc.learner_id is not None
-    ]
+    restrictions = restrict_affected(app, operation, learner_id, [original], note)
     return app.ledger.finish(
         operation,
         learner_id,

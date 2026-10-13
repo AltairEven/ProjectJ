@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Snapshot, Dashboard, RevisionRef as Ref, Document as Doc, Control, DeliveryFeedback, TextInput, VoiceSignal, PreparationResult as PrepareResult, StartResult, InputResult as Ack } from './client/types.gen'
+import type { Snapshot, Dashboard, RevisionRef as Ref, Document as Doc, Control, StudentControl, DeliveryFeedback, TextInput, VoiceSignal, PreparationResult as PrepareResult, StartResult, InputResult as Ack } from './client/types.gen'
 
 const learner = 'fictional-L1'
 const uid = () => crypto.randomUUID()
@@ -84,6 +84,8 @@ function Parent({ token }: { token: string }) {
       <p>{dashboard?.verification?.result === 'pass' ? '已有与当前构建匹配的隔离程序检查依据。' : '隔离程序检查尚未取得匹配依据，开始保持待处理。'}</p>
       {dashboard?.active ? <><p>课堂状态：{dashboard.active.activity_state}。工作台不访问课中数据库。</p>
         <div className="row"><button onClick={() => parentControl('pause')}>暂停</button><button onClick={() => parentControl('resume')}>恢复</button>
+          <button className="quiet" onClick={() => parentControl('skip')}>跳过当前题</button><button className="quiet" onClick={() => parentControl('close')}>收尾</button>
+          <button className="quiet" onClick={() => parentControl('end_unconfirmed')}>结束并保留未确认</button>
           <button className="danger" onClick={() => parentControl('stop')}>立即停止</button></div></> : <>
         <button disabled={busy} onClick={() => { const requestId = uid(); void run(async () => setPrepared(await api<PrepareResult>(token, 'parent/prepare', { request_id: requestId, learner_id: learner }))) }}>准备课程包</button>
         {prepared && <><div className="preview"><h3>本课安排</h3><pre>{show(previewsBody ?? selectedCourse?.body.parent_preview ?? '预览待取得')}</pre></div>
@@ -144,7 +146,8 @@ function Student({ token }: { token: string }) {
   const [text, setText] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
-  const [localCancelled, setLocalCancelled] = useState(false)
+  // Local stop/pause wins at once; only a newer core revision that is running lifts it.
+  const [cancelledAt, setCancelledAt] = useState<number>()
   const [voiceItem, setVoiceItem] = useState('')
   const [voiceText, setVoiceText] = useState('')
   const [lastInput, setLastInput] = useState('')
@@ -152,6 +155,7 @@ function Student({ token }: { token: string }) {
   const [failedDelivery, setFailedDelivery] = useState<DeliveryFeedback>()
   const delivered = useRef(new Set<string>())
   const setCurrent = useCallback((value: Snapshot) => setSnapshot(old => old && old.core_revision > value.core_revision ? old : value), [])
+  const localCancelled = cancelledAt !== undefined && !(snapshot && snapshot.core_revision > cancelledAt && snapshot.mode !== 'paused' && snapshot.mode !== 'ended')
   useEffect(() => {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const socket = new WebSocket(`${protocol}//${location.host}/api/student/events`, `project-j.${token}`)
@@ -174,12 +178,11 @@ function Student({ token }: { token: string }) {
     catch (error) { setFailedRequest({ path, payload }); setMessage((error as Error).message); return undefined }
     finally { setBusy(false) }
   }
-  const control = async (command: Control['command']) => {
-    if (command === 'stop' || command === 'pause') setLocalCancelled(true)
+  const control = async (command: StudentControl['command']) => {
+    if (command === 'stop' || command === 'pause') setCancelledAt(snapshot?.core_revision ?? 0)
     try {
       const value = await api<Snapshot>(token, 'student/control', { event_id: uid(), command })
       setCurrent(value)
-      if (command === 'resume') setLocalCancelled(false)
     } catch (error) { setMessage(`本端已停止呈现；核心回执未取得：${(error as Error).message}`) }
   }
   useEffect(() => {
@@ -211,7 +214,7 @@ function Student({ token }: { token: string }) {
   return <main className="student">
     <header><span className="eyebrow">JANE · 虚构课堂</span><h1>一起读故事，找依据</h1><p>文字与技术信号模拟；不会录音或播放真实声音。</p></header>
     <div className="controls"><span>{snapshot?.activity_state ?? '正在连接原会话'}</span>
-      <button className="quiet" onClick={() => void control('pause')}>暂停</button><button className="quiet" onClick={() => void control('resume')}>恢复</button>
+      <button className="quiet" onClick={() => void control('pause')}>暂停</button>
       <button className="danger" onClick={() => void control('stop')}>立即停止</button></div>
     {message && <div className="notice" role="alert">{message}</div>}
     {failedRequest && <button className="quiet" disabled={busy} onClick={() => void send(failedRequest.path, failedRequest.payload)}>接续原提交</button>}
@@ -221,7 +224,7 @@ function Student({ token }: { token: string }) {
         setCurrent(value); setFailedDelivery(undefined)
       }).catch(error => setMessage((error as Error).message))
     }}>接续原呈现回执</button>}
-    {localCancelled && <p className="notice">本端已停止呈现。恢复需核心允许；停止后不能恢复。</p>}
+    {localCancelled && <p className="notice">本端已停止呈现。暂停后由家长在工作台恢复；停止后不能恢复。</p>}
     <section className="jane"><span className="avatar" aria-hidden="true">J</span><div><h2>Jane</h2><p aria-live="polite">{localCancelled ? '呈现已取消。' : (snapshot?.pending_action ?? lastAction)?.text ?? '等待同一核心的下一动作。'}</p></div></section>
     {!localCancelled && Object.entries(snapshot?.materials ?? {}).map(([id, material]) => <section key={id} className="reading"><pre>{material}</pre></section>)}
     {snapshot?.mode === 'offscreen' ? <section><p>离屏期间没有采集。回来后需要报告实际条件与结果，返回本身不算完成。</p><button onClick={() => void control('return')}>返回，报告结果</button></section> :
@@ -230,10 +233,7 @@ function Student({ token }: { token: string }) {
           <button className="quiet" disabled={busy || localCancelled} onClick={() => void input('帮我一下', 'help')}>帮我一下</button>
           <button className="quiet" disabled={busy || localCancelled} onClick={() => void input('听到了，收到当前说明。', 'confirmation')}>确认收到说明</button>
           <button className="quiet" disabled={!lastInput || !text.trim() || localCancelled} onClick={() => void input(text, 'unknown', true)}>还没说完，补充</button>
-          <button className="quiet" onClick={() => void control('repeat')}>重复当前内容</button>
-          <button className="quiet" onClick={() => void control('skip')}>跳过</button>
-          <button className="quiet" onClick={() => void control('close')}>收尾</button>
-          <button className="quiet" onClick={() => void control('end_unconfirmed')}>结束并保留未确认</button></div></section>}
+          <button className="quiet" onClick={() => void control('repeat')}>重复当前内容</button></div></section>}
     {snapshot?.mode === 'ended' && <section><h2>本堂已结束</h2><p>只保留已发生范围；事实封存独立进行，家长可随后反馈。</p></section>}
     <details className="technical"><summary>模拟语音信号（不使用麦克风）</summary>
       <label>模拟识别文本<textarea value={voiceText} onChange={event => setVoiceText(event.target.value)} /></label>

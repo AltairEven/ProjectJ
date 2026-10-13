@@ -553,32 +553,6 @@ export type PreparationResult = {
 };
 
 /**
- * PrepareRequest
- */
-export type PrepareRequest = {
-    /**
-     * Request Id
-     */
-    request_id: string;
-    /**
-     * Learner Id
-     */
-    learner_id?: string;
-    /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
-    /**
-     * Next Course
-     */
-    next_course?: boolean;
-};
-
-/**
  * ReleaseRequest
  */
 export type ReleaseRequest = {
@@ -827,6 +801,22 @@ export type StartResult = {
 };
 
 /**
+ * StudentControl
+ *
+ * Student role: stop/pause at once, ask to repeat, report return; flow control is parental.
+ */
+export type StudentControl = {
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Command
+     */
+    command: 'stop' | 'pause' | 'return' | 'repeat';
+};
+
+/**
  * TextInput
  */
 export type TextInput = {
@@ -943,7 +933,7 @@ export type DashboardApiParentDashboardGetResponses = {
 export type DashboardApiParentDashboardGetResponse = DashboardApiParentDashboardGetResponses[keyof DashboardApiParentDashboardGetResponses];
 
 export type PrepareApiParentPreparePostData = {
-    body: PrepareRequest;
+    body: ParentRequest;
     headers?: {
         /**
          * Authorization
@@ -1619,7 +1609,7 @@ export type DeliveryApiStudentDeliveryPostResponses = {
 export type DeliveryApiStudentDeliveryPostResponse = DeliveryApiStudentDeliveryPostResponses[keyof DeliveryApiStudentDeliveryPostResponses];
 
 export type ControlApiStudentControlPostData = {
-    body: Control;
+    body: StudentControl;
     headers?: {
         /**
          * Authorization

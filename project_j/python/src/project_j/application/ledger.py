@@ -146,7 +146,14 @@ class Ledger:
             )
         return result
 
-    def checkpoint(self, operation_id: str, learner_id: str, step: Step, expected_version=None):
+    def checkpoint(
+        self,
+        operation_id: str,
+        learner_id: str,
+        step: Step,
+        expected_version=None,
+        replace_unfinished=False,
+    ):
         self.operation(operation_id, learner_id)
         table = self.store.tables["steps"]
         with self.store.write() as connection:
@@ -162,6 +169,8 @@ class Ledger:
                     if canonical(previous) != canonical(step):
                         raise Conflict("successful step cannot be run or rewritten again")
                     return previous, row["version"]
+                if replace_unfinished:
+                    expected_version = row["version"]
                 if expected_version != row["version"]:
                     raise Conflict("step progress CAS conflict")
                 if (

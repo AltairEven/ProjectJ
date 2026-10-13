@@ -4,7 +4,54 @@ from pathlib import Path
 
 from project_j.contracts import RevisionRef
 from project_j.learning.contracts import DemandBody
-from project_j.preparation.contracts import CourseBody, Support, TaskDefinition
+from project_j.preparation.contracts import (
+    CourseBody,
+    RequirementMapping,
+    Support,
+    TaskDefinition,
+    demand_requirements,
+)
+
+
+def uses_new_material(demand: DemandBody) -> bool:
+    """The template follows the saved demand: an adopted/modified suggestion means new material."""
+    return any(choice.action in {"adopt", "modify"} for choice in demand.suggestion_choices)
+
+
+def map_demand(demand: DemandBody, tasks: tuple[TaskDefinition, ...], source: str):
+    answers = tuple(task.task_id for task in tasks if task.purpose == "answer")
+    offscreen = tuple(task.task_id for task in tasks if task.purpose == "offscreen")
+    every = tuple(task.task_id for task in tasks)
+    how = {
+        "primary_goal": ("本包回答题均取该维度的文本依据。", answers),
+        "auxiliary_goal": ("各回答题第二级支持为英语短句框，帮助后表达另记。", answers),
+        "budget_minutes": ("预算各段合计30分钟，挑战只替换活动。", ()),
+        "offscreen_requirements": ("离屏任务停止采集，返回后取实际报告。", offscreen),
+        "fallback": ("全部任务以文字模拟呈现，不依赖声音评价。", every),
+        "prerequisites": ("不预设先备，以首个未提示初答取样。", answers),
+        "sampling_requirements": (
+            f"使用{source}；每题先取未提示初答，帮助后再答另记尝试。",
+            answers,
+        ),
+        "help_requirements": ("每题两级不同支持：定位提示与句框。", answers),
+        "gaps": ("沿用：本包不验证此项，课后保持未知。", ()),
+    }
+    mapping = []
+    for field, requirement in demand_requirements(demand):
+        if field == "suggestion_choices":
+            adopted = requirement.split(":", 1)[0] in {"adopt", "modify"}
+            text = "采纳建议，选新材料短观察模板。" if adopted else "未采纳，模板不因该建议改变。"
+            mapping.append(
+                RequirementMapping(field=field, requirement=requirement, implementation=text)
+            )
+            continue
+        text, task_ids = how[field]
+        mapping.append(
+            RequirementMapping(
+                field=field, requirement=requirement, implementation=text, task_ids=task_ids
+            )
+        )
+    return tuple(mapping)
 
 
 def compile_course(
@@ -13,13 +60,16 @@ def compile_course(
     jane_ref: RevisionRef,
     brief_ref: RevisionRef,
     material_ref: RevisionRef,
-    next_course: bool,
+    source: str,
 ) -> CourseBody:
     if (
         demand.primary_goal.dimension_id != "english.reading.facts"
         or demand.auxiliary_goal.dimension_id != "english.speaking.report"
     ):
         raise ValueError("the fixed paper-bridge template does not cover the selected dimensions")
+    next_course = uses_new_material(demand)
+    if source != material_source_path(demand):
+        raise ValueError("material does not follow the saved demand")
     if next_course:
         specifications = [
             (
@@ -118,6 +168,7 @@ def compile_course(
                 optional=purpose == "offscreen",
             )
         )
+    tasks = tuple(tasks)
     return CourseBody(
         demand_ref=demand_ref,
         state_ref=demand.state_ref,
@@ -136,13 +187,8 @@ def compile_course(
             "closing": 3,
         },
         lesson_type="practice" if next_course else "observation",
-        tasks=tuple(tasks),
-        implementation=tuple(demand.sampling_requirements + demand.help_requirements)
-        + (
-            "新材料短观察、保留初答；语言支架后表现另记。"
-            if next_course
-            else "没有真实旧知，以首课观察开始。",
-        ),
+        tasks=tasks,
+        demand_mapping=map_demand(demand, tasks, source),
         parent_preview={
             "why": "按当前需求观察阅读事实与短表达，科学只按实际报告解释。",
             "materials": "纸、同一本书和同一辆小车；陪伴与当前条件开始前另报。",
@@ -153,10 +199,14 @@ def compile_course(
     )
 
 
-def material_source(project_root: Path, next_course: bool) -> tuple[str, str]:
-    relative = (
+def material_source_path(demand: DemandBody) -> str:
+    return (
         "courses/paper-bridge/reading-transfer.md"
-        if next_course
+        if uses_new_material(demand)
         else "courses/paper-bridge/reading-main.md"
     )
+
+
+def material_source(project_root: Path, demand: DemandBody) -> tuple[str, str]:
+    relative = material_source_path(demand)
     return relative, (project_root / relative).read_text()

@@ -89,7 +89,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PrepareRequest"
+                "$ref": "#/components/schemas/ParentRequest"
               }
             }
           }
@@ -1281,7 +1281,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Control"
+                "$ref": "#/components/schemas/StudentControl"
               }
             }
           }
@@ -2397,44 +2397,6 @@
         ],
         "title": "PreparationResult"
       },
-      "PrepareRequest": {
-        "properties": {
-          "request_id": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Request Id"
-          },
-          "learner_id": {
-            "type": "string",
-            "pattern": "^fictional-[A-Za-z0-9_-]+$",
-            "title": "Learner Id",
-            "default": "fictional-L1"
-          },
-          "realm": {
-            "type": "string",
-            "const": "simulation",
-            "title": "Realm",
-            "default": "simulation"
-          },
-          "source_type": {
-            "type": "string",
-            "const": "simulated",
-            "title": "Source Type",
-            "default": "simulated"
-          },
-          "next_course": {
-            "type": "boolean",
-            "title": "Next Course",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "request_id"
-        ],
-        "title": "PrepareRequest"
-      },
       "ReleaseRequest": {
         "properties": {
           "request_id": {
@@ -2874,6 +2836,32 @@
           "decision"
         ],
         "title": "StartResult"
+      },
+      "StudentControl": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "command": {
+            "type": "string",
+            "enum": [
+              "stop",
+              "pause",
+              "return",
+              "repeat"
+            ],
+            "title": "Command"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "command"
+        ],
+        "title": "StudentControl",
+        "description": "Student role: stop/pause at once, ask to repeat, report return; flow control is parental."
       },
       "TextInput": {
         "properties": {

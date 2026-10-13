@@ -8,6 +8,16 @@ from project_j.learning.contracts import DemandBody, PlanBody
 from project_j.platform.storage import Conflict, Publication
 
 
+def applicable_plan(body: dict) -> PlanBody:
+    data = PlanBody.model_validate(body)
+    if data.budget_minutes != 30:
+        raise ValueError(
+            "the adopted MVP remains 30 minutes; "
+            "a different baseline needs a separate design decision"
+        )
+    return data
+
+
 def review(app, request_id: str, learner_id: str, level: str, proposed_patch: dict | None = None):
     completed = app.ledger.completed_request(
         request_id, learner_id, "review", {"level": level, "patch": proposed_patch}
@@ -17,6 +27,9 @@ def review(app, request_id: str, learner_id: str, level: str, proposed_patch: di
     if level not in {"week", "stage", "annual", "long_term"}:
         raise ValueError("unknown review level")
     plan = app.current(learner_id, f"plan:{level}")
+    if proposed_patch:
+        # A proposal that can never be applied is rejected before anyone can accept it.
+        applicable_plan(plan.body | proposed_patch)
     state = app.current(learner_id, "state")
     evaluations = app.store.list_current(learner_id, "evaluation")
     operation = app.request(
@@ -64,7 +77,6 @@ def review(app, request_id: str, learner_id: str, level: str, proposed_patch: di
         "plan_effect": "reused",
     }
     if proposed_patch:
-        PlanBody.model_validate(plan.body | proposed_patch)
         decision = app.saved_step(operation, learner_id, "decision")
         if decision is None:
             obj = document(
@@ -119,6 +131,8 @@ def decide(app, request_id: str, learner_id: str, decision_ref: RevisionRef, cho
         plan.ref != plan_ref or app.current(learner_id, "state").ref != state_ref
     ):
         raise Conflict("proposal baseline changed; a new concrete proposal must be confirmed")
+    if choice == "accept":
+        applicable_plan(plan.body | proposal.body["patch"])
     decided = app.saved_step(operation, learner_id, "decision")
     if decided is None:
         obj = document(
@@ -152,14 +166,9 @@ def decide(app, request_id: str, learner_id: str, decision_ref: RevisionRef, cho
     if choice == "accept":
         changed = app.saved_step(operation, learner_id, "plan")
         if changed is None:
-            data = PlanBody.model_validate(
+            data = applicable_plan(
                 plan.body | proposal.body["patch"] | {"decision_ref": decided[0].ref.model_dump()}
             )
-            if data.budget_minutes != 30:
-                raise ValueError(
-                    "the adopted MVP remains 30 minutes; a different baseline "
-                    "needs a separate design decision"
-                )
             obj = document(
                 "plan",
                 plan.object_id,

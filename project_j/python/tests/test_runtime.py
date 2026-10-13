@@ -5,7 +5,9 @@ from support import CONDITIONS, LEARNER, answer, complete_story, deliver_all, st
 
 from project_j.application.coordinator import Coordinator
 from project_j.contracts import RevisionRef
+from project_j.learning.contracts import DemandBody
 from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
+from project_j.preparation.contracts import demand_requirements
 
 
 def test_E2E01_complete_simulation_reaches_actual_C2_and_survives_reopen(application):
@@ -22,10 +24,9 @@ def test_E2E01_complete_simulation_reaches_actual_C2_and_survives_reopen(applica
             RevisionRef.model_validate(result["adoption"]["demand_ref"]), LEARNER
         )
         assert c2.kind == "course" and c2.body["demand_ref"] == d2.ref.model_dump()
-        assert (
-            c2.body["implementation"]
-            and c2.body["tasks"][0]["prompt"] == "Which bus did Ben try first?"
-        )
+        mapped = {(item["field"], item["requirement"]) for item in c2.body["demand_mapping"]}
+        assert mapped == set(demand_requirements(DemandBody.model_validate(d2.body)))
+        assert c2.body["tasks"][0]["prompt"] == "Which bus did Ben try first?"
         assert (
             len([call for call in application.model.calls if call["purpose"] == "evaluation"]) == 1
         )
@@ -356,7 +357,7 @@ def test_completed_requests_replay_after_later_effective_versions_without_new_ca
         assert application.current(LEARNER, "demand").ref == demand
         assert len(application.model.calls) == calls
         with pytest.raises(Conflict):
-            application.prepare("first-prepare", LEARNER, next_course=True)
+            application.feedback("first-prepare", LEARNER, core.activity_id, "无额外补充")
 
     asyncio.run(scenario())
 
@@ -375,7 +376,6 @@ def test_recovered_successful_retry_preserves_original_attempt_count(application
                 "prepare",
                 {
                     "demand_ref": app.current(LEARNER, "demand").ref.model_dump(),
-                    "next_course": False,
                 },
                 sources=(app.current(LEARNER, "demand").ref,),
                 baselines=tuple(
