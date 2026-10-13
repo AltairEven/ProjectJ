@@ -62,15 +62,26 @@ def interpret(
     }
 
 
-def next_suggestion(evaluation: Document) -> dict:
+def next_suggestion(evaluation: Document, material: dict) -> dict:
+    """material names the next fixed story; an already-read story is review, not new material."""
+    title, focus = material["title"], material["focus"]
+    if material["familiar"]:
+        direction, change = "已读材料复习及英语支架巩固", "已读材料与首次新材料分开取样"
+        first = (
+            f"复习已读的{title}，观察{focus}的文本依据；熟悉条件下的回答不作首次新材料观察或迁移。"
+        )
+    else:
+        direction, change = "新材料短观察及英语支架巩固", "新材料与实际条件分别取样"
+        first = f"用{title}观察{focus}的文本依据。"
     return {
         "status": "checked",
         "evaluation_ref": evaluation.ref.model_dump(),
-        "direction": "新材料短观察及英语支架巩固",
-        "primary_change": "新材料与实际条件分别取样",
-        "sampling": ["用Ben’s Bridge观察先小后大及实际结果的文本依据。", "初答与帮助后再试分开。"],
+        "direction": direction,
+        "primary_change": change,
+        "material": material,
+        "sampling": [first, "初答与帮助后再试分开。"],
         "help": ["保留英语短报告句框，科学条件可先用中文报告。"],
         "exit": "原30分钟预算内，挑战替换；允许跳过、暂停、停止。",
         "review": "保持与迁移需要后续新日期和新条件证据。",
-        "limitations": ["候选建议，须learning采用并保存D2后才能备课。"],
+        "limitations": ["候选建议，须learning采用并保存需求后才能备课。"],
     }

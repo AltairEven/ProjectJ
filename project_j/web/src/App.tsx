@@ -7,6 +7,9 @@ const learner = 'fictional-L1'
 const uid = () => crypto.randomUUID()
 const show = (value: unknown) => typeof value === 'string' ? value : JSON.stringify(value, null, 2)
 const ref = (doc: Doc): Ref => ({ object_id: doc.object_id, revision: doc.revision })
+const previewLabels: Record<string, string> = { story: '本课故事', why: '本课目的', materials: '实物准备', help: '帮助方式', exit: '时长与退出' }
+const stateLabels: Record<string, string> = { running: '进行中', offscreen: '离屏活动中', paused: '已暂停', closing: '收尾', ended: '已结束' }
+const previewRank = (key: string) => key in previewLabels ? Object.keys(previewLabels).indexOf(key) : 99
 
 async function api<T>(token: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(`/api/${path}`, {
@@ -30,6 +33,7 @@ function Parent({ token }: { token: string }) {
   const [backupId, setBackupId] = useState('')
   const [household, setHousehold] = useState('模拟：纸、书和小车已摆好，有30分钟，家长可陪伴。')
   const [studentLink, setStudentLink] = useState('')
+  const [lostDrafts, setLostDrafts] = useState<Record<string, string>>({})
   const [planGoal, setPlanGoal] = useState('在相近新材料中观察阅读依据，继续保留短英语报告支架。')
   const failedOperation = useRef<(() => Promise<void>) | null>(null)
   const refresh = useCallback(async () => {
@@ -61,7 +65,7 @@ function Parent({ token }: { token: string }) {
   const selectedCourse = courses.find(doc => doc.object_id === prepared?.course_ref.object_id)
   const previews = dashboard?.objects?.filter(doc => doc.kind === 'preview') ?? []
   const previewsForCourse = previews.filter(doc => doc.dependency_refs?.some(dep => dep.object_id === prepared?.course_ref.object_id))
-  const previewsBody = previewsForCourse[0]?.body.content
+  const preview = (previewsForCourse[0]?.body.content ?? selectedCourse?.body.parent_preview) as Record<string, unknown> | undefined
   const parentControl = (command: Control['command']) => {
     const body = { command, event_id: uid(), activity_id: dashboard?.active?.activity_id }
     void run(async () => { await api(token, 'parent/control', body) })
@@ -84,13 +88,15 @@ function Parent({ token }: { token: string }) {
     {failedOperation.current && <button onClick={() => void run(failedOperation.current!)} disabled={busy}>接续原操作</button>}
     <section><div className="section-title"><h2>准备与开始</h2><button className="quiet" onClick={() => void run(refresh)} disabled={busy}>刷新状态</button></div>
       <p>{dashboard?.verification?.result === 'pass' ? '已有与当前构建匹配的隔离程序检查依据。' : '隔离程序检查尚未取得匹配依据，开始保持待处理。'}</p>
-      {dashboard?.active ? <><p>课堂状态：{dashboard.active.activity_state}。工作台不访问课中数据库。</p>
+      {dashboard?.active ? <><p>课堂状态：{stateLabels[dashboard.active.activity_state]}。工作台不访问课中数据库。</p>
         <div className="row"><button onClick={() => parentControl('pause')}>暂停</button><button onClick={() => parentControl('resume')}>恢复</button>
           <button className="quiet" onClick={() => parentControl('skip')}>跳过当前题</button><button className="quiet" onClick={() => parentControl('close')}>收尾</button>
           <button className="quiet" onClick={() => parentControl('end_unconfirmed')}>结束并保留未确认</button>
           <button className="danger" onClick={() => parentControl('stop')}>立即停止</button></div></> : <>
         <button disabled={busy} onClick={() => { const requestId = uid(); void run(async () => setPrepared(await api<PrepareResult>(token, 'parent/prepare', { request_id: requestId, learner_id: learner }))) }}>准备课程包</button>
-        {prepared && <><div className="preview"><h3>本课安排</h3><pre>{show(previewsBody ?? selectedCourse?.body.parent_preview ?? '预览待取得')}</pre></div>
+        {prepared && <><div className="preview"><h3>本课安排</h3>{preview
+          ? <dl>{Object.entries(preview).sort(([a], [b]) => previewRank(a) - previewRank(b)).map(([key, value]) => <div key={key}><dt>{previewLabels[key] ?? key}</dt><dd>{show(value)}</dd></div>)}</dl>
+          : <p>预览待取得</p>}</div>
           <label>本次模拟条件报告<textarea value={household} onChange={event => setHousehold(event.target.value)} /></label>
           <button disabled={busy || !household.trim()} onClick={() => { const requestId = uid(); void run(async () => {
             const data = await api<StartResult>(token, 'parent/start', { request_id: requestId, learner_id: learner, course_ref: prepared.course_ref,
@@ -103,6 +109,14 @@ function Parent({ token }: { token: string }) {
       {studentLink && <p><a href={studentLink} target="_blank" rel="noopener noreferrer">打开独立的模拟课堂</a></p>}
     </section>
     <section><h2>结束事实与一次反馈</h2>
+      {dashboard?.lost_activities?.map(item => { const id = String(item.activity_id); const reports = (item.reports ?? []) as { text: string; reported_at: string }[]
+        return <div className="notice" key={id}><p>{new Date(String(item.requested_at)).toLocaleString()} 开始的模拟课堂：{String(item.state)}{fact ? '下方显示的不是这一堂。' : ''}</p>
+          {reports.map(report => <p key={report.reported_at}>家长补记（{new Date(report.reported_at).toLocaleString()}）：{report.text}</p>)}
+          <label>家长补记已知情况（只保存为新的来源，缺口保留，不进入评价）<textarea value={lostDrafts[id] ?? ''} onChange={event => setLostDrafts(drafts => ({ ...drafts, [id]: event.target.value }))} /></label>
+          <button className="quiet" disabled={busy || !lostDrafts[id]?.trim()} onClick={() => { const requestId = uid(); void run(async () => {
+            await api(token, 'parent/lost-report', { request_id: requestId, learner_id: learner, activity_id: id, text: lostDrafts[id] })
+            setLostDrafts(drafts => ({ ...drafts, [id]: '' })); setMessage('家长补记已保存；缺口保留，未调用评价。')
+          }) }}>保存家长补记</button></div> })}
       {fact ? <><p>结束事实已保存。原因：{String((fact.body.end as Record<string, unknown>)?.reason ?? '未知')}；活动没有新增儿童学习证据。</p>
         <label>补充实际条件或更正（仅限虚构模拟）<textarea placeholder="帮助、代答、离屏结果或体验；未提交内容只留在当前页面。" value={feedback} onChange={event => setFeedback(event.target.value)} /></label>
         <div className="row"><button disabled={busy || !feedback.trim()} onClick={() => submitFeedback(feedback)}>提交反馈并准备下一课</button>
@@ -113,7 +127,7 @@ function Parent({ token }: { token: string }) {
             setMessage('已记录稍后反馈；这一步没有调用评价模型。')
           }) }}>稍后反馈</button>
           <button className="quiet" disabled={busy} onClick={() => { const requestId = uid(); void run(async () => setReport(await api(token, 'parent/next-course', { request_id: requestId, learner_id: learner, activity_id: activity }))) }}>按需准备下一课</button></div>
-        <details><summary>查看原答、帮助、交付与结束事实</summary><pre>{show(fact.body)}</pre></details></> : <p>课堂结束后先封存事实，不等待反馈或模型评价。</p>}
+        <details><summary>查看原答、帮助、交付与结束事实</summary><pre>{show(fact.body)}</pre></details></> : <p>{dashboard?.note ?? '课堂结束后先封存事实，不等待反馈或模型评价。'}</p>}
       {(dashboard?.pending_seals?.length ?? 0) > 0 || Object.keys(dashboard?.seal_errors ?? {}).length > 0 ?
         <button disabled={busy} onClick={() => void run(async () => { await api(token, 'parent/retry-seal', {}) })}>查询并接续原封存</button> : null}
     </section>
@@ -200,8 +214,6 @@ function Student({ token }: { token: string }) {
       setFailedDelivery(payload); setMessage(`呈现回执未知：${(error as Error).message}`)
     })
   }, [snapshot, token, setCurrent, localCancelled])
-  const [lastAction, setLastAction] = useState<Snapshot['pending_action']>()
-  useEffect(() => { if (snapshot?.pending_action && !localCancelled) setLastAction(snapshot.pending_action) }, [snapshot, localCancelled])
   const input = async (value: string, intent: TextInput['intent'] = 'unknown', supplement = false) => {
     const event = uid()
     const result = await send('student/input', { event_id: event, text: value, intent,
@@ -216,7 +228,7 @@ function Student({ token }: { token: string }) {
   }
   return <main className="student">
     <header><span className="eyebrow">JANE · 虚构课堂</span><h1>一起读故事，找依据</h1><p>文字与技术信号模拟；不会录音或播放真实声音。</p></header>
-    <div className="controls"><span>{snapshot?.activity_state ?? '正在连接原会话'}</span>
+    <div className="controls"><span>{snapshot ? stateLabels[snapshot.activity_state] : '正在连接原会话'}</span>
       <button className="quiet" onClick={() => void control('pause')}>暂停</button>
       <button className="danger" onClick={() => void control('stop')}>立即停止</button></div>
     {message && <div className="notice" role="alert">{message}</div>}
@@ -228,7 +240,7 @@ function Student({ token }: { token: string }) {
       }).catch(error => setMessage((error as Error).message))
     }}>接续原呈现回执</button>}
     {localCancelled && <p className="notice">本端已停止呈现。暂停后由家长在工作台恢复；停止后不能恢复。</p>}
-    <section className="jane"><span className="avatar" aria-hidden="true">J</span><div><h2>Jane</h2><p aria-live="polite">{localCancelled ? '呈现已取消。' : (snapshot?.pending_action ?? lastAction)?.text ?? '等待同一核心的下一动作。'}</p></div></section>
+    <section className="jane"><span className="avatar" aria-hidden="true">J</span><div><h2>Jane</h2><p aria-live="polite">{localCancelled ? '呈现已取消。' : (snapshot?.pending_action ?? snapshot?.presented_action)?.text ?? '等待同一核心的下一动作。'}</p></div></section>
     {!localCancelled && Object.entries(snapshot?.materials ?? {}).map(([id, material]) => <section key={id} className="reading"><pre>{material}</pre></section>)}
     {snapshot?.mode === 'offscreen' ? <section><p>离屏期间没有采集。回来后需要报告实际条件与结果，返回本身不算完成。</p><button onClick={() => void control('return')}>返回，报告结果</button></section> :
       snapshot?.mode !== 'ended' && <section><label>你的虚构回答或报告<textarea value={text} onChange={event => setText(event.target.value)} disabled={localCancelled} /></label>

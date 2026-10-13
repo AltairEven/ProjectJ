@@ -11,7 +11,7 @@ from typing import Literal
 from alembic import command
 from alembic.config import Config
 from pydantic import AwareDatetime, BaseModel, Field
-from sqlalchemy import URL, MetaData, create_engine, event, select, update
+from sqlalchemy import URL, MetaData, create_engine, event, func, select, update
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.pool import NullPool
 
@@ -147,6 +147,24 @@ class SimulationStore:
 
     def close(self):
         self.engine.dispose()
+
+    def list_saved(self, learner_id: str, kind: str) -> list[Document]:
+        """Latest saved revision of every object of a kind, effective or not."""
+        self.ensure_idle()
+        with self.engine.begin() as connection:
+            revisions, identities = self.tables["revisions"], self.tables["identities"]
+            statement = (
+                select(revisions.c.object_id, func.max(revisions.c.revision))
+                .join(identities, revisions.c.object_id == identities.c.object_id)
+                .where(identities.c.learner_id == learner_id, identities.c.kind == kind)
+                .group_by(revisions.c.object_id)
+            )
+            return [
+                self.load(
+                    connection, RevisionRef(object_id=identity, revision=revision), learner_id
+                )
+                for identity, revision in connection.execute(statement)
+            ]
 
     @staticmethod
     def boundary(document: Document, learner_id: str):

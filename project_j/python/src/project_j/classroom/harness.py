@@ -89,6 +89,8 @@ class Harness:
         self.delivery_sequences: dict[str, int] = {}
         self.delivery_events: dict[str, str] = {}
         self.delivered: set[str] = set()
+        # The last action the student fully saw, so a reopened page can show it again.
+        self.presented: str | None = None
         self.help_by_task: dict[str, dict] = {}
         self.help_count: dict[str, int] = {}
         self.jobs: set[asyncio.Task] = set()
@@ -174,6 +176,9 @@ class Harness:
             "cancellation_epoch": self.epoch,
             "input_policy_ref": self.bindings["input_policy"],
             "pending_action": action.model_dump(mode="json") if action else None,
+            "presented_action": self.actions[self.presented].model_dump(mode="json")
+            if self.presented
+            else None,
             "attempt_count": len(self.attempts),
             "elapsed_seconds": time.monotonic() - self.started_clock,
             "end": self.end,
@@ -223,6 +228,7 @@ class Harness:
         if feedback.status != "completed" or not feedback.delivered_range:
             return self.snapshot()
         self.pending = None
+        self.presented = action.action_id
         self.move("waiting_input")
         if action.after_delivery == "next_task":
             self.next_task()
@@ -248,7 +254,7 @@ class Harness:
             self.wait_kind = "closing_confirmation"
             return self.action(
                 "closing",
-                "我们保留实际回答、帮助和未观察项。下次可用新材料短观察；请确认收到小结。",
+                "我们保留实际回答、帮助和未观察项。下次课按课后安排继续；请确认收到小结。",
                 "end_confirmation",
             )
         task = self.course.tasks[self.task_index]
@@ -415,24 +421,22 @@ class Harness:
             "closing_confirmation",
         }:
             raise ValueError("当前不需要确认收到；请回答或补充当前问题。")
-        if submitted.relation == "supplement":
+        supplement = submitted.relation == "supplement"
+        if supplement:
             original = self.inputs.get(submitted.related_event_id)
             if (
                 original is None
                 or original["signature"].get("task_instance_id") != self.task_instance_id
             ):
                 raise ValueError("supplement needs the original current-task input")
-            if any(
-                action.action_id in self.delivered
-                and action.task_instance_id == self.task_instance_id
-                and action.action_id == original.get("response_action")
-                for action in self.actions.values()
-            ):
-                raise ValueError("delivered response cannot be washed into the first answer")
-            self.invalidate()
-            if self.mode in {"judging", "delivering"}:
-                self.move("waiting_input")
-        elif (
+            # After the response was delivered the core rules the utterance new under the current
+            # wait (a retry becomes a new attempt); it never joins or washes the first answer.
+            supplement = original.get("response_action") not in self.delivered
+            if supplement:
+                self.invalidate()
+                if self.mode in {"judging", "delivering"}:
+                    self.move("waiting_input")
+        if not supplement and (
             submitted.task_instance_id != self.task_instance_id
             or submitted.wait_id != self.wait_id
             or submitted.expected_core_revision != self.revision
@@ -443,6 +447,11 @@ class Harness:
             raise ValueError("core is not waiting for a completed input")
         self.record("input", signature)
         self.inputs[submitted.event_id] = {"signature": signature, "attempt_id": None}
+        if submitted.relation == "supplement" and not supplement:
+            self.record(
+                "relation_ruled",
+                {"event_id": submitted.event_id, "relation": "new", "reason": "原回应已交付"},
+            )
         if self.wait_kind == "goal_confirmation":
             if submitted.intent == "confirmation" or any(
                 word in submitted.text for word in ("听到", "收到", "明白", "好的", "yes")
@@ -475,7 +484,7 @@ class Harness:
         )
         attempt = None
         if not is_help:
-            if submitted.relation == "supplement":
+            if supplement:
                 original_id = self.inputs[submitted.related_event_id]["attempt_id"]
                 attempt = next((a for a in self.attempts if a["attempt_id"] == original_id), None)
             if attempt is None:

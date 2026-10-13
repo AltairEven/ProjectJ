@@ -282,6 +282,60 @@
         }
       }
     },
+    "/api/parent/lost-report": {
+      "post": {
+        "summary": "Lost Report",
+        "operationId": "lost_report_api_parent_lost_report_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LostReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/parent/evaluate": {
       "post": {
         "summary": "Evaluate",
@@ -1870,6 +1924,17 @@
             "title": "Seal Errors",
             "default": {}
           },
+          "lost_activities": {
+            "items": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Lost Activities",
+            "default": []
+          },
           "active": {
             "anyOf": [
               {
@@ -2323,6 +2388,50 @@
         "title": "InputResult"
       },
       "JsonValue": {},
+      "LostReportRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "activity_id": {
+            "type": "string",
+            "title": "Activity Id"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "activity_id",
+          "text"
+        ],
+        "title": "LostReportRequest"
+      },
       "ParentRequest": {
         "properties": {
           "request_id": {
@@ -2604,6 +2713,16 @@
             "$ref": "#/components/schemas/RevisionRef"
           },
           "pending_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AllowedAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "presented_action": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/AllowedAction"

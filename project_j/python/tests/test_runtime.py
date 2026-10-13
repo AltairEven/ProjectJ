@@ -73,6 +73,26 @@ def test_E2E02_wrong_first_answer_two_different_help_and_offscreen_unknown(appli
     asyncio.run(scenario())
 
 
+@pytest.mark.parametrize("helped", [False, True])
+def test_E2E02_state_records_english_expression_only_where_help_marked_it(application, helped):
+    async def scenario():
+        core, _ = await complete_story(application, helped=helped)
+        application.feedback("feedback", LEARNER, core.activity_id, "无额外补充")
+        result = await application.next_course("next", LEARNER, core.activity_id)
+        state = application.store.read(
+            RevisionRef.model_validate(result["adoption"]["state_ref"]), LEARNER
+        )
+        dims = {item["dimension_id"]: item for item in state.body["dimensions"]}
+        speaking = dims["english.speaking.report"]
+        if helped:
+            assert (speaking["judgment"], speaking["help"]) == ("needs_help", "scaffold")
+            assert speaking["evidence_refs"] == dims["english.reading.facts"]["evidence_refs"]
+        else:
+            assert (speaking["judgment"], speaking["evidence_refs"]) == ("unknown", [])
+
+    asyncio.run(scenario())
+
+
 def test_E2E03_stop_during_model_does_not_wait_or_deliver_late_result(application):
     async def scenario():
         core = start(application)
@@ -253,6 +273,56 @@ def test_supplement_before_delivery_keeps_one_attempt_and_invalidates_old_action
     asyncio.run(scenario())
 
 
+def test_student_view_shows_the_story_without_adult_material_metadata(application):
+    async def scenario():
+        core = start(application)
+        deliver_all(core)
+        await answer(application, "收到", "confirmation")
+        [text] = application.student_view(core)["materials"].values()
+        assert text.startswith("The Paper Bridge\n\nMia has a toy car.\n")
+        assert "素材版本" not in text and "Lexile" not in text
+
+    asyncio.run(scenario())
+
+
+def test_reopened_student_page_can_show_the_last_presented_action(application):
+    async def scenario():
+        core = start(application)
+        assert core.snapshot()["presented_action"] is None
+        deliver_all(core)
+        await answer(application, "收到", "confirmation")
+        # The prompt was already delivered to the old page; a reopened page has no pending action.
+        snapshot = core.snapshot()
+        assert snapshot["pending_action"] is None
+        assert snapshot["presented_action"]["text"] == "What does Mia want to make?"
+
+    asyncio.run(scenario())
+
+
+def test_supplement_after_delivered_response_is_ruled_a_new_attempt(application):
+    async def scenario():
+        core = start(application)
+        deliver_all(core)
+        await answer(application, "收到", "confirmation")
+        await application.adapter.text("first", "that thing")
+        deliver_all(core)
+        # The clarification was delivered, so the child's "supplement" cannot join the first answer.
+        late = await application.adapter.text(
+            "late", "a bridge", relation="supplement", related="first"
+        )
+        assert late["ack"] == "accepted"
+        assert [len(attempt["inputs"]) for attempt in core.attempts] == [1, 1]
+        assert core.attempts[-1]["judgment"] == "correct"
+        ruled = [event["payload"] for event in core.events if event["kind"] == "relation_ruled"]
+        assert ruled == [{"event_id": "late", "relation": "new", "reason": "原回应已交付"}]
+        replay = await application.adapter.text(
+            "late", "a bridge", relation="supplement", related="first"
+        )
+        assert replay["ack"] == "replayed"
+
+    asyncio.run(scenario())
+
+
 def test_two_same_answers_are_two_attempts_but_transport_replay_is_one(application):
     async def scenario():
         core = start(application)
@@ -340,6 +410,46 @@ def test_persisted_start_does_not_reopen_an_activity_after_memory_loss(applicati
     assert result["decision"] == "interrupted_unknown"
     assert reopened.core is None
     assert not app.store.list_current(LEARNER, "fact")
+
+
+def test_dashboard_shows_the_gap_of_an_activity_lost_with_process_memory(application):
+    app = application
+    course = RevisionRef.model_validate(app.prepare("prepare1", LEARNER)["course_ref"])
+    started = app.start("start1", LEARNER, course, CONDITIONS)
+    app.store.active_activity_id = None  # Explicitly simulate process loss.
+    reopened = Coordinator(app.store, app.root, verification=app.verification)
+    [lost] = reopened.dashboard(LEARNER)["lost_activities"]
+    assert lost["activity_id"] == started["snapshot"]["activity_id"]
+    assert lost["course_ref"] == course.model_dump()
+    assert not app.store.list_current(LEARNER, "fact")
+
+
+def test_parent_report_on_a_lost_activity_is_only_saved_as_a_new_source(application):
+    app = application
+    course = RevisionRef.model_validate(app.prepare("prepare1", LEARNER)["course_ref"])
+    activity = app.start("start1", LEARNER, course, CONDITIONS)["snapshot"]["activity_id"]
+    app.store.active_activity_id = None  # Explicitly simulate process loss.
+    reopened = Coordinator(app.store, app.root, verification=app.verification)
+    text = "家长补记：读完故事，第一题答了a bridge，之后断电。"
+    saved = reopened.lost_report("report1", LEARNER, activity, text)
+    assert reopened.lost_report("report1", LEARNER, activity, text) == saved
+    report = app.store.read(RevisionRef.model_validate(saved["report_ref"]), LEARNER)
+    assert (report.kind, report.occurred_at) == ("parent_report", None)
+    assert (report.body["activity_id"], report.body["text"]) == (activity, text)
+    [lost] = reopened.dashboard(LEARNER)["lost_activities"]
+    assert [item["text"] for item in lost["reports"]] == [text]
+    # The gap stays; nothing is replayed into a fact or sent to evaluation.
+    assert not reopened.model.calls and not app.store.list_current(LEARNER, "fact")
+    with pytest.raises(LookupError):
+        reopened.lost_report("report2", LEARNER, "not-a-lost-activity", text)
+
+
+def test_sealed_activity_is_not_reported_lost(application):
+    async def scenario():
+        await complete_story(application)
+        assert application.dashboard(LEARNER)["lost_activities"] == []
+
+    asyncio.run(scenario())
 
 
 def test_completed_requests_replay_after_later_effective_versions_without_new_calls(application):

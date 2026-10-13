@@ -1,6 +1,7 @@
 """Simulation use cases. Each saved step can resume without rerunning successful work."""
 
 import asyncio
+import re
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -14,7 +15,7 @@ from project_j.application.ledger import Ledger, Request, Step
 from project_j.classroom.harness import Harness
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.content import check_content
-from project_j.curriculum.corrections import active_restrictions, restrict_affected
+from project_j.curriculum.corrections import active_restrictions, affected
 from project_j.evaluation.assessment import interpret, next_suggestion
 from project_j.interface.submission import InputAdapter
 from project_j.learning.adoption import adopt_demand, adopt_state, review_due
@@ -31,8 +32,18 @@ from project_j.platform.storage import (
     digest,
 )
 from project_j.preparation.contracts import CourseBody
-from project_j.preparation.packages import compile_course, material_source
+from project_j.preparation.packages import FIRST, compile_course, next_material
 from project_j.teacher.methods import JANE
+
+
+def student_text(source: str) -> str:
+    """Only the story reaches the student; the source's provenance line is adult metadata."""
+    # ponytail: assumes the fixed course format ("# title", one 素材版本 line); a structured
+    # student field on the material object is the upgrade path for other formats.
+    lines = [
+        line.removeprefix("# ") for line in source.splitlines() if not line.startswith("素材版本：")
+    ]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip() + "\n"
 
 
 class Coordinator:
@@ -375,6 +386,30 @@ class Coordinator:
             operation, learner_id, {"demand_ref": demand[0].ref.model_dump(), "realm": "simulation"}
         )
 
+    def chosen_material(self, learner_id: str, demand: DemandBody) -> tuple[str, bool]:
+        """Preparation follows the material named by the suggestion the demand adopted."""
+        for choice in demand.suggestion_choices:
+            if choice.action in {"adopt", "modify"}:
+                chosen = self.store.read(choice.suggestion_ref, learner_id).body["material"]
+                return chosen["source"], chosen["familiar"]
+        return FIRST, False
+
+    def next_lesson_material(self, learner_id: str) -> dict:
+        # The next lesson follows the latest lesson, even when an older one is re-evaluated.
+        facts = self.store.list_current(learner_id, "fact")
+        latest = max(facts, key=lambda fact: fact.occurred_at)
+        return next_material(
+            self.taught_source(learner_id, latest),
+            # ponytail: any sealed fact counts its story as read, even a class stopped before
+            # the task; this only errs toward review, never toward new material.
+            {self.taught_source(learner_id, fact) for fact in facts},
+        )
+
+    def taught_source(self, learner_id: str, fact: Document) -> str:
+        course = self.store.read(RevisionRef.model_validate(fact.body["course_ref"]), learner_id)
+        material_ref = RevisionRef.model_validate(course.body["material_refs"][0])
+        return self.store.read(material_ref, learner_id).body["source"]
+
     def prepare(self, request_id: str, learner_id: str):
         completed = self.ledger.completed_request(request_id, learner_id, "prepare", {})
         if completed:
@@ -420,9 +455,10 @@ class Coordinator:
                 [jane],
                 publications=(Publication(ref=jane.ref, reason="唯一Jane模拟方法"),),
             )
+        source, familiar = self.chosen_material(learner_id, body)
         material = self.saved_step(operation, learner_id, "material")
         if material is None:
-            source, text = material_source(self.root, body)
+            text = (self.root / source).read_text()
             asset = self.files.asset(text)
             obj = document(
                 "material",
@@ -447,7 +483,13 @@ class Coordinator:
             course_ref = RevisionRef(object_id=identity(operation, "course"), revision=1)
             brief_ref = RevisionRef(object_id=identity(operation, "brief"), revision=1)
             course = compile_course(
-                body, demand.ref, jane.ref, brief_ref, material.ref, material.body["source"]
+                body,
+                demand.ref,
+                jane.ref,
+                brief_ref,
+                material.ref,
+                material.body["source"],
+                familiar,
             )
             brief = document(
                 "brief",
@@ -714,7 +756,9 @@ class Coordinator:
             {"planned_activity_id": activity_id, "actual_activity": "unknown_after_restart"},
         )
         self.material_cache = {
-            ref.object_id: self.files.read_asset(self.store.read(ref, learner_id).body["asset"])
+            ref.object_id: student_text(
+                self.files.read_asset(self.store.read(ref, learner_id).body["asset"])
+            )
             for ref in data.material_refs
         }
         bindings = {
@@ -999,14 +1043,87 @@ class Coordinator:
         evaluation = self.store.current(identity(activity_id, "evaluation"), learner_id)
         if corrections and evaluation:
             # Derived state/demand/course stay limited until the owners recheck the new source.
-            restrict_affected(
-                self, operation, learner_id, [evaluation], "新更正影响旧解释，待同活动来源复核。"
-            )
+            for doc in [evaluation, *affected(self, evaluation.ref, learner_id)]:
+                if self.uses_corrected_source(learner_id, doc, activity_id):
+                    self.restrict(
+                        operation, learner_id, doc, "新更正影响旧解释，待同活动来源复核。"
+                    )
         return self.ledger.finish(
             operation,
             learner_id,
             {"feedback_ref": saved[0].ref.model_dump(), "evaluation": "not_requested"},
         )
+
+    def lost_report(self, request_id: str, learner_id: str, activity_id: str, text: str):
+        """A parent's later report on a class lost with process memory is a new actual source;
+        it is only saved, never replayed into a fact or sent to evaluation."""
+        body = {"activity_id": activity_id, "text": text}
+        completed = self.ledger.completed_request(request_id, learner_id, "lost-report", body)
+        if completed:
+            return completed
+        lost = next(
+            (
+                item
+                for item in self.lost_activities(learner_id, self.store.list_current(learner_id))
+                if item["activity_id"] == activity_id
+            ),
+            None,
+        )
+        if lost is None:
+            raise LookupError("not a lost class of this learner; check the activity identity")
+        start_ref = RevisionRef.model_validate(lost["start_ref"])
+        operation = self.request(request_id, learner_id, "lost-report", body, sources=(start_ref,))
+        existing = self.ledger.result(operation, learner_id)
+        if existing:
+            return existing
+        report = self.saved_step(operation, learner_id, "parent-report")
+        if report is None:
+            obj = document(
+                "parent_report",
+                identity(operation, "parent-report"),
+                operation,
+                learner_id,
+                {
+                    "status": "checked",
+                    "activity_id": activity_id,
+                    "requested_at": lost["requested_at"],
+                    "course_ref": lost["course_ref"],
+                    "text": text,
+                    "provider": "simulated_parent",
+                    "reported_at": datetime.now(UTC).isoformat(),
+                    "gap": lost["state"],
+                    "limitations": [
+                        "家长有限报告是新的实际来源；不补造原话、不重复计样本，不自动进入评价。"
+                    ],
+                },
+                refs=(start_ref,),
+            )
+            report = self.save_step(
+                operation,
+                learner_id,
+                "parent-report",
+                [obj],
+                publications=(Publication(ref=obj.ref, reason="只保存家长补记，缺口保留"),),
+            )
+        return self.ledger.finish(operation, learner_id, {"report_ref": report[0].ref.model_dump()})
+
+    def uses_corrected_source(self, learner_id: str, doc: Document, activity_id: str) -> bool:
+        """Only this activity's interpretation and current or untaught derived objects use it;
+        later lessons' own evidence and lessons already taught stay valid history."""
+        if doc.kind in {"evaluation", "report"}:
+            return doc.body.get("activity_id") == activity_id
+        if doc.kind == "suggestion":
+            return doc.body["evaluation_ref"]["object_id"] == identity(activity_id, "evaluation")
+        if doc.kind in {"state", "demand", "plan", "household"}:
+            return self.store.current(doc.object_id, learner_id).ref == doc.ref
+        if doc.kind == "start":
+            return False
+        taught = {
+            fact.body["course_ref"]["object_id"]
+            for fact in self.store.list_current(learner_id, "fact")
+        }
+        package = {doc.object_id} | {ref.object_id for ref in doc.dependency_refs}
+        return not package & taught
 
     def later_feedback(self, request_id: str, learner_id: str, activity_id: str):
         fact = self.activity_facts(activity_id, learner_id)
@@ -1126,7 +1243,7 @@ class Coordinator:
                 identity(activity_id, "suggestion"),
                 operation,
                 learner_id,
-                next_suggestion(obj),
+                next_suggestion(obj, self.next_lesson_material(learner_id)),
                 refs=(obj.ref,),
                 revision=prior_suggestion.revision + 1 if prior_suggestion else 1,
                 source_revision=source_revision,
@@ -1448,4 +1565,27 @@ class Coordinator:
             ),
             "model_calls": self.model.calls,
             "pending_seals": list(self.pending_seals),
+            "lost_activities": self.lost_activities(learner_id, documents),
         }
+
+    def lost_activities(self, learner_id: str, documents: list[Document]) -> list[dict]:
+        """A saved start only proves a request; without a fact or memory its class is a gap."""
+        known = {doc.body["activity_id"] for doc in documents if doc.kind == "fact"}
+        known |= set(self.pending_seals) | ({self.core.activity_id} if self.core else set())
+        reports = [doc for doc in documents if doc.kind == "parent_report"]
+        return [
+            {
+                "activity_id": start.body["planned_activity_id"],
+                "start_ref": start.ref.model_dump(),
+                "course_ref": start.body["course_ref"],
+                "requested_at": start.created_at.isoformat(),
+                "state": "进程丢失：实际发生与结束未知，未保存的课堂内容不可恢复。",
+                "reports": [
+                    {"text": doc.body["text"], "reported_at": doc.body["reported_at"]}
+                    for doc in reports
+                    if doc.body["activity_id"] == start.body["planned_activity_id"]
+                ],
+            }
+            for start in self.store.list_saved(learner_id, "start")
+            if start.body["planned_activity_id"] not in known
+        ]

@@ -196,6 +196,7 @@ def test_API_role_separation_unknown_start_and_stop_do_not_expose_teacher_materi
         assert "acceptable_simulated" not in str(snapshot) and "supports" not in str(snapshot)
         parent_during_class = client.get("/api/parent/dashboard", headers=parent).json()
         assert parent_during_class["objects"] == [] and parent_during_class["active"]
+        assert parent_during_class["verification"] == app.verification
         stopped = client.post(
             "/api/student/control",
             headers=student,

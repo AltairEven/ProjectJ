@@ -5,7 +5,7 @@ from project_j.contracts import RevisionRef
 from project_j.platform.storage import Publication
 
 # Facts and source reports stay historical truth; restriction records and issues are not uses.
-NOT_RESTRICTED = {"fact", "feedback", "restriction", "issue"}
+NOT_RESTRICTED = {"fact", "feedback", "parent_report", "restriction", "issue"}
 
 
 def active_restrictions(app, learner_id: str, selected_refs):

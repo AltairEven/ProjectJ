@@ -6,9 +6,10 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
-from support import CONDITIONS, LEARNER, answer, complete_story, deliver_all, start
+from support import CONDITIONS, LEARNER, answer, complete_story, deliver_all, start, teach
 
 from project_j.application.configuration import Settings
+from project_j.application.documents import identity
 from project_j.contracts import RevisionRef
 from project_j.curriculum.content import check_content
 from project_j.interface.api import create_app
@@ -51,6 +52,37 @@ def test_course_template_and_mapping_follow_the_saved_demand(application):
             item for item in again.body["demand_mapping"] if item["field"] == "suggestion_choices"
         )
         assert choice["implementation"].startswith("采纳")
+
+    asyncio.run(scenario())
+
+
+def test_two_fixed_courses_alternate_and_label_familiar_material(application):
+    app = application
+    mia, ben = "What does Mia want to make?", "Which bus did Ben try first?"
+    answers = {mia: ("a bridge", "She folded it."), ben: ("the small bus", "it fell")}
+
+    async def scenario():
+        course_ref, seen = app.prepare("c1", LEARNER)["course_ref"], []
+        for number in range(1, 5):
+            course = app.store.read(ref(course_ref), LEARNER).body
+            prompt = course["tasks"][0]["prompt"]
+            seen.append((prompt, course["lesson_type"], course["parent_preview"]["story"]))
+            fact = await teach(app, f"start{number}", course_ref, answers[prompt])
+            activity = fact.body["activity_id"]
+            app.feedback(f"feedback{number}", LEARNER, activity, "无额外补充")
+            result = await app.next_course(f"next{number}", LEARNER, activity)
+            course_ref = result["next_package"]["course_ref"]
+            demand = app.store.read(ref(result["adoption"]["demand_ref"]), LEARNER).body
+            sampling = demand["sampling_requirements"][0]
+            # D2 is the only new-material observation; from D3 on both stories were already read.
+            assert ("已读" in sampling) == (number >= 2)
+            assert ("不作首次新材料观察" in sampling) == (number >= 2)
+        assert seen == [
+            (mia, "observation", "The Paper Bridge（首课）"),
+            (ben, "practice", "Ben’s Bridge（新材料）"),
+            (mia, "review", "The Paper Bridge（已读，复习）"),
+            (ben, "review", "Ben’s Bridge（已读，复习）"),
+        ]
 
     asyncio.run(scenario())
 
@@ -295,3 +327,70 @@ def test_replayed_start_of_an_ended_activity_never_returns_its_old_result(applic
     app.start("start-B", LEARNER, course, CONDITIONS)
     with pytest.raises(Conflict, match="original start ended"):
         app.start("start-A", LEARNER, course, CONDITIONS)
+
+
+async def correct_first_lesson_after_a_second(app):
+    """C1 with help, C2 taught and followed by C3, then a correction to C1's first task."""
+    first, _, result = await first_lesson_with_next_course(app, helped=True)
+    second = await teach(
+        app, "start2", result["next_package"]["course_ref"], ("the small bus", "it fell")
+    )
+    activity = second.body["activity_id"]
+    app.feedback("feedback2", LEARNER, activity, "无额外补充")
+    third = await app.next_course("next2", LEARNER, activity)
+    app.feedback(
+        "correction1",
+        LEARNER,
+        first.activity_id,
+        "C1第一题家长代答。",
+        corrections=({"task_id": "reading-fact", "note": "家长代答，不能按儿童独立样本解释。"},),
+    )
+    return first, second, third
+
+
+def test_E2E06_correction_limits_only_the_activity_and_current_derived_objects(application):
+    app = application
+
+    async def scenario():
+        first, second, third = await correct_first_lesson_after_a_second(app)
+        targets = {
+            (doc.body["target_ref"]["object_id"], doc.body["target_ref"]["revision"])
+            for doc in app.store.list_current(LEARNER, "restriction")
+            if doc.body["restriction_state"] == "active"
+        }
+        restricted = {object_id for object_id, _ in targets}
+        current = [app.current(LEARNER, kind).ref for kind in ("state", "demand")]
+        assert {(ref.object_id, ref.revision) for ref in current} <= targets
+        assert identity(first.activity_id, "evaluation") in restricted
+        assert identity(first.activity_id, "suggestion") in restricted
+        assert third["next_package"]["course_ref"]["object_id"] in restricted
+        # Later evidence and lessons that already happened are not uses of the corrected source.
+        assert identity(second.body["activity_id"], "evaluation") not in restricted
+        assert second.body["course_ref"]["object_id"] not in restricted
+
+    asyncio.run(scenario())
+
+
+def test_E2E06_rechecking_an_older_lesson_keeps_newer_evidence_and_the_lesson_order(application):
+    app = application
+
+    async def scenario():
+        first, second, _ = await correct_first_lesson_after_a_second(app)
+        result = await app.next_course("recheck1", LEARNER, first.activity_id)
+        state = app.store.read(ref(result["adoption"]["state_ref"]), LEARNER)
+        dims = {item["dimension_id"]: item for item in state.body["dimensions"]}
+        later = app.store.current(identity(second.body["activity_id"], "evaluation"), LEARNER)
+        reading = dims["english.reading.facts"]
+        assert reading["evidence_refs"] == [later.ref.model_dump()]
+        assert any("较早活动" in item for item in reading["limitations"])
+        # English expression was only observed in C1, so its corrected source is re-reviewed.
+        rechecked = app.store.current(identity(first.activity_id, "evaluation"), LEARNER)
+        speaking = dims["english.speaking.report"]
+        assert speaking["judgment"] == "unknown"
+        assert speaking["evidence_refs"] == [rechecked.ref.model_dump()]
+        # The next lesson still follows the latest one (C2 Ben), not the corrected C1.
+        course = app.store.read(ref(result["next_package"]["course_ref"]), LEARNER).body
+        assert course["tasks"][0]["prompt"] == "What does Mia want to make?"
+        assert course["lesson_type"] == "review"
+
+    asyncio.run(scenario())

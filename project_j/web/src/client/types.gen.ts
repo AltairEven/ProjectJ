@@ -249,6 +249,12 @@ export type Dashboard = {
     seal_errors?: {
         [key: string]: string;
     };
+    /**
+     * Lost Activities
+     */
+    lost_activities?: Array<{
+        [key: string]: JsonValue;
+    }>;
     active?: Snapshot | null;
     /**
      * Note
@@ -510,6 +516,36 @@ export type InputResult = {
 export type JsonValue = unknown;
 
 /**
+ * LostReportRequest
+ */
+export type LostReportRequest = {
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    /**
+     * Realm
+     */
+    realm?: 'simulation';
+    /**
+     * Source Type
+     */
+    source_type?: 'simulated';
+    /**
+     * Activity Id
+     */
+    activity_id: string;
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
  * ParentRequest
  */
 export type ParentRequest = {
@@ -693,6 +729,7 @@ export type Snapshot = {
     cancellation_epoch: number;
     input_policy_ref: RevisionRef;
     pending_action: AllowedAction | null;
+    presented_action?: AllowedAction | null;
     /**
      * Attempt Count
      */
@@ -1046,6 +1083,35 @@ export type LaterApiParentLaterFeedbackPostErrors = {
 export type LaterApiParentLaterFeedbackPostError = LaterApiParentLaterFeedbackPostErrors[keyof LaterApiParentLaterFeedbackPostErrors];
 
 export type LaterApiParentLaterFeedbackPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type LostReportApiParentLostReportPostData = {
+    body: LostReportRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/parent/lost-report';
+};
+
+export type LostReportApiParentLostReportPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type LostReportApiParentLostReportPostError = LostReportApiParentLostReportPostErrors[keyof LostReportApiParentLostReportPostErrors];
+
+export type LostReportApiParentLostReportPostResponses = {
     /**
      * Successful Response
      */

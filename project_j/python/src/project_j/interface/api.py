@@ -63,6 +63,10 @@ class ActivityRequest(ParentRequest):
     activity_id: str
 
 
+class LostReportRequest(ActivityRequest):
+    text: str = Field(min_length=1)
+
+
 class EvaluationRequest(ActivityRequest):
     purpose: Literal["next_course", "workbench_evaluation", "final_feedback"]
 
@@ -147,6 +151,7 @@ class Snapshot(Contract):
     cancellation_epoch: int
     input_policy_ref: RevisionRef
     pending_action: AllowedAction | None
+    presented_action: AllowedAction | None = None
     attempt_count: int
     elapsed_seconds: float
     end: dict[str, JsonValue] | None
@@ -167,6 +172,7 @@ class Dashboard(Contract):
     model_calls: list[dict[str, JsonValue]] = []
     pending_seals: list[str] = []
     seal_errors: dict[str, str] = {}
+    lost_activities: list[dict[str, JsonValue]] = []
     active: Snapshot | None = None
     note: str | None = None
 
@@ -360,6 +366,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
                 "realm": "simulation",
                 "learner_id": learner_id,
                 "active": app_controller.core.snapshot(),
+                "verification": app_controller.verification,  # held in memory since startup
                 "objects": [],
                 "note": "课堂进行中，工作台只返回内存控制状态，不访问数据库。",
             }
@@ -394,6 +401,12 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
     async def later(request: ActivityRequest):
         return controller().later_feedback(
             request.request_id, request.learner_id, request.activity_id
+        )
+
+    @app.post("/api/parent/lost-report", dependencies=[Depends(parent)])
+    async def lost_report(request: LostReportRequest):
+        return controller().lost_report(
+            request.request_id, request.learner_id, request.activity_id, request.text
         )
 
     @app.post("/api/parent/evaluate", dependencies=[Depends(parent)])

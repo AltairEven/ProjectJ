@@ -75,3 +75,21 @@ async def complete_story(app, helped=False, offscreen_report=True):
     assert core.mode == "ended"
     fact = app.seal()
     return core, fact
+
+
+async def teach(app, request_id, course_ref, answers):
+    """Teach one prepared course with first-try answers and an offscreen report; seal the fact."""
+    result = app.start(request_id, LEARNER, RevisionRef.model_validate(course_ref), CONDITIONS)
+    assert result["decision"] == "allow_simulation"
+    core = app.core
+    deliver_all(core)
+    await answer(app, "听到了。", "confirmation")
+    for text in answers:
+        await answer(app, text)
+    await answer(app, "我指的是折过的纸。", "report")
+    core.control(str(uuid4()), "return")
+    deliver_all(core)
+    await answer(app, "第二次纸折了，车没有掉。", "report")
+    await answer(app, "听到了。", "confirmation")
+    assert core.mode == "ended"
+    return app.seal()

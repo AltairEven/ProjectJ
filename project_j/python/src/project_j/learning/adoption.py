@@ -16,10 +16,24 @@ def adopt_state(current: LearningState, evaluation: Document) -> StateBody:
     dimensions = {item.dimension_id: item for item in current.body.dimensions}
     observed: dict[str, list[dict]] = {}
     for task in evaluation.body["tasks"]:
-        observed.setdefault(task["dimension_id"], []).append(task)
+        # Actual help names every dimension it affected (an English sentence frame on a reading
+        # task also samples English expression); dimensions without such help are not inferred.
+        affected = {dim for dim, level in task["help"].items() if level not in {"none", "unknown"}}
+        for dimension_id in {task["dimension_id"], *affected}:
+            observed.setdefault(dimension_id, []).append(task)
     # All tasks of one dimension are merged; their order in the lesson never decides the result.
     for dimension_id, tasks in observed.items():
         previous = dimensions.get(dimension_id)
+        if previous and previous.observed_at and previous.observed_at > evaluation.occurred_at:
+            # Re-reviewing an older lesson's corrected source never overwrites newer evidence.
+            activity = evaluation.body["activity_id"]
+            note = f"较早活动{activity}的来源已更正并重审，本维度仍以较新证据为准。"
+            if note not in previous.limitations:
+                previous = previous.model_copy(
+                    update={"limitations": (*previous.limitations, note)}
+                )
+            dimensions[dimension_id] = previous
+            continue
         supported = [task for task in tasks if task["working_judgment"] != "unknown"]
         judgments = {task["working_judgment"] for task in supported}
         judgment = (
@@ -67,7 +81,8 @@ def adopt_demand(
                     SuggestionChoice(
                         suggestion_ref=suggestion.ref,
                         action="adopt",
-                        reason="在既定目标与30分钟预算内采用新材料短观察，保留帮助与未知。",
+                        reason=f"在既定目标与30分钟预算内采用{suggestion.body['direction']}，"
+                        "保留帮助与未知。",
                     ),
                 ),
                 "gaps": ("保持、迁移、外部帮助与真实声音条件仍待观察。",),
