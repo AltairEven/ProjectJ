@@ -33,6 +33,8 @@ from project_j.platform.storage import (
     canonical,
     digest,
 )
+from project_j.platform.tts.contracts import Synthesizer, SynthesizerNotReady
+from project_j.platform.tts.simulated import SimulatedSynthesizer
 from project_j.preparation.contracts import CourseBody
 from project_j.preparation.packages import FIRST, compile_course, next_material
 from project_j.teacher.methods import JANE
@@ -56,11 +58,13 @@ class Coordinator:
         verification: dict | None = None,
         models: ModelService | None = None,
         scorer: PronunciationScorer | None = None,
+        synthesizer: Synthesizer | None = None,
     ):
         self.store, self.root = store, project_root
         self.files, self.ledger = PrivateFiles(store), Ledger(store)
         self.models = models or ModelService.simulated()
         self.scorer = scorer or SimulatedScorer()
+        self.synthesizer = synthesizer or SimulatedSynthesizer()
         self.verification = (
             verification if verification is not None else simulation_evidence(project_root)
         )
@@ -634,6 +638,11 @@ class Coordinator:
         ):
             raise ScorerNotReady(
                 "发音评分未就绪：" + "；".join(reasons) + "。请运行 project-j-scorer-init probe。"
+            )
+        # Every class delivers Jane by voice; there is no text-only class mode yet.
+        if reasons := self.synthesizer.reasons():
+            raise SynthesizerNotReady(
+                "语音合成未就绪：" + "；".join(reasons) + "。请运行 project-j-tts-init probe。"
             )
         required = {
             "materials": "reported_available",

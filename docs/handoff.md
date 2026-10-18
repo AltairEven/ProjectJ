@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.17.0；更新：2026年10月18日。
+版本：1.18.0；更新：2026年10月18日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -495,7 +495,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 设计要点：评分与合成是两项各自维护的本机离线能力，子工程（project_j/scorer/与project_j/tts/）、锁定依赖与环境、模型目录（project_j/private/scorer/models/与project_j/private/tts/models/）、初始化、探针、准入、配置版本与故障处理都分开，一方升级、换模型或故障不要求另一方随之变化；各一个后端常驻子进程，标准输入输出通信、不开端口、课中不联网；模型文件由各自初始化按固定修订下载并核对摘要；课中不并行运行其他GPU任务；评分输出每词得分与疑似读错、漏读、多读等，带评分器、模型修订与门槛版本并标明未校准，不给等级；合成音色与语气指令为有版本的声音配置，中英文同一声音，按段流式、停止取段即停止生成；评分段与录音上限改为产品上限（首版100词、300秒）；评分失败记未知，合成失败改文字或暂停；儿童录音与Jane文字都不出本机；合成需要Apple Silicon。
 - 本批裁定（Claude）：子工程目录名scorer与tts；各自一个常驻子进程，经标准输入输出通信、不开网络端口；评分不输出等级；现场合成的偶发跳词或重复列为已知限制，按实际交付记录；探针样本来源与许可、合成固定随机种子、两个子工程的Python版本与单元测试纳入统一检查的方式、进程在服务启动时还是开课检查时加载、暂定门槛数值留给实施计划。
 - 未验证：评分器与合成器均未实现；真人与儿童效果、课中实际声音与延迟、暂定门槛的误报与漏报率、预合成固定种子均未验证；真实麦克风与初始化接入仍属DES-V1第二期待办。
-- 接续：评分的第二期计划已写并实施，见P2-S1；合成的实施计划随后单独写；两者分别实施、分别验收。
+- 接续：评分与合成的第二期计划都已写并实施，分别见P2-S1与P2-T1；两者分别实施、分别验收。
 
 ## P2-S1 本机发音评分实现
 
@@ -508,3 +508,15 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 真实初始化（本机M3 Pro，2026年10月18日）：download复用本机实验缓存（HF_HUB_OFFLINE=1），4个文件摘要核对通过，目录0700、文件0600；probe通过：MPS，加载约5.8秒（含预热），GPU分配峰值3.30 GB；正确朗读2.98秒评分72毫秒无标出，故意读错3.05秒评分70毫秒只标出bridge，约100词带停顿慢读43.96秒评分1.16秒、有4个误报（car、wants、toy、wants，模型在该上下文中把元音听成别的音，得分接近0，与真实读错无法靠门槛区分）；status为就绪。整篇故事复测：Samantha无误报，Daniel、Karen、Moira、Reed各1–2个口音相关误报，Flo 6个；整句漏读能标出但前后各误标一词；peeper未被标出。
 - 未验证：真人与儿童朗读效果、门槛的误报与漏报率；真实上课入口（模拟入口仍只用模拟评分器，评分进程在服务启动还是开课检查时加载待真实入口时定）；浏览器真实麦克风（须产出16 kHz单声道PCM16 WAV）；CPU与其他设备。
 - 接续：家长可用`project-j-scorer-init score`自测真人朗读（QuickTime录音经afconvert转WAV）；本机project_j/test/asr-spike（1.26 GB）在模型已核对复制后可删除，由家长决定；合成另写计划。
+
+## P2-T1 本机语音合成实现
+
+- 状态：实现与自测完成，本机真实探针通过，已本地提交（2026年10月18日）。家长审阅计划后选择在本会话直接实施，最终审查由主会话自做。
+- 负责人/集成：Claude Opus；起点06f2f17；计划docs/superpowers/plans/2026-10-18-des-v2-tts.md。
+- 文件边界：新增合成子工程project_j/tts/{pyproject.toml,uv.lock,.python-version,src/project_j_tts/{__init__,rules,model,download,serve,cli}.py,tests/{helpers,test_rules,test_download,test_serve,test_model}.py}；主工程新增platform/tts/{__init__,contracts,simulated,local,init}.py、tests/{test_tts_simulated,test_tts_gate,test_tts_local,test_tts_init}.py、tests/fixtures/fake_tts.py，修改application/coordinator.py（合成器参数与开课准入）、pyproject.toml（project-j-tts-init入口，锁文件不变）；project_j/scripts/check.py；文档AGENTS.md 1.25.0、design/platform/{models.md 2.4.2,storage-lifecycle.md 1.7.2}、docs/technology.md 1.5.2、project_j/README.md。未改评分子工程与platform/speech/。
+- 实现要点：合成子工程锁定mlx-audio 0.5.9（mlx 0.32.4、transformers 5.20.1），只解析Apple Silicon；download按固定修订取12个文件并核对SHA-256后整体换入（含speech_tokenizer子目录，逐级0700）；serve每次启动核对清单与固定摘要、离线加载并预热，读入与生成分开（读入线程排队），按约0.32秒一段输出24 kHz单声道16位PCM，收到本请求的取消即在下一段边界停止并确认，坏请求只让该次失败；声音配置teacher-1显式固定音色、语气指令、语言与采样参数；生成上限为5秒加每字0.5秒（不超过4096个语音token），达到上限记为未正常结束。主工程新建platform/tts/包（与评分分开）：Synthesizer协议、模拟合成（模拟入口默认、始终就绪）、LocalSynthesizer（最小环境、无API密钥、离线启动子进程；用aclosing关闭流即取消，取消3秒内未确认则终止进程，本堂不重启；按请求id丢弃被取消请求的迟到段；进程退出后立即失败不挂起）；开课时要求合成器就绪（当前没有只用文字的课堂模式）。
+- 执行中的裁定：标准输入结束按到达顺序处理，不中止正在合成的句子（计划原写立即停止，会使连续写入的请求丢失完成行；代价是适配器在合成中途关闭时进程可能继续生成到aclose的2秒强制结束）；假合成进程每段改为0.5秒，Task 6预期随之调整（0.2秒一段时短句不足探针的0.5秒下限）；探针按实际收到的PCM计时长与峰值，并在每次合成前清空统计；探针测试中卡死模式另设较短的段超时，只为缩短测试时间。
+- 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check含主工程275项、评分子工程39项与合成子工程15项pytest、14项前端回归、OpenAPI与类型生成、构建与文档检查，提交前重跑UTC 2026-10-18T12:52:21.101888+00:00，工程摘要83b6a17b4c3bffbe3fcb7df6111dd01982c561ac64bafddcf522025aaebbcd45，simulation_only/not_granted。
+- 真实初始化（本机M3 Pro，2026年10月18日）：download复用本机实验缓存（HF_HUB_OFFLINE=1），12个文件摘要核对通过，目录0700、文件0600；probe两次通过：GPU，模型刚复制后的首次加载41.6秒（冷读约4.5 GB，含摘要核对与预热），再次加载6.7秒；中文、英文、中英混读三句首段0.27–0.41秒、RTF 0.74–0.78；第一段后取消，0.23–0.24秒确认停止并能继续合成；固定种子两次合成相同；内存峰值5.11 GB；status为就绪。三句试听样本写在本机project_j/test/output/tts-p2/；英文样本经本机评分器打分只标出人名Mia，其余11词正常。
+- 未验证：音色与听感（待家长试听）、课中实际声音与首播延迟、与评分进程同时常驻及GPU争用下的速度、长句跳词或重复的频率、生成上限是否截断真实长句；真实上课入口（模拟入口仍只用模拟合成，合成进程在服务启动还是开课检查时加载待真实入口时定）、浏览器播放与实际播放反馈、按麦克风先停播放、合成失败改文字呈现；备课预合成。
+- 接续：家长试听project_j/test/output/tts-p2/下三个样本，也可用`project-j-tts-init speak --text "…" --out 文件.wav`试其他句子；本机project_j/test/tts-spike（4.2 GB）在模型已核对复制后可删除，由家长决定。

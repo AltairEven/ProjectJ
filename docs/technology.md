@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.5.1；更新：2026年10月18日；状态：实施基线已采用，P1隔离工程已实现，真实接入未验证。
+版本：1.5.2；更新：2026年10月18日；状态：实施基线已采用，P1隔离工程已实现，真实接入未验证。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -119,6 +119,21 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python projec
 download按固定修订ae45363bf3413b374fecd9dc8bc1df0e24c3b7f4只取4个文件并逐一核对SHA-256，是评分唯一的联网步骤；评分进程每次启动重新核对摘要、离线加载并预热，经标准输入输出每行一个JSON通信，不开端口、不写临时文件。probe用macOS自带语音Samantha在本机生成三段英文（正确、把bridge读成brige、约100词带停顿慢读），要求正确朗读无标出、读错一段只标出bridge，慢读只记耗时与内存；记录写入init.json，模型清单或评分器版本、门槛版本变化即需重新探针。`score 文件.wav --text "原文"`供成人自测，只打印不保存；QuickTime录音可先用`afconvert -f WAVE -d LEI16@16000 -c 1 输入.m4a 输出.wav`转换。录音超过40秒按40秒一窗（两侧各加2秒上下文）推理，以限制注意力内存。
 
 2026年10月18日在M3 Pro上的真实探针：MPS，加载约5.8秒（含预热），GPU分配峰值3.30 GB；3秒录音评分约70毫秒，44秒慢读约1.2秒。用6个macOS英文语音朗读整篇故事复测：Samantha无误报；其他语音各有1–2个口音相关误报（如falls、bends、Mia），Flo有6个；整句漏读能标出，但其前后的词会被误标；把paper读成peeper未被标出。慢读长段在Samantha上仍有4个误报（模型在该上下文中把wants、toy、car的元音听成别的音，得分接近0，与真实读错无法靠门槛区分）。这些只说明合成成人语音上的表现，真人与儿童效果未验证，门槛仍为暂定。
+
+### 本机语音合成初始化与探针
+
+合成器按[ADR-0016](../decisions/ADR-0016.md)是独立子工程`project_j/tts/`（Python 3.14.4，mlx-audio 0.5.9，锁定mlx 0.32.4、transformers 5.20.1，锁文件只解析Apple Silicon Mac），与主工程、评分器各自维护。主工程经`project-j-tts-init`初始化，模型与记录存于`project_j/private/tts/`：
+
+```sh
+project_j/scripts/uv.sh sync --locked --project project_j/tts
+project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-tts-init download
+project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-tts-init probe
+project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-tts-init status
+```
+
+download按固定修订52f4770fd9726457eae3d3b6aa92047a25a10776只取运行所需的12个文件（约4.5 GB）并逐一核对SHA-256，是合成唯一的联网步骤；合成进程每次启动重新核对摘要、离线加载并预热，经标准输入输出每行一个JSON通信，按约0.32秒一段输出24 kHz单声道16位PCM，收到取消即在下一段边界停止，不开端口、不写文件。声音配置版本teacher-1包括音色Serena、老师语气指令与显式的采样参数，改任何一项即升版本并须重新探针；每次文字不超过1000字符，生成上限为5秒加每字0.5秒（不超过4096个语音token），达到上限记为未正常结束。probe合成中文、英文、中英混读三句，要求都有声；合成一段长文并在第一段后取消，要求2秒内确认停止且之后还能合成；固定种子两次合成是否相同只记录；记录写入init.json。`speak --text "…" --out 文件.wav`供成人试听，只写到尚不存在的文件。
+
+2026年10月18日在M3 Pro上的真实探针：GPU，模型刚复制后的首次加载41.6秒（冷读4.5 GB，含摘要核对与预热），再次加载6.7秒；三句首段0.27–0.41秒，RTF 0.74–0.78；取消后0.23–0.24秒停止；固定种子两次合成相同；内存峰值5.11 GB。用本机评分器给英文样本打分，只标出人名Mia（评分器此前对Mia结尾的音也有口音误报），其余11词正常。音色与听感须成人试听，课中实际声音、延迟与GPU争用下的表现未验证。
 
 ### P0官方事实复核与接入缺口
 

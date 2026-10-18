@@ -29,11 +29,12 @@ project_j/scripts/start.sh
 | web/schema/、web/src/client/ | Python导出的OpenAPI及生成类型；通过命令再生成，不能手改另一份合同 |
 | web/codegen/ | 独立锁定的生成工具；TypeScript6.0.3供编译器API，应用仍用TypeScript7.0.2 |
 | scripts/ | 项目级环境、统一检查与本机启动入口 |
-| scorer/ | 本机英语发音评分独立子工程（ADR-0015）：自带pyproject、锁文件与环境，PyTorch不进主工程；与将来的合成子工程各自维护 |
+| scorer/ | 本机英语发音评分独立子工程（ADR-0015）：自带pyproject、锁文件与环境，PyTorch不进主工程；与合成子工程各自维护 |
+| tts/ | 本机语音合成独立子工程（ADR-0016）：自带pyproject、锁文件与环境，MLX不进主工程；与评分子工程各自维护 |
 | test/ | 本机调试/UI测试的运行数据、产物与记录，不进Git，工程不依赖，第一版正式版发布时删除 |
 
 类型生成使用Hey API0.99.0；传递解析器在同系列固定1.4.1，该版使用yaml2.8.3，避开1.4.4的js-yaml4告警。只输入本地导出的JSON，只生成类型；实际生成/类型编译/构建/审计验证此组合，不使用force或legacy-peer-deps。该工具独立锁定不更换应用技术基线。
 
 解释器在project_j/.python，虚拟环境在python/.venv，依赖分别由uv.lock和两份npm锁固定；缓存/检查产物在.cache，构建产物在web/dist，均忽略。模拟数据库默认为private/simulation/<run_id>/project_j.sqlite3（`--simulation-root`可显式改为另一名为simulation的根目录），素材/导出/备份在同目录，目录0700、文件0600；不创建family或adult_checks区。检查用系统临时目录，不写真实学习状态。
 
-project-j-probe为离线自检，不发请求、不读私有模型配置；真实探测改由模型适配层的初始化命令project-j-init（第一期已实现，实际API未验证，见[技术文档](../docs/technology.md#模型适配层初始化与探针)）。本机发音评分经project-j-scorer-init下载模型、探针与准入（见[技术文档](../docs/technology.md#本机发音评分初始化与探针)），统一check也运行评分子工程自己的测试；模拟入口仍只用模拟评分器。project-j-measure读取40轮明确模拟JSON，不能证明任何实际声音延迟。当前检查范围、限制与审查入口见[交接](../docs/handoff.md)。
+project-j-probe为离线自检，不发请求、不读私有模型配置；真实探测改由模型适配层的初始化命令project-j-init（第一期已实现，实际API未验证，见[技术文档](../docs/technology.md#模型适配层初始化与探针)）。本机发音评分经project-j-scorer-init下载模型、探针与准入（见[技术文档](../docs/technology.md#本机发音评分初始化与探针)），本机语音合成经project-j-tts-init下载模型、探针、准入与成人试听（见[技术文档](../docs/technology.md#本机语音合成初始化与探针)）；统一check也运行两个子工程自己的测试；模拟入口仍只用模拟评分器与模拟合成。project-j-measure读取40轮明确模拟JSON，不能证明任何实际声音延迟。当前检查范围、限制与审查入口见[交接](../docs/handoff.md)。
