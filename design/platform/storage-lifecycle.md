@@ -1,6 +1,6 @@
 # 数据存储与生命周期
 
-文档版本：1.6.1；更新：2026年10月14日；范围：存储设计及P1隔离实现。
+文档版本：1.7.0；更新：2026年10月18日；范围：存储设计及P1隔离实现。
 
 存储服务承载保存、读取、版本依赖、导出和恢复。业务模块定义数据含义及有效更新，平台维护物理可获取性、访问和保存结果；数据库事务或文件成功不能证明评价正确或所有下游已落实。
 
@@ -50,7 +50,7 @@
 
 ## 阶段0路径与阶段1保存单位
 
-工程统一在`project_j/`：`python/pyproject.toml`、`uv.lock`、`.python-version`；`python/src/project_j/`中P0独立合同/守卫/探针，P1已按application及八模块划子包；`python/tests/`放模拟输入和mock；`scripts/`放检查入口。前端P1在`web/`已建立React/TypeScript/Vite最薄页面，不先造八套页面。项目级解释器在`project_j/.python/`，环境在`project_j/python/.venv/`，缓存均忽略。
+工程统一在`project_j/`：`python/pyproject.toml`、`uv.lock`、`.python-version`；`python/src/project_j/`中P0独立合同/守卫/探针，P1已按application及八模块划子包；`python/tests/`放模拟输入和mock；`scripts/`放检查入口。前端P1在`web/`已建立React/TypeScript/Vite最薄页面，不先造八套页面。项目级解释器在`project_j/.python/`，环境在`project_j/python/.venv/`，缓存均忽略。本机发音评分与合成是两个独立子工程：评分在`project_j/scorer/`（[ADR-0015](../../decisions/ADR-0015.md)），合成在`project_j/tts/`（[ADR-0016](../../decisions/ADR-0016.md)），各自带pyproject、锁文件与环境，互不共用，也不进入主工程环境。
 
 | 分区 | 确定路径（相对于项目根） | 创建条件 |
 | --- | --- | --- |
@@ -58,6 +58,8 @@
 | 成人实际检查 | `project_j/private/adult_checks/<run_id>/`，只有技术/成人报告，实际声音缓冲不落盘 | 账号/成人设备条件具备且实际操作；不能包含儿童状态 |
 | 未来家庭私有区 | `project_j/private/family/project_j.sqlite3`及`assets/`、`exports/`、`backups/` | 阶段5数据切换及真实入口验收后创建，P0—4入口不得访问/创建 |
 | 模型配置与密钥 | `project_j/private/models/`：config.json只含绑定，credentials/<适配器>.json各存一个适配器的密钥，init.json为初始化记录；目录0700、文件0600 | 密钥文件只供后端对应适配器读取；不进Git、导出或备份；家长页对密钥只写不读；模拟入口不读写 |
+| 本机评分模型 | `project_j/private/scorer/models/`：评分按固定修订下载的模型文件及摘要清单；目录0700、文件0600 | 评分初始化下载并核对摘要；只供评分进程只读；不进Git、导出或备份；模拟入口不读写 |
+| 本机合成模型 | `project_j/private/tts/models/`：合成按固定修订下载的模型文件及摘要清单；目录0700、文件0600 | 合成初始化下载并核对摘要；只供合成进程只读；不进Git、导出或备份；模拟入口不读写 |
 
 `project_j/.gitignore`拒绝private、数据库/侧文件、缓存/虚拟环境和构建产物进入源码；忽略不是访问授权。私有目录0700、文件0600（本机账户访问），路径统一解析并拒绝逃逸/符号链接指向其他分区。测试显式传临时根目录，不隐式打开family数据库；来源类型和学习者仍需业务校验，路径本身不能证明隔离成立。P0不建立正式数据库或真实数据区。
 
