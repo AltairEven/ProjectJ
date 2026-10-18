@@ -507,7 +507,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 检查证据：9项登记命令全部通过（两份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check含主工程259项与评分子工程39项pytest、14项前端回归、OpenAPI与类型生成、构建与文档检查，提交前重跑UTC 2026-10-18T07:28:34.520246+00:00，工程摘要d96db1af471465d2c91ae16072cc960bbd30d00ed5f0960f48afff34bd79c92a，simulation_only/not_granted。
 - 真实初始化（本机M3 Pro，2026年10月18日）：download复用本机实验缓存（HF_HUB_OFFLINE=1），4个文件摘要核对通过，目录0700、文件0600；probe通过：MPS，加载约5.8秒（含预热），GPU分配峰值3.30 GB；正确朗读2.98秒评分72毫秒无标出，故意读错3.05秒评分70毫秒只标出bridge，约100词带停顿慢读43.96秒评分1.16秒、有4个误报（car、wants、toy、wants，模型在该上下文中把元音听成别的音，得分接近0，与真实读错无法靠门槛区分）；status为就绪。整篇故事复测：Samantha无误报，Daniel、Karen、Moira、Reed各1–2个口音相关误报，Flo 6个；整句漏读能标出但前后各误标一词；peeper未被标出。
 - 未验证：真人与儿童朗读效果、门槛的误报与漏报率；真实上课入口（模拟入口仍只用模拟评分器，评分进程在服务启动还是开课检查时加载待真实入口时定）；浏览器真实麦克风（须产出16 kHz单声道PCM16 WAV）；CPU与其他设备。
-- 接续：家长可用`project-j-scorer-init score`自测真人朗读（QuickTime录音经afconvert转WAV）；本机project_j/test/asr-spike（1.26 GB）在模型已核对复制后可删除，由家长决定；合成另写计划。
+- 接续：家长可用`project-j-scorer-init score`自测真人朗读（QuickTime录音经afconvert转WAV）；本机project_j/test/asr-spike（1.26 GB）已按家长要求删除（2026年10月18日）；合成另写计划。
 
 ## P2-T1 本机语音合成实现
 
@@ -519,4 +519,4 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check含主工程275项、评分子工程39项与合成子工程15项pytest、14项前端回归、OpenAPI与类型生成、构建与文档检查，提交前重跑UTC 2026-10-18T12:52:21.101888+00:00，工程摘要83b6a17b4c3bffbe3fcb7df6111dd01982c561ac64bafddcf522025aaebbcd45，simulation_only/not_granted。
 - 真实初始化（本机M3 Pro，2026年10月18日）：download复用本机实验缓存（HF_HUB_OFFLINE=1），12个文件摘要核对通过，目录0700、文件0600；probe两次通过：GPU，模型刚复制后的首次加载41.6秒（冷读约4.5 GB，含摘要核对与预热），再次加载6.7秒；中文、英文、中英混读三句首段0.27–0.41秒、RTF 0.74–0.78；第一段后取消，0.23–0.24秒确认停止并能继续合成；固定种子两次合成相同；内存峰值5.11 GB；status为就绪。三句试听样本写在本机project_j/test/output/tts-p2/；英文样本经本机评分器打分只标出人名Mia，其余11词正常。
 - 未验证：音色与听感（待家长试听）、课中实际声音与首播延迟、与评分进程同时常驻及GPU争用下的速度、长句跳词或重复的频率、生成上限是否截断真实长句；真实上课入口（模拟入口仍只用模拟合成，合成进程在服务启动还是开课检查时加载待真实入口时定）、浏览器播放与实际播放反馈、按麦克风先停播放、合成失败改文字呈现；备课预合成。
-- 接续：家长试听project_j/test/output/tts-p2/下三个样本，也可用`project-j-tts-init speak --text "…" --out 文件.wav`试其他句子；本机project_j/test/tts-spike（4.2 GB）在模型已核对复制后可删除，由家长决定。
+- 接续：家长试听project_j/test/output/tts-p2/下三个样本，也可用`project-j-tts-init speak --text "…" --out 文件.wav`试其他句子；本机project_j/test/tts-spike（4.2 GB）已按家长要求删除（2026年10月18日）。
