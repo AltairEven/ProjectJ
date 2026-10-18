@@ -109,8 +109,8 @@ class ObjectEnvelope(Contract):
 class Document(ObjectEnvelope):
     """Physical storage envelope; business modules validate their own body contracts."""
 
-    realm: Literal["simulation"] = "simulation"
-    source_type: Literal["simulated"] = "simulated"
+    realm: Literal["simulation", "adult_check"] = "simulation"
+    source_type: Literal["simulated", "adult"] = "simulated"
     body: dict[str, JsonValue]
 
     @model_validator(mode="after")

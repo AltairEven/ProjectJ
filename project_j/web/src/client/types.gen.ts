@@ -200,7 +200,7 @@ export type Dashboard = {
     /**
      * Realm
      */
-    realm?: 'simulation';
+    realm?: 'simulation' | 'adult_check';
     /**
      * Learner Id
      */
@@ -330,7 +330,7 @@ export type DeliveryFeedback = {
     /**
      * Modality
      */
-    modality: 'text' | 'simulated_audio';
+    modality: 'text' | 'simulated_audio' | 'audio';
     /**
      * Status
      */
@@ -374,11 +374,11 @@ export type Document = {
     /**
      * Realm
      */
-    realm?: 'simulation';
+    realm?: 'simulation' | 'adult_check';
     /**
      * Source Type
      */
-    source_type?: 'simulated';
+    source_type?: 'simulated' | 'adult';
     /**
      * Learner Id
      */
@@ -736,11 +736,11 @@ export type Snapshot = {
     /**
      * Realm
      */
-    realm: 'simulation';
+    realm: 'simulation' | 'adult_check';
     /**
      * Source Type
      */
-    source_type: 'simulated';
+    source_type: 'simulated' | 'adult';
     /**
      * Mode
      */
@@ -865,7 +865,7 @@ export type StartResult = {
     /**
      * Decision
      */
-    decision: 'allow_simulation' | 'waiting' | 'blocked' | 'interrupted_unknown';
+    decision: 'allow_simulation' | 'allow_adult_check' | 'waiting' | 'blocked' | 'interrupted_unknown';
     /**
      * Student Token
      */
@@ -1726,6 +1726,40 @@ export type DeliveryApiStudentDeliveryPostResponses = {
 };
 
 export type DeliveryApiStudentDeliveryPostResponse = DeliveryApiStudentDeliveryPostResponses[keyof DeliveryApiStudentDeliveryPostResponses];
+
+export type SpeechApiStudentSpeechActionIdGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Action Id
+         */
+        action_id: string;
+    };
+    query?: never;
+    url: '/api/student/speech/{action_id}';
+};
+
+export type SpeechApiStudentSpeechActionIdGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SpeechApiStudentSpeechActionIdGetError = SpeechApiStudentSpeechActionIdGetErrors[keyof SpeechApiStudentSpeechActionIdGetErrors];
+
+export type SpeechApiStudentSpeechActionIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type ControlApiStudentControlPostData = {
     body: StudentControl;

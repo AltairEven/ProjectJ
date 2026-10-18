@@ -396,7 +396,9 @@ class Coordinator:
                 baselines=(state.ref, parent.ref, household.ref),
             )
         return self.ledger.finish(
-            operation, learner_id, {"demand_ref": demand[0].ref.model_dump(), "realm": "simulation"}
+            operation,
+            learner_id,
+            {"demand_ref": demand[0].ref.model_dump(), "realm": self.store.realm},
         )
 
     def chosen_material(self, learner_id: str, demand: DemandBody) -> tuple[str, bool]:
@@ -757,7 +759,7 @@ class Coordinator:
             learner_id,
             {
                 "status": "checked",
-                "decision": "allow_simulation",
+                "decision": f"allow_{self.store.realm}",
                 "planned_activity_id": activity_id,
                 "conditions": conditions,
                 "course_ref": course.ref.model_dump(),
@@ -799,14 +801,22 @@ class Coordinator:
             "start": start.ref.model_dump(),
         }
         self.core = Harness(
-            activity_id, learner_id, course.ref, data, bindings, self.models, self.scorer
+            activity_id,
+            learner_id,
+            course.ref,
+            data,
+            bindings,
+            self.models,
+            self.scorer,
+            realm=self.store.realm,
+            jane=self.store.read(data.jane_ref, learner_id).body,
         )
         self.adapter = InputAdapter(self.core)
         self.store.active_activity_id = activity_id
         token = token_urlsafe(32)
         self.student_tokens[token] = activity_id
         result = {
-            "decision": "allow_simulation",
+            "decision": f"allow_{self.store.realm}",
             "student_token": token,
             "snapshot": self.core.snapshot(),
         }
@@ -1531,7 +1541,7 @@ class Coordinator:
         self.initialize(learner_id)
         documents = self.store.list_current(learner_id)
         return {
-            "realm": "simulation",
+            "realm": self.store.realm,
             "learner_id": learner_id,
             "qualification": "not_granted",
             "actual_api": "未验证",

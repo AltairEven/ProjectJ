@@ -1,4 +1,4 @@
-"""Simulation-only SQLite storage. All classroom persistence is prohibited."""
+"""SQLite storage for one simulation or adult-check data space. No classroom persistence."""
 
 import hashlib
 import json
@@ -28,6 +28,10 @@ def canonical(value: BaseModel | dict | list) -> str:
 
 def digest(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
+
+
+# Data space -> (partition directory, source type of everything saved in it).
+REALMS = {"simulation": ("simulation", "simulated"), "adult_check": ("adult_checks", "adult")}
 
 
 class Conflict(ValueError):
@@ -63,25 +67,30 @@ class SaveReceipt(SaveKey):
 
 
 class SimulationStore:
-    def __init__(self, simulation_root: Path, run_id: str):
+    def __init__(
+        self, root: Path, run_id: str, realm: Literal["simulation", "adult_check"] = "simulation"
+    ):
         # Roots are explicit; neither an arbitrary database URL nor a family entry is exposed.
-        if simulation_root.name != "simulation" or simulation_root.is_symlink():
-            raise ValueError("storage requires an explicit simulation root")
+        partition, self.source_type = REALMS[realm]
+        self.realm = realm
+        if root.name != partition or root.is_symlink():
+            raise ValueError(f"storage requires an explicit {partition} root")
         if not run_id or len(run_id) > 64 or not all(c.isalnum() or c in "-_" for c in run_id):
-            raise ValueError("invalid simulation run identity")
-        if any(part in {"family", "adult_checks", "credentials"} for part in simulation_root.parts):
-            raise ValueError("simulation cannot access another private partition")
-        simulation_root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if simulation_root.parent.name == "private":
-            simulation_root.parent.chmod(0o700)
-        simulation_root.chmod(0o700)
-        self.root = simulation_root.resolve(strict=True)
-        self.run = check_path(self.root, run_id, "simulation")
+            raise ValueError("invalid run identity")
+        others = {"family", "credentials"} | {p for p, _ in REALMS.values()} - {partition}
+        if any(part in others for part in root.parts):
+            raise ValueError(f"{realm} cannot access another private partition")
+        root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if root.parent.name == "private":
+            root.parent.chmod(0o700)
+        root.chmod(0o700)
+        self.root = root.resolve(strict=True)
+        self.run = check_path(self.root, run_id, realm)
         if (self.root / run_id).is_symlink():
             raise ValueError("symlink run directory is not allowed")
         self.run.mkdir(mode=0o700, exist_ok=True)
         self.run.chmod(0o700)
-        self.path = check_path(self.root, f"{run_id}/project_j.sqlite3", "simulation")
+        self.path = check_path(self.root, f"{run_id}/project_j.sqlite3", realm)
         if self.path.is_symlink() or (self.run / "project_j.sqlite3").is_symlink():
             raise ValueError("symlink database is not allowed")
         if not self.path.exists():
@@ -124,6 +133,7 @@ class SimulationStore:
         config.set_main_option("script_location", str(Path(__file__).parent / "migrations"))
         with self.write() as connection:
             config.attributes["connection"] = connection
+            config.attributes["realm"] = (self.realm, self.source_type)
             command.upgrade(config, "head")
         metadata = MetaData()
         metadata.reflect(bind=self.engine)
@@ -274,13 +284,18 @@ class SimulationStore:
         baselines: tuple[RevisionRef, ...] = (),
     ):
         self.ensure_idle()
+        if any(record.realm not in {"simulation", self.realm} for record in records):
+            raise ValueError("record belongs to another realm")
+        # The store is the entry's data space: every record saved here carries its label.
         documents = tuple(
             Document.model_validate(
                 record.model_dump(mode="json")
                 | {
+                    "realm": self.realm,
+                    "source_type": self.source_type,
                     "dependency_refs": [
                         ref.model_dump() for ref in dict.fromkeys(record.references)
-                    ]
+                    ],
                 }
             )
             for record in records

@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+from support import start
 
 from project_j.classroom.judgment import ClassroomJudgment, judgment_request
 from project_j.contracts import RevisionRef
@@ -57,7 +58,7 @@ def test_point_and_offscreen_reports_are_reported():
     assert judge("折好了", purpose="offscreen").judgment == "reported"
 
 
-def test_classroom_request_carries_task_data_only():
+def test_classroom_request_carries_task_data_jane_method_and_goals_only():
     request = judgment_request(task(), "a bridge", 0, False, 10)
     assert request.purpose == "classroom_judgment" and request.output is ClassroomJudgment
     assert set(request.context) == {
@@ -73,7 +74,29 @@ def test_classroom_request_carries_task_data_only():
         "answer",
         "reference_text",
         "pronunciation",
+        "jane_method",
+        "goals",
     }
+
+
+def test_judgment_request_carries_the_bound_jane_method_and_goals():
+    request = judgment_request(
+        task(),
+        "a car",
+        0,
+        False,
+        10,
+        jane_method={"rules": ["先保留未提示初答"], "strategies": {"english": "定位依据→换表征"}},
+        goals=("观察故事事实、顺序与文本依据", "用短英语报告实际结果"),
+    )
+    assert request.context["jane_method"]["strategies"]["english"] == "定位依据→换表征"
+    assert request.context["goals"] == ["观察故事事实、顺序与文本依据", "用短英语报告实际结果"]
+    assert "不直接说出reference_answers" in request.instructions
+
+
+def test_started_class_binds_the_course_jane_version(application):
+    core = start(application)
+    assert core.jane["identity"] == "Jane" and core.jane["rules"]
 
 
 def test_failure_switch_fails_once_and_evaluation_has_a_draft():

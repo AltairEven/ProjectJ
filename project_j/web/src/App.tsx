@@ -4,6 +4,9 @@ import { canConfirm } from './confirmation'
 import { describe, endLabels, modelLines, startMessage } from './report'
 import { finishRecording, idle, pauseRecording, recordedMs, resumeRecording, startRecording, type Recorder } from './recording'
 import { requestFailure, type RequestFailure } from './request'
+import { Speaker, reportsFor, startedReport } from './speaker'
+import { Microphone } from './microphone'
+import { toBase64 } from './audio'
 import type { Snapshot, Dashboard, RevisionRef as Ref, Document as Doc, Control, StudentControl, DeliveryFeedback, TextInput, PreparationResult as PrepareResult, StartResult, StartConditions, InputResult as Ack } from './client/types.gen'
 
 const learner = 'fictional-L1'
@@ -214,6 +217,18 @@ function Student({ token }: { token: string }) {
   const [readingText, setReadingText] = useState('')
   const reading = snapshot?.recording
   const delivered = useRef(new Set<string>())
+  // Adult check: Jane speaks first and her text appears only after the audio (parent's decision).
+  const adult = snapshot?.realm === 'adult_check'
+  const speaker = useRef<Speaker | null>(null)
+  const presenting = useRef<Promise<void>>(Promise.resolve())
+  const playing = useRef<string | null>(null)
+  const deliveryIds = useRef(new Map<string, string>())
+  const latest = useRef(snapshot)
+  latest.current = snapshot
+  const halt = useRef(false)
+  const [speaking, setSpeaking] = useState(false)
+  const [locked, setLocked] = useState(false)
+  const microphone = useRef<Microphone | null>(null)
   const setCurrent = useCallback((value: Snapshot) => setSnapshot(old => old && old.core_revision > value.core_revision ? old : value), [])
   const localCancelled = presentationCancelled(cancellation, snapshot)
   // A pause typed or spoken as an answer reaches the core without the local cancel path.
@@ -249,6 +264,7 @@ function Student({ token }: { token: string }) {
   const control = async (command: StudentControl['command']) => {
     const eventId = uid()
     setMessage('')
+    if (command === 'stop' || command === 'pause') { halt.current = true; speaker.current?.stop() }
     if (command === 'stop' || command === 'pause') setCancellation(current => cancel(current, eventId, command))
     try {
       const value = await api<Snapshot>(token, 'student/control', { event_id: eventId, command })
@@ -260,39 +276,96 @@ function Student({ token }: { token: string }) {
         : failure.unknown ? '本端已停止呈现；核心回执未取得，可再按一次。' : `本端已停止呈现；${failure.message}`)
     }
   }
+  const sendDelivery = (payload: DeliveryFeedback) => api<Snapshot>(token, 'student/delivery', payload).then(setCurrent).catch(error => {
+    const failure = error as RequestFailure
+    if (failure.unknown) setFailedDelivery(payload)
+    setMessage(failure.unknown ? '呈现回执未取得；请接续原呈现回执。' : failure.message)
+  })
+  useEffect(() => {
+    if (!adult || speaker.current) return
+    const created = new Speaker(token, (action, at) => {
+      const id = deliveryIds.current.get(action.action_id)
+      if (id) void sendDelivery(startedReport(action, id, at))
+    })
+    speaker.current = created
+    setLocked(created.locked)
+  }, [adult, token])
+  useEffect(() => () => { speaker.current?.stop(); microphone.current?.discard() }, [])
+  useEffect(() => {
+    if (snapshot && ['paused', 'offscreen', 'ended'].includes(snapshot.mode)) speaker.current?.stop()
+  }, [snapshot])
   useEffect(() => {
     const action = snapshot?.pending_action
     if (!action || localCancelled || delivered.current.has(action.action_id)) return
+    if (adult) {
+      const voice = speaker.current
+      if (!voice) return
+      delivered.current.add(action.action_id)
+      const id = uid()
+      deliveryIds.current.set(action.action_id, id)
+      halt.current = false
+      playing.current = action.action_id
+      setSpeaking(true)
+      presenting.current = voice.play(action).then(async outcome => {
+        if (playing.current === action.action_id) { playing.current = null; setSpeaking(false) }
+        const now = latest.current
+        const halted = halt.current || !now || ['paused', 'offscreen', 'ended'].includes(now.mode)
+          || now.pending_action?.action_id !== action.action_id
+        // In order: a text fallback must reach the core before the child's input does.
+        for (const feedback of reportsFor(action, outcome, halted, id, new Date())) await sendDelivery(feedback)
+      })
+      return
+    }
     delivered.current.add(action.action_id)
-    const payload: DeliveryFeedback = { delivery_event_id: uid(), delivery_id: uid(),
+    void sendDelivery({ delivery_event_id: uid(), delivery_id: uid(),
       action_id: action.action_id, activity_id: action.activity_id, task_instance_id: action.task_instance_id,
       sequence: 1, output_device_id: 'simulation-browser-text', modality: 'text', status: 'completed',
-      delivered_range: ['text_content'], occurred_at: new Date().toISOString() }
-    void api<Snapshot>(token, 'student/delivery', payload).then(setCurrent).catch(error => {
-      const failure = error as RequestFailure
-      if (failure.unknown) setFailedDelivery(payload)
-      setMessage(failure.unknown ? '呈现回执未取得；请接续原呈现回执。' : failure.message)
-    })
-  }, [snapshot, token, setCurrent, localCancelled])
+      delivered_range: ['text_content'], occurred_at: new Date().toISOString() })
+  }, [snapshot, token, setCurrent, localCancelled, adult, locked])
+  // A child cutting in stops Jane and waits until the full text has been reported.
+  const interrupt = async () => {
+    if (!adult) return
+    speaker.current?.stop()
+    await presenting.current
+  }
   const input = async (value: string, intent: TextInput['intent'] = 'unknown', supplement = false) => {
+    await interrupt()
     const result = await send('student/input', { event_id: uid(), text: value, intent,
       relation: supplement ? 'supplement' : 'new', related_event_id: supplement ? lastInput : null })
     // Keep anything typed while this request was being judged.
     if (result) setText(current => current === value ? '' : current)
+  }
+  const beginReading = async () => {
+    await interrupt()
+    if (adult) {
+      microphone.current ??= new Microphone()
+      try { await microphone.current.start() } catch {
+        setMessage('需要允许使用麦克风才能朗读；可在地址栏允许后重试。')
+        return
+      }
+    }
+    setRecorder(current => startRecording(current, performance.now()))
   }
   const finishReading = async (now: number) => {
     if (!reading) return
     const timing = finishRecording(recorder, now, Number(reading.max_seconds))
     if (!timing) return
     setRecorder(idle)
+    let audio: string
+    if (adult) {
+      try { audio = toBase64(microphone.current ? await microphone.current.finish() : new Uint8Array()) } catch {
+        setMessage('录音无法读取，请重录。')
+        return
+      }
+    }
     // Simulation convention: the recording bytes are the text the fictional child read.
-    const audio = btoa(String.fromCharCode(...new TextEncoder().encode(readingText)))
+    else audio = btoa(String.fromCharCode(...new TextEncoder().encode(readingText)))
     const result = await send('student/recording', { event_id: uid(), audio_base64: audio, ...timing })
     if (result) setReadingText('')
   }
   // Pausing, stopping or leaving the reading segment ends the take locally without submitting it.
   const readingOpen = Boolean(reading) && !halted
-  useEffect(() => { if (!readingOpen) setRecorder(idle) }, [readingOpen])
+  useEffect(() => { if (!readingOpen) { microphone.current?.discard(); setRecorder(idle) } }, [readingOpen])
   // The maximum ends the take; the latest render's finishReading sees the current text.
   const finishRef = useRef(finishReading)
   finishRef.current = finishReading
@@ -305,7 +378,8 @@ function Student({ token }: { token: string }) {
     return () => clearInterval(timer)
   }, [recorder, reading])
   return <main className="student">
-    <header><span className="eyebrow">JANE · 虚构课堂</span><h1>一起读故事，找依据</h1><p>文字与技术信号模拟；不会录音或播放真实声音。</p></header>
+    <header><span className="eyebrow">{adult ? 'JANE · 成人实际检查' : 'JANE · 虚构课堂'}</span><h1>一起读故事，找依据</h1>
+      <p>{adult ? '真实模型与本机声音；先听 Jane 说，说完再显示文字；录音只交本机评分，不保存。' : '文字与技术信号模拟；不会录音或播放真实声音。'}</p></header>
     <div className="controls"><span>{snapshot ? stateLabels[snapshot.activity_state] : '正在连接原会话'}{snapshot?.mode === 'judging' && '：Jane正在处理你的回答'}</span>
       {snapshot?.mode !== 'ended' && <><button className="quiet" disabled={halted} onClick={() => void control('pause')}>暂停</button>
         <button className="danger" onClick={() => void control('stop')}>立即停止</button></>}</div>
@@ -322,18 +396,21 @@ function Student({ token }: { token: string }) {
       })
     }}>接续原呈现回执</button>}
     {localCancelled && <p className="notice">本端已停止呈现。暂停后由家长在工作台恢复；停止后不能恢复。</p>}
-    <section className="jane"><span className="avatar" aria-hidden="true">J</span><div><h2>Jane</h2><p aria-live="polite">{localCancelled ? '呈现已取消。' : (snapshot?.pending_action ?? snapshot?.presented_action)?.text ?? '等待同一核心的下一动作。'}</p></div></section>
+    <section className="jane"><span className="avatar" aria-hidden="true">J</span><div><h2>Jane</h2><p aria-live="polite">{localCancelled ? '呈现已取消。' : !adult
+      ? (snapshot?.pending_action ?? snapshot?.presented_action)?.text ?? '等待同一核心的下一动作。'
+      : locked ? '请点“打开声音”，听 Jane 说话。' : speaking ? 'Jane 正在说话……' : snapshot?.presented_action?.text ?? '等待同一核心的下一动作。'}</p>
+      {adult && locked && <button onClick={() => void speaker.current?.resume().then(() => setLocked(false))}>打开声音</button>}</div></section>
     {!localCancelled && Object.entries(snapshot?.materials ?? {}).map(([id, material]) => <section key={id} className="reading"><pre>{material}</pre></section>)}
     {reading && snapshot?.mode !== 'ended' && <section className="reading-aloud">
       <h2>朗读这一段</h2><p>{String(reading.reference_text)}</p>
-      <label>模拟朗读内容（不使用麦克风，录音只交发音评分）<textarea value={readingText} onChange={event => setReadingText(event.target.value)} disabled={halted} /></label>
+      {!adult && <label>模拟朗读内容（不使用麦克风，录音只交发音评分）<textarea value={readingText} onChange={event => setReadingText(event.target.value)} disabled={halted} /></label>}
       <p>{{ idle: '未开始', recording: '录音中', paused: '已暂停' }[recorder.state]}</p>
       <div className="row">
-        {recorder.state === 'idle' && <button disabled={busy || halted} onClick={() => setRecorder(startRecording(recorder, performance.now()))}>开始录音</button>}
-        {recorder.state === 'recording' && <button className="quiet" onClick={() => setRecorder(pauseRecording(recorder, performance.now()))}>暂停录音</button>}
-        {recorder.state === 'paused' && <button className="quiet" onClick={() => setRecorder(resumeRecording(recorder, performance.now()))}>继续录音</button>}
+        {recorder.state === 'idle' && <button disabled={busy || halted} onClick={() => void beginReading()}>开始录音</button>}
+        {recorder.state === 'recording' && <button className="quiet" onClick={() => { microphone.current?.pause(); setRecorder(pauseRecording(recorder, performance.now())) }}>暂停录音</button>}
+        {recorder.state === 'paused' && <button className="quiet" onClick={() => { microphone.current?.resume(); setRecorder(resumeRecording(recorder, performance.now())) }}>继续录音</button>}
         {recorder.state !== 'idle' && <><button disabled={busy} onClick={() => void finishReading(performance.now())}>结束并提交</button>
-          <button className="quiet" onClick={() => setRecorder(idle)}>重录</button></>}
+          <button className="quiet" onClick={() => { microphone.current?.discard(); setRecorder(idle) }}>重录</button></>}
       </div></section>}
     {snapshot?.mode === 'offscreen' ? <section><p>离屏期间没有采集。回来后需要报告实际条件与结果，返回本身不算完成。</p><button onClick={() => void control('return')}>返回，报告结果</button></section> :
       snapshot?.mode !== 'ended' && <section><label>你的虚构回答或报告<textarea value={text} onChange={event => setText(event.target.value)} disabled={localCancelled} /></label>

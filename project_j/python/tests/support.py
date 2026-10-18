@@ -19,7 +19,7 @@ def start(app, request_id="start1"):
     result = app.start(
         request_id, LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS
     )
-    assert result["decision"] == "allow_simulation"
+    assert result["decision"] == f"allow_{app.store.realm}"
     return app.core
 
 

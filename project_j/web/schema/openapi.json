@@ -1364,6 +1364,59 @@
         }
       }
     },
+    "/api/student/speech/{action_id}": {
+      "get": {
+        "summary": "Speech",
+        "operationId": "speech_api_student_speech__action_id__get",
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Action Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/student/control": {
       "post": {
         "summary": "Control",
@@ -1843,7 +1896,10 @@
         "properties": {
           "realm": {
             "type": "string",
-            "const": "simulation",
+            "enum": [
+              "simulation",
+              "adult_check"
+            ],
             "title": "Realm",
             "default": "simulation"
           },
@@ -2050,7 +2106,8 @@
             "type": "string",
             "enum": [
               "text",
-              "simulated_audio"
+              "simulated_audio",
+              "audio"
             ],
             "title": "Modality"
           },
@@ -2125,13 +2182,19 @@
           },
           "realm": {
             "type": "string",
-            "const": "simulation",
+            "enum": [
+              "simulation",
+              "adult_check"
+            ],
             "title": "Realm",
             "default": "simulation"
           },
           "source_type": {
             "type": "string",
-            "const": "simulated",
+            "enum": [
+              "simulated",
+              "adult"
+            ],
             "title": "Source Type",
             "default": "simulated"
           },
@@ -2522,7 +2585,7 @@
           },
           "audio_base64": {
             "type": "string",
-            "maxLength": 11184814,
+            "maxLength": 13981017,
             "title": "Audio Base64"
           },
           "input_started_ms": {
@@ -2728,12 +2791,18 @@
           },
           "realm": {
             "type": "string",
-            "const": "simulation",
+            "enum": [
+              "simulation",
+              "adult_check"
+            ],
             "title": "Realm"
           },
           "source_type": {
             "type": "string",
-            "const": "simulated",
+            "enum": [
+              "simulated",
+              "adult"
+            ],
             "title": "Source Type"
           },
           "mode": {
@@ -2970,6 +3039,7 @@
             "type": "string",
             "enum": [
               "allow_simulation",
+              "allow_adult_check",
               "waiting",
               "blocked",
               "interrupted_unknown"

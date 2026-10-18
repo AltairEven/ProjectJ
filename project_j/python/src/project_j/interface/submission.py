@@ -11,6 +11,9 @@ class InputAdapter:
         self.core = core
         self.sequence = 0
 
+    def provider(self, simulated: str) -> str:
+        return "adult_tester" if self.core.realm == "adult_check" else simulated
+
     def binding(self):
         state = self.core.snapshot()
         return {
@@ -32,12 +35,12 @@ class InputAdapter:
         submitted = SubmittedInput(
             **self.binding(),
             event_id=event_id,
-            realm="simulation",
-            source_type="simulated",
+            realm=self.core.realm,
+            source_type=self.core.source_type,
             client_sequence=self.sequence,
             modality="text",
             text=text,
-            provider="simulated_speaker",
+            provider=self.provider("simulated_speaker"),
             intent=intent,
             completion_trigger="explicit",
             relation=relation,
@@ -75,11 +78,11 @@ class InputAdapter:
         submitted = SubmittedInput(
             **self.binding(),
             event_id=event_id,
-            realm="simulation",
-            source_type="simulated",
+            realm=self.core.realm,
+            source_type=self.core.source_type,
             client_sequence=self.sequence,
             modality="audio",
-            provider="simulated_reader",
+            provider=self.provider("simulated_reader"),
             intent="answer",
             completion_trigger=completion_trigger,
             input_started_ms=input_started_ms,

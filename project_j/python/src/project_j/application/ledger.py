@@ -13,8 +13,8 @@ from project_j.platform.storage import Conflict, SimulationStore, canonical, dig
 
 
 class Request(Contract):
-    realm: Literal["simulation"] = "simulation"
-    source_type: Literal["simulated"] = "simulated"
+    realm: Literal["simulation", "adult_check"] = "simulation"
+    source_type: Literal["simulated", "adult"] = "simulated"
     caller: str = Field(min_length=1)
     request_id: str = Field(min_length=1)
     learner_id: str = Field(min_length=1)
@@ -75,6 +75,9 @@ class Ledger:
 
     def accept(self, request: Request, planned_operation_id: str | None = None) -> str:
         table = self.store.tables["operations"]
+        request = request.model_copy(
+            update={"realm": self.store.realm, "source_type": self.store.source_type}
+        )
         payload = canonical(request)
         with self.store.write() as connection:
             row = (

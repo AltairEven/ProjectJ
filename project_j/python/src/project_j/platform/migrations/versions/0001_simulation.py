@@ -10,6 +10,10 @@ depends_on = None
 
 
 def upgrade():
+    # Each database holds one data space; its rows can carry no other realm or source label.
+    realm, source = op.get_context().config.attributes.get("realm", ("simulation", "simulated"))
+    if (realm, source) not in {("simulation", "simulated"), ("adult_check", "adult")}:
+        raise ValueError("unknown data space")
     op.create_table(
         "identities",
         sa.Column("object_id", sa.Text, primary_key=True),
@@ -25,8 +29,8 @@ def upgrade():
         sa.Column("payload", sa.Text, nullable=False),
         sa.Column("digest", sa.Text, nullable=False),
         sa.CheckConstraint("revision >= 1"),
-        sa.CheckConstraint("json_extract(payload, '$.realm') = 'simulation'"),
-        sa.CheckConstraint("json_extract(payload, '$.source_type') = 'simulated'"),
+        sa.CheckConstraint(f"json_extract(payload, '$.realm') = '{realm}'"),
+        sa.CheckConstraint(f"json_extract(payload, '$.source_type') = '{source}'"),
         sa.CheckConstraint("json_extract(payload, '$.object_id') = object_id"),
         sa.CheckConstraint("json_extract(payload, '$.revision') = revision"),
         sa.ForeignKeyConstraint(["object_id"], ["identities.object_id"]),
@@ -78,8 +82,8 @@ def upgrade():
         sa.Column("payload_digest", sa.Text, nullable=False),
         sa.Column("request", sa.Text, nullable=False),
         sa.Column("result", sa.Text),
-        sa.CheckConstraint("json_extract(request, '$.realm') = 'simulation'"),
-        sa.CheckConstraint("json_extract(request, '$.source_type') = 'simulated'"),
+        sa.CheckConstraint(f"json_extract(request, '$.realm') = '{realm}'"),
+        sa.CheckConstraint(f"json_extract(request, '$.source_type') = '{source}'"),
         sa.UniqueConstraint("caller", "request_id"),
     )
     op.create_table(

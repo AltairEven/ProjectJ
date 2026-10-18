@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.19.0；更新：2026年10月18日。
+版本：1.20.0；更新：2026年10月18日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -530,4 +530,17 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 实测（本机，细节记本机project_j/test/records/classroom-latency-20261018.md）：订阅列表中gpt-6.1-sol只有priority（Fast，“2x speed, increased usage”）一个附加层级，没有Spark；6个课堂判断样例逐题交替各12次，默认层级中位6.15秒（5.14–9.54），Fast中位5.25秒（4.19–7.64），约快15%，24次均与预期一致；每次输入约1.13万token、输出约37 token、无推理token，瓶颈在输入与服务端。按`codex:gpt-6.1-sol:medium`默认、`classroom_judgment=codex:gpt-6.1-sol:low:fast`重新configure与probe，准入通过（Fast层级未核实）；经正式入口6次调用服务端均回报priority、6/6与预期一致，中位5.63秒。再按`codex:gpt-6.1-sol:xhigh`默认、课堂判断不变重新configure与probe，准入通过（档位xhigh未核实），xhigh探测7.1秒、推理122 token；第一期课后评价占位调用经正式入口两次11.4与12.2秒（推理约200 token），在60秒期限内。另查DeepSeek官方文档（deepseek-flash与deepseek-v4-pro，兼容Responses API与严格结构，可关思考），实测脚本已写在本机project_j/test/records，未录密钥、未调用。
 - 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check首次因新测试一处格式未通过，格式化后重跑通过；加入xhigh后再跑统一check、probe与measure均通过（依赖未变）：主工程281项、评分子工程39项、合成子工程15项pytest，15项前端回归，OpenAPI与类型生成、构建与文档检查，UTC 2026-10-18T14:01:18.730538+00:00，工程摘要7acd079c0909d45cf5adc4e1f634b0bc3682e7def117ccd8248163c8ec74aeb0，simulation_only/not_granted。
 - 未验证：Fast层级与xhigh的额度消耗；完整课后评价内容（第二期）在xhigh下能否在60秒期限内完成，须接入后复测；课中实际判断延迟仍约5–6秒，不满足声音延迟目标（中位≤2.5秒、95%≤5秒），课堂判断换模型或备课预生成留待全流程跑通后由家长决定。
-- 接续：真实上课入口与浏览器声音链路；DeepSeek或其他更快接入届时按实测再定。
+- 接续：真实上课入口与浏览器声音链路见P2-V1；DeepSeek或其他更快接入届时按实测再定。
+
+## P2-V1 成人实际检查入口与浏览器声音链路
+
+- 状态：实现与自测完成，成人实际检查冒烟通过（脚本代替浏览器），家长已在Chrome手工核对浏览器声音与麦克风，未提交（2026年10月18日）。家长审阅计划时要求声音先出、播完再出文字，随后选择在本会话直接实施，最终审查由主会话自做。
+- 负责人/集成：Claude Opus；起点126299d；计划docs/superpowers/plans/2026-10-18-adult-check-voice.md。
+- 文件边界：platform/{storage,files}.py、platform/migrations/versions/0001_simulation.py、contracts.py、application/{configuration,ledger,coordinator}.py、classroom/{harness,judgment}.py、interface/{api,submission}.py；tests/{test_adult_check,test_tts_stream}.py（新增）、tests/{support,test_models_simulated}.py；web/src/{audio,speaker,microphone}.ts（新增）、web/src/App.tsx、web/tests/{audio,speaker}.test.mjs（新增），生成的web/schema/openapi.json与web/src/client/{types.gen,index}.ts；文档AGENTS.md 1.27.0、design/platform/{realtime-voice.md 2.2.0,storage-lifecycle.md 1.7.3}、docs/technology.md 1.5.4。未改评分与合成子工程。
+- 实现要点：沿用合同已有的adult_check数据空间，存储按数据空间选分区（project_j/private/adult_checks/<run_id>/），唯一保存入口统一落realm与来源，建表约束按数据空间取值（模拟库不变）；`project-j-serve --adult-check`组装真实模型绑定、本机评分与本机合成，两个本机进程在服务启动时加载、停止时关闭，启动失败时服务照常、开课准入给出原因；课堂判断请求带上课程绑定的Jane方法与本课目标，要求incorrect或unclear时不直接说出参考答案；新增`GET /api/student/speech/{action_id}`按已批准动作流式返回PCM，开头失败503，关闭响应即取消合成；录音上限改为10 MiB（容纳300秒16 kHz WAV）。成人检查学生页：声音先出、播完再显示文字，孩子插话或合成失败时立即显示全文并先报告文字已呈现、再记声音失败或打断，暂停/停止不显示被取消的那句；未点击时先显示“打开声音”；朗读用MediaRecorder录音，解码重采样为16 kHz单声道WAV提交。模拟学生页不变。核心状态机未改。
+- 执行中的裁定：在主分支工作区实施、不提交；check_path第三个参数是数据空间名；建表约束按数据空间取值而不新增重建表的迁移（改动了已应用的迁移文件，默认值行为不变）；测试用asyncio.run写（无pytest-asyncio）；家长请求的realm/source不加一致性检查（服务端不读、前端不发，加检查会拒绝全部成人家长请求）；封存返回事实对象，测试从存储读回；合成一段都没产出也按503处理；接口测试在TestClient内开课（课中存储关闭）；存储设计的成人检查分区一行随实现改写。
+- 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check含主工程300项、评分子工程39项、合成子工程15项pytest，25项前端回归，OpenAPI与类型生成、构建与文档检查，UTC 2026-10-18T15:03:27.020630+00:00，工程摘要98dcbb26dab7a462d1d823a6b9d03bae78263a17d1f3b9210c3e61b0702344f4，simulation_only/not_granted。
+- 成人实际检查冒烟（本机M3 Pro，细节记本机project_j/test/records/adult-smoke-20261018.md，脚本代替浏览器回报交付）：开课allow_adult_check，快照与全部17个对象为adult_check/adult；目标、题目、反馈、下一题4句真实合成，有声，时长2.4–9.8秒；一次文字作答经Codex判断6.72秒判为正确，调用记录为codex gpt-6.1-sol low fast；停止后事实封存；SIGINT停服务后评分、合成进程与Codex运行时均退出。
+- 家长Chrome核对（2026年10月18日，运行编号adult-chrome-20261018）：家长按下方清单试完反馈“试完了，没问题”；服务经SIGINT停止，评分、合成进程与服务均退出，本次库中封存事实1个，全部11类对象均为adult_check/adult。
+- 未验证：浏览器实际首播延迟（未测量）；评分与合成同时运行时的速度；课后评价真实内容；儿童入口仍关闭。
+- 接续：Chrome核对清单（已由家长完成）：用`project_j/scripts/start.sh --adult-check --run-id <id>`手工核对：打开学生页先出现“打开声音”，点后听到目标说明、说完才出文字；反馈接下一题两句依次播完；Jane说话时点“开始录音”或提交文字，声音立即停、全文出现、输入被接收；朗读段真实录音、暂停后继续、结束提交得到纠正回应；暂停/停止时声音停、不出那句文字，恢复后Jane重说上一句。

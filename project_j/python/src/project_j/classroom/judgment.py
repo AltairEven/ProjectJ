@@ -21,6 +21,8 @@ INSTRUCTIONS = (
     "error为inserted的条目表示多读或重复（word为音素），只提醒按原文读，不当作要重读的词；"
     "不另评发音，不改写评分。"
     "evidence必须原样使用上下文中的evidence；text是给孩子的简短中文回应。"
+    "text按jane_method的规则与本学科策略组织，围绕goals；"
+    "incorrect或unclear时引导孩子回到依据再试，不直接说出reference_answers。"
 )
 
 
@@ -49,6 +51,9 @@ def judgment_request(
     is_help: bool,
     deadline_seconds: float,
     pronunciation: PronunciationResult | None = None,
+    *,
+    jane_method: dict | None = None,
+    goals: tuple[str, ...] = (),
 ) -> ModelRequest:
     return ModelRequest(
         purpose="classroom_judgment",
@@ -66,6 +71,8 @@ def judgment_request(
             "answer": text,
             "reference_text": task.reference_text,
             "pronunciation": pronunciation.model_dump(mode="json") if pronunciation else None,
+            "jane_method": jane_method,
+            "goals": list(goals),
         },
         output=ClassroomJudgment,
         deadline_seconds=deadline_seconds,

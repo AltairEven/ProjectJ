@@ -5,7 +5,8 @@ import asyncio
 import base64
 import binascii
 import json
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+from contextlib import aclosing, asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -20,7 +21,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import Field, JsonValue
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -32,7 +33,12 @@ from project_j.curriculum.corrections import correct, release
 from project_j.learning.catalog import Capability, define, resolve
 from project_j.learning.maintenance import decide, review, revise_demand_after_plan
 from project_j.platform.files import PrivateFiles
+from project_j.platform.models.config import ModelFiles
+from project_j.platform.models.registry import load_service
+from project_j.platform.speech.local import LocalScorer, ScorerUnavailable
 from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
+from project_j.platform.tts.contracts import SynthesisFailed
+from project_j.platform.tts.local import LocalSynthesizer, SynthesizerUnavailable
 
 
 class ParentRequest(Contract):
@@ -107,7 +113,8 @@ class TextInput(Contract):
     related_event_id: str | None = None
 
 
-MAX_RECORDING_BYTES = 8 * 1024 * 1024
+# 300 s of 16 kHz mono PCM16 WAV is 9,600,044 bytes.
+MAX_RECORDING_BYTES = 10 * 1024 * 1024
 
 
 class RecordingInput(Contract):
@@ -141,8 +148,8 @@ class StudentControl(Contract):
 class Snapshot(Contract):
     activity_id: str
     learner_id: str
-    realm: Literal["simulation"]
-    source_type: Literal["simulated"]
+    realm: Literal["simulation", "adult_check"]
+    source_type: Literal["simulated", "adult"]
     mode: str
     activity_state: Literal["running", "offscreen", "paused", "closing", "ended"]
     wait_kind: str
@@ -163,7 +170,7 @@ class Snapshot(Contract):
 
 
 class Dashboard(Contract):
-    realm: Literal["simulation"] = "simulation"
+    realm: Literal["simulation", "adult_check"] = "simulation"
     learner_id: str = "fictional-L1"
     qualification: Literal["not_granted"] = "not_granted"
     actual_api: Literal["未验证"] = "未验证"
@@ -190,7 +197,9 @@ class PreparationResult(Contract):
 
 
 class StartResult(Contract):
-    decision: Literal["allow_simulation", "waiting", "blocked", "interrupted_unknown"]
+    decision: Literal[
+        "allow_simulation", "allow_adult_check", "waiting", "blocked", "interrupted_unknown"
+    ]
     student_token: str | None = None
     snapshot: Snapshot | None = None
     missing: tuple[str, ...] = ()
@@ -204,6 +213,28 @@ class InputResult(Contract):
     event_id: str | None = None
 
 
+def build_coordinator(settings: Settings) -> Coordinator:
+    """Simulation keeps its simulated providers; the adult check binds the real local ones."""
+    root = settings.project_root
+    if settings.realm == "simulation":
+        return Coordinator(SimulationStore(root / settings.simulation_root, settings.run_id), root)
+    return Coordinator(
+        SimulationStore(root / settings.adult_check_root, settings.run_id, realm="adult_check"),
+        root,
+        models=load_service(ModelFiles(root / "project_j/private/models")),
+        scorer=LocalScorer(root),
+        synthesizer=LocalSynthesizer(root),
+    )
+
+
+async def speech_body(stream: AsyncIterator[bytes], first: bytes) -> AsyncIterator[bytes]:
+    """The approved sentence's audio; closing it (client gone, child cut in) cancels synthesis."""
+    async with aclosing(stream):
+        yield first
+        async for chunk in stream:
+            yield chunk
+
+
 def create_app(settings: Settings | None = None, coordinator: Coordinator | None = None):
     settings = settings or Settings()
     static: dict[str, tuple[bytes, str]] = {}
@@ -213,11 +244,17 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
 
     @asynccontextmanager
     async def lifespan(app):
-        app.state.coordinator = coordinator or Coordinator(
-            SimulationStore(settings.project_root / settings.simulation_root, settings.run_id),
-            settings.project_root,
-        )
+        app.state.coordinator = coordinator or build_coordinator(settings)
         app.state.coordinator.initialize()
+        # Local scorer and synthesizer load once here (seconds each), not at every class start.
+        # A failed start keeps the server up; class admission then reports the reason.
+        local = (app.state.coordinator.scorer, app.state.coordinator.synthesizer)
+        for part in local:
+            if hasattr(part, "start"):
+                try:
+                    await part.start()
+                except (ScorerUnavailable, SynthesizerUnavailable) as error:
+                    print(error)
         dist = settings.project_root / "project_j/web/dist"
         types = {
             ".html": "text/html",
@@ -279,6 +316,9 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
                 except OSError, ValueError:
                     pass
             app_controller.store.close()
+            for part in (*local, *app_controller.models.adapters.values()):
+                if hasattr(part, "aclose"):
+                    await part.aclose()
 
     app = FastAPI(
         title="Project J 隔离模拟",
@@ -366,7 +406,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
                     "active memory status does not belong to the requested learner"
                 )
             return {
-                "realm": "simulation",
+                "realm": app_controller.store.realm,
                 "learner_id": learner_id,
                 "active": app_controller.core.snapshot(),
                 "verification": app_controller.verification,  # held in memory since startup
@@ -580,6 +620,27 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
         controller().late_delivery(request)
         return controller().student_view(core)
 
+    @app.get("/api/student/speech/{action_id}")
+    async def speech(action_id: str, core: StudentCore):
+        action = core.actions.get(action_id)
+        if action is None:
+            raise LookupError("unknown approved action")
+        synthesizer = controller().synthesizer
+        stream = synthesizer.stream(action.text)
+        try:
+            first = await anext(stream)
+        except (SynthesisFailed, StopAsyncIteration) as error:
+            await stream.aclose()
+            reason = error.reason if isinstance(error, SynthesisFailed) else "failed"
+            return JSONResponse(
+                status_code=503, content={"message": f"语音合成失败：{reason}", "reason": reason}
+            )
+        # A failure after the first chunk aborts the response; the page keeps what it played.
+        return StreamingResponse(
+            speech_body(stream, first),
+            media_type=f"audio/L16;rate={synthesizer.sample_rate};channels=1",
+        )
+
     @app.post("/api/student/control", response_model=Snapshot)
     async def control(request: StudentControl, background: BackgroundTasks, core: StudentCore):
         core.control(request.event_id, request.command)
@@ -672,12 +733,17 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
     return app
 
 
-def main():
+def main(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(
-        description="Start Project J's loopback simulation; no real API or microphone."
+        description="Start Project J's loopback simulation, or the adult check with real providers."
     )
     parser.add_argument("--run-id", default="local-simulation")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument(
+        "--adult-check",
+        action="store_true",
+        help="成人实际检查：真实模型、本机发音评分与本机合成，数据写project_j/private/adult_checks",
+    )
     parser.add_argument("--simulation-root", type=Path, default=argparse.SUPPRESS)
     debug = "调试用，只作用于模拟适配器和存储："
     parser.add_argument(
@@ -691,20 +757,33 @@ def main():
         default=argparse.SUPPRESS,
         help=f"{debug}注入一次失败，如fact:before_commit、after_commit、ledger或model",
     )
-    settings = Settings(**vars(parser.parse_args()))
-    coordinator = Coordinator(
-        SimulationStore(settings.project_root / settings.simulation_root, settings.run_id),
-        settings.project_root,
-    )
-    simulated = coordinator.models.adapters["simulated"]
-    simulated.delay_seconds = settings.model_delay
-    simulated.fail_next = settings.fail_once == "model"
-    if settings.fail_once != "model":
-        coordinator.store.fail_at = settings.fail_once
-    if settings.model_delay or settings.fail_once:
-        print(f"调试注入：模型延迟{settings.model_delay}秒；一次失败{settings.fail_once or '无'}。")
-    print(f"隔离模拟工作台：http://127.0.0.1:{settings.port}/#parent={coordinator.parent_token}")
-    print("真实API/声音/儿童入口未验证且关闭；不加载.env、不调用麦克风。")
+    args = vars(parser.parse_args(argv))
+    adult = args.pop("adult_check")
+    simulation_only = {"simulation_root", "model_delay", "fail_once"} & set(args)
+    if adult and simulation_only:
+        parser.error("--adult-check 不能与模拟调试选项同用：" + "、".join(sorted(simulation_only)))
+    settings = Settings(**args, realm="adult_check" if adult else "simulation")
+    coordinator = build_coordinator(settings)
+    if adult:
+        print(
+            f"成人实际检查工作台：http://127.0.0.1:{settings.port}/#parent={coordinator.parent_token}"
+        )
+        print("真实模型、本机发音评分与本机合成；录音只在本机内存交评分，不落盘；儿童入口仍关闭。")
+    else:
+        simulated = coordinator.models.adapters["simulated"]
+        simulated.delay_seconds = settings.model_delay
+        simulated.fail_next = settings.fail_once == "model"
+        if settings.fail_once != "model":
+            coordinator.store.fail_at = settings.fail_once
+        if settings.model_delay or settings.fail_once:
+            print(
+                f"调试注入：模型延迟{settings.model_delay}秒；"
+                f"一次失败{settings.fail_once or '无'}。"
+            )
+        print(
+            f"隔离模拟工作台：http://127.0.0.1:{settings.port}/#parent={coordinator.parent_token}"
+        )
+        print("真实API/声音/儿童入口未验证且关闭；不加载.env、不调用麦克风。")
     uvicorn.run(
         create_app(settings, coordinator),
         host=settings.host,

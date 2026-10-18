@@ -13,7 +13,7 @@ from project_j.classroom.judgment import ModelProposal, judgment_request
 from project_j.contracts import Contract, RevisionRef, SubmittedInput
 from project_j.platform.models.service import ModelService
 from project_j.platform.speech.contracts import PronunciationResult, PronunciationScorer
-from project_j.platform.storage import Conflict, canonical, digest
+from project_j.platform.storage import REALMS, Conflict, canonical, digest
 from project_j.preparation.contracts import CourseBody, TaskDefinition
 
 TRANSITIONS = {
@@ -58,7 +58,7 @@ class DeliveryFeedback(Contract):
     task_instance_id: str
     sequence: int = Field(ge=1, strict=True)
     output_device_id: str
-    modality: Literal["text", "simulated_audio"]
+    modality: Literal["text", "simulated_audio", "audio"]
     status: Literal[
         "started", "partial", "completed", "failed", "cancelled", "interrupted", "unknown"
     ]
@@ -76,8 +76,13 @@ class Harness:
         bindings: dict,
         models: ModelService,
         scorer: PronunciationScorer | None = None,
+        *,
+        realm: Literal["simulation", "adult_check"] = "simulation",
+        jane: dict | None = None,
     ):
         self.activity_id, self.learner_id = activity_id, learner_id
+        self.jane = jane  # The Jane version the course is bound to.
+        self.realm, self.source_type = realm, REALMS[realm][1]
         self.course_ref, self.course, self.bindings, self.models = (
             course_ref,
             course,
@@ -182,8 +187,8 @@ class Harness:
         return {
             "activity_id": self.activity_id,
             "learner_id": self.learner_id,
-            "realm": "simulation",
-            "source_type": "simulated",
+            "realm": self.realm,
+            "source_type": self.source_type,
             "mode": self.mode,
             "activity_state": activity_state,
             "wait_kind": self.wait_kind,
@@ -416,8 +421,8 @@ class Harness:
     ):
         if submitted.activity_id != self.activity_id or submitted.learner_id != self.learner_id:
             raise ValueError("input activity or learner mismatch")
-        if submitted.source_type != "simulated" or submitted.realm != "simulation":
-            raise ValueError("only explicitly fictional simulation inputs are allowed")
+        if submitted.realm != self.realm or submitted.source_type != self.source_type:
+            raise ValueError("input realm or source does not match this activity")
         if submitted.input_policy_ref != RevisionRef.model_validate(self.bindings["input_policy"]):
             raise ValueError("input policy does not match the fixed activity binding")
         signature = submitted.model_dump(mode="json")
@@ -555,7 +560,21 @@ class Harness:
                 if attempt is not None:
                     attempt["pronunciation"] = pronunciation.model_dump(mode="json")
             return await self.models.run(
-                judgment_request(task, text, help_count, is_help, timeout, pronunciation)
+                judgment_request(
+                    task,
+                    text,
+                    help_count,
+                    is_help,
+                    timeout,
+                    pronunciation,
+                    jane_method={k: self.jane[k] for k in ("rules", "strategies")}
+                    if self.jane
+                    else None,
+                    goals=(
+                        self.course.primary_goal.description,
+                        self.course.auxiliary_goal.description,
+                    ),
+                )
             )
 
         job = asyncio.create_task(judge())

@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from project_j.contracts import Document
 from project_j.paths import check_path
-from project_j.platform.storage import SimulationStore, canonical, digest
+from project_j.platform.storage import REALMS, SimulationStore, canonical, digest
 
 
 def private_write(path: Path, content: bytes):
@@ -36,7 +36,7 @@ class PrivateFiles:
         self.store.ensure_idle()
         checksum = digest(text)
         relative = f"assets/{checksum}.txt"
-        path = check_path(self.store.run, relative, "simulation")
+        path = check_path(self.store.run, relative, self.store.realm)
         if path.exists():
             if digest(path.read_text()) != checksum:
                 raise ValueError("fixed material integrity failure")
@@ -46,7 +46,7 @@ class PrivateFiles:
 
     def read_asset(self, manifest: dict) -> str:
         self.store.ensure_idle()
-        path = check_path(self.store.run, manifest["path"], "simulation")
+        path = check_path(self.store.run, manifest["path"], self.store.realm)
         text = path.read_text()
         if digest(text) != manifest["sha256"] or len(text.encode()) != manifest["bytes"]:
             raise ValueError("material missing or corrupted")
@@ -65,12 +65,12 @@ class PrivateFiles:
         ]
         for doc in documents:
             self.store.boundary(doc, learner_id)
-        target = check_path(self.store.run, f"exports/{uuid4()}.json", "simulation")
+        target = check_path(self.store.run, f"exports/{uuid4()}.json", self.store.realm)
         private_write(
             target,
             canonical(
                 {
-                    "realm": "simulation",
+                    "realm": self.store.realm,
                     "learner_id": learner_id,
                     "qualification": "not_granted",
                     "objects": [d.model_dump(mode="json") for d in documents],
@@ -81,7 +81,7 @@ class PrivateFiles:
 
     def backup(self) -> Path:
         self.store.ensure_idle()
-        target = check_path(self.store.run, f"backups/{uuid4()}", "simulation")
+        target = check_path(self.store.run, f"backups/{uuid4()}", self.store.realm)
         target.mkdir(mode=0o700, parents=True)
         destination = target / "project_j.sqlite3"
         destination.touch(mode=0o600)
@@ -95,15 +95,15 @@ class PrivateFiles:
             doc = Document.model_validate_json(payload)
             if doc.kind == "material":
                 self.read_asset(doc.body["asset"])
-                source = check_path(self.store.run, doc.body["asset"]["path"], "simulation")
-                copied = check_path(target, doc.body["asset"]["path"], "simulation")
+                source = check_path(self.store.run, doc.body["asset"]["path"], self.store.realm)
+                copied = check_path(target, doc.body["asset"]["path"], self.store.realm)
                 private_write(copied, source.read_bytes())
                 manifests.append(doc.body["asset"])
         private_write(
             target / "manifest.json",
             canonical(
                 {
-                    "realm": "simulation",
+                    "realm": self.store.realm,
                     "assets": manifests,
                     "database_sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
                 }
@@ -112,11 +112,12 @@ class PrivateFiles:
         return target
 
     @staticmethod
-    def restore(backup: Path, simulation_root: Path, run_id: str) -> SimulationStore:
+    def restore(backup: Path, root: Path, run_id: str) -> SimulationStore:
         manifest = json.loads((backup / "manifest.json").read_text())
-        if manifest.get("realm") != "simulation":
-            raise ValueError("only simulation backups can be restored")
-        destination = simulation_root / run_id
+        realm = next((r for r, (partition, _) in REALMS.items() if partition == root.name), None)
+        if realm is None or manifest.get("realm") != realm:
+            raise ValueError("a backup restores only into a new run of its own data space")
+        destination = root / run_id
         if destination.exists():
             raise ValueError("restore requires a new isolated directory")
         if (
@@ -124,18 +125,18 @@ class PrivateFiles:
             != manifest["database_sha256"]
         ):
             raise ValueError("backup database integrity failure")
-        store = SimulationStore(simulation_root, run_id)
+        store = SimulationStore(root, run_id, realm)
         store.close()
         shutil.copyfile(backup / "project_j.sqlite3", store.path)
         store.path.chmod(0o600)
         for asset in manifest["assets"]:
-            source = check_path(backup, asset["path"], "simulation")
-            target = check_path(store.run, asset["path"], "simulation")
+            source = check_path(backup, asset["path"], realm)
+            target = check_path(store.run, asset["path"], realm)
             content = source.read_text()
             if digest(content) != asset["sha256"] or len(content.encode()) != asset["bytes"]:
                 raise ValueError("backup material integrity failure")
             private_write(target, content.encode())
-        restored = SimulationStore(simulation_root, run_id)
+        restored = SimulationStore(root, run_id, realm)
         with restored.engine.begin() as connection:
             if connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall():
                 raise ValueError("backup contains broken exact references")

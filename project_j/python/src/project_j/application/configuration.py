@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     # Relative to project_root; an absolute path replaces it. The store still requires a
     # directory named "simulation".
     simulation_root: Path = Path("project_j/private/simulation")
-    realm: Literal["simulation"] = "simulation"
+    adult_check_root: Path = Path("project_j/private/adult_checks")
+    realm: Literal["simulation", "adult_check"] = "simulation"
     provider: Literal["simulation"] = "simulation"
     host: Literal["127.0.0.1"] = "127.0.0.1"
     port: int = 8765
