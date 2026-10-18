@@ -1252,6 +1252,62 @@
         }
       }
     },
+    "/api/student/recording": {
+      "post": {
+        "summary": "Recording",
+        "operationId": "recording_api_student_recording_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordingInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InputResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/student/delivery": {
       "post": {
         "summary": "Delivery",
@@ -1402,62 +1458,6 @@
             "content": {
               "application/json": {
                 "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/student/voice-signal": {
-      "post": {
-        "summary": "Voice Signal",
-        "operationId": "voice_signal_api_student_voice_signal_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VoiceSignal"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InputResult"
-                }
               }
             }
           },
@@ -1907,6 +1907,14 @@
             "type": "array",
             "title": "Model Calls",
             "default": []
+          },
+          "models": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Models",
+            "default": {}
           },
           "pending_seals": {
             "items": {
@@ -2506,6 +2514,60 @@
         ],
         "title": "PreparationResult"
       },
+      "RecordingInput": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "audio_base64": {
+            "type": "string",
+            "maxLength": 11184814,
+            "title": "Audio Base64"
+          },
+          "input_started_ms": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Input Started Ms"
+          },
+          "input_ended_ms": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Input Ended Ms"
+          },
+          "recording_ms": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Recording Ms"
+          },
+          "pause_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Pause Count",
+            "default": 0
+          },
+          "completion_trigger": {
+            "type": "string",
+            "enum": [
+              "explicit",
+              "max_duration"
+            ],
+            "title": "Completion Trigger",
+            "default": "explicit"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "audio_base64",
+          "input_started_ms",
+          "input_ended_ms",
+          "recording_ms"
+        ],
+        "title": "RecordingInput",
+        "description": "One reading segment's recording; it goes only to pronunciation scoring (ADR-0014)."
+      },
       "ReleaseRequest": {
         "properties": {
           "request_id": {
@@ -2763,6 +2825,20 @@
             "type": "string",
             "const": "未验证",
             "title": "Actual Voice"
+          },
+          "recording": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording"
           },
           "materials": {
             "additionalProperties": {
@@ -3073,61 +3149,6 @@
           "type"
         ],
         "title": "ValidationError"
-      },
-      "VoiceSignal": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "start",
-              "fragment",
-              "candidate_end",
-              "resume",
-              "final",
-              "window_elapsed",
-              "cancel",
-              "revision"
-            ],
-            "title": "Kind"
-          },
-          "item_id": {
-            "type": "string",
-            "title": "Item Id"
-          },
-          "text": {
-            "type": "string",
-            "title": "Text",
-            "default": ""
-          },
-          "candidate_end_ms": {
-            "anyOf": [
-              {
-                "type": "number",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Candidate End Ms"
-          },
-          "source": {
-            "type": "string",
-            "enum": [
-              "simulated_speaker",
-              "teacher_echo"
-            ],
-            "title": "Source",
-            "default": "simulated_speaker"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "kind",
-          "item_id"
-        ],
-        "title": "VoiceSignal"
       }
     }
   }

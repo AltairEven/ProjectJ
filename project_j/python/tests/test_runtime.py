@@ -1,11 +1,23 @@
 import asyncio
+import json
+from uuid import uuid4
 
 import pytest
-from support import CONDITIONS, LEARNER, answer, complete_story, deliver_all, start
+from support import (
+    CONDITIONS,
+    LEARNER,
+    answer,
+    complete_story,
+    deliver_all,
+    read,
+    read_aloud_all,
+    start,
+)
 
 from project_j.application.coordinator import Coordinator
 from project_j.classroom.harness import PLEA
 from project_j.contracts import RevisionRef
+from project_j.evaluation.assessment import interpret
 from project_j.learning.contracts import DemandBody
 from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
 from project_j.preparation.contracts import demand_requirements
@@ -14,7 +26,7 @@ from project_j.preparation.contracts import demand_requirements
 def test_E2E01_complete_simulation_reaches_actual_C2_and_survives_reopen(application):
     async def scenario():
         core, fact = await complete_story(application)
-        assert not any(call["purpose"] == "evaluation" for call in application.model.calls)
+        assert not any(call["purpose"] == "evaluation" for call in application.models.calls)
         feedback = application.feedback("feedback1", LEARNER, core.activity_id, "无额外补充")
         result = await application.next_course("next1", LEARNER, core.activity_id)
         assert feedback["evaluation"] == "not_requested"
@@ -29,11 +41,11 @@ def test_E2E01_complete_simulation_reaches_actual_C2_and_survives_reopen(applica
         assert mapped == set(demand_requirements(DemandBody.model_validate(d2.body)))
         assert c2.body["tasks"][0]["prompt"] == "Which bus did Ben try first?"
         assert (
-            len([call for call in application.model.calls if call["purpose"] == "evaluation"]) == 1
+            len([call for call in application.models.calls if call["purpose"] == "evaluation"]) == 1
         )
         application.dashboard(LEARNER)
         assert (
-            len([call for call in application.model.calls if call["purpose"] == "evaluation"]) == 1
+            len([call for call in application.models.calls if call["purpose"] == "evaluation"]) == 1
         )
         reopened = SimulationStore(application.store.root, application.store.run.name)
         assert reopened.read(fact.ref, LEARNER).body == fact.body
@@ -99,7 +111,7 @@ def test_E2E03_stop_during_model_does_not_wait_or_deliver_late_result(applicatio
         core = start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
-        application.model.delay_seconds = 5
+        application.models.adapters["simulated"].delay_seconds = 5
         work = asyncio.create_task(application.adapter.text("answer1", "a bridge"))
         await asyncio.sleep(0)
         await asyncio.sleep(0)
@@ -127,7 +139,7 @@ def test_E2E04_seal_failure_or_lost_receipt_retries_same_fact_without_model(appl
     fact = application.seal()
     assert application.activity_facts(core.activity_id, LEARNER).ref == fact.ref
     assert application.seal().ref == fact.ref
-    assert not application.model.calls
+    assert not application.models.calls
 
 
 def test_parent_skip_works_while_the_model_is_slow_and_while_offscreen(application):
@@ -136,7 +148,7 @@ def test_parent_skip_works_while_the_model_is_slow_and_while_offscreen(applicati
         deliver_all(core)
         await answer(application, "收到", "confirmation")
         first = core.task_instance_id
-        application.model.delay_seconds = 5
+        application.models.adapters["simulated"].delay_seconds = 5
         work = asyncio.create_task(application.adapter.text("slow-answer", "a bridge"))
         await asyncio.sleep(0)
         await asyncio.sleep(0)
@@ -144,7 +156,7 @@ def test_parent_skip_works_while_the_model_is_slow_and_while_offscreen(applicati
         core.control("skip-slow", "skip")
         assert core.task_instance_id != first and core.mode == "delivering"
         assert (await work)["ack"] == "cancelled"
-        application.model.delay_seconds = 0
+        application.models.adapters["simulated"].delay_seconds = 0
         deliver_all(core)
         await answer(application, "She folded it.")
         await answer(application, "我指的是折过的纸。")
@@ -153,6 +165,7 @@ def test_parent_skip_works_while_the_model_is_slow_and_while_offscreen(applicati
         assert "约7分钟" in core.snapshot()["presented_action"]["text"]
         core.control("skip-offscreen", "skip")
         deliver_all(core)
+        await read_aloud_all(application)
         assert core.wait_kind == "closing_confirmation"
         approved = [e["payload"] for e in core.events if e["kind"] == "approved_proposal"]
         assert all(item["event_id"] != "slow-answer" for item in approved)
@@ -192,6 +205,7 @@ def test_a_typed_report_mentioning_help_is_a_report_and_a_bare_plea_is_help(appl
         core.control("return1", "return")
         deliver_all(core)
         await answer(application, "第二次纸折了，车没掉，妈妈帮我扶了书。")
+        await read_aloud_all(application)
         assert core.wait_kind == "closing_confirmation"
         reports = [a["judgment"] for a in core.attempts if a["purpose"] in {"point", "offscreen"}]
         assert reports == ["reported", "reported"]
@@ -214,7 +228,7 @@ def test_E2E04_progress_failure_cannot_undo_successful_fact(application):
     application.store.fail_at = "ledger"
     fact = application.seal()
     assert application.activity_facts(core.activity_id, LEARNER).ref == fact.ref
-    assert not application.model.calls
+    assert not application.models.calls
 
 
 def test_E2E05_state_saved_demand_failure_resumes_without_rewriting_state(application, monkeypatch):
@@ -289,7 +303,7 @@ def test_E2E09_later_choice_and_dashboard_never_call_evaluation(application):
         core, _ = await complete_story(application)
         application.later_feedback("later", LEARNER, core.activity_id)
         application.dashboard(LEARNER)
-        assert not any(call["purpose"] == "evaluation" for call in application.model.calls)
+        assert not any(call["purpose"] == "evaluation" for call in application.models.calls)
         with pytest.raises(ValueError):
             await application.evaluate("refresh", LEARNER, core.activity_id, "refresh")
         provisional = await application.evaluate("needed", LEARNER, core.activity_id, "next_course")
@@ -298,38 +312,8 @@ def test_E2E09_later_choice_and_dashboard_never_call_evaluation(application):
         )
         assert provisional.ref == reused.ref
         assert (
-            len([call for call in application.model.calls if call["purpose"] == "evaluation"]) == 1
+            len([call for call in application.models.calls if call["purpose"] == "evaluation"]) == 1
         )
-
-    asyncio.run(scenario())
-
-
-def test_E2E13_fragments_windows_resumption_echo_and_recognition_revision(application):
-    async def scenario():
-        core = start(application)
-        deliver_all(core)
-        await answer(application, "收到", "confirmation")
-        adapter = application.adapter
-        await adapter.voice_event("start", "speech1")
-        await adapter.voice_event("fragment", "speech1", "a")
-        await adapter.voice_event("candidate_end", "speech1", candidate_end_ms=100)
-        await adapter.voice_event("final", "speech1", "a car")
-        assert not core.attempts
-        await adapter.voice_event("resume", "speech1")
-        assert not core.attempts
-        await adapter.voice_event("candidate_end", "speech1", candidate_end_ms=600)
-        await adapter.voice_event("final", "speech1", "a bridge")
-        assert not core.attempts
-        await adapter.voice_event("window_elapsed", "speech1")
-        assert len(core.attempts) == 1
-        deliver_all(core)
-        await adapter.voice_event("revision", "speech1", "给车搭桥")
-        assert len(core.attempts) == 1
-        assert core.attempts[0]["recognition_revisions"]
-        assert core.attempts[0]["inputs"][0]["text"] == "a bridge"
-        await adapter.voice_event("start", "echo1", source="teacher_echo")
-        await adapter.voice_event("final", "echo1", "She folded it.", source="teacher_echo")
-        assert len(core.attempts) == 1
 
     asyncio.run(scenario())
 
@@ -446,7 +430,7 @@ def test_E2E18_feedback_arriving_during_model_cannot_publish_old_source(applicat
     async def scenario():
         core, _ = await complete_story(application)
         application.later_feedback("later", LEARNER, core.activity_id)
-        application.model.delay_seconds = 0.03
+        application.models.adapters["simulated"].delay_seconds = 0.03
         old_job = asyncio.create_task(
             application.evaluate("needed", LEARNER, core.activity_id, "next_course")
         )
@@ -518,7 +502,7 @@ def test_parent_report_on_a_lost_activity_is_only_saved_as_a_new_source(applicat
     [lost] = reopened.dashboard(LEARNER)["lost_activities"]
     assert [item["text"] for item in lost["reports"]] == [text]
     # The gap stays; nothing is replayed into a fact or sent to evaluation.
-    assert not reopened.model.calls and not app.store.list_current(LEARNER, "fact")
+    assert not reopened.models.calls and not app.store.list_current(LEARNER, "fact")
     with pytest.raises(LookupError):
         reopened.lost_report("report2", LEARNER, "not-a-lost-activity", text)
 
@@ -539,12 +523,12 @@ def test_completed_requests_replay_after_later_effective_versions_without_new_ca
         result = await application.next_course("first-next", LEARNER, core.activity_id)
         state = application.current(LEARNER, "state").ref
         demand = application.current(LEARNER, "demand").ref
-        calls = len(application.model.calls)
+        calls = len(application.models.calls)
         assert application.prepare("first-prepare", LEARNER) == prepared
         assert await application.next_course("first-next", LEARNER, core.activity_id) == result
         assert application.current(LEARNER, "state").ref == state
         assert application.current(LEARNER, "demand").ref == demand
-        assert len(application.model.calls) == calls
+        assert len(application.models.calls) == calls
         with pytest.raises(Conflict):
             application.feedback("first-prepare", LEARNER, core.activity_id, "无额外补充")
 
@@ -575,3 +559,136 @@ def test_recovered_successful_retry_preserves_original_attempt_count(application
             LEARNER,
         )
     )
+
+
+async def reach_reading(app):
+    core = start(app)
+    deliver_all(core)
+    await answer(app, "收到", "confirmation")
+    await answer(app, "a bridge")
+    await answer(app, "She folded it.")
+    await answer(app, "我指的是折过的纸。", "report")
+    core.control(str(uuid4()), "return")
+    deliver_all(core)
+    await answer(app, "第二次纸折了，车没有掉。", "report")
+    assert core.reading_task().task_id == "read-aloud-1"
+    return core
+
+
+def test_E2E13_reading_is_scored_first_and_a_reread_is_a_new_attempt(application):
+    async def scenario():
+        core = await reach_reading(application)
+        task = core.reading_task()
+        assert core.snapshot()["recording"] == {
+            "max_seconds": 300,
+            "reference_text": task.reference_text,
+        }
+        with pytest.raises(ValueError):
+            await application.adapter.text("typed-reading", task.reference_text)
+        misread = task.reference_text.replace("bridge", "brige", 1)
+        await read(application, "r1", misread)
+        first = core.attempts[-1]
+        first_score = dict(first["pronunciation"])
+        assert first_score["status"] == "scored" and first["judgment"] == "incorrect"
+        assert first["inputs"][0]["text"] is None
+        call = application.models.calls[-1]
+        assert call["purpose"] == "classroom_judgment"
+        deliver_all(core)
+        await read(application, "r2", task.reference_text)
+        rereads = [a for a in core.attempts if a["task_id"] == task.task_id]
+        assert len(rereads) == 2 and rereads[-1]["judgment"] == "correct"
+        assert rereads[0]["pronunciation"] == first_score  # Earlier score kept unchanged.
+        deliver_all(core)
+        await read(application, "silent", "")
+        assert core.attempts[-1]["pronunciation"]["status"] == "unknown"
+        assert core.attempts[-1]["judgment"] == "unclear"
+        # The recording itself never enters events or attempts.
+        assert "brige" not in json.dumps(core.events, ensure_ascii=False)
+        assert "brige" not in json.dumps(core.attempts, ensure_ascii=False)
+
+    asyncio.run(scenario())
+
+
+def test_a_recording_on_a_question_is_rejected(application):
+    async def scenario():
+        core = start(application)
+        deliver_all(core)
+        await answer(application, "收到", "confirmation")
+        with pytest.raises(ValueError):
+            await read(application, "not-reading", "a bridge")
+        assert not core.attempts
+
+    asyncio.run(scenario())
+
+
+def test_help_still_works_on_a_reading_segment(application):
+    async def scenario():
+        core = await reach_reading(application)
+        await answer(application, "帮我一下", "help")
+        assert core.help_count[core.task_instance_id] == 1
+        assert core.reading_task().task_id == "read-aloud-1"
+
+    asyncio.run(scenario())
+
+
+def test_over_limit_recording_is_rejected_and_max_duration_is_accepted(application):
+    async def scenario():
+        core = await reach_reading(application)
+        with pytest.raises(ValueError):
+            await read(application, "too-long", "Mia", recording_ms=300_001)
+        result = await read(
+            application, "auto-end", core.reading_task().reference_text, 300_000, "max_duration"
+        )
+        assert result["ack"] == "accepted"
+
+    asyncio.run(scenario())
+
+
+def test_a_resent_recording_is_replayed_without_a_second_score(application):
+    async def scenario():
+        core = await reach_reading(application)
+        text = core.reading_task().reference_text
+        await read(application, "same", text)
+        attempts, calls = len(core.attempts), len(application.models.calls)
+        assert (await read(application, "same", text))["ack"] == "replayed"
+        assert len(core.attempts) == attempts and len(application.models.calls) == calls
+
+    asyncio.run(scenario())
+
+
+def test_stop_during_scoring_drops_the_late_score(application):
+    async def scenario():
+        core = await reach_reading(application)
+        gate = asyncio.Event()
+        scorer = application.scorer
+        original = scorer.score
+
+        async def slow(audio, reference):
+            await gate.wait()
+            return await original(audio, reference)
+
+        scorer.score = slow
+        job = asyncio.create_task(read(application, "slow", core.reading_task().reference_text))
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        core.control("stop-scoring", "stop")
+        gate.set()
+        assert (await job)["ack"] == "cancelled"
+        assert core.mode == "ended" and core.attempts[-1]["judgment"] == "unclear"
+        assert "pronunciation" not in core.attempts[-1]
+
+    asyncio.run(scenario())
+
+
+def test_pronunciation_scores_reach_evaluation_rows_by_segment(application):
+    async def scenario():
+        core, fact = await complete_story(application)
+        rows = interpret(fact, [], 1, "final")["tasks"]
+        reading = [r for r in rows if r["dimension_id"] == "english.speaking.pronunciation"]
+        assert [r["task_id"] for r in reading] == ["read-aloud-1", "read-aloud-2"]
+        assert all(r["pronunciation"]["status"] == "scored" for r in reading)
+        assert all(r["task_judgment"] == "correct" for r in reading)
+        others = [r for r in rows if r["dimension_id"] != "english.speaking.pronunciation"]
+        assert all(r["pronunciation"] is None for r in others)
+
+    asyncio.run(scenario())

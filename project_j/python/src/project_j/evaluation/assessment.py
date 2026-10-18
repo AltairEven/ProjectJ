@@ -1,4 +1,7 @@
-from project_j.contracts import Document
+from pydantic import Field
+
+from project_j.contracts import Contract, Document
+from project_j.platform.models.contracts import ModelRequest
 
 
 def interpret(
@@ -27,11 +30,11 @@ def interpret(
                 "attempt_id": attempt["attempt_id"],
                 "task_instance_id": attempt["task_instance_id"],
                 "dimension_id": attempt["dimension_id"],
-                "task_judgment": "unclear"
-                if affected or attempt.get("recognition_revisions")
-                else attempt["judgment"],
+                "task_judgment": "unclear" if affected else attempt["judgment"],
                 "working_judgment": "unknown" if affected else judgment,
                 "help": help_map,
+                # Scoring-module evidence for read-aloud segments; the model never re-scores it.
+                "pronunciation": attempt.get("pronunciation"),
                 "external_help": "unknown",
                 "retention": None,
                 "transfer": None,
@@ -85,3 +88,24 @@ def next_suggestion(evaluation: Document, material: dict) -> dict:
         "review": "保持与迁移需要后续新日期和新条件证据。",
         "limitations": ["候选建议，须learning采用并保存需求后才能备课。"],
     }
+
+
+EVALUATION_INSTRUCTIONS = (
+    "你是Jane的课后评价助手。只依据给出的封存事实与家长反馈引用整理本课解释，"
+    "不补造未观察的独立表现、保持或迁移；summary为简短中文。"
+)
+
+
+class EvaluationDraft(Contract):
+    summary: str = Field(min_length=1)
+
+
+def evaluation_request(activity_id: str, source_revision: int) -> ModelRequest:
+    # Phase 1 does not adopt the model draft; interpret() stays the authority.
+    return ModelRequest(
+        purpose="evaluation",
+        instructions=EVALUATION_INSTRUCTIONS,
+        context={"activity_id": activity_id, "source_revision": source_revision},
+        output=EvaluationDraft,
+        deadline_seconds=60,
+    )

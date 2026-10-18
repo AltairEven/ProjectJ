@@ -28,6 +28,7 @@ def review(app, request_id: str, learner_id: str, level: str, proposed_patch: di
     )
     if completed:
         return completed
+    app.models.require()
     if level not in {"week", "stage", "annual", "long_term"}:
         raise ValueError("unknown review level")
     plan = app.current(learner_id, f"plan:{level}")

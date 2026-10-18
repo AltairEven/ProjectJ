@@ -1,6 +1,7 @@
 """Regressions for the P1 independent review findings (simulation and temporary stores only)."""
 
 import asyncio
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -10,6 +11,7 @@ from support import CONDITIONS, LEARNER, answer, complete_story, deliver_all, st
 
 from project_j.application.configuration import Settings
 from project_j.application.documents import identity
+from project_j.classroom.harness import DeliveryFeedback
 from project_j.contracts import RevisionRef
 from project_j.curriculum.content import check_content
 from project_j.interface.api import create_app
@@ -144,24 +146,34 @@ def test_evaluation_reuse_requires_the_same_sealed_fact_revision(application):
     app = application
 
     def calls():
-        return len([call for call in app.model.calls if call["purpose"] == "evaluation"])
+        return len([call for call in app.models.calls if call["purpose"] == "evaluation"])
 
     async def scenario():
         core = start(app)
         deliver_all(core)
         await answer(app, "收到", "confirmation")
-        adapter = app.adapter
-        await adapter.voice_event("start", "speech")
-        await adapter.voice_event("candidate_end", "speech", candidate_end_ms=100)
-        await adapter.voice_event("final", "speech", "a car")
-        await adapter.voice_event("window_elapsed", "speech")
-        deliver_all(core)
+        await app.adapter.text("speech", "a car")
+        unseen = core.actions[core.pending]  # The correction was never presented before stop.
         core.control("stop", "stop")
         app.seal()
         app.feedback("feedback", LEARNER, core.activity_id, "无额外补充")
         await app.evaluate("first", LEARNER, core.activity_id, "final_feedback")
         assert calls() == 1
-        await adapter.voice_event("revision", "speech", "a bridge")
+        late = DeliveryFeedback(
+            delivery_event_id="late",
+            delivery_id="late",
+            action_id=unseen.action_id,
+            activity_id=core.activity_id,
+            task_instance_id=unseen.task_instance_id,
+            sequence=1,
+            output_device_id="explicit_simulation_device",
+            modality="text",
+            status="completed",
+            delivered_range=("text_content",),
+            occurred_at=datetime.now(UTC),
+        )
+        core.delivery(late)
+        app.late_delivery(late)
         revised = await app.evaluate("after-revision", LEARNER, core.activity_id, "final_feedback")
         assert calls() == 2
         assert revised.body["fact_ref"]["revision"] == 2

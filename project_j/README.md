@@ -35,4 +35,4 @@ project_j/scripts/start.sh
 
 解释器在project_j/.python，虚拟环境在python/.venv，依赖分别由uv.lock和两份npm锁固定；缓存/检查产物在.cache，构建产物在web/dist，均忽略。模拟数据库默认为private/simulation/<run_id>/project_j.sqlite3（`--simulation-root`可显式改为另一名为simulation的根目录），素材/导出/备份在同目录，目录0700、文件0600；不创建family或adult_checks区。检查用系统临时目录，不写真实学习状态。
 
-P0独立project-j-probe默认不发请求、不加载.env；其显式真实入口和未来接入条件见[技术文档](../docs/technology.md)，本批未执行。project-j-measure读取40轮明确模拟JSON，不能证明任何实际声音延迟。当前检查范围、限制与审查入口见[交接](../docs/handoff.md)。
+project-j-probe为离线自检，不发请求、不读私有模型配置；真实探测改由模型适配层的初始化命令project-j-init（第一期已实现，实际API未验证，见[技术文档](../docs/technology.md#模型适配层初始化与探针)）。project-j-measure读取40轮明确模拟JSON，不能证明任何实际声音延迟。当前检查范围、限制与审查入口见[交接](../docs/handoff.md)。

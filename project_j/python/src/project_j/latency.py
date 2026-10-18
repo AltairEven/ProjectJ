@@ -14,12 +14,12 @@ from project_j.contracts import Contract
 
 class RoundMeasurement(Contract):
     sample_id: str = Field(min_length=1)
-    # All timestamps projected onto the same browser monotonic clock, in milliseconds.
-    candidate_end_ms: float = Field(ge=0, allow_inf_nan=False)
-    window_expired_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
-    asr_final_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    # All on one browser monotonic clock (ms). Start: a typed submit, or the reading's end press.
+    input_ended_ms: float = Field(ge=0, allow_inf_nan=False)
     submitted_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    scored_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)  # Reading only.
     judgment_done_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    # None when a presynthesized line plays directly.
     tts_first_chunk_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     playback_started_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     outcome: Literal["effective", "failure", "timeout", "unknown", "filler_only"]
@@ -27,51 +27,32 @@ class RoundMeasurement(Contract):
 
     @model_validator(mode="after")
     def valid_order(self) -> Self:
-        for stamp in (
-            self.window_expired_ms,
-            self.asr_final_ms,
+        phases = (
             self.submitted_ms,
+            self.scored_ms,
             self.judgment_done_ms,
             self.tts_first_chunk_ms,
             self.playback_started_ms,
-            self.failure_or_fallback_ms,
+        )
+        for stamp in (*phases, self.failure_or_fallback_ms):
+            if stamp is not None and stamp < self.input_ended_ms:
+                raise ValueError("timestamp precedes the end of input")
+        if self.outcome == "effective" and None in (
+            self.submitted_ms,
+            self.judgment_done_ms,
+            self.playback_started_ms,
         ):
-            if stamp is not None and stamp < self.candidate_end_ms:
-                raise ValueError("timestamp precedes VAD candidate end")
-        if self.outcome == "effective":
-            required = (
-                self.window_expired_ms,
-                self.asr_final_ms,
-                self.submitted_ms,
-                self.judgment_done_ms,
-                self.tts_first_chunk_ms,
-                self.playback_started_ms,
-            )
-            if any(x is None for x in required):
-                raise ValueError("effective round needs every phase, including actual playback")
-        if self.submitted_ms is not None:
-            for stamp in (self.window_expired_ms, self.asr_final_ms):
-                if stamp is not None and stamp > self.submitted_ms:
-                    raise ValueError("submission before completion conditions")
-        sequence = [
-            x
-            for x in (
-                self.submitted_ms,
-                self.judgment_done_ms,
-                self.tts_first_chunk_ms,
-                self.playback_started_ms,
-            )
-            if x is not None
-        ]
+            raise ValueError("effective round needs submit, judgment and actual playback")
+        sequence = [x for x in phases if x is not None]
         if sequence != sorted(sequence):
-            raise ValueError("judgment, synthesis and playback order invalid")
+            raise ValueError("submit, scoring, judgment, synthesis and playback order invalid")
         return self
 
     @property
     def effective_latency_ms(self) -> float:
         if self.outcome != "effective" or self.playback_started_ms is None:
             return float("inf")  # Failed/unknown rounds remain in the denominator.
-        return self.playback_started_ms - self.candidate_end_ms
+        return self.playback_started_ms - self.input_ended_ms
 
 
 class MeasurementRun(Contract):
@@ -88,7 +69,7 @@ class MeasurementRun(Contract):
     model: Literal["gpt-6.1-sol"]
     effort: Literal["low"]
     service_tier: str = Field(min_length=1)
-    transcription_model: str = Field(min_length=1)
+    pronunciation_service: str | None = None
     tts_model: str = Field(min_length=1)
     voice: str = Field(min_length=1)
     clock_id: str = Field(min_length=1)
@@ -112,7 +93,7 @@ def summarize(run: MeasurementRun) -> dict:
     failed = sum(r.outcome != "effective" for r in run.rounds)
     timeout_control_ok = all(
         r.failure_or_fallback_ms is not None
-        and r.failure_or_fallback_ms - r.candidate_end_ms <= 10000
+        and r.failure_or_fallback_ms - r.input_ended_ms <= 10000
         for r in run.rounds
         if r.outcome == "timeout" or r.effective_latency_ms >= 10000
     )
@@ -134,22 +115,17 @@ def summarize(run: MeasurementRun) -> dict:
         "phase_ms": [
             {
                 "sample_id": r.sample_id,
-                "pause_window": _elapsed(r.window_expired_ms, r.candidate_end_ms),
-                "final_transcript_from_vad": _elapsed(r.asr_final_ms, r.candidate_end_ms),
-                "submit_after_ready": _elapsed(r.submitted_ms, _ready(r)),
-                "judgment": _elapsed(r.judgment_done_ms, r.submitted_ms),
+                "submit": _elapsed(r.submitted_ms, r.input_ended_ms),
+                "scoring": _elapsed(r.scored_ms, r.submitted_ms),
+                "judgment": _elapsed(r.judgment_done_ms, r.scored_ms or r.submitted_ms),
                 "synthesis_first_chunk": _elapsed(r.tts_first_chunk_ms, r.judgment_done_ms),
-                "actual_playback": _elapsed(r.playback_started_ms, r.tts_first_chunk_ms),
+                "actual_playback": _elapsed(
+                    r.playback_started_ms, r.tts_first_chunk_ms or r.judgment_done_ms
+                ),
             }
             for r in run.rounds
         ],
     }
-
-
-def _ready(r: RoundMeasurement) -> float | None:
-    if r.window_expired_ms is None or r.asr_final_ms is None:
-        return None
-    return max(r.window_expired_ms, r.asr_final_ms)
 
 
 def _elapsed(end: float | None, start: float | None) -> float | None:

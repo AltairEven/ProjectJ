@@ -16,13 +16,15 @@ from project_j.classroom.harness import Harness
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.content import check_content
 from project_j.curriculum.corrections import active_restrictions, affected
-from project_j.evaluation.assessment import interpret, next_suggestion
+from project_j.evaluation.assessment import evaluation_request, interpret, next_suggestion
 from project_j.interface.submission import InputAdapter
 from project_j.learning.adoption import adopt_demand, adopt_state, review_due
 from project_j.learning.contracts import DemandBody, LearningState, PlanBody
 from project_j.platform.files import PrivateFiles
+from project_j.platform.models.service import ModelService
 from project_j.platform.retries import retry_save
-from project_j.platform.simulated import SimulatedModel
+from project_j.platform.speech.contracts import PronunciationScorer
+from project_j.platform.speech.simulated import SimulatedScorer
 from project_j.platform.storage import (
     Conflict,
     Publication,
@@ -48,10 +50,17 @@ def student_text(source: str) -> str:
 
 class Coordinator:
     def __init__(
-        self, store: SimulationStore, project_root: Path, verification: dict | None = None
+        self,
+        store: SimulationStore,
+        project_root: Path,
+        verification: dict | None = None,
+        models: ModelService | None = None,
+        scorer: PronunciationScorer | None = None,
     ):
         self.store, self.root = store, project_root
-        self.files, self.ledger, self.model = PrivateFiles(store), Ledger(store), SimulatedModel()
+        self.files, self.ledger = PrivateFiles(store), Ledger(store)
+        self.models = models or ModelService.simulated()
+        self.scorer = scorer or SimulatedScorer()
         self.verification = (
             verification if verification is not None else simulation_evidence(project_root)
         )
@@ -421,6 +430,7 @@ class Coordinator:
                     "saved preparation has restricted dependencies; owner recheck required"
                 )
             return completed
+        self.models.require()
         demand = self.current(learner_id, "demand")
         body = DemandBody.model_validate(demand.body)
         state, plan, household = [
@@ -490,6 +500,7 @@ class Coordinator:
                 material.ref,
                 material.body["source"],
                 familiar,
+                student_text((self.root / material.body["source"]).read_text()).split("\n", 1)[1],
             )
             brief = document(
                 "brief",
@@ -609,6 +620,7 @@ class Coordinator:
             raise Conflict(
                 "previous ended facts are still waiting for sealing or receipt confirmation"
             )
+        self.models.require()
         if self.verification.get("result") != "pass":
             return {
                 "decision": "waiting",
@@ -689,11 +701,9 @@ class Coordinator:
             None,
             {
                 "status": "checked",
-                "mode": "simulation_text_and_recognition_signals",
-                "short_window_ms": 600,
-                "explanation_window_ms": 1200,
+                "mode": "simulation_text_and_reading_recording",
                 "actual_voice": "未验证",
-                "automatic_real_voice": "disabled",
+                "real_recording": "disabled",
             },
         )
         config = document(
@@ -773,8 +783,10 @@ class Coordinator:
             "validation": verification.ref.model_dump(),
             "start": start.ref.model_dump(),
         }
-        self.core = Harness(activity_id, learner_id, course.ref, data, bindings, self.model)
-        self.adapter = InputAdapter(self.core, self.late_recognition)
+        self.core = Harness(
+            activity_id, learner_id, course.ref, data, bindings, self.models, self.scorer
+        )
+        self.adapter = InputAdapter(self.core)
         self.store.active_activity_id = activity_id
         token = token_urlsafe(32)
         self.student_tokens[token] = activity_id
@@ -918,58 +930,6 @@ class Coordinator:
         if fact is None:
             raise LookupError("facts have not been sealed; do not reconstruct from the course")
         return fact
-
-    def late_recognition(self, submitted):
-        core = self.core
-        if core is None or core.mode != "ended":
-            return
-        current = self.store.current(identity(core.activity_id, "fact"), core.learner_id)
-        pending = self.freeze_end() if current is None else current
-        reports = pending.body.get("late_recognition_revisions", [])
-        if any(row["event_id"] == submitted.event_id for row in reports):
-            return
-        body = pending.body | {
-            "late_recognition_revisions": reports + [submitted.model_dump(mode="json")],
-            "attempts": core.attempts,
-        }
-        if current is None:
-            self.pending_seals[core.activity_id] = document(
-                "fact",
-                pending.object_id,
-                pending.operation_id,
-                core.learner_id,
-                body,
-                refs=pending.dependency_refs,
-                occurred_at=pending.occurred_at,
-            )
-            return
-        operation = identity(core.activity_id, f"recognition-revision:{submitted.event_id}")
-        updated = document(
-            "fact",
-            current.object_id,
-            operation,
-            core.learner_id,
-            body,
-            refs=current.dependency_refs,
-            sources=(current.ref,),
-            revision=current.revision + 1,
-            source_revision=current.revision + 1,
-            occurred_at=current.occurred_at,
-        )
-        self.store.save(
-            SaveKey(
-                operation_id=operation, step_id="fact-revision", source_revision=updated.revision
-            ),
-            core.learner_id,
-            [updated],
-            (
-                Publication(
-                    ref=updated.ref,
-                    expected_revision=current.revision,
-                    reason="后到原语段技术修订；同活动同尝试，不重开教学",
-                ),
-            ),
-        )
 
     def feedbacks(self, activity_id: str, learner_id: str):
         return sorted(
@@ -1164,6 +1124,7 @@ class Coordinator:
         )
 
     async def evaluate(self, request_id: str, learner_id: str, activity_id: str, purpose: str):
+        self.models.require()
         fact = self.activity_facts(activity_id, learner_id)
         source_revision, feedbacks = self.source_revision(activity_id, learner_id)
         current = self.store.current(identity(activity_id, "evaluation"), learner_id)
@@ -1212,7 +1173,9 @@ class Coordinator:
                 )
             )
             if not no_new_facts:
-                await self.model.evaluate(activity_id, source_revision)
+                result = await self.models.run(evaluation_request(activity_id, source_revision))
+                if not result.ok:
+                    raise RuntimeError(f"evaluation model call failed: {result.failure}")
             current_revision, current_feedback = self.source_revision(activity_id, learner_id)
             if current_revision != source_revision:
                 # Re-enter with the new source, never publish the late old interpretation.
@@ -1563,7 +1526,8 @@ class Coordinator:
             "review_due": review_due(
                 [doc for doc in documents if doc.kind == "plan"], datetime.now(UTC)
             ),
-            "model_calls": self.model.calls,
+            "model_calls": self.models.calls,
+            "models": self.models.status(),
             "pending_seals": list(self.pending_seals),
             "lost_activities": self.lost_activities(learner_id, documents),
         }

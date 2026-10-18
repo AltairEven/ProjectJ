@@ -193,17 +193,18 @@ class SubmittedInput(Contract):
     input_policy_ref: RevisionRef
     realm: Literal["simulation", "adult_check"]  # P0 has no family input entry.
     source_type: Literal["simulated", "adult", "technical"]
-    modality: Literal["text", "transcript", "action_report"]
-    text: str = Field(min_length=1)
+    # Answers are typed or clicked; only an English reading segment is recorded (ADR-0014).
+    modality: Literal["text", "audio", "action_report"]
+    # Audio bytes never travel inside this contract; they reach the core in memory beside it.
+    text: str | None = Field(default=None, min_length=1)
     provider: str = Field(min_length=1)  # "unknown" is explicit, never inferred child.
     intent: Literal["answer", "help", "confirmation", "report", "unknown"]
-    completion_trigger: Literal["explicit", "vad_window"]
-    candidate_end_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
-    window_elapsed: bool = False
-    recognition_final: bool = False
-    recognition_item_ids: tuple[str, ...] = ()
-    speech_resumed_or_cancelled: bool = False
-    relation: Literal["new", "supplement", "recognition_revision"] = "new"
+    completion_trigger: Literal["explicit", "max_duration"]
+    input_started_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    input_ended_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    recording_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    pause_count: int = Field(default=0, ge=0, strict=True)
+    relation: Literal["new", "supplement"] = "new"
     related_event_id: str | None = None
 
     @model_validator(mode="after")
@@ -213,19 +214,20 @@ class SubmittedInput(Contract):
         if self.realm == "adult_check" and self.source_type == "simulated":
             raise ValueError("adult check source mismatch")
         if self.relation != "new" and not self.related_event_id:
-            raise ValueError("supplement/revision needs original event")
+            raise ValueError("a supplement needs its original event")
         if self.related_event_id == self.event_id:
-            raise ValueError("revision must have a new event identity")
-        if self.speech_resumed_or_cancelled:
-            raise ValueError("resumed or cancelled input cannot be submitted")
-        if self.modality == "transcript":
-            if not self.recognition_final or not self.recognition_item_ids:
-                raise ValueError("recognition fragments are not submissions")
-        if self.completion_trigger == "vad_window":
-            if (
-                self.modality != "transcript"
-                or self.candidate_end_ms is None
-                or not self.window_elapsed
-            ):
-                raise ValueError("automatic submission conditions not met")
+            raise ValueError("a supplement must have a new event identity")
+        timing = (self.input_started_ms, self.input_ended_ms, self.recording_ms)
+        if self.modality == "audio":
+            if self.text is not None or None in timing:
+                raise ValueError("a reading recording carries its timing and no text")
+            if self.input_ended_ms < self.input_started_ms:
+                raise ValueError("a recording cannot end before it starts")
+            if self.relation != "new":
+                raise ValueError("a reread is a new attempt, never a supplement")
+        else:
+            if self.text is None:
+                raise ValueError("a typed or reported input needs its text")
+            if self.completion_trigger != "explicit" or any(x is not None for x in timing):
+                raise ValueError("only a reading recording ends by time or carries timing")
         return self

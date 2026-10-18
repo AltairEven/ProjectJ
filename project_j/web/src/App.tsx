@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { acknowledgePause, cancel, presentationCancelled, type Cancellation } from './cancellation'
 import { canConfirm } from './confirmation'
-import { describe, endLabels, startMessage } from './report'
+import { describe, endLabels, modelLines, startMessage } from './report'
+import { finishRecording, idle, pauseRecording, recordedMs, resumeRecording, startRecording, type Recorder } from './recording'
 import { requestFailure, type RequestFailure } from './request'
-import type { Snapshot, Dashboard, RevisionRef as Ref, Document as Doc, Control, StudentControl, DeliveryFeedback, TextInput, VoiceSignal, PreparationResult as PrepareResult, StartResult, StartConditions, InputResult as Ack } from './client/types.gen'
+import type { Snapshot, Dashboard, RevisionRef as Ref, Document as Doc, Control, StudentControl, DeliveryFeedback, TextInput, PreparationResult as PrepareResult, StartResult, StartConditions, InputResult as Ack } from './client/types.gen'
 
 const learner = 'fictional-L1'
 const uid = () => crypto.randomUUID()
@@ -112,6 +113,7 @@ function Parent({ token }: { token: string }) {
     {failedOperation.current && <button onClick={() => void run(failedOperation.current!)} disabled={busy}>接续原操作</button>}
     <section><div className="section-title"><h2>准备与开始</h2><button className="quiet" onClick={() => void run(refresh)} disabled={busy}>刷新状态</button></div>
       <p>{dashboard?.verification?.result === 'pass' ? '已有与当前构建匹配的隔离程序检查依据。' : '隔离程序检查尚未取得匹配依据，开始保持待处理。'}</p>
+      {modelLines(dashboard?.models as Record<string, any> | undefined).map(line => <p key={line}>{line}</p>)}
       {dashboard?.active ? <><p>课堂状态：{stateLabels[dashboard.active.activity_state]}。工作台不访问课中数据库。</p>
         <div className="row"><button onClick={() => parentControl('pause')}>暂停</button><button onClick={() => parentControl('resume')}>恢复</button>
           <button className="quiet" onClick={() => parentControl('skip')}>跳过当前题</button><button className="quiet" onClick={() => parentControl('close')}>收尾</button>
@@ -205,11 +207,12 @@ function Student({ token }: { token: string }) {
   const [inFlight, setInFlight] = useState(0)
   const busy = inFlight > 0
   const [cancellation, setCancellation] = useState<Cancellation>()
-  const [voiceItem, setVoiceItem] = useState('')
-  const [voiceText, setVoiceText] = useState('')
   const [lastInput, setLastInput] = useState('')
   const [failedRequest, setFailedRequest] = useState<{ path: string; payload: unknown }>()
   const [failedDelivery, setFailedDelivery] = useState<DeliveryFeedback>()
+  const [recorder, setRecorder] = useState<Recorder>(idle)
+  const [readingText, setReadingText] = useState('')
+  const reading = snapshot?.recording
   const delivered = useRef(new Set<string>())
   const setCurrent = useCallback((value: Snapshot) => setSnapshot(old => old && old.core_revision > value.core_revision ? old : value), [])
   const localCancelled = presentationCancelled(cancellation, snapshot)
@@ -277,12 +280,30 @@ function Student({ token }: { token: string }) {
     // Keep anything typed while this request was being judged.
     if (result) setText(current => current === value ? '' : current)
   }
-  const voice = async (kind: VoiceSignal['kind']) => {
-    const item = kind === 'start' ? uid() : voiceItem
-    if (kind === 'start') setVoiceItem(item)
-    await send('student/voice-signal', { kind, item_id: item, text: voiceText,
-      candidate_end_ms: kind === 'candidate_end' ? performance.now() : null, source: 'simulated_speaker' })
+  const finishReading = async (now: number) => {
+    if (!reading) return
+    const timing = finishRecording(recorder, now, Number(reading.max_seconds))
+    if (!timing) return
+    setRecorder(idle)
+    // Simulation convention: the recording bytes are the text the fictional child read.
+    const audio = btoa(String.fromCharCode(...new TextEncoder().encode(readingText)))
+    const result = await send('student/recording', { event_id: uid(), audio_base64: audio, ...timing })
+    if (result) setReadingText('')
   }
+  // Pausing, stopping or leaving the reading segment ends the take locally without submitting it.
+  const readingOpen = Boolean(reading) && !halted
+  useEffect(() => { if (!readingOpen) setRecorder(idle) }, [readingOpen])
+  // The maximum ends the take; the latest render's finishReading sees the current text.
+  const finishRef = useRef(finishReading)
+  finishRef.current = finishReading
+  useEffect(() => {
+    if (recorder.state !== 'recording' || !reading) return
+    const timer = setInterval(() => {
+      const now = performance.now()
+      if (recordedMs(recorder, now) >= Number(reading.max_seconds) * 1000) void finishRef.current(now)
+    }, 250)
+    return () => clearInterval(timer)
+  }, [recorder, reading])
   return <main className="student">
     <header><span className="eyebrow">JANE · 虚构课堂</span><h1>一起读故事，找依据</h1><p>文字与技术信号模拟；不会录音或播放真实声音。</p></header>
     <div className="controls"><span>{snapshot ? stateLabels[snapshot.activity_state] : '正在连接原会话'}{snapshot?.mode === 'judging' && '：Jane正在处理你的回答'}</span>
@@ -303,20 +324,25 @@ function Student({ token }: { token: string }) {
     {localCancelled && <p className="notice">本端已停止呈现。暂停后由家长在工作台恢复；停止后不能恢复。</p>}
     <section className="jane"><span className="avatar" aria-hidden="true">J</span><div><h2>Jane</h2><p aria-live="polite">{localCancelled ? '呈现已取消。' : (snapshot?.pending_action ?? snapshot?.presented_action)?.text ?? '等待同一核心的下一动作。'}</p></div></section>
     {!localCancelled && Object.entries(snapshot?.materials ?? {}).map(([id, material]) => <section key={id} className="reading"><pre>{material}</pre></section>)}
+    {reading && snapshot?.mode !== 'ended' && <section className="reading-aloud">
+      <h2>朗读这一段</h2><p>{String(reading.reference_text)}</p>
+      <label>模拟朗读内容（不使用麦克风，录音只交发音评分）<textarea value={readingText} onChange={event => setReadingText(event.target.value)} disabled={halted} /></label>
+      <p>{{ idle: '未开始', recording: '录音中', paused: '已暂停' }[recorder.state]}</p>
+      <div className="row">
+        {recorder.state === 'idle' && <button disabled={busy || halted} onClick={() => setRecorder(startRecording(recorder, performance.now()))}>开始录音</button>}
+        {recorder.state === 'recording' && <button className="quiet" onClick={() => setRecorder(pauseRecording(recorder, performance.now()))}>暂停录音</button>}
+        {recorder.state === 'paused' && <button className="quiet" onClick={() => setRecorder(resumeRecording(recorder, performance.now()))}>继续录音</button>}
+        {recorder.state !== 'idle' && <><button disabled={busy} onClick={() => void finishReading(performance.now())}>结束并提交</button>
+          <button className="quiet" onClick={() => setRecorder(idle)}>重录</button></>}
+      </div></section>}
     {snapshot?.mode === 'offscreen' ? <section><p>离屏期间没有采集。回来后需要报告实际条件与结果，返回本身不算完成。</p><button onClick={() => void control('return')}>返回，报告结果</button></section> :
       snapshot?.mode !== 'ended' && <section><label>你的虚构回答或报告<textarea value={text} onChange={event => setText(event.target.value)} disabled={localCancelled} /></label>
-        <div className="row"><button disabled={busy || !text.trim() || halted} onClick={() => void input(text)}>提交</button>
+        <div className="row"><button disabled={busy || !text.trim() || halted || Boolean(reading)} onClick={() => void input(text)}>提交</button>
           <button className="quiet" disabled={busy || halted} onClick={() => void input('帮我一下', 'help')}>帮我一下</button>
           {canConfirm(snapshot) && <button className="quiet" disabled={busy || halted} onClick={() => void input('听到了，收到当前说明。', 'confirmation')}>确认收到说明</button>}
           <button className="quiet" disabled={!lastInput || !text.trim() || halted} onClick={() => void input(text, 'unknown', true)}>还没说完，补充</button>
           <button className="quiet" disabled={halted} onClick={() => void control('repeat')}>重复当前内容</button></div></section>}
     {snapshot?.mode === 'ended' && <section><h2>本堂已结束</h2>{snapshot.end && <p>结束原因：{endLabels[String(snapshot.end.reason)] ?? String(snapshot.end.reason)}。</p>}<p>只保留已发生范围；事实封存独立进行，家长可随后反馈。</p></section>}
-    <details className="technical"><summary>模拟语音信号（不使用麦克风）</summary>
-      <label>模拟识别文本<textarea value={voiceText} onChange={event => setVoiceText(event.target.value)} /></label>
-      <div className="row">{(['start', 'fragment', 'candidate_end', 'final', 'window_elapsed', 'resume', 'revision', 'cancel'] as const).map((kind, index) =>
-        <button className="quiet" disabled={halted || snapshot?.mode === 'ended'} key={kind} onClick={() => void voice(kind)}>{['新语段', '识别片段', '候选结束', '最终识别', '窗口到期', '继续说话', '识别修订', '取消语段'][index]}</button>)}</div>
-      <p>片段不评分；窗口到期、最终齐和绑定仍有效才提交。识别修订回连原语段，不新增尝试。</p>
-    </details>
   </main>
 }
 

@@ -4,6 +4,7 @@ from pydantic import Field, model_validator
 
 from project_j.contracts import Contract, RevisionRef
 from project_j.learning.contracts import DemandBody, Goal, Help
+from project_j.preparation.reading import MAX_SEGMENT_WORDS, sentences, words
 
 
 def demand_requirements(demand: DemandBody) -> list[tuple[str, str]]:
@@ -42,7 +43,7 @@ class Support(Contract):
 class TaskDefinition(Contract):
     task_id: str = Field(min_length=1)
     dimension_id: str = Field(min_length=1)
-    purpose: Literal["answer", "point", "offscreen"]
+    purpose: Literal["answer", "point", "offscreen", "read_aloud"]
     prompt: str = Field(min_length=1)
     material_ref: RevisionRef
     evidence: str = Field(min_length=1)
@@ -51,11 +52,27 @@ class TaskDefinition(Contract):
     supports: tuple[Support, ...] = Field(min_length=2)
     exit_text: str = Field(min_length=1)
     optional: bool = False
+    # Read-aloud only: the scoring segment's reference text and the reading it belongs to.
+    reference_text: str | None = None
+    reading_id: str | None = None
 
     @model_validator(mode="after")
     def different_supports(self):
         if len({support.text for support in self.supports}) != len(self.supports):
             raise ValueError("help branches must provide different actual guidance")
+        return self
+
+    @model_validator(mode="after")
+    def reading_segment(self):
+        if self.purpose != "read_aloud":
+            if self.reference_text is not None or self.reading_id is not None:
+                raise ValueError("only a read-aloud task carries a reference text")
+            return self
+        if not self.reference_text or not self.reading_id:
+            raise ValueError("a read-aloud task needs its reference text and reading")
+        sentences(self.reference_text)  # Raises unless it ends at a sentence end.
+        if len(words(self.reference_text)) > MAX_SEGMENT_WORDS:
+            raise ValueError("a scoring segment must stay within the segment word limit")
         return self
 
 

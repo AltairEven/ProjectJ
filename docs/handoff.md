@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.14.0；更新：2026年10月14日。
+版本：1.15.1；更新：2026年10月18日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -441,3 +441,47 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 纪律：30分钟预算课进行期间，曾在另一终端运行单元测试与类型检查（只用临时目录，未触及该课堂），违反课中不运行工程检查的约定，已在调试记录中说明并改正。
 - 待家长决定：W跨课综合——较新课堂某维度无有据判断时，是沿用较早的有据判断与证据，还是按最新观察改为未知（现状为后者；learning/updates.md:27与state.md:77支持保留，但与P1-R7已定的同活动重审规则需一并设计）；沿用N（开课前登记已读材料）、R（评价保存失败后复用已生成结果）、G（更正指定题目）、K（家长页处理较早课堂反馈）。
 - 低优先待办：离屏动作尚无“允许帮助”，需在课程包任务中新增该内容（内容决定）；页面不报告呈现失败——纯文字模拟没有页面可观察的失败，呈现恢复只在接口层可达，留待真实语音。同一需求重复点“准备课程包”会新建多份包，属新请求身份的允许行为（内容更正后重新备课依赖它），不作缺陷。
+
+## P1-M1 模型适配层第一期
+
+- 状态：第一期实现与自测完成，家长要求后与DES-V1第一期同一本地提交（2026年10月18日）。家长要求把模型适配独立出来，同时支持API与订阅SDK（如Codex SDK、Claude Agent SDK），每种接入单独适配、上层足够通用；经逐段讨论采用通用结构化任务合同。
+- 负责人/集成：Claude（Opus起草设计，Fable审阅并接续）；起点9c5b4fb。
+- 家长决定：订阅类可用于真实课堂，按各适配器条款自行决定；请求只带学习阶段、状态与任务数据，不带年龄等身份信息，不再以零数据保留为数据条件；实际配置未核实可启用并逐次记录，明确不符判失败；每个适配器实现探针协议，含图片等多模态可用性；每次请求自带完整必要上下文；使用前命令行初始化（未配置默认模型先配置），通过后才可备课、开课、复盘与评价；密钥与绑定分文件、按适配器各一个本地密钥文件，后续由家长页管理；课中不切换适配器；第一期不开真实模型上课入口。
+- 设计文件边界：decisions/ADR-0013.md、design/platform/{models.md,configuration-permissions.md,storage-lifecycle.md,handoffs.md,README.md}、design/classroom/session-start.md、design/interface/parent-workbench.md、design/preparation/readiness.md、docs/{technology.md,acceptance.md,roadmap.md,handoff.md}、AGENTS.md、project_j/README.md。
+- Fable设计审阅（2026年10月14日，主会话直接读diff并对照ADR-0008、session-start、parent-workbench、profile、execution-recovery、业务合同阻断标准及现有调用点）：修正用途所需档位写死low/medium（改为按绑定档位探测）、开课判定表与平台启动段补模型初始化准入、家长工作台补模型接入区域、密钥指纹改为单向摘要、学习阶段对齐档案学段/年级；家长随后决定密钥与绑定分文件存放，已写入。
+- 第一期实现范围：合同、替换SimulatedModel的模拟适配器、OpenAI适配器、探针协议、project-j-init及准入、家长页模型状态；所有模拟模型调用改经统一入口。2026年10月16日Codex SDK适配器提前到第一期（见下方补充）；第二期为Claude Agent SDK适配器，DeepSeek等待定。
+- 验收条件：现有pytest与前端回归含义不变；新增合同、统一入口、模拟与OpenAI适配器（MockTransport）、探针、初始化、准入及导出排除测试；8项登记检查；浏览器模拟一课；家长以真实密钥运行project-j-init为第一期唯一真实API步骤。
+- 实施计划：docs/superpowers/plans/2026-10-14-p1-m1-model-adapters.md（Opus起草）。Fable计划审阅（2026年10月14日，主会话逐任务对照设计并实测SDK）：修正OpenAI适配器按调用建客户端会关闭注入http客户端致探针第二次调用必失败（改为按适配器实例一个客户端）、统一入口补适配器意外异常只记类型、准入测试补开课、家长页补能力摘要、test_probe_stack删除范围、设计中能力报告与配置摘要的绑定措辞；第一期课堂请求不含短简报列为待续。
+- 工程文件边界：新增project_j/python/src/project_j/platform/models/{__init__,contracts,simulated,service,openai_api,config,registry,init}.py、classroom/judgment.py及tests/test_models_{contracts,simulated,service,gate,openai,init}.py；修改classroom/harness.py、application/coordinator.py、evaluation/assessment.py、learning/maintenance.py、interface/api.py、probe.py、pyproject.toml（project-j-init入口，锁文件不变）、tests/{test_control_boundaries,test_classroom_debug_fixes,test_integration_fixes,test_review_fixes,test_runtime,test_probe_stack}.py、web/src/{App.tsx,report.ts}、web/tests/report.test.mjs及生成的web/schema/openapi.json与web/src/client/types.gen.ts；删除platform/simulated.py。
+- 实现要点：课堂判断与课后评价经ModelService调用模拟适配器，课堂行为与原模拟一致（现有测试只改取值位置）；未初始化时备课、开课、复盘、评价拒绝并给中文原因，查看、导出、补记不受影响；家长页显示初始化状态、各用途绑定与能力报告；OpenAI适配器与探针只在mock传输层测试；project-j-init在临时目录实跑配置与探测成功，文件0600、目录0700。
+- 检查证据：8项登记命令全部通过（锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure）；终审修复后重跑统一check（200项pytest、11项前端回归、OpenAPI与类型重新生成、构建、文档）、probe与measure通过，检查UTC 2026-10-14T03:20:07.520312+00:00，工程摘要da643408baaffd6e9e3499ee26499eeaac6ff550e1359ebb3c0b37fcda3fda8a，simulation_only/not_granted。
+- 浏览器实测（模拟入口8771，数据根project_j/test/simulation，细节记本机project_j/test/records）：家长页显示“模型已初始化（模拟适配器）”、两行绑定与能力报告；完整一课含求助、正确、指认、离屏（带7分钟预算与返回方式）、收尾、反馈与下一课，记录6次模型调用（5次课堂low、1次评价medium），调用记录不含密钥字段。课中未运行检查或Git。
+- 终审（主会话，按家长习惯不派子代理）：修复家长可见原因夹带英文标识（用途与能力项改中文名，先写失败测试）；延后两项小问题：ModelFiles.set_key依赖调用方校验适配器名（命令行已校验，将来页面写入须同样校验）、新建的project_j/private上级目录沿用默认权限（现有目录已是0700）。
+- 未验证：实际API与订阅接入（家长运行project-j-init login codex或set-key openai，再configure、probe为唯一真实步骤）、课堂参考题集语义、语音、Claude Agent SDK适配器（第二期）。待续：第一期课堂请求只带任务数据，不含短简报与Jane方法，开放真实上课入口的批次补全。
+- 补充：Codex SDK适配器（2026年10月16日，Claude Opus实现与集成）。家长只有ChatGPT订阅、没有API账号，要求先接Codex SDK；经简短设计确认：新增codex适配器、保留OpenAI API适配器，登录状态与家长全局~/.codex隔离。
+  - 文件边界：新增platform/models/codex_sdk.py、tests/test_models_codex.py；修改platform/models/{registry,init,contracts}.py、tests/{test_models_init,test_probe_stack}.py、pyproject.toml与uv.lock（新增openai-codex==0.163.0及附带运行时openai-codex-cli-bin）；文档ADR-0013 1.1.0、design/platform/models.md 2.1.0、configuration-permissions.md 1.2.1、docs/technology.md 1.3.1。
+  - 实现要点：官方Python SDK在本机启动codex app-server；project-j-init login codex经浏览器ChatGPT登录，CODEX_HOME固定为project_j/private/models/codex-home（绝对路径，0700）；每次调用开不留存新会话、空临时目录、只读沙箱、拒绝全部提权、中性基础指令替换Codex代理提示词、严格JSON结构、档位逐轮传入；配置覆盖关闭记忆、历史、项目说明文档、网页搜索、分析统计及shell工具，覆盖项经本地config/read核对已载入（shell工具开关因未知键也会回显，实际生效未核实，故另以返回条目核对：出现工具调用即“工具”明确不符而失败）；取消与超时请求服务端中断；失败按Codex错误信息映射鉴权/额度/拒绝/不可用，异常只留类型；SDK不回报每轮实际模型与档位，记未核实，探针以订阅模型列表核对模型与声明档位，新增“工具关闭”探测项；project-j-init probe结束后关闭各适配器运行时。
+  - 自测中发现并修复：CLI传入的相对CODEX_HOME在运行时临时工作目录下会解析错（改为绝对路径并加测试）；单元测试未关闭适配器在系统临时目录留下42个空工作目录（测试改用各自tmp目录，已清理）。
+  - 检查证据：8项登记命令全部通过（锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe含codex、模拟measure）；统一check 220项pytest，末次统一check UTC 2026-10-16T01:54:34.828696+00:00，工程摘要bdfd7baccab8bfa37e8b463ca47f79278c7a2d25e64bb31acb45957f039f9994，simulation_only/not_granted。另以真实codex运行时在临时目录做未登录冒烟：probe约2秒返回“鉴权：失败（未登录，请运行 project-j-init login codex）”，无残留进程或工作目录；未登录、未调用模型。
+  - 真实订阅测试（2026年10月16日，家长浏览器登录后由Claude运行，细节记本机project_j/test/records/codex-20261016.md）：project-j-init probe准入通过（鉴权、模型、结构化输出、工具关闭、取消、图片输入已核实，档位low/medium未核实）。实测发现运行时注入约1.2万token内置上下文且同进程逐次增长（来自插件与技能），按实测补充关闭环境/权限/应用/协作说明及应用、插件、技能，适配器版本升为2使旧初始化记录失效；改后输入稳定约1.1万token、不再增长，记忆库与会话表为空。v2重新probe通过（low 5.6秒、medium 8.8秒）。经统一入口跑6个课堂判断样例（正确、改写正确、错误、不清楚、首次求助、帮助用尽）6/6与预期一致、依据原样、未用工具，耗时4.94–8.33秒、中位约5.4秒，均在单次10秒期限内。
+  - 结论：Codex订阅路径功能可用；单次判断约5–8秒，课堂实时判断不能满足声音验收“说完至首播中位≤2.5秒、95%≤5秒”，备课与课后评价等非实时用途可用。剩余约1.1万token为运行时自带框架与工具定义，配置无法再减。
+  - 未验证：订阅用量上限、shell工具开关本身的效果（以返回条目核对兜底，实测未出现工具）、中性基础指令对更多题型判断质量的影响、服务端中断后是否计费、课后评价真实样本；登录变更不使初始化记录失效（只有登出后调用以鉴权失败呈现）。观察：答错回应直接给出答案，留待课堂请求补短简报与Jane方法时处理。
+- 补充：四个用途（2026年10月16日，家长指出设计为学习规划、备课、课堂、课后评价四项）。合同新增planning（学习规划）与preparation（备课），所需能力同课后评价，模拟入口默认medium；家长页与status按流程顺序显示四行，家长页补“工具关闭”中文名；两项暂无模型调用，只参与绑定、探测与准入。真实配置改为默认codex:gpt-6.1-sol:medium、课堂判断low并重新probe通过。重探时图片输入把8×8的(220,30,30)认成orange而失败（该项不在准入条件），探测图改为64×64纯红后重探通过。文件：platform/models/{contracts,service,openai_api}.py、tests/test_models_{service,contracts,init,openai}.py、web/src/report.ts、web/tests/report.test.mjs；design/platform/models.md 2.2.0、docs/technology.md。
+- 接续：已与DES-V1第一期同一本地提交；真实模型接入按初始化与探针另行验收。
+
+## DES-V1 课堂语音方案设计
+
+- 状态：设计已写入；第一期模拟闭环已实现并通过登记检查，真实评分/合成/麦克风未实现；家长要求后与P1-M1同一本地提交（2026年10月18日）。家长要求拆分课堂模型能力，经逐项讨论确定：课堂管理归程序；作答、求助与确认用文字/点选提交，不设语音识别，模型不听录音；只有英语朗读/跟读评分任务按键录音（开始、暂停/继续、结束、重录），录音交独立发音评分（首选国内K12口语评测，腾讯云优先），课堂判断模型据评分结果判断、纠正并提出推进动作，课后评价据评分分析；合成独立并在备课时预合成固定语句与示范音；备课把长篇朗读切成评分段。中途曾写成“整段录音交课堂判断模型直接听”，家长指出只有发音评分需要录音后改正。
+- 负责人/集成：Claude Opus。
+- 文件边界：decisions/ADR-0014.md（新增）；design/platform/{realtime-voice.md 2.0.0,models.md 2.3.0,README.md,configuration-permissions.md,handoffs.md,failures-performance.md,sessions-sync.md}；design/interface/{input-submission.md 2.0.0,input-output-adapters.md,README.md,handoffs.md}；design/preparation/{course-package.md,readiness.md}；design/classroom/{session-start.md,boundaries-events.md,guidance-correction.md}；design/evaluation/facts-evidence.md；design/shared/{business-contracts.md,end-to-end-cases.md,execution-recovery.md}；docs/{acceptance.md,technology.md,roadmap.md,handoff.md}；AGENTS.md。输入提交分界标题改为“补充、再试与评分异议的分界”，引用锚点已同步。
+- 事实依据（2026年10月16日，细节记本机project_j/test/records）：Codex订阅全部模型声明输入只有文字和图片，按底层协议发送wav时模型回答未收到音频（按本设计模型不听录音，只作记录）；腾讯云智聆口语评测段落模式文本不超过120词、录音不超过300秒。
+- 实施计划：docs/superpowers/plans/2026-10-16-des-v1-reading-score.md（Claude Opus起草，家长要求以Fable审核后修订；第一期：删除模拟识别路径、延迟工具改起点、模拟发音评分器、备课切分评分段、Harness朗读流程、评价带评分、录音接口与学生页模拟录音；真实评分/合成服务、预合成与播放、初始化接入及真实麦克风留第二期）。
+- 第一期实现（2026年10月16日，Claude执行与集成；家长说“开工”后在主分支工作区内联执行，未提交）：
+  - 文件边界：新增project_j/python/src/project_j/platform/speech/{__init__,contracts,simulated}.py、preparation/reading.py、tests/test_{speech_simulated,reading_segments}.py、web/src/recording.ts、web/tests/recording.test.mjs；修改contracts.py（SubmittedInput）、interface/{submission,api}.py、classroom/{harness,judgment}.py、platform/models/simulated.py、application/coordinator.py、evaluation/assessment.py、preparation/{contracts,packages}.py、learning/catalog.py、latency.py、tests/{support,test_contracts,test_control_boundaries,test_runtime,test_review_fixes,test_models_simulated,test_classroom_debug_fixes,test_latency}.py、tests/fixtures/latency_simulated.json、web/src/App.tsx及生成的openapi.json、types.gen.ts、client/index.ts；文档design/interface/input-submission.md 2.0.1、design/shared/end-to-end-cases.md 1.4.1。
+  - 实现要点：提交合同只有文字/点选与朗读录音两类（modality为text/audio/action_report，completion_trigger为explicit/max_duration，录音带时间与暂停次数且只能为new），删除模拟识别信号接口、WS分支、迟到识别修订与学生页“模拟语音信号”区；延迟工具起点改为提交/按结束，阶段为提交、评分、判断、合成首段（预合成可无）、实际首播；备课把故事切成不超过100词的评分段（主故事53+52词两段、迁移故事56词一段），作为read-aloud-N任务排在离屏之后，新增能力“英语朗读发音”；朗读段只收录音，录音只在本次调用内交模拟评分器，评分结果（不含录音）连同参考文本交课堂判断，尝试与课后评价行带pronunciation，评分未知判unclear；非朗读题拒收录音，朗读题拒收文字作答但“帮我一下”仍走帮助；录音超过评分上限300秒拒绝、max_duration接受；重发同一录音replayed、不再评分；评分中停止丢弃迟到评分；新增POST /api/student/recording（base64，解码上限8 MiB）与快照recording字段；学生页朗读区可开始、暂停录音/继续录音、结束并提交、重录，到最长时长自动提交。
+  - 执行中的裁定：未建worktree，直接在主分支工作区实施（与P1-M1等未提交改动同处）；计划中的提交步骤全部跳过（家长未要求提交）；合同报错文字缩短以满足行宽；残留检查中test_contracts.py的transcript/recognition_revision是应被拒绝的反例输入，保留；课堂判断请求上下文键集合测试补reference_text/pronunciation；test_classroom_debug_fixes另一个走到收尾的用例补朗读步骤；浏览器实测发现朗读区“暂停/继续”与课堂级“暂停”同名，改为“暂停录音/继续录音”（改后未重跑浏览器）。
+  - 检查证据：8项登记命令全部通过（锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；终审修复后重跑统一check：245项pytest、14项前端回归、OpenAPI与类型重新生成、构建、文档检查通过，UTC 2026-10-16T09:18:11.143618+00:00，工程摘要fbd7610528247de1b5afaf05cbdfca32b766c951352b6b58f90941becea5000c，simulation_only/not_granted。
+  - 浏览器模拟一课（端口8772，数据根project_j/test/simulation/des-v1-reading，细节记本机project_j/test/records/des-v1-20261016.md）：第1段写错一个bridge，Jane回应“这几个词再读一遍：bridge”，读对后进入第2段；第2段暂停后继续再提交，进入收尾；反馈与课后评价中三条朗读行（第1段错一次、重读正确，第2段正确）均带评分；封存事实中朗读输入text为空、modality为audio、第2段暂停1次，不含写错的原文。课中未运行检查或Git。
+  - 终审（主会话自审，按家长习惯不派子代理）：修复两项——空录音（按结束但没读）接口返回422，改为接受并记评分未知（先在接口测试补“没读就结束”步骤看到失败）；课堂暂停/停止/离开朗读段时页面本地录音仍在计时、到上限会向已暂停的核心自动提交，改为立即结束本地录音且不提交（页面组件无单元测试框架，经类型检查、构建与浏览器重跑核对：录音中按课堂“暂停”后“结束并提交”消失、尝试数不变）。延后小问题：Jane回应交付中的极短时间内朗读区按钮可点，提交会被核心以“未在等待输入”拒绝；同一事件ID重发不同录音时按首次正文回放（录音不留存，无法比较）；模拟评分一词读错仍为“优”、模拟判断任一错词即要求重读，待真实服务校准。
+- 第二期待办：真实发音评分适配器（腾讯云智聆口语评测优先）与探针（标准/故意读错录音、文本与时长上限）；合成适配器、备课预合成示范音与播放、“按麦克风先停播放”；初始化/配置接入两类语音能力及准入；浏览器真实麦克风录音；朗读段最长时长随运行配置绑定；真实成人实测（慢读、暂停、读错重读、忘按结束）；评分等级与“几处错词需要重读”按真实服务校准；Codex课堂判断5–8秒不满足声音延迟目标，是否换更快接入待定。
+- 接续：已与P1-M1同一本地提交；下一步按家长要求调研口语评测服务，再进入第二期真实发音评分适配器。

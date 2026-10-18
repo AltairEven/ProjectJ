@@ -53,6 +53,30 @@ async def answer(app, text, intent="unknown"):
     return result
 
 
+async def read(app, event_id, text, recording_ms=4000.0, trigger="explicit"):
+    """Simulated reading: the recording bytes are the text the fictional child read."""
+    return await app.adapter.recording(
+        event_id,
+        text.encode(),
+        input_started_ms=0.0,
+        input_ended_ms=recording_ms + 100,
+        recording_ms=recording_ms,
+        completion_trigger=trigger,
+    )
+
+
+async def read_aloud_all(app):
+    """Read every remaining segment faithfully; a no-op when no reading task is current."""
+    core = app.core
+    while core.reading_task() is not None and core.wait_kind in {
+        "answer",
+        "retry",
+        "clarification",
+    }:
+        await read(app, str(uuid4()), core.reading_task().reference_text)
+        deliver_all(core)
+
+
 async def complete_story(app, helped=False, offscreen_report=True):
     core = start(app)
     deliver_all(core)
@@ -71,6 +95,7 @@ async def complete_story(app, helped=False, offscreen_report=True):
     else:
         core.control(str(uuid4()), "close")
         deliver_all(core)
+    await read_aloud_all(app)
     await answer(app, "听到了，下次看不同的桥。", "confirmation")
     assert core.mode == "ended"
     fact = app.seal()
@@ -90,6 +115,7 @@ async def teach(app, request_id, course_ref, answers):
     core.control(str(uuid4()), "return")
     deliver_all(core)
     await answer(app, "第二次纸折了，车没有掉。", "report")
+    await read_aloud_all(app)
     await answer(app, "听到了。", "confirmation")
     assert core.mode == "ended"
     return app.seal()

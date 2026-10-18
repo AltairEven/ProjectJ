@@ -74,3 +74,37 @@ export function startMessage(result: { decision: string; missing?: string[] | nu
   if (result.missing?.length) return `尚不能开始，待确认：${result.missing.map(item => startItems[item] ?? item).join('、')}。`
   return (result.reason && startReasons[result.reason]) || `尚不能开始（${result.reason ?? result.decision}）。`
 }
+
+const purposeLabels: Record<string, string> = {
+  planning: '学习规划', preparation: '备课', classroom_judgment: '课堂判断', evaluation: '课后评价',
+}
+const itemLabels: Record<string, string> = {
+  auth: '鉴权', model: '模型', structured_output: '结构化输出', cancellation: '取消', image_input: '图片输入', audio: '音频',
+  tools: '工具关闭',
+}
+const statusLabels: Record<string, string> = {
+  verified: '已核实', unverified: '未核实', unsupported: '不支持', failed: '失败', not_probed: '未探测',
+}
+const itemLabel = (name: string) => itemLabels[name] ?? (name.startsWith('effort:') ? `档位${name.slice(7)}` : name)
+
+export function modelLines(models?: Body): string[] {
+  if (!models?.purposes) return ['模型接入状态未取得。']
+  const head = models.initialized
+    ? `模型已初始化${models.simulated ? '（模拟适配器）' : ''}。`
+    : '模型未初始化，备课、开课、复盘和评价暂不可用。'
+  const purposes = Object.entries(models.purposes as Record<string, Body>).map(([purpose, item]) => {
+    const binding = item.binding ? `${item.binding.adapter} · ${item.binding.model} · ${item.binding.effort}` : '未配置'
+    const reasons = (item.reasons ?? []) as string[]
+    return `${purposeLabels[purpose] ?? purpose}：${binding}${reasons.length ? `；未通过：${reasons.join('；')}` : ''}`
+  })
+  // One line per capability report, items grouped by status in probe order; never credentials.
+  const reports = ((models.reports ?? []) as Body[]).map(report => {
+    const groups = new Map<string, string[]>()
+    for (const [name, item] of Object.entries((report.items ?? {}) as Record<string, Body>)) {
+      const status = statusLabels[item.status] ?? String(item.status)
+      groups.set(status, [...(groups.get(status) ?? []), itemLabel(name)])
+    }
+    return `能力报告 ${report.adapter} · ${report.model}：${[...groups].map(([status, names]) => `${status} ${names.join('、')}`).join('；')}`
+  })
+  return [head, ...purposes, ...reports]
+}

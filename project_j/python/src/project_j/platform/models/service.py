@@ -1,0 +1,155 @@
+"""Unified model entry: purpose bindings, admission, output checks and call records."""
+
+import asyncio
+import time
+from datetime import UTC, datetime
+from uuid import uuid4
+
+from pydantic import ValidationError
+
+from project_j.platform.models.contracts import (
+    PURPOSE_LABELS,
+    PURPOSES,
+    AdapterReply,
+    Binding,
+    CapabilityReport,
+    ModelAdapter,
+    ModelRequest,
+    ModelResult,
+    Purpose,
+    admission,
+)
+from project_j.platform.models.simulated import SIMULATED_MODEL, SimulatedAdapter
+from project_j.platform.storage import Conflict
+
+
+class ModelsNotReady(Conflict):
+    """Preparation, start, review and evaluation wait for model initialization."""
+
+
+class ModelService:
+    def __init__(
+        self,
+        adapters: dict[str, ModelAdapter],
+        bindings: dict[Purpose, Binding],
+        reports: list[CapabilityReport],
+        problem: str | None = None,
+    ):
+        self.adapters, self.bindings, self.reports = adapters, bindings, reports
+        self.problem = problem
+        self.calls: list[dict] = []
+
+    @classmethod
+    def simulated(cls) -> ModelService:
+        """The simulation entry initializes in memory and never reads real configuration."""
+        adapter = SimulatedAdapter()
+        medium = Binding(adapter="simulated", model=SIMULATED_MODEL, effort="medium")
+        bindings: dict[Purpose, Binding] = {
+            "planning": medium,
+            "preparation": medium,
+            "classroom_judgment": Binding(adapter="simulated", model=SIMULATED_MODEL, effort="low"),
+            "evaluation": medium,
+        }
+        report = adapter.report(SIMULATED_MODEL, ("low", "medium"))
+        return cls({"simulated": adapter}, bindings, [report])
+
+    def report_for(self, binding: Binding) -> CapabilityReport | None:
+        return next(
+            (r for r in self.reports if r.adapter == binding.adapter and r.model == binding.model),
+            None,
+        )
+
+    def reasons(self, purpose: Purpose) -> list[str]:
+        if self.problem:
+            return [self.problem]
+        binding = self.bindings.get(purpose)
+        if binding is None or binding.adapter not in self.adapters:
+            return ["未配置该用途的模型"]
+        return admission(self.report_for(binding), purpose, binding.effort)
+
+    def require(self):
+        reasons = [
+            f"{PURPOSE_LABELS[purpose]}：{reason}"
+            for purpose in PURPOSES
+            for reason in self.reasons(purpose)
+        ]
+        if reasons:
+            raise ModelsNotReady(
+                "模型未初始化：" + "；".join(reasons) + "。请运行 project-j-init probe。"
+            )
+
+    async def run(self, request: ModelRequest) -> ModelResult:
+        binding = self.bindings.get(request.purpose)
+        adapter = self.adapters.get(binding.adapter) if binding else None
+        entry = {
+            "call_id": str(uuid4()),
+            "purpose": request.purpose,
+            "at": datetime.now(UTC).isoformat(),
+            "adapter": binding.adapter if binding else None,
+            "adapter_version": adapter.version if adapter else None,
+            "simulated": adapter.simulated if adapter else None,
+            "model": binding.model if binding else None,
+            "effort": binding.effort if binding else None,
+            "failure": None,
+            "actual": {},
+            "usage": None,
+            "request_id": None,
+            "elapsed_ms": None,
+        }
+        self.calls.append(entry)
+        started = time.perf_counter()
+        reply = AdapterReply(data=None, failure="not_initialized")
+        try:
+            if adapter and not self.reasons(request.purpose):
+                try:
+                    reply = await asyncio.wait_for(
+                        adapter.invoke(request, binding), request.deadline_seconds
+                    )
+                except TimeoutError:
+                    reply = AdapterReply(data=None, failure="timeout")
+                except Exception as error:  # Kind only; provider text may carry secrets.
+                    entry["error_type"] = type(error).__name__
+                    reply = AdapterReply(data=None, failure="unavailable")
+        except asyncio.CancelledError:
+            entry["failure"] = "cancelled"
+            raise
+        finally:
+            entry["elapsed_ms"] = round((time.perf_counter() - started) * 1000, 3)
+        output, failure = None, reply.failure
+        if failure is None and any(check.status == "mismatch" for check in reply.actual.values()):
+            failure = "config_mismatch"
+        if failure is None:
+            try:
+                output = request.output.model_validate(reply.data)
+            except ValidationError:
+                failure = "invalid_output"
+        entry |= {
+            "failure": failure,
+            "actual": {name: check.model_dump() for name, check in reply.actual.items()},
+            "usage": reply.usage,
+            "request_id": reply.request_id,
+        }
+        return ModelResult(
+            entry["call_id"], request.purpose, binding, output, failure, reply.actual
+        )
+
+    def status(self) -> dict:
+        """What the parent page shows; bindings and reports only, never credentials."""
+        purposes = {
+            purpose: {
+                "binding": binding.model_dump()
+                if (binding := self.bindings.get(purpose))
+                else None,
+                "reasons": self.reasons(purpose),
+            }
+            for purpose in PURPOSES
+        }
+        used = [
+            self.adapters[b.adapter] for b in self.bindings.values() if b.adapter in self.adapters
+        ]
+        return {
+            "initialized": not any(item["reasons"] for item in purposes.values()),
+            "simulated": bool(used) and all(adapter.simulated for adapter in used),
+            "purposes": purposes,
+            "reports": [report.model_dump(mode="json") for report in self.reports],
+        }

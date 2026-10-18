@@ -1,10 +1,11 @@
 """Manual-debug regressions using simulated providers and pytest temporary stores."""
 
 import asyncio
+import base64
 
 import pytest
 from fastapi.testclient import TestClient
-from support import CONDITIONS, LEARNER, answer, deliver_all, start
+from support import CONDITIONS, LEARNER, answer, deliver_all, read_aloud_all, start
 
 from project_j.application.configuration import Settings
 from project_j.contracts import RevisionRef
@@ -48,6 +49,7 @@ def test_all_template_sentence_frames_and_saved_c2_follow_the_corrected_flow(app
         core.control("returned", "return")
         deliver_all(core)
         await answer(app, "同一本书和同一辆车，纸折后车没有掉。", "report")
+        await read_aloud_all(app)
         await answer(app, "收到小结", "confirmation")
         assert core.mode == "ended"
         fact = app.seal()
@@ -83,10 +85,10 @@ def test_wrong_phase_confirmation_is_not_an_attempt_and_cannot_cancel_judgment(a
         revision, epoch, events = core.revision, core.epoch, len(core.events)
         with pytest.raises(ValueError, match="当前不需要确认"):
             await app.adapter.text("unexpected", "听到了，收到当前说明。", "confirmation")
-        assert not core.attempts and not app.model.calls
+        assert not core.attempts and not app.models.calls
         assert (core.revision, core.epoch, len(core.events)) == (revision, epoch, events)
         assert "unexpected" not in core.inputs
-        app.model.delay_seconds = 0.03
+        app.models.adapters["simulated"].delay_seconds = 0.03
         pending = asyncio.create_task(app.adapter.text("answer", "a bridge"))
         await asyncio.sleep(0.005)
         assert core.mode == "judging"
@@ -96,7 +98,7 @@ def test_wrong_phase_confirmation_is_not_an_attempt_and_cannot_cancel_judgment(a
         assert core.epoch == epoch and core.mode == "judging"
         assert (await pending)["ack"] == "accepted"
         deliver_all(core)
-        assert len(core.attempts) == len(app.model.calls) == 1 and core.task_index == 1
+        assert len(core.attempts) == len(app.models.calls) == 1 and core.task_index == 1
         core.control("stop", "stop")
         app.seal()
 
@@ -114,12 +116,12 @@ def test_legal_confirmation_replays_and_closes_without_learning_attempts(applica
         assert (await app.adapter.text("goal-receipt", "听到了，收到当前说明。", "confirmation"))[
             "ack"
         ] == "replayed"
-        assert core.task_index == 0 and not core.attempts and not app.model.calls
+        assert core.task_index == 0 and not core.attempts and not app.models.calls
         core.control("close", "close")
         deliver_all(core)
         await app.adapter.text("closing-receipt", "收到小结", "confirmation")
         assert core.mode == "ended" and core.end["reason"] == "normal"
-        assert not core.attempts and not app.model.calls
+        assert not core.attempts and not app.models.calls
         assert app.seal().body["attempts"] == []
 
     asyncio.run(scenario())
@@ -162,7 +164,7 @@ def test_api_rejects_confirmation_at_answer_wait_without_a_model_call(applicatio
         )
         assert wrong.status_code == 400
         assert "当前不需要确认" in wrong.json()["message"]
-        assert not app.core.attempts and not app.model.calls
+        assert not app.core.attempts and not app.models.calls
         assert (
             client.post(
                 "/api/student/input",
@@ -175,3 +177,72 @@ def test_api_rejects_confirmation_at_answer_wait_without_a_model_call(applicatio
         client.post(
             "/api/student/control", headers=student, json={"event_id": "stop", "command": "stop"}
         )
+
+
+def test_api_accepts_a_base64_recording_only_on_a_reading_segment(application):
+    app = application
+    with TestClient(create_app(Settings(), app)) as client:
+        parent = {"Authorization": f"Bearer {app.parent_token}"}
+        prepared = client.post(
+            "/api/parent/prepare",
+            headers=parent,
+            json={"request_id": "prepare", "learner_id": LEARNER},
+        ).json()
+        started = client.post(
+            "/api/parent/start",
+            headers=parent,
+            json={
+                "request_id": "start",
+                "learner_id": LEARNER,
+                "course_ref": prepared["course_ref"],
+                "conditions": CONDITIONS,
+            },
+        ).json()
+        student = {"Authorization": f"Bearer {started['student_token']}"}
+        core = app.core
+
+        def say(event_id, text, intent="unknown"):
+            reply = client.post(
+                "/api/student/input",
+                headers=student,
+                json={"event_id": event_id, "text": text, "intent": intent},
+            )
+            assert reply.status_code == 200
+            deliver_all(core)
+
+        def recording(event_id, audio_base64):
+            return client.post(
+                "/api/student/recording",
+                headers=student,
+                json={
+                    "event_id": event_id,
+                    "audio_base64": audio_base64,
+                    "input_started_ms": 0,
+                    "input_ended_ms": 4100,
+                    "recording_ms": 4000,
+                },
+            )
+
+        def encoded(text):
+            return base64.b64encode(text.encode()).decode()
+
+        deliver_all(core)
+        assert recording("too-early", encoded("a bridge")).status_code in {400, 409, 422}
+        say("goal", "收到", "confirmation")
+        say("q1", "a bridge")
+        say("q2", "She folded it.")
+        say("point", "我指的是折过的纸。", "report")
+        core.control("return", "return")
+        deliver_all(core)
+        say("offscreen", "第二次纸折了，车没有掉。", "report")
+        reference = core.reading_task().reference_text
+        silent = recording("silent", "")  # Ended without reading: an unknown score, not an error.
+        assert silent.status_code == 200 and silent.json()["ack"] == "accepted"
+        assert core.attempts[-1]["pronunciation"]["status"] == "unknown"
+        deliver_all(core)
+        result = recording("read-1", encoded(reference)).json()
+        assert result["ack"] == "accepted"
+        assert result["snapshot"]["recording"]["reference_text"] == reference
+        deliver_all(core)
+        assert core.reading_task().task_id == "read-aloud-2"
+        assert recording("bad", "not base64!").status_code in {400, 422}

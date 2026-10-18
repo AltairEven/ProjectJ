@@ -2,6 +2,8 @@
 
 import argparse
 import asyncio
+import base64
+import binascii
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -105,6 +107,22 @@ class TextInput(Contract):
     related_event_id: str | None = None
 
 
+MAX_RECORDING_BYTES = 8 * 1024 * 1024
+
+
+class RecordingInput(Contract):
+    """One reading segment's recording; it goes only to pronunciation scoring (ADR-0014)."""
+
+    event_id: str
+    # Empty when nothing was read; scoring then returns unknown rather than a low score.
+    audio_base64: str = Field(max_length=MAX_RECORDING_BYTES * 4 // 3 + 4)
+    input_started_ms: float = Field(ge=0, allow_inf_nan=False)
+    input_ended_ms: float = Field(ge=0, allow_inf_nan=False)
+    recording_ms: float = Field(ge=0, allow_inf_nan=False)
+    pause_count: int = Field(default=0, ge=0)
+    completion_trigger: Literal["explicit", "max_duration"] = "explicit"
+
+
 class Control(Contract):
     event_id: str
     activity_id: str | None = None
@@ -118,23 +136,6 @@ class StudentControl(Contract):
 
     event_id: str
     command: Literal["stop", "pause", "return", "repeat"]
-
-
-class VoiceSignal(Contract):
-    kind: Literal[
-        "start",
-        "fragment",
-        "candidate_end",
-        "resume",
-        "final",
-        "window_elapsed",
-        "cancel",
-        "revision",
-    ]
-    item_id: str
-    text: str = ""
-    candidate_end_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
-    source: Literal["simulated_speaker", "teacher_echo"] = "simulated_speaker"
 
 
 class Snapshot(Contract):
@@ -157,6 +158,7 @@ class Snapshot(Contract):
     end: dict[str, JsonValue] | None
     actual_api: Literal["未验证"]
     actual_voice: Literal["未验证"]
+    recording: dict[str, JsonValue] | None = None
     materials: dict[str, str] = {}
 
 
@@ -170,6 +172,7 @@ class Dashboard(Contract):
     objects: list[Document] = []
     review_due: list[dict[str, JsonValue]] = []
     model_calls: list[dict[str, JsonValue]] = []
+    models: dict[str, JsonValue] = {}
     pending_seals: list[str] = []
     seal_errors: dict[str, str] = {}
     lost_activities: list[dict[str, JsonValue]] = []
@@ -367,6 +370,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
                 "learner_id": learner_id,
                 "active": app_controller.core.snapshot(),
                 "verification": app_controller.verification,  # held in memory since startup
+                "models": app_controller.models.status(),
                 "objects": [],
                 "note": "课堂进行中，工作台只返回内存控制状态，不访问数据库。",
             }
@@ -556,6 +560,20 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
         ended(core, background)
         return result | {"snapshot": controller().student_view(core)}
 
+    @app.post("/api/student/recording", response_model=InputResult)
+    async def recording(request: RecordingInput, background: BackgroundTasks, core: StudentCore):
+        try:
+            audio = base64.b64decode(request.audio_base64, validate=True)
+        except binascii.Error as error:
+            raise ValueError("录音数据无法解码") from error
+        result = await controller().adapter.recording(
+            request.event_id,
+            audio,
+            **request.model_dump(exclude={"event_id", "audio_base64"}),
+        )
+        ended(core, background)
+        return result | {"snapshot": controller().student_view(core)}
+
     @app.post("/api/student/delivery", response_model=Snapshot)
     async def delivery(request: DeliveryFeedback, core: StudentCore):
         core.delivery(request)
@@ -578,12 +596,6 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
         core.control(request.event_id, request.command)
         ended(core, background)
         return core.snapshot()
-
-    @app.post("/api/student/voice-signal", response_model=InputResult)
-    async def voice_signal(request: VoiceSignal, background: BackgroundTasks, core: StudentCore):
-        result = await controller().adapter.voice_event(**request.model_dump())
-        ended(core, background)
-        return result | {"snapshot": controller().student_view(core)}
 
     @app.websocket("/api/student/events")
     async def events(socket: WebSocket):
@@ -617,10 +629,6 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
                     feedback = DeliveryFeedback.model_validate(message["payload"])
                     core.delivery(feedback)
                     controller().late_delivery(feedback)
-                elif message["kind"] == "voice_signal":
-                    await controller().adapter.voice_event(
-                        **VoiceSignal.model_validate(message["payload"]).model_dump()
-                    )
                 else:
                     raise ValueError("unknown event kind")
                 controller().student(token)
@@ -671,7 +679,7 @@ def main():
     parser.add_argument("--run-id", default="local-simulation")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--simulation-root", type=Path, default=argparse.SUPPRESS)
-    debug = "调试用，只作用于模拟提供者和存储："
+    debug = "调试用，只作用于模拟适配器和存储："
     parser.add_argument(
         "--model-delay",
         type=float,
@@ -688,8 +696,9 @@ def main():
         SimulationStore(settings.project_root / settings.simulation_root, settings.run_id),
         settings.project_root,
     )
-    coordinator.model.delay_seconds = settings.model_delay
-    coordinator.model.fail_next = settings.fail_once == "model"
+    simulated = coordinator.models.adapters["simulated"]
+    simulated.delay_seconds = settings.model_delay
+    simulated.fail_next = settings.fail_once == "model"
     if settings.fail_once != "model":
         coordinator.store.fail_at = settings.fail_once
     if settings.model_delay or settings.fail_once:

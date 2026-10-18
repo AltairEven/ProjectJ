@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { describe, startMessage } from '../src/report.ts'
+import { describe, modelLines, startMessage } from '../src/report.ts'
 
 const doc = (object_id, revision, kind, body) => ({ object_id, revision, kind, body })
 const docs = [
@@ -27,4 +27,35 @@ test('a start without a classroom says what is missing or failed in Chinese', ()
   assert.equal(startMessage({ decision: 'waiting', missing: ['materials', 'accompaniment'] }), '尚不能开始，待确认：材料、陪伴。')
   assert.match(startMessage({ decision: 'blocked', missing: [], reason: 'required household condition failed' }), /本次不开课/)
   assert.equal(startMessage({ decision: 'blocked', reason: 'new reason' }), '尚不能开始（new reason）。')
+})
+
+test('model status reads as Chinese lines without any credential field', () => {
+  const ok = modelLines({
+    initialized: true, simulated: true,
+    purposes: {
+      planning: { binding: { adapter: 'simulated', model: 'simulated-jane', effort: 'medium' }, reasons: [] },
+      preparation: { binding: { adapter: 'simulated', model: 'simulated-jane', effort: 'medium' }, reasons: [] },
+      classroom_judgment: { binding: { adapter: 'simulated', model: 'simulated-jane', effort: 'low' }, reasons: [] },
+      evaluation: { binding: { adapter: 'simulated', model: 'simulated-jane', effort: 'medium' }, reasons: [] },
+    },
+    reports: [{ adapter: 'simulated', model: 'simulated-jane', items: {
+      auth: { status: 'verified' }, model: { status: 'verified' }, structured_output: { status: 'verified' },
+      cancellation: { status: 'verified' }, 'effort:low': { status: 'verified' }, 'effort:medium': { status: 'verified' },
+      tools: { status: 'verified' }, image_input: { status: 'unsupported' }, audio: { status: 'not_probed' } } }],
+  })
+  assert.deepEqual(ok, [
+    '模型已初始化（模拟适配器）。',
+    '学习规划：simulated · simulated-jane · medium',
+    '备课：simulated · simulated-jane · medium',
+    '课堂判断：simulated · simulated-jane · low',
+    '课后评价：simulated · simulated-jane · medium',
+    '能力报告 simulated · simulated-jane：已核实 鉴权、模型、结构化输出、取消、档位low、档位medium、工具关闭；不支持 图片输入；未探测 音频',
+  ])
+  const blocked = modelLines({
+    initialized: false, simulated: false,
+    purposes: { evaluation: { binding: null, reasons: ['未配置默认模型'] } },
+  })
+  assert.equal(blocked[0], '模型未初始化，备课、开课、复盘和评价暂不可用。')
+  assert.equal(blocked[1], '课后评价：未配置；未通过：未配置默认模型')
+  assert.deepEqual(modelLines(undefined), ['模型接入状态未取得。'])
 })

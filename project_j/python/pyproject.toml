@@ -7,6 +7,7 @@ dependencies = [
     "alembic>=1.20.0",
     "fastapi>=0.143.0",
     "openai>=3.29.0",
+    "openai-codex==0.163.0",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.15.0",
     "sqlalchemy>=2.1.4",
@@ -24,6 +25,7 @@ module-name = "project_j"
 
 [project.scripts]
 project-j-probe = "project_j.probe:main"
+project-j-init = "project_j.platform.models.init:main"
 project-j-measure = "project_j.latency:main"
 project-j-serve = "project_j.interface.api:main"
 project-j-export-schema = "project_j.interface.api:export_schema"

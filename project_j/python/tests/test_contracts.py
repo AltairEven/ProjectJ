@@ -26,17 +26,67 @@ def submitted(**changes):
         input_policy_ref={"object_id": "IS1", "revision": 1},
         realm="simulation",
         source_type="simulated",
-        modality="transcript",
+        modality="text",
         text="a bridge",
         provider="simulated speaker",
         intent="answer",
-        completion_trigger="vad_window",
-        candidate_end_ms=100,
-        window_elapsed=True,
-        recognition_final=True,
-        recognition_item_ids=["asr-1"],
+        completion_trigger="explicit",
     )
     return SubmittedInput.model_validate(data | changes)
+
+
+def recording(**changes):
+    return submitted(
+        **{
+            "modality": "audio",
+            "text": None,
+            "provider": "simulated_reader",
+            "input_started_ms": 0.0,
+            "input_ended_ms": 4200.0,
+            "recording_ms": 4000.0,
+            "pause_count": 1,
+        }
+        | changes
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"text": None},
+        {"completion_trigger": "max_duration"},
+        {"recording_ms": 10.0},
+        {"modality": "transcript"},
+        {"realm": "family"},
+        {"relation": "supplement"},
+        {"relation": "recognition_revision", "related_event_id": "I0"},
+    ],
+)
+def test_text_submission_has_no_recording_fields_or_speech_recognition(change):
+    with pytest.raises(ValidationError):
+        submitted(**change)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"text": "a bridge"},
+        {"recording_ms": None},
+        {"input_ended_ms": None},
+        {"input_started_ms": 5000.0},
+        {"relation": "supplement", "related_event_id": "I0"},
+    ],
+)
+def test_recording_needs_timing_no_text_and_is_never_a_supplement(change):
+    with pytest.raises(ValidationError):
+        recording(**change)
+
+
+def test_text_and_recordings_are_explicit_submissions():
+    assert submitted().modality == "text"
+    assert submitted(relation="supplement", related_event_id="I0", event_id="I2").text
+    assert recording(completion_trigger="max_duration").recording_ms == 4000.0
+    assert recording().text is None  # Audio bytes never travel inside the contract.
 
 
 def test_reference_skeleton_reaches_c2_with_exact_dependencies():
@@ -80,37 +130,6 @@ def test_duplicate_revision_and_missing_c2_are_rejected():
         validate_e2e01_reference_fixture(data + [data[0]])
     with pytest.raises(ValueError, match="C2"):
         validate_e2e01_reference_fixture([x for x in data if x.object_id != "C2"])
-
-
-@pytest.mark.parametrize(
-    "change",
-    [
-        {"recognition_final": False},
-        {"window_elapsed": False},
-        {"speech_resumed_or_cancelled": True},
-        {"recognition_item_ids": []},
-        {"candidate_end_ms": None},
-        {"modality": "text"},
-        {"realm": "family"},
-        {"relation": "recognition_revision"},
-    ],
-)
-def test_fragments_slow_speech_and_unbound_revision_cannot_be_submitted(change):
-    with pytest.raises(ValidationError):
-        submitted(**change)
-
-
-def test_submission_and_technical_revision_preserve_two_input_identities():
-    original = submitted()
-    correction = submitted(event_id="I2", relation="recognition_revision", related_event_id="I1")
-    assert original.event_id != correction.event_id
-    assert correction.related_event_id == original.event_id
-    assert original.text == "a bridge"
-
-
-def test_explicit_text_submission_is_valid_without_voice_conditions():
-    event = submitted(modality="text", completion_trigger="explicit", recognition_item_ids=[])
-    assert event.modality == "text"  # No claim of natural voice qualification.
 
 
 def test_reference_answers_are_fixed_simulated_data_and_have_independent_sources():

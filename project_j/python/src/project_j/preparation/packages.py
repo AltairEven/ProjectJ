@@ -9,9 +9,11 @@ from project_j.preparation.contracts import (
     TaskDefinition,
     demand_requirements,
 )
+from project_j.preparation.reading import segment_reading
 
 FIRST = "courses/paper-bridge/reading-main.md"
 TRANSFER = "courses/paper-bridge/reading-transfer.md"
+PRONUNCIATION = "english.speaking.pronunciation"
 # The two fixed simulation courses are each other's next course, so course switching can loop.
 COURSES = {
     FIRST: {
@@ -110,7 +112,7 @@ def map_demand(demand: DemandBody, tasks: tuple[TaskDefinition, ...], source: st
         "auxiliary_goal": ("各回答题第二级支持为英语短句框，帮助后表达另记。", answers),
         "budget_minutes": ("预算各段合计30分钟，挑战只替换活动。", ()),
         "offscreen_requirements": ("离屏任务停止采集，返回后取实际报告。", offscreen),
-        "fallback": ("全部任务以文字模拟呈现，不依赖声音评价。", every),
+        "fallback": ("作答以文字模拟；朗读段以模拟录音交模拟评分，不代表真实发音。", every),
         "prerequisites": ("不预设先备，以首个未提示初答取样。", answers),
         "sampling_requirements": (
             f"使用{source}；每题先取未提示初答，帮助后再答另记尝试。",
@@ -145,6 +147,7 @@ def compile_course(
     material_ref: RevisionRef,
     source: str,
     familiar: bool,
+    story: str,
 ) -> CourseBody:
     if (
         demand.primary_goal.dimension_id != "english.reading.facts"
@@ -214,6 +217,32 @@ def compile_course(
                 optional=purpose == "offscreen",
             )
         )
+    segments = segment_reading(story)
+    for index, segment in enumerate(segments, 1):
+        tasks.append(
+            TaskDefinition(
+                task_id=f"read-aloud-{index}",
+                dimension_id=PRONUNCIATION,
+                purpose="read_aloud",
+                prompt=f"请朗读故事第{index}/{len(segments)}段：按麦克风开始，读完按结束。",
+                material_ref=material_ref,
+                evidence="以发音评分模块对本段参考文本的评分为据；模型不另评发音。",
+                acceptable_simulated=(),
+                reference_text=segment,
+                reading_id="story-read-aloud",
+                supports=(
+                    Support(
+                        text="看着标出的词再读一遍，读慢一点。",
+                        help={PRONUNCIATION: "light_prompt"},
+                    ),
+                    Support(
+                        text="先听Jane示范这一段，再跟读。", help={PRONUNCIATION: "full_model"}
+                    ),
+                ),
+                exit_text="这一段可以先跳过，评分记为未知。",
+                optional=True,
+            )
+        )
     tasks = tuple(tasks)
     return CourseBody(
         demand_ref=demand_ref,
@@ -249,6 +278,9 @@ def compile_course(
             "help": "定位提示和不同句框分开；家长额外帮助随后补充。",
             "exit": "30分钟内，挑战只替换；可跳过、暂停或停止。",
         },
-        limitations=("固定模拟编制；实际模型、声音、30分钟和儿童用途未验证。",)
+        limitations=(
+            "固定模拟编制；实际模型、声音、30分钟和儿童用途未验证。",
+            "朗读评分为模拟评分器结果，不代表真实发音。",
+        )
         + (("已读材料复习：初答不代表首次阅读理解，也不作迁移证据。",) if familiar else ()),
     )

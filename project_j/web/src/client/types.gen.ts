@@ -240,6 +240,12 @@ export type Dashboard = {
         [key: string]: JsonValue;
     }>;
     /**
+     * Models
+     */
+    models?: {
+        [key: string]: JsonValue;
+    };
+    /**
      * Pending Seals
      */
     pending_seals?: Array<string>;
@@ -589,6 +595,42 @@ export type PreparationResult = {
 };
 
 /**
+ * RecordingInput
+ *
+ * One reading segment's recording; it goes only to pronunciation scoring (ADR-0014).
+ */
+export type RecordingInput = {
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Audio Base64
+     */
+    audio_base64: string;
+    /**
+     * Input Started Ms
+     */
+    input_started_ms: number;
+    /**
+     * Input Ended Ms
+     */
+    input_ended_ms: number;
+    /**
+     * Recording Ms
+     */
+    recording_ms: number;
+    /**
+     * Pause Count
+     */
+    pause_count?: number;
+    /**
+     * Completion Trigger
+     */
+    completion_trigger?: 'explicit' | 'max_duration';
+};
+
+/**
  * ReleaseRequest
  */
 export type ReleaseRequest = {
@@ -753,6 +795,12 @@ export type Snapshot = {
      */
     actual_voice: '未验证';
     /**
+     * Recording
+     */
+    recording?: {
+        [key: string]: JsonValue;
+    } | null;
+    /**
      * Materials
      */
     materials?: {
@@ -905,32 +953,6 @@ export type ValidationError = {
     ctx?: {
         [key: string]: unknown;
     };
-};
-
-/**
- * VoiceSignal
- */
-export type VoiceSignal = {
-    /**
-     * Kind
-     */
-    kind: 'start' | 'fragment' | 'candidate_end' | 'resume' | 'final' | 'window_elapsed' | 'cancel' | 'revision';
-    /**
-     * Item Id
-     */
-    item_id: string;
-    /**
-     * Text
-     */
-    text?: string;
-    /**
-     * Candidate End Ms
-     */
-    candidate_end_ms?: number | null;
-    /**
-     * Source
-     */
-    source?: 'simulated_speaker' | 'teacher_echo';
 };
 
 export type DashboardApiParentDashboardGetData = {
@@ -1643,6 +1665,37 @@ export type SubmitApiStudentInputPostResponses = {
 
 export type SubmitApiStudentInputPostResponse = SubmitApiStudentInputPostResponses[keyof SubmitApiStudentInputPostResponses];
 
+export type RecordingApiStudentRecordingPostData = {
+    body: RecordingInput;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/student/recording';
+};
+
+export type RecordingApiStudentRecordingPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RecordingApiStudentRecordingPostError = RecordingApiStudentRecordingPostErrors[keyof RecordingApiStudentRecordingPostErrors];
+
+export type RecordingApiStudentRecordingPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: InputResult;
+};
+
+export type RecordingApiStudentRecordingPostResponse = RecordingApiStudentRecordingPostResponses[keyof RecordingApiStudentRecordingPostResponses];
+
 export type DeliveryApiStudentDeliveryPostData = {
     body: DeliveryFeedback;
     headers?: {
@@ -1733,37 +1786,6 @@ export type ParentControlApiParentControlPostResponses = {
      */
     200: unknown;
 };
-
-export type VoiceSignalApiStudentVoiceSignalPostData = {
-    body: VoiceSignal;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/student/voice-signal';
-};
-
-export type VoiceSignalApiStudentVoiceSignalPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type VoiceSignalApiStudentVoiceSignalPostError = VoiceSignalApiStudentVoiceSignalPostErrors[keyof VoiceSignalApiStudentVoiceSignalPostErrors];
-
-export type VoiceSignalApiStudentVoiceSignalPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: InputResult;
-};
-
-export type VoiceSignalApiStudentVoiceSignalPostResponse = VoiceSignalApiStudentVoiceSignalPostResponses[keyof VoiceSignalApiStudentVoiceSignalPostResponses];
 
 export type WebpagePathGetData = {
     body?: never;

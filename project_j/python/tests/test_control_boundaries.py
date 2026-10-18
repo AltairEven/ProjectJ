@@ -5,8 +5,8 @@ import pytest
 from support import LEARNER, answer, complete_story, deliver_all, start
 
 from project_j.classroom.harness import DeliveryFeedback
+from project_j.classroom.judgment import ModelProposal
 from project_j.contracts import SubmittedInput
-from project_j.platform.simulated import ModelProposal
 from project_j.platform.storage import Conflict
 
 
@@ -61,6 +61,7 @@ def test_E2E11_out_of_bound_proposal_does_not_advance(application):
                     judgment="correct",
                     evidence="valid-looking JSON is not permission",
                     text="未经允许的内容",
+                    call_id="test-call",
                 )
             )
         assert core.task_index == before and core.mode == "waiting_input"
@@ -101,7 +102,7 @@ def test_model_failure_keeps_original_input_and_does_not_advance(application):
         core = start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
-        application.model.fail_next = True
+        application.models.adapters["simulated"].fail_next = True
         result = await application.adapter.text("failure-input", "a bridge")
         assert result["ack"] == "failed"
         assert core.task_index == 0 and core.attempts[0]["inputs"][0]["text"] == "a bridge"
@@ -130,45 +131,19 @@ def test_E2E18_explicit_no_addition_reuses_provisional_without_another_model_cal
         second = await application.evaluate("final", LEARNER, core.activity_id, "final_feedback")
         assert first.ref != second.ref and second.body["purpose"] == "final"
         assert (
-            len([call for call in application.model.calls if call["purpose"] == "evaluation"]) == 1
+            len([call for call in application.models.calls if call["purpose"] == "evaluation"]) == 1
         )
 
     asyncio.run(scenario())
 
 
-def test_late_recognition_revises_original_fact_without_reopening_or_new_attempt(application):
+def test_typed_stop_bypasses_question_binding(application):
     async def scenario():
         core = start(application)
-        deliver_all(core)
-        await answer(application, "收到", "confirmation")
-        adapter = application.adapter
-        await adapter.voice_event("start", "original-speech")
-        await adapter.voice_event("candidate_end", "original-speech", candidate_end_ms=100)
-        await adapter.voice_event("final", "original-speech", "a bridge")
-        await adapter.voice_event("window_elapsed", "original-speech")
-        deliver_all(core)
-        core.control("stop-original", "stop")
-        original = application.seal()
-        await adapter.voice_event("revision", "original-speech", "给车搭桥")
-        revised = application.activity_facts(core.activity_id, LEARNER)
-        assert revised.revision == 2 and revised.supersedes == original.ref
-        assert application.store.read(original.ref, LEARNER).body == original.body
-        assert revised.body["late_recognition_revisions"]
-        assert len(revised.body["attempts"]) == len(original.body["attempts"]) == 1
-        assert core.mode == "ended" and core.pending is None
-
-    asyncio.run(scenario())
-
-
-def test_natural_stop_bypasses_question_binding_and_voice_window(application):
-    async def scenario():
-        core = start(application)
-        adapter = application.adapter
-        await adapter.voice_event("start", "stop-utterance")
-        result = await adapter.voice_event("final", "stop-utterance", "停止")
+        result = await application.adapter.text("stop-typed", "停止")
         assert result["ack"] == "accepted_control"
         assert core.mode == "ended" and core.pending is None and not core.attempts
-        assert not application.model.calls
+        assert not application.models.calls
 
     asyncio.run(scenario())
 
@@ -246,15 +221,15 @@ def test_invalid_structured_proposal_retains_input_and_offers_clarification(
         deliver_all(core)
         await answer(application, "收到", "confirmation")
 
-        async def wrong_evidence(binding, task, text, count, is_help):
-            return ModelProposal(
-                **binding,
-                judgment="correct",
-                evidence="outside fixed content",
-                text="This should not be delivered.",
-            )
-
-        monkeypatch.setattr(application.model, "judge", wrong_evidence)
+        monkeypatch.setattr(
+            application.models.adapters["simulated"],
+            "respond",
+            lambda request: {
+                "judgment": "correct",
+                "evidence": "outside fixed content",
+                "text": "This should not be delivered.",
+            },
+        )
         result = await application.adapter.text("invalid-proposal-input", "a bridge")
         assert result["ack"] == "rejected_proposal"
         assert core.task_index == 0 and core.actions[core.pending].kind == "clarification"

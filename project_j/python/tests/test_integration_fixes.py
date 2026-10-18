@@ -149,10 +149,10 @@ def test_reused_state_retry_keeps_newer_evidence_and_rechecks_demand(application
             and newer.ref.model_dump() in row["payload"]["input_refs"]
             for row in steps
         )
-        calls = len(app.model.calls)
+        calls = len(app.models.calls)
         assert app.adopt("reused-state-adopt", LEARNER, evaluation1) == result
         assert app.current(LEARNER, "demand").ref == demand.ref
-        assert len(app.model.calls) == calls
+        assert len(app.models.calls) == calls
 
     asyncio.run(scenario())
 

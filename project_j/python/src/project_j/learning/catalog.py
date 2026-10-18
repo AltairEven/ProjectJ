@@ -43,6 +43,12 @@ INITIAL = (
         definition="报告当前实际结果；帮助与语言维度分开。",
     ),
     Capability(
+        dimension_id="english.speaking.pronunciation",
+        subject="english.speaking",
+        name="英语朗读发音",
+        definition="朗读参考文本的发音；以发音评分模块结果为据，模型不另评。",
+    ),
+    Capability(
         dimension_id="science.observation.report",
         subject="science",
         name="实际观察报告",

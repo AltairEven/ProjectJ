@@ -9,10 +9,12 @@ from uuid import uuid4
 
 from pydantic import AwareDatetime, Field
 
+from project_j.classroom.judgment import ModelProposal, judgment_request
 from project_j.contracts import Contract, RevisionRef, SubmittedInput
-from project_j.platform.simulated import ModelProposal, SimulatedModel
+from project_j.platform.models.service import ModelService
+from project_j.platform.speech.contracts import PronunciationResult, PronunciationScorer
 from project_j.platform.storage import Conflict, canonical, digest
-from project_j.preparation.contracts import CourseBody
+from project_j.preparation.contracts import CourseBody, TaskDefinition
 
 TRANSITIONS = {
     "delivering": {"waiting_input", "delivering", "offscreen", "paused", "ended"},
@@ -72,15 +74,17 @@ class Harness:
         course_ref: RevisionRef,
         course: CourseBody,
         bindings: dict,
-        model: SimulatedModel,
+        models: ModelService,
+        scorer: PronunciationScorer | None = None,
     ):
         self.activity_id, self.learner_id = activity_id, learner_id
-        self.course_ref, self.course, self.bindings, self.model = (
+        self.course_ref, self.course, self.bindings, self.models = (
             course_ref,
             course,
             bindings,
-            model,
+            models,
         )
+        self.scorer = scorer
         self.mode = "delivering"
         self.wait_kind = "goal_confirmation"
         self.revision, self.epoch, self.task_index = 1, 0, -1
@@ -159,6 +163,12 @@ class Harness:
         self.record("allowed_action", action.model_dump(mode="json"))
         return action
 
+    def reading_task(self) -> TaskDefinition | None:
+        if self.mode == "ended" or not 0 <= self.task_index < len(self.course.tasks):
+            return None
+        task = self.course.tasks[self.task_index]
+        return task if task.purpose == "read_aloud" else None
+
     def snapshot(self):
         self.tick()
         action = self.actions.get(self.pending) if self.pending else None
@@ -188,6 +198,12 @@ class Harness:
             else None,
             "attempt_count": len(self.attempts),
             "elapsed_seconds": time.monotonic() - self.started_clock,
+            "recording": {
+                "max_seconds": self.scorer.limits.max_seconds,
+                "reference_text": reading.reference_text,
+            }
+            if (reading := self.reading_task()) and self.scorer
+            else None,
             "end": self.end,
             "actual_api": "未验证",
             "actual_voice": "未验证",
@@ -282,6 +298,13 @@ class Harness:
                 "offscreen",
                 f"{task.prompt}这一段约{minutes}分钟；做完点“返回”，再说实际结果。",
                 "offscreen",
+                materials=(task.material_ref,),
+            )
+        if task.purpose == "read_aloud":
+            return self.action(
+                "question",
+                f"{task.prompt}\n{task.reference_text}",
+                "input",
                 materials=(task.material_ref,),
             )
         return self.action("question", task.prompt, "input", materials=(task.material_ref,))
@@ -385,7 +408,12 @@ class Harness:
                 "end_confirmation",
             )
 
-    async def submit(self, submitted: SubmittedInput, deadline: float | None = None):
+    async def submit(
+        self,
+        submitted: SubmittedInput,
+        deadline: float | None = None,
+        audio: bytes | None = None,
+    ):
         if submitted.activity_id != self.activity_id or submitted.learner_id != self.learner_id:
             raise ValueError("input activity or learner mismatch")
         if submitted.source_type != "simulated" or submitted.realm != "simulation":
@@ -398,36 +426,6 @@ class Harness:
             if previous["signature"] != signature:
                 raise Conflict("same input identity has different content")
             return {"ack": "replayed", "event_id": submitted.event_id, "snapshot": self.snapshot()}
-        if submitted.relation == "recognition_revision":
-            original = self.inputs.get(submitted.related_event_id)
-            if original is None or "modality" not in original["signature"]:
-                raise ValueError("recognition revision needs an original submitted segment")
-            if submitted.recognition_item_ids != tuple(
-                original["signature"]["recognition_item_ids"]
-            ):
-                raise ValueError("recognition revision must identify the same original segment")
-            self.inputs[submitted.event_id] = {
-                "signature": signature,
-                "attempt_id": original["attempt_id"],
-            }
-            self.record("recognition_revision", signature)
-            if (
-                self.mode == "judging"
-                and original["signature"]["task_instance_id"] == self.task_instance_id
-            ):
-                self.invalidate()
-                self.move("waiting_input")
-                self.action(
-                    "clarification", "原识别已更正，原答保留；请确认当前表达。", "clarification"
-                )
-            for attempt in self.attempts:
-                if attempt["attempt_id"] == original["attempt_id"]:
-                    attempt.setdefault("recognition_revisions", []).append(signature)
-                    attempt["judgment"] = "unclear"
-                    attempt["limitations"].append(
-                        "原识别已更正，解释待复核；原答和已交付帮助保留。"
-                    )
-            return {"ack": "accepted", "snapshot": self.snapshot()}
         if submitted.intent == "confirmation" and self.wait_kind not in {
             "goal_confirmation",
             "closing_confirmation",
@@ -457,6 +455,16 @@ class Harness:
             raise Conflict("stale input binding")
         if self.mode != "waiting_input":
             raise ValueError("core is not waiting for a completed input")
+        reading = self.reading_task()
+        answering = self.wait_kind in {"answer", "retry", "clarification"}
+        if submitted.modality == "audio":
+            if reading is None or audio is None or not answering or self.scorer is None:
+                raise ValueError("录音只用于当前朗读段。")
+            if submitted.recording_ms > self.scorer.limits.max_seconds * 1000:
+                raise ValueError("录音超过本段最长时长。")
+        elif reading is not None and answering and submitted.intent != "help":
+            if not any(word in submitted.text for word in ("帮我", "不懂", "help")):
+                raise ValueError("朗读段请按麦克风录音提交。")
         self.record("input", signature)
         self.inputs[submitted.event_id] = {"signature": signature, "attempt_id": None}
         if submitted.relation == "supplement" and not supplement:
@@ -491,11 +499,12 @@ class Harness:
         if self.wait_kind == "delivery_recovery":
             raise ValueError("repeat or stop after a failed delivery; do not rescore the answer")
         task = self.course.tasks[self.task_index]
+        text = submitted.text or ""
         is_help = submitted.intent == "help" or (
             # A report task asks what help was used, so there only a bare plea is a help request.
-            not PLEA.sub("", submitted.text.casefold())
+            not PLEA.sub("", text.casefold())
             if task.purpose in {"point", "offscreen"}
-            else any(word in submitted.text for word in ("帮我", "不懂", "help"))
+            else any(word in text for word in ("帮我", "不懂", "help"))
         )
         attempt = None
         if not is_help:
@@ -513,7 +522,11 @@ class Harness:
                     "help": dict(self.help_by_task.get(self.task_instance_id, {})),
                     "external_help": "unknown",
                     "judgment": "unclear",
-                    "limitations": ["明确模拟；外部帮助、保持与迁移未知。"],
+                    "limitations": [
+                        "明确模拟录音与模拟评分；不代表真实发音。"
+                        if submitted.modality == "audio"
+                        else "明确模拟；外部帮助、保持与迁移未知。"
+                    ],
                 }
                 self.attempts.append(attempt)
             attempt["inputs"].append(signature)
@@ -527,36 +540,52 @@ class Harness:
             cancellation_epoch=self.epoch,
             event_id=submitted.event_id,
         )
-        job = asyncio.create_task(
-            self.model.judge(
-                binding,
-                task,
-                submitted.text,
-                self.help_count.get(self.task_instance_id, 0),
-                is_help,
+        timeout = max(0, (deadline or time.monotonic() + 10) - time.monotonic())
+        help_count = self.help_count.get(self.task_instance_id, 0)
+
+        async def judge():
+            pronunciation = None
+            if audio is not None:  # The recording lives only in this call, never in a record.
+                try:
+                    pronunciation = await self.scorer.score(audio, task.reference_text)
+                except Exception:  # A scorer must not raise; treat it as an unknown score.
+                    pronunciation = PronunciationResult.unknown("failed", self.scorer)
+                if self.epoch != binding["cancellation_epoch"]:
+                    raise asyncio.CancelledError  # Stopped meanwhile: drop the late score.
+                if attempt is not None:
+                    attempt["pronunciation"] = pronunciation.model_dump(mode="json")
+            return await self.models.run(
+                judgment_request(task, text, help_count, is_help, timeout, pronunciation)
             )
-        )
+
+        job = asyncio.create_task(judge())
         self.jobs.add(job)
         try:
-            proposal = await asyncio.wait_for(
-                job, timeout=max(0, (deadline or time.monotonic() + 10) - time.monotonic())
-            )
+            result = await asyncio.wait_for(job, timeout=timeout)
         except asyncio.CancelledError:
             return {"ack": "cancelled", "snapshot": self.snapshot()}
-        except TimeoutError, RuntimeError:
+        except TimeoutError:
+            result = None
+        finally:
+            self.jobs.discard(job)
+        if result is None or not result.ok:
             if self.mode == "judging" and self.epoch == binding["cancellation_epoch"]:
                 self.move("waiting_input")
                 self.record(
-                    "model_failure", {"event_id": submitted.event_id, "deadline_seconds": 10}
+                    "model_failure",
+                    {
+                        "event_id": submitted.event_id,
+                        "deadline_seconds": 10,
+                        "failure": result.failure if result else "timeout",
+                    },
                 )
                 self.action(
                     "clarification",
-                    "模拟判断未取得。原输入已保留，可补充、跳过或停止。",
+                    "判断未取得。原输入已保留，可补充、跳过或停止。",
                     "clarification",
                 )
             return {"ack": "failed", "snapshot": self.snapshot()}
-        finally:
-            self.jobs.discard(job)
+        proposal = ModelProposal(**binding, **result.output.model_dump(), call_id=result.call_id)
         try:
             self.approve(proposal)
         except ValueError:

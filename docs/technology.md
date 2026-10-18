@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.2.0；更新：2026年10月13日；状态：实施基线已采用，P1隔离工程已实现，真实接入未验证。
+版本：1.4.0；更新：2026年10月16日；状态：实施基线已采用，P1隔离工程已实现，真实接入未验证。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -16,7 +16,7 @@
 | 素材 | 受控本地文件目录与数据库版本引用 | 保存实际内容、用途及完整性依据，避免数据库记录与文件版本脱节 |
 | 模型接入 | 官方Python SDK、Responses API、结构化输出 | 平台核对结构，业务核对内容及可采用范围；不把模型结果直接写成正式状态 |
 | 应用通信 | HTTP处理普通请求，WebSocket传课堂事件与交付反馈 | 两者共享活动、任务、事件身份及版本；重连沿原活动核对 |
-| 语音 | 浏览器WebRTC优先接实时转写，批准文本经后端合成并流式交付 | 输入提交、教学批准和实际播放分开；协议通过阶段0短验证后固定 |
+| 语音 | 作答为文字/点选，不设语音识别；英语朗读按键录音交发音评分；批准文本经后端合成并流式交付 | 输入提交、教学批准和实际播放分开；模型不听录音，见[ADR-0014](../decisions/ADR-0014.md) |
 
 Vite提供React/TypeScript模板，FastAPI支持基于Pydantic的验证、OpenAPI以及WebSocket。[Vite文档](https://vite.dev/guide/)、[FastAPI功能](https://fastapi.tiangolo.com/features/)、[WebSocket支持](https://fastapi.tiangolo.com/advanced/websockets/)
 
@@ -26,7 +26,7 @@ SQLite适合当前本机、低写并发的范围。以后出现多服务器或�
 
 ## 进程和数据组织
 
-模型、识别与合成请求异步执行，不能长时间持有课堂状态锁。回包后重新核对活动修订、等待对象与取消状态；停止控制走独立优先路径，不排在模型请求之后。首版不启用多个后端worker分别持有同一课堂内存。
+模型、发音评分与合成请求异步执行，不能长时间持有课堂状态锁。回包后重新核对活动修订、等待对象与取消状态；停止控制走独立优先路径，不排在模型请求之后。首版不启用多个后端worker分别持有同一课堂内存。
 
 课前用例与结束后的操作进度保存在数据库；活动开始后的事件、语音缓冲与实际交付保留本堂必要内存，结束时封存。存储时点及丢失边界按[共同执行](../design/shared/execution-recovery.md)，不能用数据库日志、浏览器缓存或SDK追踪变相保存课中快照或原始音频。
 
@@ -40,20 +40,22 @@ SQLite适合当前本机、低写并发的范围。以后出现多服务器或�
 | --- | --- | --- |
 | 课堂判断与指导 | gpt-6.1-sol，reasoning.effort为low | 实际配置、语义、允许动作、取消、用量与响应时间 |
 | 备课、评价、学习规划与复盘 | 同模型，reasoning.effort为medium | 来源、结构、证据限制、内容核验及结果复用 |
-| 实时转写 | gpt-live-transcribe，浏览器WebRTC路径 | 中英输入、慢答/停顿、最终转写、取消、回声与数据条件 |
 | 合成 | gpt-4o-mini-tts，固定经过试听的声音配置 | 中英文、可懂度、实际首播、打断与交付范围 |
+| 英语发音评分 | 国内K12口语评测，腾讯云智聆口语评测优先 | 评分方向、逐词/音素结果、段落文本与录音上限、数据条件 |
 
 Sol官方模型说明列明low、medium及结构化输出支持；格式正确仍可能有语义错误。模型页另列fast与ultrafast服务层级，核对时价格分别为标准层的2倍和6倍；层级按[质量门槛](acceptance.md#最小版本质量门槛)作为延迟测量变量，不默认启用。[模型说明](https://developers.openai.com/api/docs/models/gpt-6.1-sol)、[结构化输出](https://developers.openai.com/api/docs/guides/structured-outputs)
 
-实时转写首选的gpt-live-transcribe需要客户端判断音频轮次并commit，不支持server_vad或semantic_vad。采用客户端VAD与任务停顿窗口：先结束本轮音频取得最终转写，再由interface按[输入提交规则](../design/interface/input-submission.md)决定是否向核心提交；中途续说与迟到修订不能被当成独立答案。[实时转写官方说明](https://developers.openai.com/api/docs/guides/realtime-transcription)
+课堂路径为“文字/点选提交（英语朗读为按键录音 → 发音评分）→ 课堂判断模型据文字或评分结果判断 → 核心允许动作 → 合成已允许文本 → 实际播放反馈”，依据见[ADR-0014](../decisions/ADR-0014.md)。模型不听录音，不设语音识别，原首选的gpt-live-transcribe浏览器WebRTC转写路径不再采用；朗读由孩子按结束决定读完，不用客户端VAD或停顿窗口。合成可以流式播放已批准文本，未批准的模型片段不提前发声；固定教师语句与示范音在备课时预合成。[语音合成官方说明](https://developers.openai.com/api/docs/guides/text-to-speech)
 
-语音路径为“实时转写 → 完成输入提交 → 核心判断并允许动作 → 合成已允许文本 → 实际播放反馈”。合成可以流式播放已批准文本，但未批准的模型片段不提前发声。[语音合成官方说明](https://developers.openai.com/api/docs/guides/text-to-speech)
+2026年10月16日实测Codex订阅：底层协议有音频输入类型，但订阅中全部模型声明的输入只有文字和图片，按协议发送16kHz wav（本地文件与data URL各一次）时模型回答未收到音频。按ADR-0014模型不听录音，此事实只作记录；课堂判断仍是文字用途，可继续绑定Codex订阅，但其单次5–8秒的判断耗时不满足声音延迟目标，是否换更快的接入待实测后由家长决定。
 
-长期密钥由本地后端管理，浏览器直连服务时取得受限临时凭据；账号、接口、区域、权限、保留和实际参数均需阶段0核对。首选配置不可用时记录缺口和具体替代，不静默更换。声音配置与协议选择不会创建第二位教师。
+腾讯云智聆口语评测（新版）段落模式为文本不超过120词、录音不超过300秒，句子模式文本不超过30词、录音不超过60秒（2026年10月16日查官方文档）；阿里云口语评测段落录音上限同为300秒，讯飞未查到篇章上限。实际上限以所选服务的探针记录为准，备课按此切分评分段。[腾讯云评测模式与限制](https://cloud.tencent.com/document/product/1774/107338)
 
-浏览器直连意味着孩子的原始音频由浏览器直接发往服务商。2026年10月12日核对的官方数据控制页列出`/v1/realtime`和`/v1/audio/transcriptions`可申请零数据保留，未单独列出实时转写会话端点，也未说明临时凭据路径；阶段0须以实际账户核实所选转写路径的覆盖范围。覆盖未确认时，成人开发可继续使用该路径，但转写接入保持可替换；进入阶段5前必须确认或换成一条资格已核实的路径，候选包括经后端中转的连接和按轮转写接口，均以实际账户核实为准。[官方数据控制](https://developers.openai.com/api/docs/guides/your-data)
+长期密钥由本地后端管理；朗读录音经后端发往发音评分服务，不在浏览器持有长期密钥。账号、接口、区域、权限、保留和实际参数均需实测核对。首选配置不可用时记录缺口和具体替代，不静默更换。声音配置与接入选择不会创建第二位教师。
 
-按轮上传转写可作为成人比较或备用候选；只有通过对应任务/输入条件检查后才采用，不将其冒充已通过自然语音验收。按键提交和文字备用同样需说明评价条件变化。
+英语朗读评分任务中孩子的原始录音会发送给所选发音评分服务商。按[ADR-0013](../decisions/ADR-0013.md)，零数据保留不再是真实数据接入条件；各服务记录实际发送范围与保留条款，由家长知情采用，接入保持可替换。[官方数据控制](https://developers.openai.com/api/docs/guides/your-data)
+
+文字/点选明确提交是首版作答方式；发音观察只由朗读评分承接。
 
 ## Harness和模型的分工
 
@@ -84,16 +86,22 @@ Python3.14仍为受维护系列；官方已经发布安全补丁3.14.8。本机u
 
 工程/数据库/私有文件布局唯一维护在[存储规则](../design/platform/storage-lifecycle.md#阶段0路径与阶段1保存单位)，操作身份/保存单位与有限重试在[共同执行](../design/shared/execution-recovery.md#p0操作身份保存与有限接续)。锁定安装与检查命令见AGENTS，检查只验证声明范围。
 
-### 独立探针与真实接入入口
+### 模型适配层、初始化与探针
 
-`project-j-probe`默认离线，不载入.env，不连接服务、不读取麦克风；只返回配置目标与密钥是否存在。显式真实入口在具备账号/权限后使用以下两条，每条一份固定虚构技术样本；标签是非秘密识别名，密钥从后端进程环境提供，不放命令正文或Git。
+模型经platform的模型适配层接入，设计见[模型服务](../design/platform/models.md)，决定见[ADR-0013](../decisions/ADR-0013.md)。`project-j-probe`保留为登记检查中的离线自检：列出已登记适配器及其声明能力，不读取私有模型配置、不联网、不读取麦克风。真实探测统一经初始化命令（第一期已实现；实际API与订阅接入未验证）。用ChatGPT订阅经Codex SDK接入：
 
 ```sh
-project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-probe --live --effort low --account-label adult-dev --project-label project-j-dev
-project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-probe --live --effort medium --account-label adult-dev --project-label project-j-dev
+project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-init login codex
+project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-init configure --default codex:gpt-6.1-sol:medium --purpose classroom_judgment=codex:gpt-6.1-sol:low
+project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-init probe
+project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-init status
 ```
 
-本批没有执行--live。SDK请求指定gpt-6.1-sol、reasoning.effort、default层级、store=false与结构化格式，自动重试关闭；输出请求/返回配置、UTC时间、样本、结果/未知、request_id、可取得用量和后台耗时。返回模型/effort/层级缺失或不符不能通过配置核验，不能靠提示词宣称Low。此单请求耗时不是声音延迟；完整参考题集语义验证、课堂总期限/取消和Medium实际内容核验另做。
+四个用途（planning学习规划、preparation备课、classroom_judgment课堂判断、evaluation课后评价）先取默认绑定，再按`--purpose 用途=适配器:模型:档位`逐项覆盖，可各绑不同适配器。用API密钥时改为先`project-j-init set-key openai`，绑定写`openai:gpt-6.1-sol:medium`等，其余相同。
+
+Codex适配器使用官方Python SDK `openai-codex`（锁定0.163.0，随包附带codex运行时），在本机启动`codex app-server`；login打开ChatGPT浏览器登录，登录状态存于`project_j/private/models/codex-home/`，不读也不改家长全局的`~/.codex`。每次调用开一个不留存的新会话，空临时目录、只读沙箱、拒绝全部提权，以中性基础指令替换Codex自带的代理提示词，用途指令作开发者指令，按pydantic严格JSON结构输出，档位按绑定逐轮传入；配置覆盖关闭记忆、历史、项目说明文档、网页搜索、分析统计、shell工具、应用、插件、技能及环境/权限/应用/协作说明（后几项据真实运行实测：去掉插件与技能注入后输入不再逐次增长，剩余约1.1万token为运行时自带内容）。返回条目出现任何工具调用即记“工具”明确不符而失败。取消与超时会请求服务端中断该轮。SDK不回报每轮实际模型与档位，二者记未核实；探针以订阅模型列表核对模型与所声明的档位，记录鉴权、结构化输出、工具关闭、取消、图片输入与耗时。
+
+set-key以隐藏输入把密钥写入本地模型配置，不放命令正文、日志或Git。OpenAI适配器使用Responses API，请求指定模型、reasoning.effort、default层级、store=false与严格结构，SDK自动重试关闭；探针逐项记录实际模型、档位、层级（已核实、未核实或不支持）及结构化输出、取消、图片输入、request_id、可取得用量与耗时。明确不符判失败，未核实如实记录，不能靠提示词宣称Low。探测只用虚构技术样本，单请求耗时不是声音延迟；完整参考题集语义验证、课堂总期限/取消和Medium实际内容核验另做。OpenAI API实际调用样本数为0。Codex订阅2026年10月16日实测：probe准入通过，6个课堂判断样例6/6与预期一致，单次4.9–8.8秒、课堂判断中位约5.4秒，不能满足声音延迟目标，备课与课后评价等非实时用途可用。
 
 ### P0官方事实复核与接入缺口
 
@@ -101,11 +109,11 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python projec
 
 | 项目 | 官方说明/实际状态 | 继续条件 |
 | --- | --- | --- |
-| Sol Low/Medium | 官方模型页支持两档及结构化输出；本机仅SDK mock通过，实际API**未验证** | API项目/密钥、模型权限、费用归属与测试预算具备后分别运行探针；课堂参考题集与Medium内容另验 |
+| Sol Low/Medium | 官方模型页支持两档及结构化输出；本机仅SDK mock/假运行时通过，实际API与订阅**未验证** | 订阅经project-j-init login codex登录，或API项目/密钥、模型权限、费用归属与测试预算具备后，经project-j-init probe探测；课堂参考题集与Medium内容另验 |
 | 服务层级 | 官方列fast=标准2倍、ultrafast=6倍；本批只声明default，实际计费/可用性**未验证** | 记录返回层级/用量；更高成本层级待家长按实际成本决定，不为延迟暗改 |
-| 转写WebRTC | 官方推荐gpt-live-transcribe，客户端commit且无server_vad/semantic_vad；本批未建音频连接 | 保留首选候选，成人实测临时凭据/连接/会话配置/最终item_id映射、客户端VAD和回声后再固定协议/窗口 |
-| 凭据/数据条件 | 官方WebRTC示例有client_secrets及calls；数据控制保留表未单列这些或transcription_sessions。该页区域服务清单提到transcription_sessions，不能由此推断ZDR覆盖 | 实际组织/项目ZDR批准与所选模型/端点/功能/地区覆盖**待核实**；儿童入口关闭 |
-| Responses/合成/按轮转写保留 | 官方表列responses、audio/speech、audio/transcriptions与realtime有ZDR资格，带适用限制；本账户资格**未验证** | 按实际发送范围核对全部所选路径，store=false不代账户批准 |
+| 转写WebRTC | 官方推荐gpt-live-transcribe，客户端commit且无server_vad/semantic_vad；本批未建音频连接 | 2026年10月16日按[ADR-0014](../decisions/ADR-0014.md)不再采用，作答改为文字/点选，只有英语朗读录音交发音评分；本行保留为当时核对记录 |
+| 凭据/数据条件 | 官方WebRTC示例有client_secrets及calls；数据控制保留表未单列这些或transcription_sessions。该页区域服务清单提到transcription_sessions，不能由此推断ZDR覆盖 | ADR-0013起不以ZDR为数据条件，记录实际发送范围与条款；儿童入口按验收关闭 |
+| Responses/合成/按轮转写保留 | 官方表列responses、audio/speech、audio/transcriptions与realtime有ZDR资格，带适用限制；本账户资格**未验证** | 记录所选路径的发送范围与保留条款，store=false不代账户批准 |
 | 声音与设备 | 家长选择当前Mac内置麦克风＋内置扬声器，Chrome候选已记录版本；未请求麦克风或播放声音 | 成人在场授权设备、试听中英固定声音；回声/插话/停止/延迟实测，不能移用其他设备检查 |
 
 上述事实来源：[Sol模型页](https://developers.openai.com/api/docs/models/gpt-6.1-sol)、[实时转写](https://developers.openai.com/api/docs/guides/realtime-transcription)、[WebRTC](https://developers.openai.com/api/docs/guides/voice-webrtc?voice-api=realtime)、[数据控制](https://developers.openai.com/api/docs/guides/your-data)。实际API调用样本数为0、语音操作样本数为0；账号条件缺失可继续隔离阶段1，不能把文档核对当接口通过。
@@ -126,6 +134,6 @@ Python新增pydantic-settings2.15.0、tenacity9.2.1、uvicorn0.54.0、websockets
 
 前端采用官方Vite react-ts模板；应用保留TypeScript7.0.2。类型生成需要编译器API，因此web/codegen单独锁TypeScript6.0.3/Hey API0.99.0；解析器同系列固定1.4.1，避免1.4.4的js-yaml4已知告警，不使用force、legacy-peer-deps或跨主版替换。它只读取本地导出JSON并生成类型；两份锁、生成/编译/构建及审计均需检查，完整证据见[交接](handoff.md)。
 
-当前模拟无需API账号、密钥或预算。未来“账号条件”指J实际调用所用的API组织/项目、调用凭据、模型/语音权限及费用归属；“账单范围”应理解为允许的调用与测试预算，不要求开放账单管理权限。账户的数据处理资格另验，开发代理的登录不自动授予J调用或儿童用途资格。
+当前模拟无需API账号、密钥或预算。未来“账号条件”指J实际调用所用的API组织/项目、调用凭据、模型/语音权限及费用归属；“账单范围”应理解为允许的调用与测试预算，不要求开放账单管理权限。订阅类适配器使用家长在对应工具中的订阅登录，额度与条款按订阅另计；开发代理自身的登录不自动成为J的模型接入。
 
 本机工作台/单活动学生的临时访问令牌只用于J的loopback访问控制，不是服务商API密钥，不代表模型权限或产生模型调用费用。
