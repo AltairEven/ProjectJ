@@ -34,6 +34,7 @@ def test_valid_output_is_returned_and_recorded():
     call = service.calls[-1]
     assert call["purpose"] == "evaluation" and call["failure"] is None
     assert call["adapter"] == "simulated" and call["effort"] == "medium"
+    assert call["tier"] == "default"
 
 
 def test_wrong_structure_is_invalid_output_not_a_wrong_answer():

@@ -97,9 +97,10 @@ class FakeThread:
 class FakeCodex:
     """Stands in for openai_codex.AsyncCodex; never launches the binary."""
 
-    def __init__(self, events=None, account=True, models=("gpt-6.1-sol",), hang=False):
+    def __init__(self, events=None, account=True, models=("gpt-6.1-sol",), hang=False, fast=True):
         self.events = events if events is not None else [message(GOOD), completed()]
         self.account_present, self.model_ids, self.hang = account, models, hang
+        self.fast = fast
         self.starts, self.turns, self.handles, self.closed = [], [], [], False
 
     def next_handle(self, input):
@@ -135,6 +136,9 @@ class FakeCodex:
                 "supportedReasoningEfforts": [
                     {"description": "", "reasoningEffort": effort} for effort in ("low", "medium")
                 ],
+                "serviceTiers": [{"description": "2x speed", "id": "priority", "name": "Fast"}]
+                if self.fast
+                else [],
             }
             for model_id in self.model_ids
         ]
@@ -170,6 +174,17 @@ def test_each_call_is_an_isolated_read_only_ephemeral_thread(tmp_path):
         "effort": "unverified",
         "tools": "verified",
     }
+
+
+def test_fast_tier_requests_the_priority_service_tier(tmp_path):
+    fake = FakeCodex()
+    codex = adapter(fake, tmp_path)
+    asyncio.run(codex.invoke(REQUEST, BINDING))
+    fast = BINDING.model_copy(update={"tier": "fast"})
+    reply = asyncio.run(codex.invoke(REQUEST, fast))
+    assert fake.starts[0]["service_tier"] is None and fake.starts[1]["service_tier"] == "priority"
+    assert reply.actual["service_tier"].requested == "fast"
+    assert reply.actual["service_tier"].status == "unverified"
 
 
 def test_a_tool_call_is_an_explicit_mismatch(tmp_path):
@@ -262,6 +277,17 @@ def test_probe_reports_each_item(tmp_path):
     text, image = fake.turns[-1][0]
     assert isinstance(image, ImageInput) and image.url.startswith("data:image/png;base64,")
     assert "x@example.com" not in report.model_dump_json() and not report.simulated
+
+
+def test_probe_reads_the_fast_tier_from_the_subscription_list(tmp_path):
+    listed = asyncio.run(adapter(FakeCodex(), tmp_path).probe("gpt-6.1-sol", ("low",), ("fast",)))
+    assert listed.items["tier:fast"].status == "unverified"
+    missing = asyncio.run(
+        adapter(FakeCodex(fast=False), tmp_path).probe("gpt-6.1-sol", ("low",), ("fast",))
+    )
+    assert missing.items["tier:fast"].status == "unsupported"
+    plain = asyncio.run(adapter(FakeCodex(), tmp_path).probe("gpt-6.1-sol", ("low",)))
+    assert "tier:fast" not in plain.items
 
 
 def test_probe_without_login_stops_at_auth(tmp_path):

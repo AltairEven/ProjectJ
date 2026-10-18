@@ -41,6 +41,21 @@ def test_request_rejects_unknown_purpose_and_empty_instructions():
         ModelRequest("evaluation", "  ", {}, Out)
 
 
+def test_a_fast_tier_binding_needs_its_tier_probed():
+    base = {
+        "auth": "verified",
+        "model": "verified",
+        "structured_output": "verified",
+        "cancellation": "verified",
+        "effort:low": "unverified",
+    }
+    assert admission(report(**base), "classroom_judgment", "low") == []
+    reasons = admission(report(**base), "classroom_judgment", "low", "fast")
+    assert reasons == ["Fast层级：未探测"]
+    listed = report(**base, **{"tier:fast": "unverified"})
+    assert admission(listed, "classroom_judgment", "low", "fast") == []
+
+
 def test_unverified_items_pass_admission_but_failed_or_missing_items_do_not():
     ok = report(
         auth="verified",

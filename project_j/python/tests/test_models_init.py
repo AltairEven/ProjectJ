@@ -74,6 +74,75 @@ def test_configure_validates_adapter_effort_and_purpose(root):
     assert "api_key" not in (root / "config.json").read_text()
 
 
+def test_configure_accepts_a_fast_tier_only_where_the_adapter_offers_it(root):
+    assert cli("configure", "--default", "openai:gpt-6.1-sol:low:fast") == 1
+    assert cli("configure", "--default", "codex:gpt-6.1-sol:low:turbo") == 1
+    assert cli("configure", "--default", "codex:gpt-6.1-sol:low:fast:x") == 1
+    assert (
+        cli(
+            "configure",
+            "--default",
+            "codex:gpt-6.1-sol:medium",
+            "--purpose",
+            "classroom_judgment=codex:gpt-6.1-sol:low:fast",
+        )
+        == 0
+    )
+    tiers = {p: b.tier for p, b in ModelFiles(root).bindings().items()}
+    assert tiers == {
+        "planning": "default",
+        "preparation": "default",
+        "classroom_judgment": "fast",
+        "evaluation": "default",
+    }
+
+
+def test_extra_high_effort_is_offered_by_codex_only(root):
+    assert cli("configure", "--default", "openai:gpt-6.1-sol:xhigh") == 1
+    assert (
+        cli(
+            "configure",
+            "--default",
+            "codex:gpt-6.1-sol:xhigh",
+            "--purpose",
+            "classroom_judgment=codex:gpt-6.1-sol:low:fast",
+        )
+        == 0
+    )
+    efforts = {p: b.effort for p, b in ModelFiles(root).bindings().items()}
+    assert efforts == {
+        "planning": "xhigh",
+        "preparation": "xhigh",
+        "classroom_judgment": "low",
+        "evaluation": "xhigh",
+    }
+
+
+def test_probe_asks_each_adapter_for_the_tiers_its_bindings_use(root, monkeypatch, capsys):
+    from project_j.platform.models.simulated import SimulatedAdapter
+
+    seen = []
+    original = SimulatedAdapter.probe
+
+    async def probe(self, model, efforts, tiers=()):
+        seen.append(tiers)
+        return await original(self, model, efforts, tiers)
+
+    monkeypatch.setattr(SimulatedAdapter, "probe", probe)
+    monkeypatch.setattr(SimulatedAdapter, "tiers", ("default", "fast"))
+    cli(
+        "configure",
+        "--default",
+        "simulated:simulated-jane:medium",
+        "--purpose",
+        "classroom_judgment=simulated:simulated-jane:low:fast",
+    )
+    assert cli("probe") == 1  # the simulated report has no tier item
+    assert seen == [("fast",)]
+    out = capsys.readouterr().out
+    assert "simulated:simulated-jane:low:fast" in out and "Fast层级：未探测" in out
+
+
 def test_probe_records_admission_without_secrets_and_changes_invalidate(root, capsys):
     assert cli("probe") == 1 and "未配置默认模型" in capsys.readouterr().out
     assert cli("configure", "--default", "simulated:simulated-jane:low") == 0

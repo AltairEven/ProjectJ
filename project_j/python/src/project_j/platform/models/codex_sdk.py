@@ -41,6 +41,7 @@ from project_j.platform.models.contracts import (
     Effort,
     ModelRequest,
     ProbeItem,
+    Tier,
 )
 from project_j.platform.models.openai_api import FAILURE_TEXT, PROBE, ColorAnswer, solid_png
 
@@ -81,6 +82,8 @@ BASE_INSTRUCTIONS = (
 )
 # Turn items that are not tool use; anything else means tools were not actually closed.
 QUIET_ITEMS = {"userMessage", "agentMessage", "reasoning", "plan", "contextCompaction"}
+# Subscription service tier ids; the default tier sends none.
+SERVICE_TIERS = {"fast": "priority"}
 
 
 def codex_config(home: Path, workdir: Path) -> CodexConfig:
@@ -114,7 +117,8 @@ async def collect(handle):
 class CodexAdapter:
     adapter_id = "codex"
     version = "2"
-    efforts: tuple[Effort, ...] = ("low", "medium", "high")
+    efforts: tuple[Effort, ...] = ("low", "medium", "high", "xhigh")
+    tiers: tuple[Tier, ...] = ("default", "fast")
     simulated = False
 
     def __init__(self, home: Path, factory=None):
@@ -162,6 +166,10 @@ class CodexAdapter:
             "model": ConfigCheck(requested=binding.model, actual=None, status="unverified"),
             "effort": ConfigCheck(requested=binding.effort, actual=None, status="unverified"),
         }
+        if binding.tier != "default":  # The runtime does not report the tier it served.
+            actual["service_tier"] = ConfigCheck(
+                requested=binding.tier, actual=None, status="unverified"
+            )
         handle = None
         try:
             async with asyncio.timeout(timeout):
@@ -174,6 +182,7 @@ class CodexAdapter:
                     base_instructions=BASE_INSTRUCTIONS,
                     developer_instructions=instructions,
                     cwd=str(self._workdir),
+                    service_tier=SERVICE_TIERS.get(binding.tier),
                 )
                 handle = await thread.turn(
                     input, effort=binding.effort, output_schema=to_strict_json_schema(output)
@@ -206,11 +215,13 @@ class CodexAdapter:
         context = json.dumps(request.context, ensure_ascii=False)
         return await self.call(binding, request.instructions, context, request.output)
 
-    async def probe(self, model: str, efforts: tuple[Effort, ...]) -> CapabilityReport:
+    async def probe(
+        self, model: str, efforts: tuple[Effort, ...], tiers: tuple[Tier, ...] = ()
+    ) -> CapabilityReport:
         items = {"audio": ProbeItem(status="not_probed", detail="语音另行设计")}
         calls: list[dict] = []
         rest = ("model", "structured_output", "tools", "cancellation", "image_input")
-        rest = (*rest, *(f"effort:{e}" for e in efforts))
+        rest = (*rest, *(f"effort:{e}" for e in efforts), *(f"tier:{t}" for t in tiers))
         try:
             account = await self.codex().account()
             listed = await self.codex().models()
@@ -235,6 +246,13 @@ class CodexAdapter:
             if entry
             else set()
         )
+        offered = {t.id for t in entry.service_tiers or []} if entry else set()
+        for tier in tiers:
+            items[f"tier:{tier}"] = (
+                ProbeItem(status="unverified", detail="订阅列表声明支持；实际层级返回未标明")
+                if SERVICE_TIERS[tier] in offered
+                else ProbeItem(status="unsupported", detail="订阅模型列表未声明该层级")
+            )
         broken, tool_checks = None, []
         for effort in efforts:
             started = time.perf_counter()

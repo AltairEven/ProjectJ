@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.18.0；更新：2026年10月18日。
+版本：1.19.0；更新：2026年10月18日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -520,3 +520,14 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 真实初始化（本机M3 Pro，2026年10月18日）：download复用本机实验缓存（HF_HUB_OFFLINE=1），12个文件摘要核对通过，目录0700、文件0600；probe两次通过：GPU，模型刚复制后的首次加载41.6秒（冷读约4.5 GB，含摘要核对与预热），再次加载6.7秒；中文、英文、中英混读三句首段0.27–0.41秒、RTF 0.74–0.78；第一段后取消，0.23–0.24秒确认停止并能继续合成；固定种子两次合成相同；内存峰值5.11 GB；status为就绪。三句试听样本写在本机project_j/test/output/tts-p2/；英文样本经本机评分器打分只标出人名Mia，其余11词正常。家长试听三句后认为音色、语速、中英切换均可，未听出跳字或重复，声音配置teacher-1不变（2026年10月18日）。
 - 未验证：课中实际声音与首播延迟、与评分进程同时常驻及GPU争用下的速度、长句跳词或重复的频率、生成上限是否截断真实长句；真实上课入口（模拟入口仍只用模拟合成，合成进程在服务启动还是开课检查时加载待真实入口时定）、浏览器播放与实际播放反馈、按麦克风先停播放、合成失败改文字呈现；备课预合成。
 - 接续：家长可用`project-j-tts-init speak --text "…" --out 文件.wav`试其他句子；本机project_j/test/tts-spike（4.2 GB）已按家长要求删除（2026年10月18日）。
+
+## LAT-1 课堂判断延迟选项与Fast层级
+
+- 状态：实现与自测完成，真实配置已改并重新探测通过，已本地提交（2026年10月18日）。家长要求先看课堂判断延迟的可选路线；比较Codex Fast层级、Spark小模型、OpenAI API、其他厂商、本机小模型与备课预生成后，家长决定先试Codex订阅Fast层级，不行再换DeepSeek API；Fast实测后家长决定暂不换模型，课堂判断先用Fast跑通全流程，之后再考虑调整；随后家长要求学习规划、备课与课后评价改用gpt-6.1-sol的extra high档（xhigh）。
+- 负责人/集成：Claude Opus；起点dc3e960。
+- 文件边界：platform/models/{contracts,init,service,codex_sdk,openai_api,simulated}.py；tests/test_models_{contracts,init,codex,service}.py；web/src/report.ts、web/tests/report.test.mjs；文档AGENTS.md 1.26.0、design/platform/models.md 2.5.0、docs/{technology.md 1.5.3,acceptance.md 1.15.2}。
+- 实现要点：绑定增加可选层级（default/fast，缺省default，旧配置照常读取），命令行写`适配器:模型:档位[:fast]`，各适配器声明可用层级，目前只有Codex提供fast，对应订阅列表中的priority层级；Codex调用时传入该层级，每次实际层级SDK不回报，记未核实；探针按用到的层级从订阅模型列表核对，列出记未核实、未列出记不支持；绑定Fast的用途准入另需该层级已探测且未判为不支持或失败；调用记录带层级；家长页模型状态显示“· Fast”及“Fast层级”探测项。绑定字段变化使旧初始化记录失效，需重新探测。档位增加xhigh，只有Codex适配器接受（订阅列表含high、xhigh、max、ultra）；OpenAI适配器仍为low、medium、high。
+- 实测（本机，细节记本机project_j/test/records/classroom-latency-20261018.md）：订阅列表中gpt-6.1-sol只有priority（Fast，“2x speed, increased usage”）一个附加层级，没有Spark；6个课堂判断样例逐题交替各12次，默认层级中位6.15秒（5.14–9.54），Fast中位5.25秒（4.19–7.64），约快15%，24次均与预期一致；每次输入约1.13万token、输出约37 token、无推理token，瓶颈在输入与服务端。按`codex:gpt-6.1-sol:medium`默认、`classroom_judgment=codex:gpt-6.1-sol:low:fast`重新configure与probe，准入通过（Fast层级未核实）；经正式入口6次调用服务端均回报priority、6/6与预期一致，中位5.63秒。再按`codex:gpt-6.1-sol:xhigh`默认、课堂判断不变重新configure与probe，准入通过（档位xhigh未核实），xhigh探测7.1秒、推理122 token；第一期课后评价占位调用经正式入口两次11.4与12.2秒（推理约200 token），在60秒期限内。另查DeepSeek官方文档（deepseek-flash与deepseek-v4-pro，兼容Responses API与严格结构，可关思考），实测脚本已写在本机project_j/test/records，未录密钥、未调用。
+- 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check首次因新测试一处格式未通过，格式化后重跑通过；加入xhigh后再跑统一check、probe与measure均通过（依赖未变）：主工程281项、评分子工程39项、合成子工程15项pytest，15项前端回归，OpenAPI与类型生成、构建与文档检查，UTC 2026-10-18T14:01:18.730538+00:00，工程摘要7acd079c0909d45cf5adc4e1f634b0bc3682e7def117ccd8248163c8ec74aeb0，simulation_only/not_granted。
+- 未验证：Fast层级与xhigh的额度消耗；完整课后评价内容（第二期）在xhigh下能否在60秒期限内完成，须接入后复测；课中实际判断延迟仍约5–6秒，不满足声音延迟目标（中位≤2.5秒、95%≤5秒），课堂判断换模型或备课预生成留待全流程跑通后由家长决定。
+- 接续：真实上课入口与浏览器声音链路；DeepSeek或其他更快接入届时按实测再定。

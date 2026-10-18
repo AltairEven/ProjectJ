@@ -27,28 +27,35 @@ from project_j.platform.models.registry import (
 
 def parse_binding(text: str) -> Binding:
     parts = text.split(":")
-    if len(parts) != 3:
-        raise ValueError(f"绑定格式应为 适配器:模型:档位，收到 {text}")
-    adapter, model, effort = parts
+    if len(parts) not in (3, 4):
+        raise ValueError(f"绑定格式应为 适配器:模型:档位[:fast]，收到 {text}")
+    adapter, model, effort, tier = (*parts, "default")[:4]
     if adapter not in ADAPTERS:
         raise ValueError(f"未知适配器：{adapter}")
     if effort not in ADAPTERS[adapter].efforts:
         raise ValueError(f"{adapter} 不支持档位 {effort}")
-    return Binding(adapter=adapter, model=model, effort=effort)
+    if tier not in ADAPTERS[adapter].tiers:
+        raise ValueError(f"{adapter} 不支持层级 {tier}")
+    return Binding(adapter=adapter, model=model, effort=effort, tier=tier)
 
 
 async def probe_all(files: ModelFiles) -> dict:
     bindings = files.bindings()
     if bindings is None:
         raise ValueError("未配置默认模型，请先运行 project-j-init configure")
-    wanted: dict[tuple[str, str], set[str]] = {}
+    wanted: dict[tuple[str, str], tuple[set[str], set[str]]] = {}
     for binding in bindings.values():
-        wanted.setdefault((binding.adapter, binding.model), set()).add(binding.effort)
+        efforts, tiers = wanted.setdefault((binding.adapter, binding.model), (set(), set()))
+        efforts.add(binding.effort)
+        if binding.tier != "default":
+            tiers.add(binding.tier)
     reports = []
-    for (adapter, model), efforts in wanted.items():
+    for (adapter, model), (efforts, tiers) in wanted.items():
         instance = build(adapter, files)
         try:
-            reports.append(await instance.probe(model, tuple(sorted(efforts))))
+            reports.append(
+                await instance.probe(model, tuple(sorted(efforts)), tuple(sorted(tiers)))
+            )
         finally:
             if hasattr(instance, "aclose"):
                 await instance.aclose()
@@ -60,7 +67,7 @@ async def probe_all(files: ModelFiles) -> dict:
         )
         purposes[purpose] = {
             "binding": binding.model_dump(),
-            "reasons": admission(report, purpose, binding.effort),
+            "reasons": admission(report, purpose, binding.effort, binding.tier),
         }
     record = {
         "config_digest": files.digest(versions(bindings)),
@@ -77,8 +84,12 @@ def show(status: dict, files: ModelFiles):
     print("模型已初始化。" if status["initialized"] else "模型未初始化。")
     for purpose, item in status["purposes"].items():
         binding = item["binding"]
+        tier = binding.get("tier", "default") if binding else "default"
         where = (
-            f"{binding['adapter']}:{binding['model']}:{binding['effort']}" if binding else "未配置"
+            f"{binding['adapter']}:{binding['model']}:{binding['effort']}"
+            + ("" if tier == "default" else f":{tier}")
+            if binding
+            else "未配置"
         )
         reasons = "；".join(item["reasons"])
         print(f"- {PURPOSE_LABELS[purpose]}：{where}" + (f"；未通过：{reasons}" if reasons else ""))

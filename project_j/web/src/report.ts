@@ -80,7 +80,7 @@ const purposeLabels: Record<string, string> = {
 }
 const itemLabels: Record<string, string> = {
   auth: '鉴权', model: '模型', structured_output: '结构化输出', cancellation: '取消', image_input: '图片输入', audio: '音频',
-  tools: '工具关闭',
+  tools: '工具关闭', 'tier:fast': 'Fast层级',
 }
 const statusLabels: Record<string, string> = {
   verified: '已核实', unverified: '未核实', unsupported: '不支持', failed: '失败', not_probed: '未探测',
@@ -93,7 +93,8 @@ export function modelLines(models?: Body): string[] {
     ? `模型已初始化${models.simulated ? '（模拟适配器）' : ''}。`
     : '模型未初始化，备课、开课、复盘和评价暂不可用。'
   const purposes = Object.entries(models.purposes as Record<string, Body>).map(([purpose, item]) => {
-    const binding = item.binding ? `${item.binding.adapter} · ${item.binding.model} · ${item.binding.effort}` : '未配置'
+    const tier = item.binding?.tier === 'fast' ? ' · Fast' : ''
+    const binding = item.binding ? `${item.binding.adapter} · ${item.binding.model} · ${item.binding.effort}${tier}` : '未配置'
     const reasons = (item.reasons ?? []) as string[]
     return `${purposeLabels[purpose] ?? purpose}：${binding}${reasons.length ? `；未通过：${reasons.join('；')}` : ''}`
   })

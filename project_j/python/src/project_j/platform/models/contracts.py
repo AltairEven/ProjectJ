@@ -11,7 +11,9 @@ from project_j.contracts import Contract
 # Workflow order; planning and preparation have bindings and admission before they have callers.
 Purpose = Literal["planning", "preparation", "classroom_judgment", "evaluation"]
 PURPOSES: tuple[Purpose, ...] = ("planning", "preparation", "classroom_judgment", "evaluation")
-Effort = Literal["low", "medium", "high"]
+Effort = Literal["low", "medium", "high", "xhigh"]
+# Service tier; "fast" trades higher usage for speed where an adapter offers it.
+Tier = Literal["default", "fast"]
 Check = Literal["verified", "unverified", "unsupported", "mismatch"]
 ProbeStatus = Literal["verified", "unverified", "unsupported", "failed", "not_probed"]
 Failure = Literal[
@@ -46,6 +48,7 @@ ITEM_LABELS = {
     "image_input": "图片输入",
     "audio": "音频",
     "tools": "工具关闭",
+    "tier:fast": "Fast层级",
 }
 # Requests carry learning stage/state and task data only (ADR-0013).
 IDENTITY_KEYS = frozenset(
@@ -63,6 +66,7 @@ class Binding(Contract):
     adapter: str = Field(min_length=1)
     model: str = Field(min_length=1)
     effort: Effort
+    tier: Tier = "default"
 
 
 class ConfigCheck(Contract):
@@ -146,19 +150,25 @@ class ModelAdapter(Protocol):
     adapter_id: str
     version: str
     efforts: tuple[Effort, ...]
+    tiers: tuple[Tier, ...]
     simulated: bool
 
     async def invoke(self, request: ModelRequest, binding: Binding) -> AdapterReply: ...
 
-    async def probe(self, model: str, efforts: tuple[Effort, ...]) -> CapabilityReport: ...
+    async def probe(
+        self, model: str, efforts: tuple[Effort, ...], tiers: tuple[Tier, ...] = ()
+    ) -> CapabilityReport: ...
 
 
-def admission(report: CapabilityReport | None, purpose: Purpose, effort: Effort) -> list[str]:
+def admission(
+    report: CapabilityReport | None, purpose: Purpose, effort: Effort, tier: Tier = "default"
+) -> list[str]:
     """Why a probed binding cannot serve a purpose; unverified items pass and stay recorded."""
     if report is None:
         return ["尚未探测"]
     reasons = []
-    for name in (*REQUIRED[purpose], f"effort:{effort}"):
+    tiers = () if tier == "default" else (f"tier:{tier}",)
+    for name in (*REQUIRED[purpose], f"effort:{effort}", *tiers):
         item = report.items.get(name, ProbeItem(status="not_probed"))
         if item.status in {"unsupported", "failed", "not_probed"}:
             detail = f"（{item.detail}）" if item.detail else ""

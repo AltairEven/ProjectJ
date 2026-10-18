@@ -65,7 +65,7 @@ class ModelService:
         binding = self.bindings.get(purpose)
         if binding is None or binding.adapter not in self.adapters:
             return ["未配置该用途的模型"]
-        return admission(self.report_for(binding), purpose, binding.effort)
+        return admission(self.report_for(binding), purpose, binding.effort, binding.tier)
 
     def require(self):
         reasons = [
@@ -90,6 +90,7 @@ class ModelService:
             "simulated": adapter.simulated if adapter else None,
             "model": binding.model if binding else None,
             "effort": binding.effort if binding else None,
+            "tier": binding.tier if binding else None,
             "failure": None,
             "actual": {},
             "usage": None,

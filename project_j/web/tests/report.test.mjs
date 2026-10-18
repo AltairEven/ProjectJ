@@ -29,6 +29,23 @@ test('a start without a classroom says what is missing or failed in Chinese', ()
   assert.equal(startMessage({ decision: 'blocked', reason: 'new reason' }), '尚不能开始（new reason）。')
 })
 
+test('a fast tier binding and its probe item read as Fast', () => {
+  const lines = modelLines({
+    initialized: true, simulated: false,
+    purposes: {
+      classroom_judgment: { binding: { adapter: 'codex', model: 'gpt-6.1-sol', effort: 'low', tier: 'fast' }, reasons: [] },
+      evaluation: { binding: { adapter: 'codex', model: 'gpt-6.1-sol', effort: 'medium', tier: 'default' }, reasons: [] },
+    },
+    reports: [{ adapter: 'codex', model: 'gpt-6.1-sol', items: { 'tier:fast': { status: 'unverified' } } }],
+  })
+  assert.deepEqual(lines, [
+    '模型已初始化。',
+    '课堂判断：codex · gpt-6.1-sol · low · Fast',
+    '课后评价：codex · gpt-6.1-sol · medium',
+    '能力报告 codex · gpt-6.1-sol：未核实 Fast层级',
+  ])
+})
+
 test('model status reads as Chinese lines without any credential field', () => {
   const ok = modelLines({
     initialized: true, simulated: true,

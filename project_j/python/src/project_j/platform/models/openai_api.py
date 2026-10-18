@@ -20,6 +20,7 @@ from project_j.platform.models.contracts import (
     Effort,
     ModelRequest,
     ProbeItem,
+    Tier,
 )
 
 # Order matters: a timeout is also a connection error.
@@ -108,6 +109,7 @@ class OpenAIAdapter:
     adapter_id = "openai"
     version = "1"
     efforts: tuple[Effort, ...] = ("low", "medium", "high")
+    tiers: tuple[Tier, ...] = ("default",)
     simulated = False
 
     def __init__(self, api_key: str | None, http_client=None):
@@ -187,7 +189,9 @@ class OpenAIAdapter:
         context = json.dumps(request.context, ensure_ascii=False)
         return await self.call(binding, request.instructions, context, request.output)
 
-    async def probe(self, model: str, efforts: tuple[Effort, ...]) -> CapabilityReport:
+    async def probe(
+        self, model: str, efforts: tuple[Effort, ...], tiers: tuple[Tier, ...] = ()
+    ) -> CapabilityReport:
         items: dict[str, ProbeItem] = {
             "audio": ProbeItem(status="not_probed", detail="语音另行设计")
         }

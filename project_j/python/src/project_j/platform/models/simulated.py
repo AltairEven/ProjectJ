@@ -11,6 +11,7 @@ from project_j.platform.models.contracts import (
     Effort,
     ModelRequest,
     ProbeItem,
+    Tier,
 )
 
 SIMULATED_MODEL = "simulated-jane"
@@ -24,6 +25,7 @@ class SimulatedAdapter:
     adapter_id = "simulated"
     version = "1"
     efforts: tuple[Effort, ...] = ("low", "medium", "high")
+    tiers: tuple[Tier, ...] = ("default",)
     simulated = True
 
     def __init__(self):
@@ -104,5 +106,7 @@ class SimulatedAdapter:
             items=items,
         )
 
-    async def probe(self, model: str, efforts: tuple[Effort, ...]) -> CapabilityReport:
+    async def probe(
+        self, model: str, efforts: tuple[Effort, ...], tiers: tuple[Tier, ...] = ()
+    ) -> CapabilityReport:
         return self.report(model, efforts)
