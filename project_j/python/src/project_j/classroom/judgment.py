@@ -17,6 +17,8 @@ INSTRUCTIONS = (
     "reported（task_purpose为point或offscreen时，只记录已报告的条件）。"
     "task_purpose为read_aloud时answer为空：只依据pronunciation（发音评分模块的结果）与reference_text判断，"
     "达到要求为correct，需要纠正的词为incorrect并在text中点出这些词，pronunciation.status为unknown时为unclear；"
+    "pronunciation.limitations写明评分限制（如门槛未校准）时，分数只作纠正提示，不向孩子报分数或等级；"
+    "error为inserted的条目表示多读或重复（word为音素），只提醒按原文读，不当作要重读的词；"
     "不另评发音，不改写评分。"
     "evidence必须原样使用上下文中的evidence；text是给孩子的简短中文回应。"
 )

@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.5.0；更新：2026年10月18日；状态：实施基线已采用，P1隔离工程已实现，真实接入未验证。
+版本：1.5.1；更新：2026年10月18日；状态：实施基线已采用，P1隔离工程已实现，真实接入未验证。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -104,6 +104,21 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python projec
 Codex适配器使用官方Python SDK `openai-codex`（锁定0.163.0，随包附带codex运行时），在本机启动`codex app-server`；login打开ChatGPT浏览器登录，登录状态存于`project_j/private/models/codex-home/`，不读也不改家长全局的`~/.codex`。每次调用开一个不留存的新会话，空临时目录、只读沙箱、拒绝全部提权，以中性基础指令替换Codex自带的代理提示词，用途指令作开发者指令，按pydantic严格JSON结构输出，档位按绑定逐轮传入；配置覆盖关闭记忆、历史、项目说明文档、网页搜索、分析统计、shell工具、应用、插件、技能及环境/权限/应用/协作说明（后几项据真实运行实测：去掉插件与技能注入后输入不再逐次增长，剩余约1.1万token为运行时自带内容）。返回条目出现任何工具调用即记“工具”明确不符而失败。取消与超时会请求服务端中断该轮。SDK不回报每轮实际模型与档位，二者记未核实；探针以订阅模型列表核对模型与所声明的档位，记录鉴权、结构化输出、工具关闭、取消、图片输入与耗时。
 
 set-key以隐藏输入把密钥写入本地模型配置，不放命令正文、日志或Git。OpenAI适配器使用Responses API，请求指定模型、reasoning.effort、default层级、store=false与严格结构，SDK自动重试关闭；探针逐项记录实际模型、档位、层级（已核实、未核实或不支持）及结构化输出、取消、图片输入、request_id、可取得用量与耗时。明确不符判失败，未核实如实记录，不能靠提示词宣称Low。探测只用虚构技术样本，单请求耗时不是声音延迟；完整参考题集语义验证、课堂总期限/取消和Medium实际内容核验另做。OpenAI API实际调用样本数为0。Codex订阅2026年10月16日实测：probe准入通过，6个课堂判断样例6/6与预期一致，单次4.9–8.8秒、课堂判断中位约5.4秒，不能满足声音延迟目标，备课与课后评价等非实时用途可用。
+
+### 本机发音评分初始化与探针
+
+评分器按[ADR-0015](../decisions/ADR-0015.md)是独立子工程`project_j/scorer/`（Python 3.14.4，torch 2.14.1、transformers 5.20.1，锁文件只解析Apple Silicon Mac），与主工程、合成各自维护。主工程经`project-j-scorer-init`初始化，模型与记录存于`project_j/private/scorer/`：
+
+```sh
+project_j/scripts/uv.sh sync --locked --project project_j/scorer
+project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-scorer-init download
+project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-scorer-init probe
+project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-scorer-init status
+```
+
+download按固定修订ae45363bf3413b374fecd9dc8bc1df0e24c3b7f4只取4个文件并逐一核对SHA-256，是评分唯一的联网步骤；评分进程每次启动重新核对摘要、离线加载并预热，经标准输入输出每行一个JSON通信，不开端口、不写临时文件。probe用macOS自带语音Samantha在本机生成三段英文（正确、把bridge读成brige、约100词带停顿慢读），要求正确朗读无标出、读错一段只标出bridge，慢读只记耗时与内存；记录写入init.json，模型清单或评分器版本、门槛版本变化即需重新探针。`score 文件.wav --text "原文"`供成人自测，只打印不保存；QuickTime录音可先用`afconvert -f WAVE -d LEI16@16000 -c 1 输入.m4a 输出.wav`转换。录音超过40秒按40秒一窗（两侧各加2秒上下文）推理，以限制注意力内存。
+
+2026年10月18日在M3 Pro上的真实探针：MPS，加载约5.8秒（含预热），GPU分配峰值3.30 GB；3秒录音评分约70毫秒，44秒慢读约1.2秒。用6个macOS英文语音朗读整篇故事复测：Samantha无误报；其他语音各有1–2个口音相关误报（如falls、bends、Mia），Flo有6个；整句漏读能标出，但其前后的词会被误标；把paper读成peeper未被标出。慢读长段在Samantha上仍有4个误报（模型在该上下文中把wants、toy、car的元音听成别的音，得分接近0，与真实读错无法靠门槛区分）。这些只说明合成成人语音上的表现，真人与儿童效果未验证，门槛仍为暂定。
 
 ### P0官方事实复核与接入缺口
 

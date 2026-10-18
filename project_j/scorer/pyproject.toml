@@ -1,0 +1,47 @@
+[project]
+name = "project-j-scorer"
+version = "0.1.0"
+description = "Project J local English pronunciation scorer (ADR-0015); separate from the main app and TTS"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "espeakng-loader>=0.2.4",
+    "huggingface-hub>=2.2.0",
+    "numpy>=2.5.4",
+    "phonemizer-fork>=3.3.2",
+    "torch==2.14.1",
+    "transformers==5.20.1",
+]
+
+[build-system]
+requires = ["uv_build==0.11.11"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "project_j_scorer"
+
+[tool.uv]
+# torch 2.14.1 ships only macOS 14+ arm64 wheels for Macs; verified on Apple Silicon only.
+environments = ["sys_platform == 'darwin' and platform_machine == 'arm64'"]
+
+[project.scripts]
+project-j-scorer = "project_j_scorer.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --disable-socket --allow-unix-socket"
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["project_j_scorer"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-socket>=0.8.1",
+]

@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 
-from project_j.platform.speech.contracts import PronunciationResult
+from project_j.platform.speech.contracts import PronunciationLimits, PronunciationResult
 from project_j.platform.speech.simulated import SimulatedScorer
 
 REFERENCE = "Mia has a toy car. She wants a bridge for her car."
@@ -17,7 +17,8 @@ def test_a_faithful_reading_scores_every_word_without_errors():
     result = score(REFERENCE.encode())
     assert result.status == "scored" and result.simulated
     assert all(word.error == "none" for word in result.words)
-    assert result.completeness == 100 and result.level == "优"
+    assert result.completeness == 100 and result.pauses == 0 and result.limitations == ()
+    assert not hasattr(result, "level") and not hasattr(result, "fluency")
 
 
 def test_a_misread_word_is_marked_on_the_reference_word():
@@ -46,4 +47,20 @@ def test_scored_results_need_their_scores_and_unknown_results_carry_none():
     with pytest.raises(ValidationError):
         PronunciationResult(
             status="unknown", reason="failed", accuracy=50, service="s", version="1", simulated=True
+        )
+
+
+def test_simulated_scorer_uses_product_limits_and_is_always_ready():
+    from project_j.platform.speech.contracts import PRODUCT_LIMITS
+    from project_j.preparation.reading import MAX_SEGMENT_WORDS
+
+    scorer = SimulatedScorer()
+    assert scorer.limits == PRODUCT_LIMITS == PronunciationLimits(max_words=100, max_seconds=300)
+    assert MAX_SEGMENT_WORDS == 100 and scorer.reasons() == []
+
+
+def test_unknown_results_carry_no_timing():
+    with pytest.raises(ValidationError):
+        PronunciationResult(
+            status="unknown", reason="failed", pauses=0, service="s", version="1", simulated=False
         )

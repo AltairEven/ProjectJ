@@ -26,6 +26,7 @@ module-name = "project_j"
 [project.scripts]
 project-j-probe = "project_j.probe:main"
 project-j-init = "project_j.platform.models.init:main"
+project-j-scorer-init = "project_j.platform.speech.init:main"
 project-j-measure = "project_j.latency:main"
 project-j-serve = "project_j.interface.api:main"
 project-j-export-schema = "project_j.interface.api:export_schema"

@@ -23,7 +23,7 @@ from project_j.learning.contracts import DemandBody, LearningState, PlanBody
 from project_j.platform.files import PrivateFiles
 from project_j.platform.models.service import ModelService
 from project_j.platform.retries import retry_save
-from project_j.platform.speech.contracts import PronunciationScorer
+from project_j.platform.speech.contracts import PronunciationScorer, ScorerNotReady
 from project_j.platform.speech.simulated import SimulatedScorer
 from project_j.platform.storage import (
     Conflict,
@@ -629,6 +629,12 @@ class Coordinator:
             }
         course = self.store.read(course_ref, learner_id)
         data = CourseBody.model_validate(course.body)
+        if any(task.purpose == "read_aloud" for task in data.tasks) and (
+            reasons := self.scorer.reasons()
+        ):
+            raise ScorerNotReady(
+                "发音评分未就绪：" + "；".join(reasons) + "。请运行 project-j-scorer-init probe。"
+            )
         required = {
             "materials": "reported_available",
             "time": "reported_30_minutes",

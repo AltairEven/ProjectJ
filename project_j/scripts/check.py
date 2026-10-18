@@ -10,6 +10,7 @@ from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parents[2]
 PYTHON_PROJECT = ROOT / "project_j/python"
+SCORER_PROJECT = ROOT / "project_j/scorer"
 
 
 def main() -> int:
@@ -17,30 +18,14 @@ def main() -> int:
     env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY"}
     report_dir = ROOT / "project_j/.cache"
     report_dir.mkdir(parents=True, exist_ok=True)
+    ruff = [sys.executable, "-m", "ruff"]
+    main_paths = ["--config", "pyproject.toml", "src", "tests", "../scripts"]
+    scorer_paths = ["--config", "../scorer/pyproject.toml", "../scorer/src", "../scorer/tests"]
     commands = [
-        [
-            sys.executable,
-            "-m",
-            "ruff",
-            "check",
-            "--config",
-            "pyproject.toml",
-            "src",
-            "tests",
-            "../scripts",
-        ],
-        [
-            sys.executable,
-            "-m",
-            "ruff",
-            "format",
-            "--check",
-            "--config",
-            "pyproject.toml",
-            "src",
-            "tests",
-            "../scripts",
-        ],
+        [*ruff, "check", *main_paths],
+        [*ruff, "format", "--check", *main_paths],
+        [*ruff, "check", *scorer_paths],
+        [*ruff, "format", "--check", *scorer_paths],
         [
             str(PYTHON_PROJECT / ".venv/bin/project-j-export-schema"),
             str(ROOT / "project_j/web/schema/openapi.json"),
@@ -62,10 +47,27 @@ def main() -> int:
         completed = subprocess.run(command, cwd=PYTHON_PROJECT, env=env, check=False)
         if completed.returncode:
             return completed.returncode
+    # The scorer sub-project has its own locked environment (ADR-0015); offline, no real model.
+    completed = subprocess.run(
+        [
+            str(SCORER_PROJECT / ".venv/bin/python"),
+            "-m",
+            "pytest",
+            f"--junitxml={report_dir / 'scorer-tests.xml'}",
+        ],
+        cwd=SCORER_PROJECT,
+        env=env | {"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1"},
+        check=False,
+    )
+    if completed.returncode:
+        return completed.returncode
     from project_j.application.acceptance import fingerprint
 
-    suites = ElementTree.parse(report_dir / "simulation-tests.xml").getroot()
-    count = sum(int(suite.attrib.get("tests", 0)) for suite in suites.iter("testsuite"))
+    count = sum(
+        int(suite.attrib.get("tests", 0))
+        for report in ("simulation-tests.xml", "scorer-tests.xml")
+        for suite in ElementTree.parse(report_dir / report).getroot().iter("testsuite")
+    )
     evidence = {
         "source_type": "simulated",
         "evidence": "automated_simulation_checks",

@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.16.0；更新：2026年10月18日。
+版本：1.17.0；更新：2026年10月18日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -495,4 +495,16 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 设计要点：评分与合成是两项各自维护的本机离线能力，子工程（project_j/scorer/与project_j/tts/）、锁定依赖与环境、模型目录（project_j/private/scorer/models/与project_j/private/tts/models/）、初始化、探针、准入、配置版本与故障处理都分开，一方升级、换模型或故障不要求另一方随之变化；各一个后端常驻子进程，标准输入输出通信、不开端口、课中不联网；模型文件由各自初始化按固定修订下载并核对摘要；课中不并行运行其他GPU任务；评分输出每词得分与疑似读错、漏读、多读等，带评分器、模型修订与门槛版本并标明未校准，不给等级；合成音色与语气指令为有版本的声音配置，中英文同一声音，按段流式、停止取段即停止生成；评分段与录音上限改为产品上限（首版100词、300秒）；评分失败记未知，合成失败改文字或暂停；儿童录音与Jane文字都不出本机；合成需要Apple Silicon。
 - 本批裁定（Claude）：子工程目录名scorer与tts；各自一个常驻子进程，经标准输入输出通信、不开网络端口；评分不输出等级；现场合成的偶发跳词或重复列为已知限制，按实际交付记录；探针样本来源与许可、合成固定随机种子、两个子工程的Python版本与单元测试纳入统一检查的方式、进程在服务启动时还是开课检查时加载、暂定门槛数值留给实施计划。
 - 未验证：评分器与合成器均未实现；真人与儿童效果、课中实际声音与延迟、暂定门槛的误报与漏报率、预合成固定种子均未验证；真实麦克风与初始化接入仍属DES-V1第二期待办。
-- 接续：家长要求先写评分的第二期实施计划，合成的实施计划随后单独写；两者分别实施、分别验收。
+- 接续：评分的第二期计划已写并实施，见P2-S1；合成的实施计划随后单独写；两者分别实施、分别验收。
+
+## P2-S1 本机发音评分实现
+
+- 状态：实现与自测完成，本机真实探针通过，已本地提交（2026年10月18日）。家长审阅计划后选择在本会话直接实施，最终审查由主会话自做。
+- 负责人/集成：Claude Opus；起点b2fd2b9；计划docs/superpowers/plans/2026-10-18-des-v2-scorer.md。
+- 文件边界：新增评分子工程project_j/scorer/{pyproject.toml,uv.lock,.python-version,src/project_j_scorer/{__init__,rules,text,align,score,model,download,serve,cli}.py,tests/{helpers,test_rules,test_text,test_align,test_score,test_download,test_model,test_serve}.py}；主工程新增platform/speech/{local,init}.py、tests/{test_speech_gate,test_speech_local,test_speech_init}.py、tests/fixtures/fake_scorer.py，修改platform/speech/{contracts,simulated}.py、preparation/reading.py、classroom/judgment.py、application/coordinator.py、pyproject.toml（project-j-scorer-init入口，锁文件不变）、tests/test_speech_simulated.py；project_j/scripts/check.py；文档AGENTS.md 1.24.0、design/platform/{models.md 2.4.1,storage-lifecycle.md 1.7.1}、docs/technology.md 1.5.1、project_j/README.md。
+- 实现要点：评分子工程只依赖numpy的部分（参考文本转音素后的整句对齐、CTC强制对齐、贪心解码、编辑对齐、按规则打分）用合成后验矩阵测试；download按固定修订取4个文件并核对SHA-256后整体换入；serve每次启动核对清单与固定摘要、离线加载并预热，标准输出只走协议（库输出改到标准错误），坏请求只让该次记未知。主工程LocalScorer以最小环境（无API密钥、离线）启动子进程，按请求id丢弃被取消请求的迟到回复，进程退出后返回未知而不挂起；评分结果去掉等级与流利度，增加最低音素分、停顿、语速、模型修订、门槛版本与限制说明“本机评分器，门槛未校准”；产品上限100词、300秒统一为PRODUCT_LIMITS；含朗读段的课程开课时要求评分器就绪（模拟评分器始终就绪）；课堂判断说明补“分数只作纠正提示、不报分数或等级，多读条目不当作要重读的词”。
+- 执行中的裁定（细节记本机project_j/test/records/scorer-*.txt及调试脚本）：首次真实探针未通过（正确朗读把Mia标为读错，长段标出12个词），据6个macOS英文语音的朗读统计修正三处根因——整句转音素后拆回各词改为整句音素与逐词音素的编辑对齐（原拆分遇连读r即整篇退回逐词，所有a变成重读eɪ）；自由解码丢失的音素只有在其得分也低于50时才算删除（空白会吞掉读对的短音素，真正漏读的音素得分不高于33）；强制对齐按等价音素取最佳帧。等价组只补多数语音都出现的写法或口音差异（iə/iː、ɐ/æ、ɔ/ʌ、ɔɪ/oːɹ、z/s、ᵻ/ɪ、ɔː并入ɑː/ɔ），情态动词列为虚词；个别语音才有、也可能是学习者真实错误的（b/p、ɛ/ɪ）不放宽；门槛版本仍为provisional-1（此前没有通过过探针的版本）。另加加载时预热（首次评分由1.67秒降到约70毫秒），内存改为在释放缓存前读取峰值。统一check里评分子工程测试用独立一次调用接入，未改成命令表配对。
+- 检查证据：9项登记命令全部通过（两份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check含主工程259项与评分子工程39项pytest、14项前端回归、OpenAPI与类型生成、构建与文档检查，提交前重跑UTC 2026-10-18T07:28:34.520246+00:00，工程摘要d96db1af471465d2c91ae16072cc960bbd30d00ed5f0960f48afff34bd79c92a，simulation_only/not_granted。
+- 真实初始化（本机M3 Pro，2026年10月18日）：download复用本机实验缓存（HF_HUB_OFFLINE=1），4个文件摘要核对通过，目录0700、文件0600；probe通过：MPS，加载约5.8秒（含预热），GPU分配峰值3.30 GB；正确朗读2.98秒评分72毫秒无标出，故意读错3.05秒评分70毫秒只标出bridge，约100词带停顿慢读43.96秒评分1.16秒、有4个误报（car、wants、toy、wants，模型在该上下文中把元音听成别的音，得分接近0，与真实读错无法靠门槛区分）；status为就绪。整篇故事复测：Samantha无误报，Daniel、Karen、Moira、Reed各1–2个口音相关误报，Flo 6个；整句漏读能标出但前后各误标一词；peeper未被标出。
+- 未验证：真人与儿童朗读效果、门槛的误报与漏报率；真实上课入口（模拟入口仍只用模拟评分器，评分进程在服务启动还是开课检查时加载待真实入口时定）；浏览器真实麦克风（须产出16 kHz单声道PCM16 WAV）；CPU与其他设备。
+- 接续：家长可用`project-j-scorer-init score`自测真人朗读（QuickTime录音经afconvert转WAV）；本机project_j/test/asr-spike（1.26 GB）在模型已核对复制后可删除，由家长决定；合成另写计划。

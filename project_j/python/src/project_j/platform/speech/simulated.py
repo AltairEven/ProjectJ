@@ -5,7 +5,7 @@ from difflib import SequenceMatcher
 from statistics import mean
 
 from project_j.platform.speech.contracts import (
-    PronunciationLimits,
+    PRODUCT_LIMITS,
     PronunciationResult,
     WordScore,
 )
@@ -17,8 +17,13 @@ class SimulatedScorer:
     service = "simulated-pronunciation"
     version = "1"
     simulated = True
-    # Mirrors the preferred service's paragraph mode (120 words, 300 seconds).
-    limits = PronunciationLimits(max_words=120, max_seconds=300)
+    limits = PRODUCT_LIMITS
+    model = None
+    thresholds = None
+    limitations = ()
+
+    def reasons(self) -> list[str]:
+        return []
 
     async def score(self, audio: bytes, reference_text: str) -> PronunciationResult:
         try:
@@ -49,9 +54,8 @@ class SimulatedScorer:
             status="scored",
             words=tuple(words),
             accuracy=accuracy,
-            fluency=90,
             completeness=100 * sum(w.error != "omitted" for w in read) / len(read),
-            level="优" if accuracy >= 85 else "良" if accuracy >= 60 else "待加强",
+            pauses=0,
             service=self.service,
             version=self.version,
             simulated=True,

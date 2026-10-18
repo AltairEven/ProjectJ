@@ -3,8 +3,9 @@
 import re
 from math import ceil
 
-# Under the preferred scoring service's 120-word paragraph limit, with a margin.
-MAX_SEGMENT_WORDS = 100
+from project_j.platform.speech.contracts import PRODUCT_LIMITS
+
+MAX_SEGMENT_WORDS = PRODUCT_LIMITS.max_words  # Product limit (ADR-0015).
 WORD = re.compile(r"[A-Za-z]+(?:['’][A-Za-z]+)?")
 SENTENCE = re.compile(r"[^.!?]+[.!?]+[”\"’]?")
 
