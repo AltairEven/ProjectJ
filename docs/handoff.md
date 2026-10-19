@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.21.0；更新：2026年10月19日。
+版本：1.22.0；更新：2026年10月19日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -557,3 +557,16 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 修正与重跑：家长要求先修再提交。classroom/judgment.py的课堂判断指令加三条：对孩子不用“依据”“证据”“参考答案”；incorrect/unclear时不说出evidence中能直接回答本题的词（可用allowed_supports的说法）；correct时不再要求孩子重说或改用英语再答（tests/test_models_simulated.py加断言，先失败后通过）。按总验收重跑（运行编号judgment-ref-20261019b）37/37，人工逐条阅读无答案词泄露、无“依据”、答对不再邀请重说；判断耗时中位4528毫秒、95分位7497毫秒，无超时。
 - 未验证：重复运行下的稳定性（基线只跑1遍）；题集预期的独立内容审查（家长看过题目表后要求实施，未提出修改）；开放式题型与其他学科未覆盖。
 - 接续：以后改课堂判断模型、档位、层级、指令或请求内容，按总验收重跑题集；换更快的模型时用同一题集比较；新题型先补题。
+
+## EVAL-1 课后评价接真实模型
+
+- 状态：实现、自测与真实模型核对完成，未提交（2026年10月19日）。家长要求先做完功能再考虑性能，选定先做课后评价；审阅计划后同意按建议在本会话直接实施，最终审查由主会话自做。
+- 负责人/集成：Claude Opus；起点6d962f1；计划docs/superpowers/plans/2026-10-19-evaluation-model.md。
+- 文件边界：project_j/python/src/project_j/evaluation/assessment.py、application/coordinator.py、interface/api.py、classroom/harness.py、platform/models/simulated.py、learning/contracts.py；tests/test_evaluation_model.py（新增）、tests/{test_adult_check,test_models_simulated,test_learning_contracts}.py；web/src/{App.tsx,report.ts,speaker.ts}、web/tests/report.test.mjs；文档design/evaluation/{README.md 1.8.0,assessment.md 1.1.0}、docs/technology.md 1.7.0。学习更新、计划、下节建议与备课逻辑未改（learning/contracts.py只放宽数据空间，见下）。
+- 实现要点：评价请求改为带封存事实的作答原文、课堂判断、帮助、朗读评分、课程题目、目标、Jane方法、结束情况与家长反馈原文（不带学习者身份，有测试）；模型返回逐次尝试的工作判断、家外帮助（附逐字原话）与解读，以及概括、最有依据、尚未确定和课程与课堂差异。apply_draft在规则函数interpret()的结果上覆盖：单次独立须初答正确、课中无帮助且家长明确说没有额外帮助（此时补帮助程度none，使学习状态能采用）；需要帮助须有课中帮助、家长报告帮助或答错；家外帮助原话须逐字出现在反馈里；受更正影响的一律未知；不合规退回未知并记入checks与该题限制；草稿漏掉或多出尝试则整份不保存。只有“无额外补充”且事实不变时沿用上一版草稿、不调模型。评价未取得返回503与中文原因，可重试同一请求。家长页新增“课后评价”区。顺带修P2-V1三项：成人检查的事实与尝试限制、家长页字样不再写“模拟”；学生页“开始播放”回报完成后才发收尾回报；学生页卸载时关闭音频上下文。
+- 真实核对中发现并修复：成人检查数据空间在学习更新一步被拒（learning/contracts.py的SimulationRecord仍只接受simulation，P2-V1放宽数据空间时漏改），改为数据空间simulation/adult_check、来源simulated/adult，新增成人检查反馈后准备下节课的测试（先失败后通过）。
+- 执行中的裁定：在主分支工作区实施、不提交；旧测试test_models_simulated.py按新evaluation_request签名改写参数；学生页音频引用类型为Speaker | null，清理时置null；test_learning_contracts中“adult_check+adult应被拒”早于P2-V1，改为拒收adult_check+simulated并新增接受成人检查数据空间的测试。最终审查由主会话自做，未发现严重或重要问题。
+- 真实模型核对：本机脚本在临时成人检查数据空间中用模拟提供者上课、课后换真实绑定codex:gpt-6.1-sol:xhigh，三种情形（无帮助且家长说没帮忙；首题有课堂支架、家长无补充；家长说第二题是自己告诉的）评价全部成功、规则核对无退回，判断与预期一致，原话逐字，概括写明成人与模拟来源；修复后下节课准备全部成功，学习状态出现单次独立、需要帮助等判断。评价耗时38.6–57.3秒（6次），逼近60秒期限，属性能问题待定。调试细节见本机记录。
+- 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；修复后重跑统一check：主工程343项、评分子工程39项、合成子工程15项pytest及28项前端回归、OpenAPI与类型生成、构建与文档检查全部通过，UTC 2026-10-19T02:54:12.064550+00:00，工程摘要e4909a8ddccc8ff659cd5dfc06c6cdcd66c947e7467cee4eb4ab1d7986aa0c2b，simulation_only/not_granted。
+- 未验证：浏览器中开始回报串行与关闭音频；学习更新与规划对新判断的完整使用（下一批）；评价耗时余量。
+- 接续：浏览器核对成人检查学生页插话时不再出现英文顺序错误、关闭学生页后音频设备释放；评价期限或档位留待性能阶段决定。

@@ -81,6 +81,12 @@ export class Speaker {
     this.sources = []
   }
 
+  // Releases the audio device when the page goes away.
+  close() {
+    this.stop()
+    void this.context.close()
+  }
+
   private async stream(action: AllowedAction, signal: AbortSignal, begin: () => void, settle: (kind: Outcome['kind']) => void) {
     if (this.locked) await new Promise<void>(release => this.waiting.push(release))
     if (signal.aborted) return

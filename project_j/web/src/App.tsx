@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { acknowledgePause, cancel, presentationCancelled, type Cancellation } from './cancellation'
 import { canConfirm } from './confirmation'
-import { describe, endLabels, modelLines, startMessage } from './report'
+import { describe, endLabels, evaluationLines, modelLines, startMessage } from './report'
 import { finishRecording, idle, pauseRecording, recordedMs, resumeRecording, startRecording, type Recorder } from './recording'
 import { requestFailure, type RequestFailure } from './request'
 import { Speaker, reportsFor, startedReport } from './speaker'
@@ -87,6 +87,8 @@ function Parent({ token }: { token: string }) {
   const facts = dashboard?.objects?.filter(doc => doc.kind === 'fact').sort((a, b) => b.created_at.localeCompare(a.created_at)) ?? []
   const fact = facts[0]
   const activity = fact ? String(fact.body.activity_id) : undefined
+  const mode = dashboard?.realm === 'adult_check' ? '成人检查' : '模拟'
+  const evaluationDoc = activity ? dashboard?.objects?.find(doc => doc.kind === 'evaluation' && doc.body.activity_id === activity) : undefined
   const feedbackChosen = (dashboard?.objects ?? []).some(doc => doc.body.activity_id === activity && (doc.kind === 'feedback' || doc.body.later_explicit === true))
   const pendingSeals = dashboard?.pending_seals ?? []
   const courses = dashboard?.objects?.filter(doc => doc.kind === 'course') ?? []
@@ -110,7 +112,7 @@ function Parent({ token }: { token: string }) {
     })
   }
   return <main>
-    <header><span className="eyebrow">PROJECT J · 隔离模拟</span><h1>Jane 的家长工作台</h1>
+    <header><span className="eyebrow">{dashboard?.realm === 'adult_check' ? 'PROJECT J · 成人实际检查' : 'PROJECT J · 隔离模拟'}</span><h1>Jane 的家长工作台</h1>
       <p>虚构学习者 · 本课到下一课程包 · 真实 API、声音和儿童入口未验证</p></header>
     {message && <div className="notice" role="alert">{message}</div>}
     {failedOperation.current && <button onClick={() => void run(failedOperation.current!)} disabled={busy}>接续原操作</button>}
@@ -126,7 +128,7 @@ function Parent({ token }: { token: string }) {
         {prepared && <><div className="preview"><h3>本课安排</h3>{preview
           ? <dl>{Object.entries(preview).sort(([a], [b]) => previewRank(a) - previewRank(b)).map(([key, value]) => <div key={key}><dt>{previewLabels[key] ?? key}</dt><dd>{show(value)}</dd></div>)}</dl>
           : <p>预览待取得</p>}</div>
-          <h3>本次模拟条件报告</h3><div className="row">{conditionChoices.map(([key, name, options]) => <label key={key}>{name}
+          <h3>本次{mode}条件报告</h3><div className="row">{conditionChoices.map(([key, name, options]) => <label key={key}>{name}
             <select value={conditions[key]} onChange={event => setConditions(current => ({ ...current, [key]: event.target.value }))}>
               {options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>)}</div>
           <label>补充说明（可选）<textarea value={household} onChange={event => setHousehold(event.target.value)} /></label>
@@ -136,14 +138,14 @@ function Parent({ token }: { token: string }) {
               conditions: { ...conditions, raw_report: household.trim() ? `${reported}；补充：${household.trim()}` : reported, explicit_start: true } })
             if (!data.student_token) throw new Error(startMessage(data))
             const link = `${location.origin}/#student=${data.student_token}`
-            setStudentLink(link); setMessage('模拟课堂已建立。打开课堂后可直接输入、求助、暂停或停止。')
-          }) }}>采用当前安排，开始模拟</button></>}
+            setStudentLink(link); setMessage(`${mode}课堂已建立。打开课堂后可直接输入、求助、暂停或停止。`)
+          }) }}>采用当前安排，开始{mode}</button></>}
       </>}
-      {studentLink && dashboard?.active && <p><a href={studentLink} target="_blank" rel="noopener noreferrer">打开独立的模拟课堂</a></p>}
+      {studentLink && dashboard?.active && <p><a href={studentLink} target="_blank" rel="noopener noreferrer">打开独立的{mode}课堂</a></p>}
     </section>
     <section><h2>结束事实与一次反馈</h2>
       {dashboard?.lost_activities?.map(item => { const id = String(item.activity_id); const reports = (item.reports ?? []) as { text: string; reported_at: string }[]
-        return <div className="notice" key={id}><p>{new Date(String(item.requested_at)).toLocaleString()} 开始的模拟课堂：{String(item.state)}{fact ? '下方显示的不是这一堂。' : ''}</p>
+        return <div className="notice" key={id}><p>{new Date(String(item.requested_at)).toLocaleString()} 开始的{mode}课堂：{String(item.state)}{fact ? '下方显示的不是这一堂。' : ''}</p>
           {reports.map(report => <p key={report.reported_at}>家长补记（{new Date(report.reported_at).toLocaleString()}）：{report.text}</p>)}
           <label>家长补记已知情况（只保存为新的来源，缺口保留，不进入评价）<textarea value={lostDrafts[id] ?? ''} onChange={event => setLostDrafts(drafts => ({ ...drafts, [id]: event.target.value }))} /></label>
           <button className="quiet" disabled={busy || !lostDrafts[id]?.trim()} onClick={() => { const requestId = uid(); void run(async () => {
@@ -154,7 +156,7 @@ function Parent({ token }: { token: string }) {
         ? '最近一堂的结束事实已写入，但保存回执尚未确认；请查询并接续原封存。'
         : `最近结束的一堂课，结束事实尚未确认保存${fact ? '；下方显示的是此前已保存的一堂' : ''}。请查询并接续原封存，不要重新开课补造。`}</div>}
       {fact ? <><p>结束事实已保存。原因：{(reason => endLabels[reason] ?? reason)(String((fact.body.end as Record<string, unknown>)?.reason ?? '未知'))}；活动没有新增儿童学习证据。</p>
-        <label>补充实际条件或更正（仅限虚构模拟）<textarea placeholder="帮助、代答、离屏结果或体验；未提交内容只留在当前页面。" value={feedback} onChange={event => setFeedback(event.target.value)} /></label>
+        <label>{dashboard?.realm === 'adult_check' ? '补充实际条件或更正（成人检查，虚构学习者）' : '补充实际条件或更正（仅限虚构模拟）'}<textarea placeholder="帮助、代答、离屏结果或体验；未提交内容只留在当前页面。" value={feedback} onChange={event => setFeedback(event.target.value)} /></label>
         <div className="row"><button disabled={busy || !feedback.trim()} onClick={() => submitFeedback(feedback)}>提交反馈并准备下一课</button>
           <button disabled={busy} onClick={() => submitFeedback('无额外补充')}>无额外补充，准备下一课</button>
           <button className="quiet" disabled={busy || !feedback.trim()} onClick={() => submitFeedback(feedback, true)}>追加事实更正并复核</button>
@@ -170,12 +172,13 @@ function Parent({ token }: { token: string }) {
     <section><h2>实际处理与下一课程包</h2>
       {report ? <div className="preview"><dl>{describe(report, dashboard?.objects ?? []).map(([label, text], index) => <div key={index}><dt>{label}</dt><dd>{text}</dd></div>)}</dl>
         <details><summary>原始结果</summary><pre>{show(report)}</pre></details></div> : <p>反馈保存、评价、状态／计划采用、D2 和 C2 分别报告；下节建议不能代替课程包。</p>}
+      {evaluationDoc && <div className="preview"><h3>课后评价</h3><dl>{evaluationLines(evaluationDoc, dashboard?.objects ?? []).map(([label, text], index) => <div key={index}><dt>{label}</dt><dd>{text}</dd></div>)}</dl></div>}
       <details><summary>查看已保存对象与确切版本</summary>{dashboard?.objects?.map(doc => <article key={`${doc.object_id}:${doc.revision}`}><h3>{doc.kind} · 修订 {doc.revision}</h3><pre>{show(doc.body)}</pre></article>)}</details>
     </section>
     <section><h2>计划复盘与维护</h2><div className="row">{(['week', 'stage', 'annual', 'long_term'] as const).map((level, index) =>
       <button className="quiet" key={level} disabled={busy} onClick={() => { const requestId = uid(); void run(async () => setReport(await api(token, 'parent/review', { request_id: requestId, learner_id: learner, level }))) }}>{['周复盘', '阶段复盘', '年度复盘', '长期回看'][index]}</button>)}</div>
       <p>复盘复用原证据；日期到达不意味着完成。重要变化须绑定具体方案决定。</p>
-      <label>模拟重要计划方案<textarea value={planGoal} onChange={event => setPlanGoal(event.target.value)} /></label>
+      <label>{mode}重要计划方案<textarea value={planGoal} onChange={event => setPlanGoal(event.target.value)} /></label>
       <button className="quiet" disabled={busy || !planGoal.trim()} onClick={() => { const requestId = uid(); void run(async () => setReport(await api(token, 'parent/review', { request_id: requestId, learner_id: learner, level: 'week', proposed_patch: { main_goal: { dimension_id: 'english.reading.facts', description: planGoal } } }))) }}>形成具体方案，暂不生效</button>
       {dashboard?.objects?.filter(doc => doc.kind === 'decision' && doc.body.decision_state === 'pending').map(proposal => {
         // Only current revisions are listed, so a baseline missing from them has changed since the proposal.
@@ -196,9 +199,9 @@ function Parent({ token }: { token: string }) {
         const response = await fetch(`/api/parent/export-file?path=${encodeURIComponent(data.path)}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
         if (!response.ok) throw new Error('导出未取得')
         const url = URL.createObjectURL(await response.blob()); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'project-j-simulation.json'; anchor.click(); URL.revokeObjectURL(url)
-      }) }}>导出模拟记录</button>
+      }) }}>导出{mode}记录</button>
       <button className="quiet" disabled={busy} onClick={() => void run(async () => { const data = await api<{backup_id: string}>(token, 'parent/backup', {}); setBackupId(data.backup_id); setMessage('一致数据库与固定素材已备份。') })}>备份</button>
-      <button className="quiet" disabled={busy || !backupId} onClick={() => { const newRun = `restored-${uid()}`; void run(async () => { const data = await api(token, 'parent/restore', { backup_id: backupId, new_run_id: newRun }); setReport(data) }) }}>恢复到新模拟目录</button></div>
+      <button className="quiet" disabled={busy || !backupId} onClick={() => { const newRun = `restored-${uid()}`; void run(async () => { const data = await api(token, 'parent/restore', { backup_id: backupId, new_run_id: newRun }); setReport(data) }) }}>恢复到新{mode}目录</button></div>
     </section>
   </main>
 }
@@ -223,6 +226,7 @@ function Student({ token }: { token: string }) {
   const presenting = useRef<Promise<void>>(Promise.resolve())
   const playing = useRef<string | null>(null)
   const deliveryIds = useRef(new Map<string, string>())
+  const started = useRef(new Map<string, Promise<void>>())
   const latest = useRef(snapshot)
   latest.current = snapshot
   const halt = useRef(false)
@@ -285,10 +289,11 @@ function Student({ token }: { token: string }) {
     if (!adult || speaker.current) return
     const created = new Speaker(token, (action, at) => {
       const id = deliveryIds.current.get(action.action_id)
-      if (id) void sendDelivery(startedReport(action, id, at))
+      if (id) started.current.set(id, sendDelivery(startedReport(action, id, at)))
     })
     speaker.current = created
     setLocked(created.locked)
+    return () => { created.close(); speaker.current = null }
   }, [adult, token])
   useEffect(() => () => { speaker.current?.stop(); microphone.current?.discard() }, [])
   useEffect(() => {
@@ -311,7 +316,9 @@ function Student({ token }: { token: string }) {
         const now = latest.current
         const halted = halt.current || !now || ['paused', 'offscreen', 'ended'].includes(now.mode)
           || now.pending_action?.action_id !== action.action_id
-        // In order: a text fallback must reach the core before the child's input does.
+        // In order: "started" first, and a text fallback before the child's input does.
+        await started.current.get(id)
+        started.current.delete(id)
         for (const feedback of reportsFor(action, outcome, halted, id, new Date())) await sendDelivery(feedback)
       })
       return

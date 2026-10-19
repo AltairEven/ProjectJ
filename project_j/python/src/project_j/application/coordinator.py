@@ -16,7 +16,15 @@ from project_j.classroom.harness import Harness
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.content import check_content
 from project_j.curriculum.corrections import active_restrictions, affected
-from project_j.evaluation.assessment import evaluation_request, interpret, next_suggestion
+from project_j.evaluation.assessment import (
+    DraftMismatch,
+    EvaluationDraft,
+    EvaluationUnavailable,
+    apply_draft,
+    evaluation_request,
+    interpret,
+    next_suggestion,
+)
 from project_j.interface.submission import InputAdapter
 from project_j.learning.adoption import adopt_demand, adopt_state, review_due
 from project_j.learning.contracts import DemandBody, Goal, LearningState, PlanBody
@@ -1204,10 +1212,27 @@ class Coordinator:
                     for fb in feedbacks
                 )
             )
-            if not no_new_facts:
-                result = await self.models.run(evaluation_request(activity_id, source_revision))
+            # No new facts: reuse the checked draft instead of asking the model again.
+            draft = (
+                EvaluationDraft.model_validate(prior.body["draft"])
+                if no_new_facts and prior.body.get("draft")
+                else None
+            )
+            if draft is None:
+                course = self.store.read(
+                    RevisionRef.model_validate(fact.body["course_ref"]), learner_id
+                )
+                jane = self.store.read(
+                    RevisionRef.model_validate(course.body["jane_ref"]), learner_id
+                )
+                result = await self.models.run(
+                    evaluation_request(
+                        fact.body, course.body, [fb.body for fb in feedbacks], jane.body
+                    )
+                )
                 if not result.ok:
-                    raise RuntimeError(f"evaluation model call failed: {result.failure}")
+                    raise EvaluationUnavailable(result.failure)
+                draft = result.output
             current_revision, current_feedback = self.source_revision(activity_id, learner_id)
             if current_revision != source_revision:
                 # Re-enter with the new source, never publish the late old interpretation.
@@ -1216,17 +1241,25 @@ class Coordinator:
                 )
             prior = self.store.current(identity(activity_id, "evaluation"), learner_id)
             prior_suggestion = self.store.current(identity(activity_id, "suggestion"), learner_id)
+            try:
+                body = apply_draft(
+                    interpret(
+                        fact,
+                        current_feedback,
+                        source_revision,
+                        "final" if current_feedback else "provisional",
+                    ),
+                    draft,
+                    [fb.body for fb in current_feedback],
+                )
+            except DraftMismatch as error:
+                raise EvaluationUnavailable(str(error)) from error
             obj = document(
                 "evaluation",
                 identity(activity_id, "evaluation"),
                 operation,
                 learner_id,
-                interpret(
-                    fact,
-                    current_feedback,
-                    source_revision,
-                    "final" if current_feedback else "provisional",
-                ),
+                body,
                 refs=(fact.ref, RevisionRef.model_validate(fact.body["course_ref"])),
                 sources=tuple(fb.ref for fb in current_feedback),
                 revision=prior.revision + 1 if prior else 1,
@@ -1268,7 +1301,7 @@ class Coordinator:
                     "activity_id": activity_id,
                     "source_revision": source_revision,
                     "purpose": purpose,
-                    "evidence": "simulated",
+                    "evidence": "simulated" if self.evaluation_simulated() else "model",
                 }
             )
             self.ledger.finish(
@@ -1285,6 +1318,11 @@ class Coordinator:
         self.evaluation_jobs[job_key] = job
         job.add_done_callback(lambda completed: self.evaluation_jobs.pop(job_key, None))
         return await asyncio.shield(job)
+
+    def evaluation_simulated(self) -> bool:
+        binding = self.models.bindings.get("evaluation")
+        adapter = self.models.adapters.get(binding.adapter) if binding else None
+        return adapter is None or adapter.simulated
 
     def adopt(self, request_id: str, learner_id: str, evaluation: Document):
         completed = self.ledger.completed_request(

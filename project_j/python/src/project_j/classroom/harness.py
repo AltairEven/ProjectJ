@@ -40,6 +40,19 @@ def is_help_request(task: TaskDefinition, text: str, intent: str) -> bool:
     )
 
 
+# Per realm: a text attempt, a recorded attempt, the sealed activity.
+LIMITATIONS = {
+    "simulation": (
+        "明确模拟；外部帮助、保持与迁移未知。",
+        "明确模拟录音与模拟评分；不代表真实发音。",
+        "明确模拟活动，不能作为儿童学习证据。",
+    ),
+    "adult_check": (
+        "成人实际检查；外部帮助、保持与迁移未知。",
+        "成人实际检查录音，交本机发音评分；评分门槛未校准。",
+        "成人实际检查活动，不能作为儿童学习证据。",
+    ),
+}
 HELP_ORDER = {"none": 0, "light_prompt": 1, "scaffold": 2, "full_model": 3, "unknown": 4}
 
 
@@ -534,11 +547,7 @@ class Harness:
                     "help": dict(self.help_by_task.get(self.task_instance_id, {})),
                     "external_help": "unknown",
                     "judgment": "unclear",
-                    "limitations": [
-                        "明确模拟录音与模拟评分；不代表真实发音。"
-                        if submitted.modality == "audio"
-                        else "明确模拟；外部帮助、保持与迁移未知。"
-                    ],
+                    "limitations": [LIMITATIONS[self.realm][submitted.modality == "audio"]],
                 }
                 self.attempts.append(attempt)
             attempt["inputs"].append(signature)
@@ -678,5 +687,5 @@ class Harness:
             ],
             "attempts": self.attempts,
             "qualification": "not_granted",
-            "limitations": ["明确模拟活动，不能作为儿童学习证据。"],
+            "limitations": [LIMITATIONS[self.realm][2]],
         }

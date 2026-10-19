@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { describe, modelLines, startMessage } from '../src/report.ts'
+import { describe, evaluationLines, modelLines, startMessage } from '../src/report.ts'
 
 const doc = (object_id, revision, kind, body) => ({ object_id, revision, kind, body })
 const docs = [
@@ -75,4 +75,29 @@ test('model status reads as Chinese lines without any credential field', () => {
   assert.equal(blocked[0], '模型未初始化，备课、开课、复盘和评价暂不可用。')
   assert.equal(blocked[1], '课后评价：未配置；未通过：未配置默认模型')
   assert.deepEqual(modelLines(undefined), ['模型接入状态未取得。'])
+})
+
+test('an evaluation reads as summary, evidence, unknowns, differences and per-task lines', () => {
+  const evaluation = doc('e', 1, 'evaluation', {
+    report: { summary: '完成两题。', strongest: ['首题初答对'], uncertain: [], alignment: '离屏未做。' },
+    tasks: [{ task_id: 'reading-fact', dimension_id: 'english.reading.facts', working_judgment: 'single_independent', explanation: '初答正确，家长说没有帮忙。' }],
+    checks: [{ attempt_id: 'a2', task_id: 'reading-sequence', reason: '单次独立的条件不足' }],
+  })
+  const rows = evaluationLines(evaluation, docs)
+  assert.deepEqual(rows[0], ['本课概括', '完成两题。'])
+  assert.deepEqual(rows[1], ['最有依据', '首题初答对'])
+  assert.deepEqual(rows[2], ['尚未确定', '无'])
+  assert.deepEqual(rows[3], ['课程与课堂差异', '离屏未做。'])
+  assert.deepEqual(rows[4], ['阅读事实与顺序·reading-fact', '单次独立：初答正确，家长说没有帮忙。'])
+  assert.deepEqual(rows.at(-1), ['规则调整', 'reading-sequence：单次独立的条件不足'])
+})
+
+test('an evaluation saved before model drafts says so', () => {
+  assert.deepEqual(evaluationLines(doc('e', 1, 'evaluation', { tasks: [] }), docs), [['课后评价', '这一版评价没有模型解读。']])
+})
+
+test('a restored run is labelled without saying simulation', () => {
+  const rows = new Map(describe({ result: 'restored_to_new_simulation', run_id: 'restored-1' }, docs))
+  assert.equal(rows.get('结果'), '已恢复到新运行目录')
+  assert.equal(rows.get('新运行目录'), 'restored-1')
 })

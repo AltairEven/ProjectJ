@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from support import answer, deliver_all, start
+from support import answer, complete_story, deliver_all, start
 
 from project_j.application.configuration import Settings
 from project_j.application.coordinator import Coordinator
@@ -177,3 +177,29 @@ def test_adult_entry_refuses_simulation_debug_switches():
     with pytest.raises(SystemExit) as stop:
         main(["--adult-check", "--model-delay", "1"])
     assert stop.value.code == 2
+
+
+def test_adult_check_limitations_do_not_say_simulated(tmp_path):
+    store = SimulationStore(tmp_path / "private/adult_checks", "a1", realm="adult_check")
+    app = Coordinator(store, ROOT, verification=PASS)
+    app.initialize()
+    try:
+        core, fact = asyncio.run(complete_story(app))
+        assert fact.body["limitations"] == ["成人实际检查活动，不能作为儿童学习证据。"]
+        for attempt in fact.body["attempts"]:
+            assert all(
+                "成人实际检查" in item and "模拟" not in item for item in attempt["limitations"]
+            )
+    finally:
+        store.close()
+
+
+def test_adult_check_prepares_the_next_course_after_feedback(adult):
+    core, fact = asyncio.run(complete_story(adult))
+    activity = fact.body["activity_id"]
+    adult.feedback("fb1", core.learner_id, activity, "无额外补充", [])
+    result = asyncio.run(adult.next_course("next1", core.learner_id, activity))
+    state = adult.store.read(
+        RevisionRef.model_validate(result["adoption"]["state_ref"]), core.learner_id
+    )
+    assert (state.realm, state.source_type) == ("adult_check", "adult")

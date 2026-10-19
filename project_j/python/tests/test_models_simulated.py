@@ -110,7 +110,9 @@ def test_started_class_binds_the_course_jane_version(application):
 def test_failure_switch_fails_once_and_evaluation_has_a_draft():
     adapter = SimulatedAdapter()
     adapter.fail_next = True
-    request = evaluation_request("activity-1", 2)
+    fact = {"end": {"reason": "normal"}, "attempts": [], "limitations": []}
+    course = {"primary_goal": {"description": "a"}, "auxiliary_goal": {"description": "b"}}
+    request = evaluation_request(fact, course | {"tasks": []}, [], None)
     assert asyncio.run(adapter.invoke(request, BINDING)).failure == "unavailable"
     reply = asyncio.run(adapter.invoke(request, BINDING))
     assert EvaluationDraft.model_validate(reply.data).summary

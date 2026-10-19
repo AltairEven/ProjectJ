@@ -3,16 +3,16 @@ import type { Document as Doc, RevisionRef as Ref } from './client'
 type Body = Record<string, any>
 
 const keyLabels: Record<string, string> = {
-  report_ref: '汇总报告', course_ref: '课程', preview_ref: '家长预览', check_ref: '内容核对', preparation: '备课',
+  report_ref: '汇总报告', evaluation_ref: '课后评价', course_ref: '课程', preview_ref: '家长预览', check_ref: '内容核对', preparation: '备课',
   start: '开始', unverified: '未验证', state_ref: '学习状态', plan_ref: '计划', plan_effect: '计划处理',
   demand_ref: '下一课需求', suggestion_ref: '下节建议', review_ref: '复盘', decision_ref: '具体方案', choice: '家长选择',
-  effect: '结果', next_step: '下一步', run_id: '新模拟目录', result: '结果', qualification: '使用资格',
+  effect: '结果', next_step: '下一步', run_id: '新运行目录', result: '结果', qualification: '使用资格',
 }
 const valueLabels: Record<string, string> = {
   fixed_simulation_checked: '固定模拟包已核对', pending: '待开始', actual_api: '实际API', voice: '声音',
   child_entry: '儿童入口', reused: '沿用', reused_with_reason: '沿用并说明理由', plan_effective: '新计划已生效',
   not_changed: '未改变', recheck_demand_and_course: '复核需求和课程', accept: '接受', reject: '拒绝',
-  restored_to_new_simulation: '已恢复到新模拟目录', not_granted: '未授予',
+  restored_to_new_simulation: '已恢复到新运行目录', not_granted: '未授予',
 }
 const judgmentLabels: Record<string, string> = {
   unknown: '未知', needs_help: '需要帮助', single_independent: '单次独立',
@@ -32,6 +32,7 @@ function summary(doc: Doc, docs: Doc[]): string | undefined {
   const name = (id: string) => (docs.find(item => item.kind === 'capability' && item.body.dimension_id === id)?.body.name as string) ?? id
   switch (doc.kind) {
     case 'course': return body.parent_preview?.story
+    case 'evaluation': return body.report?.summary
     case 'preview': return body.content?.story
     case 'suggestion': return body.direction
     case 'demand': return body.primary_goal?.description
@@ -57,6 +58,23 @@ export function describe(value: unknown, docs: Doc[]): [string, string][] {
     if (typeof item === 'object' && item !== null && !Array.isArray(item)) return describe(item, docs)
     return [[keyLabels[key] ?? key, text(item)]]
   })
+}
+
+const joined = (items: unknown) => Array.isArray(items) && items.length ? items.join('；') : '无'
+
+/** A model-drafted evaluation as rows: summary first, then each attempt and any rule changes. */
+export function evaluationLines(doc: Doc, docs: Doc[]): [string, string][] {
+  const body = doc.body as Body
+  if (!body.report) return [['课后评价', '这一版评价没有模型解读。']]
+  const name = (id: string) => (docs.find(item => item.kind === 'capability' && item.body.dimension_id === id)?.body.name as string) ?? id
+  const rows: [string, string][] = [
+    ['本课概括', body.report.summary], ['最有依据', joined(body.report.strongest)],
+    ['尚未确定', joined(body.report.uncertain)], ['课程与课堂差异', body.report.alignment],
+    ...(body.tasks ?? []).map((task: Body): [string, string] => [`${name(task.dimension_id)}·${task.task_id}`,
+      `${judgmentLabels[task.working_judgment] ?? task.working_judgment}：${task.explanation ?? ''}`]),
+  ]
+  if (body.checks?.length) rows.push(['规则调整', body.checks.map((check: Body) => `${check.task_id}：${check.reason}`).join('；')])
+  return rows
 }
 
 const startItems: Record<string, string> = {

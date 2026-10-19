@@ -30,7 +30,7 @@ def test_initial_state_and_demand_keep_unknown_dimensions_and_exact_references()
     "change",
     [
         {"realm": "family", "source_type": "child"},
-        {"realm": "adult_check", "source_type": "adult"},
+        {"realm": "adult_check", "source_type": "simulated"},
         {"source_type": "technical"},
         {"owner": "platform"},
         {"learner_id": None},
@@ -42,6 +42,13 @@ def test_learning_objects_reject_non_simulation_and_incomplete_identity(change):
     state = initial_records()[1].model_dump(mode="json")
     with pytest.raises(ValidationError):
         record_adapter.validate_python(state | change)
+
+
+def test_learning_objects_accept_the_adult_check_realm():
+    # The adult check keeps its fictional learner's state in its own partition (P2-V1).
+    state = initial_records()[1].model_dump(mode="json")
+    adult = record_adapter.validate_python(state | {"realm": "adult_check", "source_type": "adult"})
+    assert (adult.realm, adult.source_type) == ("adult_check", "adult")
 
 
 @pytest.mark.parametrize(

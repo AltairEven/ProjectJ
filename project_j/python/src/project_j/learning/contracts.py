@@ -114,8 +114,9 @@ class HouseholdBody(Contract):
 
 
 class SimulationRecord(ObjectEnvelope):
-    realm: Literal["simulation"] = "simulation"
-    source_type: Literal["simulated"] = "simulated"
+    # Simulation or adult check; ObjectEnvelope keeps realm and source paired, family is excluded.
+    realm: Literal["simulation", "adult_check"] = "simulation"
+    source_type: Literal["simulated", "adult"] = "simulated"
     owner: Literal["learning"] = "learning"
     received_at: AwareDatetime
 

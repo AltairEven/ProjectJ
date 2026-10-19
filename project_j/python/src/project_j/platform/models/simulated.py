@@ -35,7 +35,23 @@ class SimulatedAdapter:
     def respond(self, request: ModelRequest) -> dict:
         context = request.context
         if request.purpose == "evaluation":
-            return {"summary": "模拟评价：按封存事实与反馈整理，未调用真实模型。"}
+            return {
+                "tasks": [
+                    {
+                        "attempt_id": attempt["attempt_id"],
+                        "working_judgment": "needs_help"
+                        if any(v not in {"none", "unknown"} for v in attempt["help"].values())
+                        else "unknown",
+                        "external_help": "unknown",
+                        "explanation": "模拟评价：按封存事实整理。",
+                    }
+                    for attempt in context["attempts"]
+                ],
+                "summary": "模拟评价：按封存事实与反馈整理，未调用真实模型。",
+                "strongest": [],
+                "uncertain": ["独立条件、保持与迁移未观察。"],
+                "alignment": "按实际已发生范围整理。",
+            }
         evidence = context["evidence"]
         if context["core_decided_help"]:  # The core decides help; the model only words it.
             supports, count = context["allowed_supports"], context["help_count"]

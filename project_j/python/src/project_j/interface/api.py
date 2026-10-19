@@ -30,6 +30,7 @@ from project_j.application.coordinator import Coordinator
 from project_j.classroom.harness import AllowedAction, DeliveryFeedback, Harness
 from project_j.contracts import Contract, Document, RevisionRef
 from project_j.curriculum.corrections import correct, release
+from project_j.evaluation.assessment import EvaluationUnavailable
 from project_j.learning.catalog import Capability, define, resolve
 from project_j.learning.maintenance import decide, review, revise_demand_after_plan
 from project_j.platform.files import PrivateFiles
@@ -354,6 +355,12 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
                 if isinstance(error, Conflict) and error.current
                 else None,
             },
+        )
+
+    @app.exception_handler(EvaluationUnavailable)
+    async def evaluation_failed(request, error):
+        return JSONResponse(
+            status_code=503, content={"message": str(error), "evaluation": "failed"}
         )
 
     @app.exception_handler(LookupError)
