@@ -14,6 +14,7 @@ from support import (
     complete_story,
     confirmed,
     deliver_all,
+    ready,
     start,
     teach,
 )
@@ -144,7 +145,7 @@ def test_feedback_correction_limits_derived_course_until_it_is_rechecked(applica
         assert app.store.read(fact.ref, LEARNER).body == fact.body
         rechecked = await app.next_course("recheck", LEARNER, core.activity_id)
         new_course = ref(rechecked["next_package"]["course_ref"])
-        confirmed(app, {"course_ref": new_course})
+        await ready(app, {"course_ref": new_course})
         assert app.start("new-c3", LEARNER, new_course, CONDITIONS)["decision"] == (
             "allow_simulation"
         )

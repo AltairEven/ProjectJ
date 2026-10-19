@@ -22,6 +22,7 @@ from project_j.platform.models.contracts import (
 )
 from project_j.platform.models.simulated import SIMULATED_MODEL, SimulatedAdapter
 from project_j.platform.storage import Conflict
+from project_j.platform.visuals import image_type
 
 log = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ class ModelService:
             entry["elapsed_ms"] = round((time.perf_counter() - started) * 1000, 3)
             if entry["failure"] == "cancelled":
                 self.log(entry)
-        output, failure = None, reply.failure
+        output, failure, media = None, reply.failure, ()
         if failure is None and any(check.status == "mismatch" for check in reply.actual.values()):
             failure = "config_mismatch"
         if failure is None:
@@ -129,22 +130,32 @@ class ModelService:
                 output = request.output.model_validate(reply.data)
             except ValidationError:
                 failure = "invalid_output"
+        if failure is None and request.media:
+            try:
+                if len(reply.media) != 1:
+                    raise ValueError("one picture per request")
+                image_type(reply.media[0])
+                media = reply.media
+            except ValueError:
+                output, failure = None, "invalid_output"
         entry |= {
             "failure": failure,
             "actual": {name: check.model_dump() for name, check in reply.actual.items()},
             "usage": reply.usage,
             "request_id": reply.request_id,
+            "media": len(media),
+            "media_bytes": sum(len(item) for item in media),
         }
         self.log(entry)
         return ModelResult(
-            entry["call_id"], request.purpose, binding, output, failure, reply.actual
+            entry["call_id"], request.purpose, binding, output, failure, reply.actual, media
         )
 
     @staticmethod
     def log(entry: dict):
         log.info(
             "model %s adapter=%s model=%s effort=%s tier=%s failure=%s elapsed_ms=%.0f "
-            "error_type=%s request_id=%s usage=%s",
+            "error_type=%s request_id=%s usage=%s media=%s media_bytes=%s",
             entry["purpose"],
             entry["adapter"],
             entry["model"],
@@ -155,6 +166,8 @@ class ModelService:
             entry.get("error_type"),
             entry["request_id"],
             entry["usage"],
+            entry.get("media", 0),
+            entry.get("media_bytes", 0),
         )
 
     def status(self) -> dict:

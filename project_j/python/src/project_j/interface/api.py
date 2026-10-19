@@ -44,7 +44,9 @@ from project_j.platform.speech.local import LocalScorer, ScorerUnavailable
 from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.local import LocalSynthesizer, SynthesizerUnavailable
+from project_j.platform.tts.recorded import speak
 from project_j.preparation.drafting import PreparationUnavailable
+from project_j.preparation.resources import adopt_resource, generate_resource, resource_file
 
 
 class ParentRequest(Contract):
@@ -73,6 +75,14 @@ class CourseRequest(ParentRequest):
 
 class DiscussRequest(CourseRequest):
     feedback: str = Field(min_length=1, max_length=2000)
+
+
+class ResourceRequest(CourseRequest):
+    resource_id: str = Field(min_length=1, max_length=200)
+
+
+class AdoptRequest(ResourceRequest):
+    version: int = Field(ge=1)
 
 
 class FeedbackRequest(ParentRequest):
@@ -208,6 +218,14 @@ class PreparationResult(Contract):
     preparation: Literal["drafted"]
     start: Literal["pending"]
     unverified: tuple[str, ...]
+
+
+class ResourceResult(Contract):
+    course_ref: RevisionRef
+    preview_ref: RevisionRef
+    resource_id: str
+    version: int
+    state: Literal["generated", "adopted"]
 
 
 class StartResult(Contract):
@@ -517,6 +535,52 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
     async def confirm(request: CourseRequest):
         return controller().confirm(request.request_id, request.learner_id, request.course_ref)
 
+    @app.post(
+        "/api/parent/generate-resource",
+        dependencies=[Depends(parent)],
+        response_model=ResourceResult,
+    )
+    async def generate(request: ResourceRequest):
+        return await generate_resource(
+            controller(),
+            request.request_id,
+            request.learner_id,
+            request.course_ref,
+            request.resource_id,
+        )
+
+    @app.post(
+        "/api/parent/adopt-resource", dependencies=[Depends(parent)], response_model=ResourceResult
+    )
+    async def adopt(request: AdoptRequest):
+        return adopt_resource(
+            controller(),
+            request.request_id,
+            request.learner_id,
+            request.course_ref,
+            request.resource_id,
+            request.version,
+        )
+
+    @app.get("/api/parent/resource-file", dependencies=[Depends(parent)])
+    async def resource_download(
+        object_id: str,
+        revision: int,
+        resource_id: str,
+        version: int,
+        learner_id: str = "fictional-L1",
+    ):
+        data, media_type = resource_file(
+            controller(),
+            learner_id,
+            RevisionRef(object_id=object_id, revision=revision),
+            resource_id,
+            version,
+        )
+        # A generated SVG is shown as an image only; sandbox it if opened directly.
+        headers = {"Cache-Control": "no-store", "Content-Security-Policy": "sandbox"}
+        return Response(data, media_type=media_type, headers=headers)
+
     @app.post("/api/parent/start", dependencies=[Depends(parent)], response_model=StartResult)
     async def start(request: StartRequest):
         result = controller().start(
@@ -728,7 +792,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
         if action is None:
             raise LookupError("unknown approved action")
         synthesizer = controller().synthesizer
-        stream = synthesizer.stream(action.text)
+        stream = speak(action.speech or (action.text,), controller().recorded, synthesizer)
         try:
             first = await anext(stream)
         except (SynthesisFailed, StopAsyncIteration) as error:
@@ -741,6 +805,18 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
         return StreamingResponse(
             speech_body(stream, first),
             media_type=f"audio/L16;rate={synthesizer.sample_rate};channels=1",
+        )
+
+    @app.get("/api/student/visual/{action_id}/{resource_id}")
+    async def visual(action_id: str, resource_id: str, core: StudentCore):
+        action = core.actions.get(action_id)
+        if action is None or resource_id not in action.visuals:
+            raise LookupError("unknown visual of an approved action")
+        data, media_type = controller().visuals[resource_id]
+        return Response(
+            data,
+            media_type=media_type,
+            headers={"Cache-Control": "no-store", "Content-Security-Policy": "sandbox"},
         )
 
     @app.post("/api/student/control", response_model=Snapshot)

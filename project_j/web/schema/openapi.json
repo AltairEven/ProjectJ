@@ -228,6 +228,208 @@
         }
       }
     },
+    "/api/parent/generate-resource": {
+      "post": {
+        "summary": "Generate",
+        "operationId": "generate_api_parent_generate_resource_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/adopt-resource": {
+      "post": {
+        "summary": "Adopt",
+        "operationId": "adopt_api_parent_adopt_resource_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdoptRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/resource-file": {
+      "get": {
+        "summary": "Resource Download",
+        "operationId": "resource_download_api_parent_resource_file_get",
+        "parameters": [
+          {
+            "name": "object_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Revision"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resource Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version"
+            }
+          },
+          {
+            "name": "learner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "fictional-L1",
+              "title": "Learner Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/parent/start": {
       "post": {
         "summary": "Start",
@@ -1527,6 +1729,68 @@
         }
       }
     },
+    "/api/student/visual/{action_id}/{resource_id}": {
+      "get": {
+        "summary": "Visual",
+        "operationId": "visual_api_student_visual__action_id___resource_id__get",
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Action Id"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resource Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/student/control": {
       "post": {
         "summary": "Control",
@@ -1715,6 +1979,56 @@
         ],
         "title": "ActivityRequest"
       },
+      "AdoptRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "course_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "resource_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Resource Id"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "course_ref",
+          "resource_id",
+          "version"
+        ],
+        "title": "AdoptRequest"
+      },
       "AllowedAction": {
         "properties": {
           "action_id": {
@@ -1781,6 +2095,22 @@
             "type": "object",
             "title": "Help",
             "default": {}
+          },
+          "speech": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Speech",
+            "default": []
+          },
+          "visuals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Visuals",
+            "default": []
           },
           "after_delivery": {
             "type": "string",
@@ -2869,6 +3199,86 @@
           "evidence"
         ],
         "title": "ReleaseRequest"
+      },
+      "ResourceRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "course_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "resource_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Resource Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "course_ref",
+          "resource_id"
+        ],
+        "title": "ResourceRequest"
+      },
+      "ResourceResult": {
+        "properties": {
+          "course_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "preview_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "resource_id": {
+            "type": "string",
+            "title": "Resource Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "generated",
+              "adopted"
+            ],
+            "title": "State"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "course_ref",
+          "preview_ref",
+          "resource_id",
+          "version",
+          "state"
+        ],
+        "title": "ResourceResult"
       },
       "RestoreRequest": {
         "properties": {

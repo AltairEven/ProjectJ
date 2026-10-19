@@ -192,6 +192,8 @@ class OpenAIAdapter:
         )
 
     async def invoke(self, request: ModelRequest, binding: Binding) -> AdapterReply:
+        if request.media:  # Pictures come through the Codex runtime only (ADR-0017).
+            return AdapterReply(data=None, failure="unavailable")
         context = json.dumps(request.context, ensure_ascii=False)
         return await self.call(
             binding, request.instructions, context, request.output, request.deadline_seconds

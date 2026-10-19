@@ -66,6 +66,7 @@ from project_j.preparation.packages import (
     next_material,
     template_draft,
 )
+from project_j.preparation.resources import GENERATED, adopted
 from project_j.teacher.methods import JANE
 
 PRIMARY_GOAL = Goal(
@@ -137,6 +138,8 @@ class Coordinator:
         self.parent_token = token_urlsafe(32)
         self.start_requests: dict[str, dict] = {}
         self.material_cache: dict[str, str] = {}
+        self.recorded: dict[str, bytes] = {}  # Adopted speech of the class, by exact text.
+        self.visuals: dict[str, tuple[bytes, str]] = {}  # Adopted student visuals, by id.
         self.evaluation_jobs: dict[tuple, asyncio.Task] = {}
         self.evaluation_calls: list[dict] = []
         self.pending_seals: dict[str, Document] = {}
@@ -706,7 +709,7 @@ class Coordinator:
         )
 
     def confirm(self, request_id: str, learner_id: str, course_ref: RevisionRef):
-        """The parent confirms one exact course version; resources wait for generation."""
+        """The parent confirms one exact course version; resources then can be generated."""
         signature = {"course_ref": course_ref.model_dump()}
         completed = self.ledger.completed_request(request_id, learner_id, "confirm", signature)
         if completed:
@@ -740,7 +743,16 @@ class Coordinator:
                         "confirmed_at": datetime.now(UTC).isoformat(),
                     },
                     "resources": [
-                        item | {"state": "awaiting_generation"}
+                        item
+                        | (
+                            {
+                                "state": "awaiting_generation",
+                                "versions": [],
+                                "adopted_version": None,
+                            }
+                            if item["kind"] in GENERATED
+                            else {"state": "not_connected"}
+                        )
                         for item in preview.body["resources"]
                     ],
                 },
@@ -761,7 +773,7 @@ class Coordinator:
                 ),
                 baselines=(course.ref, preview.ref),
             )
-        resources = len(saved[0].body["resources"])
+        resources = sum(item["kind"] in GENERATED for item in saved[0].body["resources"])
         log.info(
             "preparation confirmed course=%s revision=%d resources=%d",
             course.object_id,
@@ -1035,12 +1047,24 @@ class Coordinator:
         latest = self.store.current(course_ref.object_id, learner_id)
         if latest is None or latest.ref != course_ref:
             raise Conflict(STALE_COURSE)
-        if not any(
-            (preview.body.get("confirmation") or {}).get("course_ref") == course_ref.model_dump()
-            for preview in self.store.list_current(learner_id, "preview")
-        ):
+        confirmed = next(
+            (
+                preview
+                for preview in self.store.list_current(learner_id, "preview")
+                if (preview.body.get("confirmation") or {}).get("course_ref")
+                == course_ref.model_dump()
+            ),
+            None,
+        )
+        if confirmed is None:
             log.info("start refused reason=unconfirmed")
             raise Conflict("课程未确认：请先在本课安排里确认课程，确认后才能开始。")
+        recorded, visuals, missing, skipped = adopted(self, confirmed)
+        if missing:
+            log.info("start refused reason=resources_missing count=%d", len(missing))
+            raise Conflict(
+                f"资源未就绪：{'、'.join(missing)}。请在本课安排里生成、查看并采用后再开始。"
+            )
         operation = self.request(
             request_id,
             learner_id,
@@ -1155,6 +1179,16 @@ class Coordinator:
             self.scorer,
             realm=self.store.realm,
             jane=self.store.read(data.jane_ref, learner_id).body,
+            voiced=frozenset(recorded),
+            visible=tuple(item for item in data.resources if item.resource_id in visuals),
+        )
+        # Held in memory for the class; nothing is read from disk while teaching.
+        self.recorded, self.visuals = recorded, visuals
+        log.info(
+            "start resources recorded=%d visuals=%d skipped=%d",
+            len(recorded),
+            len(visuals),
+            skipped,
         )
         self.adapter = InputAdapter(self.core)
         self.store.active_activity_id = activity_id

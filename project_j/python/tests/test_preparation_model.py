@@ -101,6 +101,7 @@ def science_draft(context, evidence="He fills it with water."):
                 "audience": "student",
                 "required": False,
                 "fallback": "家长拿出实物杯子。",
+                "stage": "question",
             }
         ],
         "preview": {
@@ -127,7 +128,7 @@ def model_prepares(application, monkeypatch, *drafts):
     queue = list(drafts)
 
     def respond(request):
-        if request.purpose != "preparation":
+        if request.purpose != "preparation" or "kind" in request.context:  # Not a course draft.
             return original(request)
         build = queue.pop(0) if len(queue) > 1 else queue[0]
         return build(request.context)

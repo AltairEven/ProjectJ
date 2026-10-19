@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 from support import LEARNER
 
 from project_j.application.coordinator import story_text
@@ -81,7 +82,7 @@ def test_preparation_request_carries_no_identity(application):
             assert word not in text
         assert request.purpose == "preparation" and request.deadline_seconds == 600
     assert len(first.context["requirements"]) == len(demand_requirements(demand))
-    assert first.context["connected_kinds"] == []
+    assert first.context["connected_kinds"] == ["image", "animation"]
 
 
 def test_discussion_and_repair_requests(application):
@@ -281,17 +282,23 @@ def test_resources_are_planned_only(demand, draft):
         "audience": "student",
         "required": True,
         "fallback": "只看文字。",
+        "stage": "question",
     }
-    draft["resources"] = [resource]
+    draft["resources"] = [resource, resource]
     assert rejected(demand, draft) == {"resource"}
-    draft["resources"] = [resource | {"required": False}, resource | {"required": False}]
+    draft["resources"] = [resource | {"task_ids": ["no-such-task"]}]
     assert rejected(demand, draft) == {"resource"}
-    draft["resources"] = [resource | {"required": False, "task_ids": ["no-such-task"]}]
+    video = resource | {"resource_id": "bridge-video", "kind": "video"}
+    draft["resources"] = [resource, video]
     assert rejected(demand, draft) == {"resource"}
-    audio = resource | {"resource_id": "demo", "kind": "audio", "required": False}
-    draft["resources"] = [resource | {"required": False}, audio]
+    draft["resources"] = [resource | {"resource_id": "demo", "kind": "audio"}]
+    with pytest.raises(ValidationError):  # Jane's voice comes from the rules, not the model.
+        CourseDraft.model_validate(draft)
+    draft["resources"] = [resource | {"stage": "help"}, video | {"required": False}]
     resources = check(demand, draft).course.resources
-    assert [item.resource_id for item in resources] == ["bridge-picture", "demo"]
+    assert [item.resource_id for item in resources[:2]] == ["bridge-picture", "bridge-video"]
+    assert resources[0].stage == "help" and resources[0].required
+    assert all(item.resource_id.startswith(("voice:", "demo:")) for item in resources[2:])
 
 
 def test_new_story_rules(demand, draft):

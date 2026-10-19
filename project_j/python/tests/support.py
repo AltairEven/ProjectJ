@@ -1,8 +1,10 @@
+import asyncio
 from datetime import UTC, datetime
 from uuid import uuid4
 
 from project_j.classroom.harness import DeliveryFeedback
 from project_j.contracts import RevisionRef
+from project_j.preparation.resources import adopt_resource, generate_resource
 
 LEARNER = "fictional-L1"
 CONDITIONS = {
@@ -16,7 +18,7 @@ CONDITIONS = {
 
 async def start(app, request_id="start1"):
     prepared = await app.prepare("prepare1", LEARNER)
-    confirmed(app, prepared)
+    await ready(app, prepared)
     result = app.start(
         request_id, LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS
     )
@@ -105,7 +107,7 @@ async def complete_story(app, helped=False, offscreen_report=True):
 
 async def teach(app, request_id, course_ref, answers):
     """Teach one prepared course with first-try answers and an offscreen report; seal the fact."""
-    confirmed(app, {"course_ref": course_ref})
+    await ready(app, {"course_ref": course_ref})
     result = app.start(request_id, LEARNER, RevisionRef.model_validate(course_ref), CONDITIONS)
     assert result["decision"] == "allow_simulation"
     core = app.core
@@ -128,9 +130,23 @@ def judgments(app):
     return [call for call in app.models.calls if call["purpose"] == "classroom_judgment"]
 
 
-def confirmed(app, prepared):
-    """The parent confirms the prepared course version; starting needs it."""
+async def ready(app, prepared):
+    """The parent confirms the prepared course version, then generates and adopts the
+    first version of every required resource; starting needs both."""
     course_ref = prepared["course_ref"]
     if isinstance(course_ref, dict):
         course_ref = RevisionRef.model_validate(course_ref)
-    return app.confirm(f"confirm:{course_ref.object_id}:{course_ref.revision}", LEARNER, course_ref)
+    key = f"{course_ref.object_id}:{course_ref.revision}"
+    result = app.confirm(f"confirm:{key}", LEARNER, course_ref)
+    preview = app.store.read(RevisionRef.model_validate(result["preview_ref"]), LEARNER)
+    for item in preview.body["resources"]:
+        if item["required"]:
+            name = item["resource_id"]
+            made = await generate_resource(app, f"generate:{key}:{name}", LEARNER, course_ref, name)
+            adopt_resource(app, f"adopt:{key}:{name}", LEARNER, course_ref, name, made["version"])
+    return result
+
+
+def confirmed(app, prepared):
+    """ready() for synchronous tests."""
+    return asyncio.run(ready(app, prepared))

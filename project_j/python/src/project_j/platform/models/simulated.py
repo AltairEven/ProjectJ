@@ -13,8 +13,14 @@ from project_j.platform.models.contracts import (
     ProbeItem,
     Tier,
 )
+from project_j.platform.models.openai_api import solid_png
 
 SIMULATED_MODEL = "simulated-jane"
+SIMULATED_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20">'
+    '<animate attributeName="r" values="20;35;20" dur="2s" repeatCount="indefinite"/>'
+    "</circle></svg>"
+)
 
 
 def normalized(text: str) -> str:
@@ -53,6 +59,8 @@ class SimulatedAdapter:
                 "alignment": "按实际已发生范围整理。",
             }
         if request.purpose == "preparation":
+            if context.get("kind") == "animation":
+                return {"svg": SIMULATED_SVG, "description": "模拟动画：一个圆变大又变小。"}
             if "feedback" in context:  # A discussion round keeps the course unchanged.
                 note = "模拟：已记录意见，未调用真实模型，课程内容不变。"
                 return context["previous"] | {"note": note}
@@ -137,11 +145,17 @@ class SimulatedAdapter:
         if self.fail_next:
             self.fail_next = False
             return AdapterReply(data=None, failure="unavailable")
-        data = self.respond(request)
+        media = ()
+        if request.media == "image":
+            data = {"description": "模拟图片：一块纯色方块，未调用真实模型。"}
+            media = (solid_png(),)
+        else:
+            data = self.respond(request)
         if data is None:  # Nothing the simulated model can reproduce.
             return AdapterReply(data=None, failure="unavailable")
         return AdapterReply(
             data=data,
+            media=media,
             actual={
                 "model": ConfigCheck(
                     requested=binding.model, actual=binding.model, status="verified"

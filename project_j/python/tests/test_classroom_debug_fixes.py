@@ -13,6 +13,7 @@ from support import (
     deliver_all,
     judgments,
     read_aloud_all,
+    ready,
     start,
 )
 
@@ -67,7 +68,7 @@ def test_all_template_sentence_frames_and_saved_c2_follow_the_corrected_flow(app
         course_ref = RevisionRef.model_validate(result["next_package"]["course_ref"])
         course = app.store.read(course_ref, LEARNER)
         assert course.body["demand_ref"] == app.current(LEARNER, "demand").ref.model_dump()
-        confirmed(app, {"course_ref": course_ref})
+        await ready(app, {"course_ref": course_ref})
         assert (
             app.start("c2-start", LEARNER, course_ref, CONDITIONS)["decision"] == "allow_simulation"
         )

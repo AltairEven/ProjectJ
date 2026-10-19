@@ -20,9 +20,11 @@ from project_j.preparation.contracts import (
 )
 from project_j.preparation.packages import reading_tasks
 from project_j.preparation.reading import flat, segment_reading, words
+from project_j.preparation.voice import audio_resources
 
-# Resource kinds with a connected generator; only these may be required by a course.
-CONNECTED_KINDS: tuple[str, ...] = ()
+# Model-listed kinds with a connected generator; only these may be required by a course.
+# Jane's voice is not listed by the model: the rules derive it (preparation/voice.py).
+CONNECTED_KINDS: tuple[str, ...] = ("image", "animation")
 TASK_ID = r"^[a-z][a-z0-9-]{0,30}$"
 
 PREPARATION_INSTRUCTIONS = (
@@ -51,8 +53,11 @@ PREPARATION_INSTRUCTIONS = (
     "demand_mapping对requirements每一条写一项：index对应，implementation写本课怎样落实或为何沿用，"
     "task_ids写落实它的题号，朗读题写read_aloud。"
     "lesson_type：observation短观察，practice练习；复习已读故事时由规则定为复习。"
-    "resources只列需要的图片、音频、动画、视频，写清用途与要生成的内容，现在不生成；"
-    "kind不在connected_kinds里的资源required必须为false，课程在没有这些资源时也要能上，fallback写替代办法。"
+    "resources只列需要的图片、动画、视频，写清用途、要画的内容与出现阶段"
+    "（stage为question时提问时显示，help时孩子求助后作为帮助显示），现在不生成；"
+    "学生看的资源不能含本题或后续题的答案；图片与动画由多模态模型生成，"
+    "kind不在connected_kinds里的资源required必须为false，课程在没有这些资源时也要能上，fallback写替代办法；"
+    "Jane的题目语音与朗读示范由规则生成，不要列音频。"
     "preview给家长：story本课故事，why为什么上，materials要准备的实物，help帮助方式，exit时长与退出。"
     "brief给Jane：history相关历史（成人或模拟来源不能当孩子的历史，没有儿童历史就写无历史分支），"
     "adjustments允许的挑战、降阶、跳过、暂停与停止，closing正常小结与停止时的简短结束。"
@@ -105,7 +110,8 @@ class MappingDraft(Contract):
 
 class ResourceDraft(Contract):
     resource_id: str = Field(pattern=TASK_ID)
-    kind: Literal["image", "audio", "animation", "video"]
+    kind: Literal["image", "animation", "video"]
+    stage: Literal["question", "help"]
     purpose: Text
     content: Text
     task_ids: tuple[str, ...]
@@ -233,7 +239,7 @@ class PreparationUnavailable(Exception):
 
     def __init__(self, reason: str, subject: str = "课程"):
         text = FAILURE_TEXT.get(reason, reason)
-        kept = "下节需求已保存" if subject == "课程" else "原课程版本不变"
+        kept = {"课程": "下节需求已保存", "资源": "原资源不变"}.get(subject, "原课程版本不变")
         super().__init__(f"{subject}未取得（{text}）。{kept}，可以重试。")
 
 
@@ -411,4 +417,6 @@ def checked_course(
             for item in draft.resources
         ),
     )
+    # Jane's sentences follow the final tasks, budget and lesson type.
+    course = course.model_copy(update={"resources": course.resources + audio_resources(course)})
     return Checked(course=course, source=source, title=title or "", story=story)

@@ -31,6 +31,37 @@ export type ActivityRequest = {
 };
 
 /**
+ * AdoptRequest
+ */
+export type AdoptRequest = {
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    /**
+     * Realm
+     */
+    realm?: 'simulation';
+    /**
+     * Source Type
+     */
+    source_type?: 'simulated';
+    course_ref: RevisionRef;
+    /**
+     * Resource Id
+     */
+    resource_id: string;
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
  * AllowedAction
  */
 export type AllowedAction = {
@@ -80,6 +111,14 @@ export type AllowedAction = {
     help?: {
         [key: string]: string;
     };
+    /**
+     * Speech
+     */
+    speech?: Array<string>;
+    /**
+     * Visuals
+     */
+    visuals?: Array<string>;
     /**
      * After Delivery
      */
@@ -712,6 +751,53 @@ export type ReleaseRequest = {
 };
 
 /**
+ * ResourceRequest
+ */
+export type ResourceRequest = {
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    /**
+     * Realm
+     */
+    realm?: 'simulation';
+    /**
+     * Source Type
+     */
+    source_type?: 'simulated';
+    course_ref: RevisionRef;
+    /**
+     * Resource Id
+     */
+    resource_id: string;
+};
+
+/**
+ * ResourceResult
+ */
+export type ResourceResult = {
+    course_ref: RevisionRef;
+    preview_ref: RevisionRef;
+    /**
+     * Resource Id
+     */
+    resource_id: string;
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * State
+     */
+    state: 'generated' | 'adopted';
+};
+
+/**
  * RestoreRequest
  */
 export type RestoreRequest = {
@@ -1126,6 +1212,118 @@ export type ConfirmApiParentConfirmPostErrors = {
 export type ConfirmApiParentConfirmPostError = ConfirmApiParentConfirmPostErrors[keyof ConfirmApiParentConfirmPostErrors];
 
 export type ConfirmApiParentConfirmPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type GenerateApiParentGenerateResourcePostData = {
+    body: ResourceRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/parent/generate-resource';
+};
+
+export type GenerateApiParentGenerateResourcePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GenerateApiParentGenerateResourcePostError = GenerateApiParentGenerateResourcePostErrors[keyof GenerateApiParentGenerateResourcePostErrors];
+
+export type GenerateApiParentGenerateResourcePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: ResourceResult;
+};
+
+export type GenerateApiParentGenerateResourcePostResponse = GenerateApiParentGenerateResourcePostResponses[keyof GenerateApiParentGenerateResourcePostResponses];
+
+export type AdoptApiParentAdoptResourcePostData = {
+    body: AdoptRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/parent/adopt-resource';
+};
+
+export type AdoptApiParentAdoptResourcePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AdoptApiParentAdoptResourcePostError = AdoptApiParentAdoptResourcePostErrors[keyof AdoptApiParentAdoptResourcePostErrors];
+
+export type AdoptApiParentAdoptResourcePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: ResourceResult;
+};
+
+export type AdoptApiParentAdoptResourcePostResponse = AdoptApiParentAdoptResourcePostResponses[keyof AdoptApiParentAdoptResourcePostResponses];
+
+export type ResourceDownloadApiParentResourceFileGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query: {
+        /**
+         * Object Id
+         */
+        object_id: string;
+        /**
+         * Revision
+         */
+        revision: number;
+        /**
+         * Resource Id
+         */
+        resource_id: string;
+        /**
+         * Version
+         */
+        version: number;
+        /**
+         * Learner Id
+         */
+        learner_id?: string;
+    };
+    url: '/api/parent/resource-file';
+};
+
+export type ResourceDownloadApiParentResourceFileGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ResourceDownloadApiParentResourceFileGetError = ResourceDownloadApiParentResourceFileGetErrors[keyof ResourceDownloadApiParentResourceFileGetErrors];
+
+export type ResourceDownloadApiParentResourceFileGetResponses = {
     /**
      * Successful Response
      */
@@ -1865,6 +2063,44 @@ export type SpeechApiStudentSpeechActionIdGetErrors = {
 export type SpeechApiStudentSpeechActionIdGetError = SpeechApiStudentSpeechActionIdGetErrors[keyof SpeechApiStudentSpeechActionIdGetErrors];
 
 export type SpeechApiStudentSpeechActionIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type VisualApiStudentVisualActionIdResourceIdGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Action Id
+         */
+        action_id: string;
+        /**
+         * Resource Id
+         */
+        resource_id: string;
+    };
+    query?: never;
+    url: '/api/student/visual/{action_id}/{resource_id}';
+};
+
+export type VisualApiStudentVisualActionIdResourceIdGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type VisualApiStudentVisualActionIdResourceIdGetError = VisualApiStudentVisualActionIdResourceIdGetErrors[keyof VisualApiStudentVisualActionIdResourceIdGetErrors];
+
+export type VisualApiStudentVisualActionIdResourceIdGetResponses = {
     /**
      * Successful Response
      */

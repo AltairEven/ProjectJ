@@ -27,6 +27,7 @@ from openai_codex import (
 )
 from openai_codex.generated.v2_all import (
     AgentMessageThreadItem,
+    ImageGenerationThreadItem,
     ItemCompletedNotification,
     ThreadTokenUsageUpdatedNotification,
     TurnCompletedNotification,
@@ -82,6 +83,12 @@ BASE_INSTRUCTIONS = (
     "Answer the single request in the developer and user messages. "
     "Use no tools; reply only with JSON matching the required schema."
 )
+# A picture request may use the built-in image tool (features.image_generation) once.
+IMAGE_INSTRUCTIONS = (
+    "Use the image generation tool exactly once for the single request in the developer and "
+    "user messages, then reply only with JSON matching the required schema."
+)
+IMAGE_TOOL = "imageGeneration"
 # Turn items that are not tool use; anything else means tools were not actually closed.
 QUIET_ITEMS = {"userMessage", "agentMessage", "reasoning", "plan", "contextCompaction"}
 # Subscription service tier ids; the default tier sends none.
@@ -99,8 +106,8 @@ def error_kind(turn) -> str:
 
 
 async def collect(handle):
-    """Final answer, completed turn, usage and any tool item types from one turn."""
-    text, turn, usage, tools = None, None, None, set()
+    """Final answer, completed turn, usage, tool item types and generated pictures."""
+    text, turn, usage, tools, images = None, None, None, set(), []
     async for event in handle.stream():
         payload = event.payload
         if isinstance(payload, ItemCompletedNotification):
@@ -109,11 +116,31 @@ async def collect(handle):
                 text = item.text
             elif item.type not in QUIET_ITEMS:
                 tools.add(item.type)
+                if isinstance(item, ImageGenerationThreadItem):
+                    images.append(item)
         elif isinstance(payload, ThreadTokenUsageUpdatedNotification):
             usage = payload.token_usage.model_dump(mode="json")
         elif isinstance(payload, TurnCompletedNotification) and payload.turn.id == handle.id:
             turn = payload.turn
-    return text, turn, usage, tools
+    return text, turn, usage, tools, images
+
+
+def picture(item: ImageGenerationThreadItem) -> bytes:
+    """The image bytes, inline or from the file the runtime saved under its home.
+
+    The runtime saves every picture there; the copy and its emptied folder are removed, so
+    course pictures live only in the project's own storage.
+    """
+    path = Path(item.saved_path.root) if item.saved_path else None
+    try:
+        if item.result:
+            return base64.b64decode(item.result)
+        return path.read_bytes() if path else b""
+    finally:
+        if path:
+            path.unlink(missing_ok=True)
+            with contextlib.suppress(OSError):
+                path.parent.rmdir()
 
 
 class CodexAdapter:
@@ -163,12 +190,20 @@ class CodexAdapter:
         return (await handle.wait()).success
 
     async def call(
-        self, binding: Binding, instructions: str, input, output: type[BaseModel], timeout=60.0
+        self,
+        binding: Binding,
+        instructions: str,
+        input,
+        output: type[BaseModel],
+        timeout=60.0,
+        media=None,
     ) -> AdapterReply:
         timing: dict[str, float | None] = {"thread": None, "turn": None}
         started, reply = time.perf_counter(), None
         try:
-            reply = await self.exchange(binding, instructions, input, output, timeout, timing)
+            reply = await self.exchange(
+                binding, instructions, input, output, timeout, timing, media
+            )
             return reply
         finally:
             # Thread time includes the runtime's own start on the first call of a process.
@@ -180,7 +215,9 @@ class CodexAdapter:
                 "cancelled" if reply is None else reply.failure or "completed",
             )
 
-    async def exchange(self, binding, instructions, input, output, timeout, timing) -> AdapterReply:
+    async def exchange(
+        self, binding, instructions, input, output, timeout, timing, media=None
+    ) -> AdapterReply:
         actual = {
             "model": ConfigCheck(requested=binding.model, actual=None, status="unverified"),
             "effort": ConfigCheck(requested=binding.effort, actual=None, status="unverified"),
@@ -198,7 +235,7 @@ class CodexAdapter:
                     ephemeral=True,
                     sandbox=Sandbox.read_only,
                     approval_mode=ApprovalMode.deny_all,
-                    base_instructions=BASE_INSTRUCTIONS,
+                    base_instructions=IMAGE_INSTRUCTIONS if media else BASE_INSTRUCTIONS,
                     developer_instructions=instructions,
                     cwd=str(self._workdir),
                     service_tier=SERVICE_TIERS.get(binding.tier),
@@ -207,7 +244,7 @@ class CodexAdapter:
                 handle = await thread.turn(
                     input, effort=binding.effort, output_schema=to_strict_json_schema(output)
                 )
-                text, turn, usage, tools = await collect(handle)
+                text, turn, usage, tools, images = await collect(handle)
                 timing["turn"] = round((time.perf_counter() - begun) * 1000) - timing["thread"]
         except (asyncio.CancelledError, TimeoutError) as stop:
             if handle is not None:  # Stop the server-side turn too, not only our wait.
@@ -218,24 +255,42 @@ class CodexAdapter:
             return AdapterReply(data=None, failure="timeout", actual=actual)
         except RUNTIME_ERRORS:
             return AdapterReply(data=None, failure="unavailable", actual=actual)
+        allowed = {IMAGE_TOOL} if media else set()
         used = ",".join(sorted(tools)) or "none"
         actual["tools"] = ConfigCheck(
-            requested="none", actual=used, status="mismatch" if tools else "verified"
+            requested=IMAGE_TOOL if media else "none",
+            actual=used,
+            status="mismatch" if tools - allowed else "verified",
         )
         if turn is not None and turn.status is TurnStatus.failed:
             return AdapterReply(data=None, failure=error_kind(turn), actual=actual)
-        if turn is None or turn.status is not TurnStatus.completed or text is None:
+        if any(item.failure is not None for item in images):
+            return AdapterReply(data=None, failure="quota", actual=actual)
+        pictures = tuple(picture(item) for item in images) if media else ()
+        if (
+            turn is None
+            or turn.status is not TurnStatus.completed
+            or text is None
+            or (media and not any(pictures))
+        ):
             return AdapterReply(data=None, failure="incomplete", actual=actual)
         try:
             data = output.model_validate_json(text).model_dump()
         except ValidationError:
             return AdapterReply(data=None, failure="invalid_output", actual=actual)
-        return AdapterReply(data=data, actual=actual, usage=usage, request_id=turn.id)
+        return AdapterReply(
+            data=data, actual=actual, usage=usage, request_id=turn.id, media=pictures
+        )
 
     async def invoke(self, request: ModelRequest, binding: Binding) -> AdapterReply:
         context = json.dumps(request.context, ensure_ascii=False)
         return await self.call(
-            binding, request.instructions, context, request.output, request.deadline_seconds
+            binding,
+            request.instructions,
+            context,
+            request.output,
+            request.deadline_seconds,
+            request.media,
         )
 
     async def probe(

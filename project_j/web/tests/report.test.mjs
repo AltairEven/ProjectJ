@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { describe, discussionLines, evaluationLines, modelLines, resourceLines, startMessage } from '../src/report.ts'
+import { describe, discussionLines, evaluationLines, missingResources, modelLines, resourceLines, startMessage } from '../src/report.ts'
 
 const doc = (object_id, revision, kind, body) => ({ object_id, revision, kind, body })
 const docs = [
@@ -130,16 +130,24 @@ test('a model-planned demand explains its change and an uncovered goal reads as 
   assert.equal(rows.get('规则调整'), '预算固定30分钟，改动不生效。')
 })
 
-test('a planned resource list says what each item is for and that it waits for confirmation', () => {
+test('resource lines show stage, spoken words, versions and adoption', () => {
+  const demo = { resource_id: 'demo:read-aloud-1', kind: 'audio', purpose: '朗读示范：read-aloud-1', text: 'Mia has paper.', required: true,
+    stage: 'help', fallback: '采用后才能开课。', state: 'generated', versions: [{ version: 1 }, { version: 2 }], adopted_version: 1 }
   const lines = resourceLines({ resources: [
-    { resource_id: 'cup', kind: 'image', purpose: '展示两个杯子', required: false, fallback: '拿出实物杯子。', state: 'planned' },
-    { resource_id: 'demo', kind: 'audio', purpose: '朗读示范', required: true, fallback: '家长读一遍。', state: 'awaiting_generation' },
+    demo,
+    { resource_id: 'cup', kind: 'image', purpose: '展示两个杯子', required: false, stage: 'help', fallback: '拿出实物杯子。', state: 'planned' },
+    { resource_id: 'clip', kind: 'video', purpose: '倒水', required: false, stage: 'question', fallback: '家长演示。', state: 'not_connected' },
+    { resource_id: 'voice:goal', kind: 'audio', purpose: '开场说明', text: '我是Jane。', required: false, stage: 'question', fallback: '现场合成。',
+      state: 'adopted', versions: [{ version: 1 }], adopted_version: 1 },
   ] })
   assert.deepEqual(lines, [
-    '图片（可选）：展示两个杯子；没有时：拿出实物杯子。——已列入清单，确认后生成',
-    '音频（必需）：朗读示范；没有时：家长读一遍。——确认后生成（下一批接入）',
+    '语音（必需，求助后）：朗读示范：read-aloud-1「Mia has paper.」；没有时：采用后才能开课。——待查看，采用第1版，共2版',
+    '图片（可选，求助后）：展示两个杯子；没有时：拿出实物杯子。——已列入清单，确认后生成',
+    '视频（可选，提问时）：倒水；没有时：家长演示。——未接入',
+    '语音（可选，提问时）：开场说明「我是Jane。」；没有时：现场合成。——已采用，采用第1版，共1版',
   ])
   assert.deepEqual(resourceLines({ resources: [] }), [])
+  assert.deepEqual(missingResources({ resources: [demo, { ...demo, purpose: '朗读示范：read-aloud-2', adopted_version: null }] }), ['朗读示范：read-aloud-2'])
 })
 
 test('discussion rounds read as the parent feedback and what the model changed', () => {

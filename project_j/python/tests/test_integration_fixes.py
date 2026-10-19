@@ -3,7 +3,7 @@
 import asyncio
 
 import pytest
-from support import CONDITIONS, LEARNER, answer, complete_story, confirmed, deliver_all
+from support import CONDITIONS, LEARNER, answer, complete_story, confirmed, deliver_all, ready
 
 from project_j.application.documents import document
 from project_j.contracts import RevisionRef
@@ -38,7 +38,7 @@ def test_corrected_sources_block_new_preparation_and_saved_preparation_replay(ap
         assert app.start("blocked-old", LEARNER, old_course, CONDITIONS)["decision"] == "blocked"
         rechecked = await app.next_course("recheck", LEARNER, core.activity_id)
         new_course = ref(rechecked["next_package"]["course_ref"])
-        confirmed(app, {"course_ref": new_course})
+        await ready(app, {"course_ref": new_course})
         assert app.start("allowed-new", LEARNER, new_course, CONDITIONS)["decision"] == (
             "allow_simulation"
         )
@@ -106,7 +106,7 @@ def test_reused_state_retry_keeps_newer_evidence_and_rechecks_demand(application
         assert state_step["effect_refs"] == [reused.model_dump()]
 
         package = await app.prepare("newer-prepare", LEARNER)
-        confirmed(app, {"course_ref": ref(package["course_ref"])})
+        await ready(app, {"course_ref": ref(package["course_ref"])})
         assert (
             app.start("newer-start", LEARNER, ref(package["course_ref"]), CONDITIONS)["decision"]
             == "allow_simulation"

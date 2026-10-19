@@ -52,6 +52,33 @@ class PrivateFiles:
             raise ValueError("material missing or corrupted")
         return text
 
+    def binary_asset(self, content: bytes, suffix: str) -> dict:
+        """Generated audio or pictures, named by their own SHA-256."""
+        self.store.ensure_idle()
+        checksum = hashlib.sha256(content).hexdigest()
+        relative = f"assets/{checksum}.{suffix}"
+        path = check_path(self.store.run, relative, self.store.realm)
+        if path.exists():
+            if hashlib.sha256(path.read_bytes()).hexdigest() != checksum:
+                raise ValueError("fixed material integrity failure")
+        else:
+            private_write(path, content)
+        return {"path": relative, "sha256": checksum, "bytes": len(content)}
+
+    def read_binary(self, manifest: dict) -> bytes:
+        self.store.ensure_idle()
+        path = check_path(self.store.run, manifest["path"], self.store.realm)
+        try:
+            content = path.read_bytes()
+        except FileNotFoundError:
+            content = b""
+        if (
+            hashlib.sha256(content).hexdigest() != manifest["sha256"]
+            or len(content) != manifest["bytes"]
+        ):
+            raise ValueError("material missing or corrupted")
+        return content
+
     def export(self, learner_id: str) -> Path:
         self.store.ensure_idle()
         with self.store.engine.begin() as connection:
@@ -90,15 +117,19 @@ class PrivateFiles:
             connection.connection.driver_connection.backup(backup)
         with sqlite3.connect(destination) as backup:
             rows = backup.execute("SELECT payload FROM revisions").fetchall()
-        manifests = []
+        manifests = {}
         for (payload,) in rows:
             doc = Document.model_validate_json(payload)
             if doc.kind == "material":
-                self.read_asset(doc.body["asset"])
-                source = check_path(self.store.run, doc.body["asset"]["path"], self.store.realm)
-                copied = check_path(target, doc.body["asset"]["path"], self.store.realm)
-                private_write(copied, source.read_bytes())
-                manifests.append(doc.body["asset"])
+                manifests[doc.body["asset"]["path"]] = doc.body["asset"]
+            elif doc.kind == "preview":  # Generated resource versions (ADR-0017).
+                for item in doc.body.get("resources", ()):
+                    for version in item.get("versions", ()):
+                        manifests[version["asset"]["path"]] = version["asset"]
+        for manifest in manifests.values():
+            copied = check_path(target, manifest["path"], self.store.realm)
+            private_write(copied, self.read_binary(manifest))
+        manifests = list(manifests.values())
         private_write(
             target / "manifest.json",
             canonical(
@@ -132,10 +163,13 @@ class PrivateFiles:
         for asset in manifest["assets"]:
             source = check_path(backup, asset["path"], realm)
             target = check_path(store.run, asset["path"], realm)
-            content = source.read_text()
-            if digest(content) != asset["sha256"] or len(content.encode()) != asset["bytes"]:
+            content = source.read_bytes()
+            if (
+                hashlib.sha256(content).hexdigest() != asset["sha256"]
+                or len(content) != asset["bytes"]
+            ):
                 raise ValueError("backup material integrity failure")
-            private_write(target, content.encode())
+            private_write(target, content)
         restored = SimulationStore(root, run_id, realm)
         with restored.engine.begin() as connection:
             if connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall():

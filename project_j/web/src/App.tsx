@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { acknowledgePause, cancel, presentationCancelled, type Cancellation } from './cancellation'
 import { canConfirm } from './confirmation'
-import { describe, discussionLines, endLabels, evaluationLines, modelLines, resourceLines, startMessage } from './report'
+import { describe, discussionLines, endLabels, evaluationLines, missingResources, modelLines, resourceLines, startMessage } from './report'
 import { finishRecording, idle, pauseRecording, recordedMs, resumeRecording, startRecording, type Recorder } from './recording'
 import { requestFailure, type RequestFailure } from './request'
 import { Speaker, reportsFor, startedReport } from './speaker'
 import { Microphone } from './microphone'
 import { toBase64 } from './audio'
-import type { Snapshot, Dashboard, RevisionRef as Ref, Document as Doc, Control, StudentControl, DeliveryFeedback, TextInput, PreparationResult as PrepareResult, StartResult, StartConditions, InputResult as Ack } from './client/types.gen'
+import type { AllowedAction, Snapshot, Dashboard, RevisionRef as Ref, Document as Doc, Control, StudentControl, DeliveryFeedback, TextInput, PreparationResult as PrepareResult, StartResult, StartConditions, InputResult as Ack } from './client/types.gen'
 
 const learner = 'fictional-L1'
 const uid = () => crypto.randomUUID()
@@ -23,6 +23,33 @@ const conditionChoices: [Condition, string, [string, string][]][] = [
   ['accompaniment', '陪伴', [['unknown', '未确认'], ['reported_present', '家长可陪伴'], ['unavailable', '家长不能陪伴']]],
 ]
 const previewRank = (key: string) => key in previewLabels ? Object.keys(previewLabels).indexOf(key) : 99
+// Resource kinds with a connected generator: voice by local synthesis, the rest by the model.
+const generatable = ['audio', 'image', 'animation']
+type Resource = { resource_id: string, kind: string, purpose: string, versions?: unknown[], adopted_version?: number | null }
+
+// A generated file fetched with the bearer token, as a URL the page can play or show.
+async function fileUrl(token: string, path: string): Promise<string> {
+  const response = await fetch(path, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+  if (!response.ok) throw requestFailure(response.status, '资源文件未取得')
+  return URL.createObjectURL(await response.blob())
+}
+
+// Pictures and animations the core approved with an action; shown as images only.
+function Visuals({ token, action }: { token: string, action?: AllowedAction }) {
+  const [urls, setUrls] = useState<string[]>([])
+  const id = action?.action_id, visuals = action?.visuals ?? []
+  const key = visuals.join(' ')
+  useEffect(() => {
+    if (!id || !key) { setUrls([]); return }
+    let alive = true
+    const made: string[] = []
+    void Promise.all(key.split(' ').map(resource => fileUrl(token, `/api/student/visual/${encodeURIComponent(id)}/${encodeURIComponent(resource)}`)
+      .then(url => { made.push(url); return url }).catch(() => undefined)))
+      .then(list => { if (alive) setUrls(list.filter((url): url is string => Boolean(url))) })
+    return () => { alive = false; made.forEach(url => URL.revokeObjectURL(url)) }
+  }, [token, id, key])
+  return urls.length ? <section className="visuals">{urls.map(url => <img key={url} src={url} alt="Jane 展示的图" />)}</section> : null
+}
 
 async function api<T>(token: string, path: string, body?: unknown): Promise<T> {
   let response: Response
@@ -55,6 +82,8 @@ function Parent({ token }: { token: string }) {
   const [lostDrafts, setLostDrafts] = useState<Record<string, string>>({})
   const [planGoal, setPlanGoal] = useState('在相近新材料中观察阅读依据，继续保留短英语报告支架。')
   const failedOperation = useRef<(() => Promise<void>) | null>(null)
+  const [shown, setShown] = useState<Record<string, string>>({})
+  const listening = useRef<HTMLAudioElement | null>(null)
   const refresh = useCallback(async () => {
     const data = await api<Dashboard>(token, `parent/dashboard?learner_id=${learner}`)
     setDashboard(data)
@@ -101,6 +130,29 @@ function Parent({ token }: { token: string }) {
   const preview = (previewDoc?.body.content ?? selectedCourse?.body.parent_preview) as Record<string, unknown> | undefined
   const confirmed = Boolean(previewDoc?.body.confirmation)
   const courseRequest = () => ({ request_id: uid(), learner_id: learner, course_ref: prepared?.course_ref })
+  const resources = (previewDoc?.body.resources ?? []) as Resource[]
+  const missing = previewDoc ? missingResources(previewDoc.body) : []
+  // Request bodies are made once, so resuming a failed operation repeats the same request.
+  const generate = (item: Resource) => {
+    const body = { ...courseRequest(), resource_id: item.resource_id }
+    return async () => { await api(token, 'parent/generate-resource', body) }
+  }
+  const adopt = (item: Resource, version: number) => {
+    const body = { ...courseRequest(), resource_id: item.resource_id, version }
+    return async () => { await api(token, 'parent/adopt-resource', body) }
+  }
+  const look = (item: Resource, version: number) => async () => {
+    const course = prepared!.course_ref
+    const query = new URLSearchParams({ learner_id: learner, object_id: course.object_id, revision: String(course.revision),
+      resource_id: item.resource_id, version: String(version) })
+    const url = await fileUrl(token, `/api/parent/resource-file?${query}`)
+    if (item.kind === 'audio') { listening.current?.pause(); listening.current = new Audio(url); await listening.current.play() }
+    else setShown(current => ({ ...current, [item.resource_id]: url }))
+  }
+  const generateAll = () => {
+    const steps = resources.filter(item => generatable.includes(item.kind) && !item.versions?.length).map(generate)
+    return async () => { for (const step of steps) await step() }
+  }
   const parentControl = (command: Control['command']) => {
     const body = { command, event_id: uid(), activity_id: dashboard?.active?.activity_id }
     void run(async () => { await api(token, 'parent/control', body) })
@@ -134,8 +186,20 @@ function Parent({ token }: { token: string }) {
           ? <dl>{Object.entries(preview).sort(([a], [b]) => previewRank(a) - previewRank(b)).map(([key, value]) => <div key={key}><dt>{previewLabels[key] ?? key}</dt><dd>{show(value)}</dd></div>)}</dl>
           : <p>预览待取得</p>}
           {previewDoc?.body.note ? <p>说明：{String(previewDoc.body.note)}</p> : null}
-          {previewDoc && <><h3>教学资源清单</h3>{resourceLines(previewDoc.body).length
-            ? <ul>{resourceLines(previewDoc.body).map(line => <li key={line}>{line}</li>)}</ul> : <p>本课不需要额外资源。</p>}
+          {previewDoc && <><h3>教学资源清单</h3>
+            {confirmed && resources.some(item => generatable.includes(item.kind) && !item.versions?.length)
+              && <button className="quiet" disabled={busy} onClick={() => void run(generateAll())}>生成全部待生成的资源</button>}
+            {resources.length ? <ul>{resourceLines(previewDoc.body).map((line, index) => {
+              const item = resources[index], latest = item.versions?.length ?? 0
+              return <li key={item.resource_id}>{line}
+                {confirmed && generatable.includes(item.kind) && <div className="row">
+                  <button className="quiet" disabled={busy} onClick={() => void run(generate(item))}>{latest ? '重新生成' : '生成'}</button>
+                  {latest > 0 && <><button className="quiet" disabled={busy} onClick={() => void run(look(item, latest))}>{item.kind === 'audio' ? '试听' : '查看'}第{latest}版</button>
+                    <button disabled={busy || item.adopted_version === latest} onClick={() => void run(adopt(item, latest))}>采用第{latest}版</button></>}
+                </div>}
+                {shown[item.resource_id] && <img className="resource-preview" src={shown[item.resource_id]} alt={item.purpose} />}
+              </li>
+            })}</ul> : <p>本课不需要额外资源。</p>}
             <dl>{discussionLines(previewDoc.body).map(([label, value], index) => <div key={index}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></>}
           <label>修改意见（改目标、30分钟预算或主要教学方式需回到学习规划）<textarea value={courseFeedback} onChange={event => setCourseFeedback(event.target.value)} /></label>
           <div className="row"><button className="quiet" disabled={busy || !courseFeedback.trim()} onClick={() => void run(async () => {
@@ -147,6 +211,7 @@ function Parent({ token }: { token: string }) {
               {options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>)}</div>
           <label>补充说明（可选）<textarea value={household} onChange={event => setHousehold(event.target.value)} /></label>
           {!confirmed && <p>确认课程后才能开始。</p>}
+          {confirmed && missing.length > 0 && <p>以下必需资源采用后才能开始：{missing.join('、')}。</p>}
           <button disabled={busy || !confirmed} onClick={() => { const requestId = uid(); void run(async () => {
             const reported = conditionChoices.map(([key, name, options]) => `${name}：${options.find(([value]) => value === conditions[key])?.[1]}`).join('；')
             const data = await api<StartResult>(token, 'parent/start', { request_id: requestId, learner_id: learner, course_ref: prepared.course_ref,
@@ -422,6 +487,8 @@ function Student({ token }: { token: string }) {
       ? (snapshot?.pending_action ?? snapshot?.presented_action)?.text ?? '等待同一核心的下一动作。'
       : locked ? '请点“打开声音”，听 Jane 说话。' : speaking ? 'Jane 正在说话……' : snapshot?.presented_action?.text ?? '等待同一核心的下一动作。'}</p>
       {adult && locked && <button onClick={() => void speaker.current?.resume().then(() => setLocked(false))}>打开声音</button>}</div></section>
+    {!localCancelled && <Visuals token={token} action={!adult ? (snapshot?.pending_action ?? snapshot?.presented_action) ?? undefined
+      : locked || speaking ? undefined : snapshot?.presented_action ?? undefined} />}
     {!localCancelled && Object.entries(snapshot?.materials ?? {}).map(([id, material]) => <section key={id} className="reading"><pre>{material}</pre></section>)}
     {reading && snapshot?.mode !== 'ended' && <section className="reading-aloud">
       <h2>朗读这一段</h2><p>{String(reading.reference_text)}</p>

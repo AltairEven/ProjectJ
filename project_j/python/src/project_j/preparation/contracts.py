@@ -76,6 +76,10 @@ class TaskDefinition(Contract):
         return self
 
 
+# The local synthesizer's single-request text limit (ADR-0016).
+MAX_AUDIO_CHARS = 1000
+
+
 class ResourceSpec(Contract):
     """A teaching resource the course asks for; generated only after the parent confirms."""
 
@@ -87,6 +91,16 @@ class ResourceSpec(Contract):
     audience: Literal["student", "parent", "teacher"]
     required: bool
     fallback: str = Field(min_length=1)
+    # When the student sees or hears it: with the question, or as help after asking.
+    stage: Literal["question", "help"] = "question"
+    # Audio only: the exact words Jane says, word for word the course text.
+    text: str | None = Field(default=None, min_length=1, max_length=MAX_AUDIO_CHARS)
+
+    @model_validator(mode="after")
+    def spoken_text(self):
+        if (self.kind == "audio") != (self.text is not None):
+            raise ValueError("audio resources carry exactly the text Jane says; others none")
+        return self
 
 
 class CourseBody(Contract):

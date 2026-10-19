@@ -15,7 +15,8 @@ from project_j.contracts import Contract, RevisionRef, SubmittedInput
 from project_j.platform.models.service import ModelService
 from project_j.platform.speech.contracts import PronunciationResult, PronunciationScorer
 from project_j.platform.storage import REALMS, Conflict, canonical, digest
-from project_j.preparation.contracts import CourseBody, TaskDefinition
+from project_j.preparation.contracts import CourseBody, ResourceSpec, TaskDefinition
+from project_j.preparation.voice import goal_text, question_speech, question_text
 
 log = logging.getLogger(__name__)
 # Diagnostic logs carry identities, kinds and outcomes only, never what was said or shown.
@@ -79,6 +80,10 @@ class AllowedAction(Contract):
     audience: Literal["student"] = "student"
     material_refs: tuple[RevisionRef, ...] = ()
     help: dict[str, str] = {}
+    # What Jane says, part by part (empty: the whole text); adopted recordings play as is.
+    speech: tuple[str, ...] = ()
+    # Adopted pictures or animations shown with this action, by resource id.
+    visuals: tuple[str, ...] = ()
     after_delivery: Literal[
         "input", "retry", "clarification", "next_task", "offscreen", "end_confirmation"
     ]
@@ -113,8 +118,12 @@ class Harness:
         *,
         realm: Literal["simulation", "adult_check"] = "simulation",
         jane: dict | None = None,
+        voiced: frozenset[str] = frozenset(),
+        visible: tuple[ResourceSpec, ...] = (),
     ):
         self.activity_id, self.learner_id = activity_id, learner_id
+        # Texts with an adopted recording; adopted student pictures and animations.
+        self.voiced, self.visible = voiced, visible
         self.jane = jane  # The Jane version the course is bound to.
         self.realm, self.source_type = realm, REALMS[realm][1]
         self.course_ref, self.course, self.bindings, self.models = (
@@ -148,12 +157,7 @@ class Harness:
         self.closing_clock: float | None = None
         self.budget_exhausted = False
         # A review lesson must not present an already-read story as a first reading.
-        reading = "先复习读过的故事" if self.course.lesson_type == "review" else "先读故事"
-        self.action(
-            "goal",
-            f"我是Jane。{reading}、找依据，再做纸桥短观察；可随时暂停或停止。请确认收到安排。",
-            "input",
-        )
+        self.action("goal", goal_text(self.course), "input", visuals=self.shown((), "question"))
 
     def record(self, kind: str, payload: dict):
         self.events.append(
@@ -179,7 +183,25 @@ class Harness:
         for job in tuple(self.jobs):
             job.cancel()
 
-    def action(self, kind: str, text: str, after: str, help_map=None, materials=()):
+    def shown(self, task_ids: tuple[str, ...], stage: str) -> tuple[str, ...]:
+        """Adopted visuals for these tasks at this stage; ones tied to no task open the class."""
+        return tuple(
+            item.resource_id
+            for item in self.visible
+            if item.stage == stage
+            and (set(item.task_ids) & set(task_ids) if task_ids else not item.task_ids)
+        )
+
+    def action(
+        self,
+        kind: str,
+        text: str,
+        after: str,
+        help_map=None,
+        materials=(),
+        speech=(),
+        visuals=(),
+    ):
         if self.mode in {"ended", "paused"}:
             raise ValueError("action cannot be issued after stop or while paused")
         if self.mode != "delivering":
@@ -198,6 +220,8 @@ class Harness:
             after_delivery=after,
             help=help_map or {},
             material_refs=materials,
+            speech=speech,
+            visuals=visuals,
         )
         self.actions[action.action_id] = action
         self.pending = action.action_id
@@ -321,7 +345,7 @@ class Harness:
                 "我们保留实际回答、帮助和未观察项。下次课按课后安排继续；请确认收到小结。",
                 "end_confirmation",
             )
-        task = self.course.tasks[self.task_index]
+        task, budget = self.course.tasks[self.task_index], self.course.budget
         self.wait_kind = "answer"
         self.record(
             "task_started",
@@ -332,23 +356,20 @@ class Harness:
                 "purpose": task.purpose,
             },
         )
+        text, spoken = question_text(task, budget), question_speech(task, budget)
+        visuals = self.shown((task.task_id,), "question")
         if task.purpose == "offscreen":
-            # The offscreen action itself carries its budget and the way back.
-            minutes = self.course.budget["offscreen"]
             return self.action(
-                "offscreen",
-                f"{task.prompt}这一段约{minutes}分钟；做完点“返回”，再说实际结果。",
-                "offscreen",
-                materials=(task.material_ref,),
+                "offscreen", text, "offscreen", materials=(task.material_ref,), visuals=visuals
             )
-        if task.purpose == "read_aloud":
-            return self.action(
-                "question",
-                f"{task.prompt}\n{task.reference_text}",
-                "input",
-                materials=(task.material_ref,),
-            )
-        return self.action("question", task.prompt, "input", materials=(task.material_ref,))
+        return self.action(
+            "question",
+            text,
+            "input",
+            materials=(task.material_ref,),
+            speech=() if spoken == text else (spoken,),
+            visuals=visuals,
+        )
 
     def control(self, event_id: str, command: str):
         signature = {"event_id": event_id, "command": command}
@@ -374,7 +395,15 @@ class Harness:
             self.move("offscreen" if previous_mode == "offscreen" else "delivering")
             if previous_mode != "offscreen":
                 last = next(reversed(self.actions.values()))
-                self.action("repeat", last.text, last.after_delivery, last.help, last.material_refs)
+                self.action(
+                    "repeat",
+                    last.text,
+                    last.after_delivery,
+                    last.help,
+                    last.material_refs,
+                    last.speech,
+                    last.visuals,
+                )
         elif command == "return":
             if self.mode != "offscreen":
                 raise ValueError("return does not create an offscreen result")
@@ -394,7 +423,15 @@ class Harness:
         elif command == "repeat":
             if self.mode in {"waiting_input", "delivering"}:
                 last = next(reversed(self.actions.values()))
-                self.action("repeat", last.text, last.after_delivery, last.help, last.material_refs)
+                self.action(
+                    "repeat",
+                    last.text,
+                    last.after_delivery,
+                    last.help,
+                    last.material_refs,
+                    last.speech,
+                    last.visuals,
+                )
         elif command == "close":
             if self.mode not in {"ended", "paused"}:
                 self.invalidate()
@@ -664,6 +701,14 @@ class Harness:
             self.help_count[self.task_instance_id] = count + 1
             if count < len(task.supports):
                 help_map = task.supports[count].help
+        speech = ()
+        # The full-model help of a reading segment plays its adopted demonstration.
+        if (
+            task.purpose == "read_aloud"
+            and "full_model" in help_map.values()
+            and task.reference_text in self.voiced
+        ):
+            speech = (proposal.text, task.reference_text)
         action = self.action(
             "help" if help_map else "feedback",
             proposal.text,
@@ -673,6 +718,8 @@ class Harness:
             if proposal.judgment == "unclear"
             else "retry",
             help_map,
+            speech=speech,
+            visuals=self.shown((task.task_id,), "help") if help_map else (),
         )
         self.inputs[submitted.event_id]["response_action"] = action.action_id
         return {"ack": "accepted", "snapshot": self.snapshot()}

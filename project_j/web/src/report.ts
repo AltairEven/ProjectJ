@@ -14,9 +14,10 @@ const valueLabels: Record<string, string> = {
   child_entry: '儿童入口', reused: '沿用', reused_with_reason: '沿用并说明理由', plan_effective: '新计划已生效',
   not_changed: '未改变', recheck_demand_and_course: '复核需求和课程', accept: '接受', reject: '拒绝',
   restored_to_new_simulation: '已恢复到新运行目录', not_granted: '未授予', not_ready: '课程未就绪', adjusted: '已调整',
-  confirmed: '已确认', awaiting_generation: '确认后生成（下一批接入）', planned: '已列入清单，确认后生成',
+  confirmed: '已确认', awaiting_generation: '待生成', planned: '已列入清单，确认后生成', generated: '待查看', adopted: '已采用', not_connected: '未接入',
 }
-const kindLabels: Record<string, string> = { image: '图片', audio: '音频', animation: '动画', video: '视频' }
+const kindLabels: Record<string, string> = { image: '图片', audio: '语音', animation: '动画', video: '视频' }
+const stageLabels: Record<string, string> = { question: '提问时', help: '求助后' }
 const directionLabels: Record<string, string> = {
   consolidate: '巩固', review: '复查', extend: '拓展', advance: '小步进阶', observe: '短观察',
 }
@@ -108,10 +109,18 @@ const startReasons: Record<string, string> = {
 }
 
 /** Explain a start that did not create a classroom, without turning a failed condition into a pass. */
-/** One line per planned teaching resource: kind, need, purpose, fallback and state. */
+/** One line per teaching resource: kind, need, stage, purpose, Jane's words, fallback, state and versions. */
 export function resourceLines(preview: Body): string[] {
-  return (preview.resources ?? []).map((item: Body) =>
-    `${kindLabels[item.kind] ?? item.kind}（${item.required ? '必需' : '可选'}）：${item.purpose}；没有时：${item.fallback}——${valueLabels[item.state] ?? item.state}`)
+  return (preview.resources ?? []).map((item: Body) => {
+    const versions = item.versions?.length ? `${item.adopted_version ? `，采用第${item.adopted_version}版` : ''}，共${item.versions.length}版` : ''
+    return `${kindLabels[item.kind] ?? item.kind}（${item.required ? '必需' : '可选'}，${stageLabels[item.stage] ?? item.stage}）：${item.purpose}`
+      + `${item.text ? `「${item.text}」` : ''}；没有时：${item.fallback}——${valueLabels[item.state] ?? item.state}${versions}`
+  })
+}
+
+/** Required resources that still have no adopted version; the class cannot start before them. */
+export function missingResources(preview: Body): string[] {
+  return (preview.resources ?? []).filter((item: Body) => item.required && !item.adopted_version).map((item: Body) => item.purpose)
 }
 
 /** Each discussion round as the parent's feedback and the model's note, then the confirmation. */

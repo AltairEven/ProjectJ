@@ -62,6 +62,12 @@ REQUIRED: dict[Purpose, tuple[str, ...]] = {
 }
 
 
+class ImageNote(Contract):
+    """What a generated picture shows, for the parent to check against the request."""
+
+    description: str = Field(min_length=1)
+
+
 class Binding(Contract):
     adapter: str = Field(min_length=1)
     model: str = Field(min_length=1)
@@ -113,6 +119,8 @@ class ModelRequest:
     context: dict
     output: type[BaseModel]
     deadline_seconds: float = 10.0
+    # "image": the reply carries one generated picture besides the structured output.
+    media: Literal["image"] | None = None
 
     def __post_init__(self):
         if self.purpose not in PURPOSES:
@@ -130,6 +138,7 @@ class AdapterReply:
     actual: dict[str, ConfigCheck] = field(default_factory=dict)
     usage: dict | None = None
     request_id: str | None = None
+    media: tuple[bytes, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -140,6 +149,7 @@ class ModelResult:
     output: BaseModel | None
     failure: Failure | None
     actual: dict[str, ConfigCheck]
+    media: tuple[bytes, ...] = ()
 
     @property
     def ok(self) -> bool:
