@@ -2,7 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 
 import pytest
-from support import LEARNER, answer, complete_story, deliver_all, start
+from support import LEARNER, answer, complete_story, deliver_all, judgments, start
 
 from project_j.classroom.harness import DeliveryFeedback
 from project_j.classroom.judgment import ModelProposal
@@ -13,7 +13,7 @@ from project_j.platform.storage import Conflict
 def test_delivery_partial_interruption_and_sequence_cannot_forge_receipt_or_understanding(
     application,
 ):
-    core = start(application)
+    core = asyncio.run(start(application))
     action = core.actions[core.pending]
     partial = DeliveryFeedback(
         delivery_event_id="dl1",
@@ -45,7 +45,7 @@ def test_delivery_partial_interruption_and_sequence_cannot_forge_receipt_or_unde
 
 def test_E2E11_out_of_bound_proposal_does_not_advance(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
         before = core.task_index
@@ -72,7 +72,7 @@ def test_E2E11_out_of_bound_proposal_does_not_advance(application):
 
 def test_stale_input_after_next_question_is_not_scored(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
         old = application.adapter.binding()
@@ -99,7 +99,7 @@ def test_stale_input_after_next_question_is_not_scored(application):
 
 def test_model_failure_keeps_original_input_and_does_not_advance(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
         application.models.adapters["simulated"].fail_next = True
@@ -111,7 +111,7 @@ def test_model_failure_keeps_original_input_and_does_not_advance(application):
 
 
 def test_budget_boundaries_are_explicit_simulated_clock_events(application):
-    core = start(application)
+    core = asyncio.run(start(application))
     core.started_clock -= 27 * 60 + 1
     core.tick()
     assert core.wait_kind == "closing_confirmation"
@@ -139,17 +139,17 @@ def test_E2E18_explicit_no_addition_reuses_provisional_without_another_model_cal
 
 def test_typed_stop_bypasses_question_binding(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         result = await application.adapter.text("stop-typed", "停止")
         assert result["ack"] == "accepted_control"
         assert core.mode == "ended" and core.pending is None and not core.attempts
-        assert not application.models.calls
+        assert not judgments(application)
 
     asyncio.run(scenario())
 
 
 def test_repeat_revisions_prevent_old_delivery_from_advancing(application):
-    core = start(application)
+    core = asyncio.run(start(application))
     old = core.actions[core.pending]
     revision = core.revision
     core.control("repeat-goal", "repeat")
@@ -173,7 +173,7 @@ def test_repeat_revisions_prevent_old_delivery_from_advancing(application):
 
 
 def test_late_actual_delivery_is_an_append_only_fact_revision(application):
-    core = start(application)
+    core = asyncio.run(start(application))
     action = core.actions[core.pending]
     core.control("stop-before-late-delivery", "stop")
     old = application.seal()
@@ -203,7 +203,7 @@ def test_late_actual_delivery_is_an_append_only_fact_revision(application):
 def test_seal_progress_is_healed_from_the_durable_fact_receipt(application):
     from project_j.application.documents import identity
 
-    core = start(application)
+    core = asyncio.run(start(application))
     core.control("stop-with-ledger-failure", "stop")
     application.store.fail_at = "ledger"
     fact = application.seal()
@@ -217,7 +217,7 @@ def test_invalid_structured_proposal_retains_input_and_offers_clarification(
     application, monkeypatch
 ):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
 

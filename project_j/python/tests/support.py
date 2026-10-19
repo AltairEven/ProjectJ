@@ -14,8 +14,9 @@ CONDITIONS = {
 }
 
 
-def start(app, request_id="start1"):
-    prepared = app.prepare("prepare1", LEARNER)
+async def start(app, request_id="start1"):
+    prepared = await app.prepare("prepare1", LEARNER)
+    confirmed(app, prepared)
     result = app.start(
         request_id, LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS
     )
@@ -78,7 +79,7 @@ async def read_aloud_all(app):
 
 
 async def complete_story(app, helped=False, offscreen_report=True):
-    core = start(app)
+    core = await start(app)
     deliver_all(core)
     await answer(app, "听到了，先读故事再试纸桥。", "confirmation")
     if helped:
@@ -104,6 +105,7 @@ async def complete_story(app, helped=False, offscreen_report=True):
 
 async def teach(app, request_id, course_ref, answers):
     """Teach one prepared course with first-try answers and an offscreen report; seal the fact."""
+    confirmed(app, {"course_ref": course_ref})
     result = app.start(request_id, LEARNER, RevisionRef.model_validate(course_ref), CONDITIONS)
     assert result["decision"] == "allow_simulation"
     core = app.core
@@ -119,3 +121,16 @@ async def teach(app, request_id, course_ref, answers):
     await answer(app, "听到了。", "confirmation")
     assert core.mode == "ended"
     return app.seal()
+
+
+def judgments(app):
+    """Classroom judgment calls only; preparation calls the model before class too."""
+    return [call for call in app.models.calls if call["purpose"] == "classroom_judgment"]
+
+
+def confirmed(app, prepared):
+    """The parent confirms the prepared course version; starting needs it."""
+    course_ref = prepared["course_ref"]
+    if isinstance(course_ref, dict):
+        course_ref = RevisionRef.model_validate(course_ref)
+    return app.confirm(f"confirm:{course_ref.object_id}:{course_ref.revision}", LEARNER, course_ref)

@@ -10,11 +10,13 @@ const keyLabels: Record<string, string> = {
   status: '课程状态', reason: '原因', plan_reason: '计划理由',
 }
 const valueLabels: Record<string, string> = {
-  fixed_simulation_checked: '固定模拟包已核对', pending: '待开始', actual_api: '实际API', voice: '声音',
+  drafted: '已编写，待确认', pending: '待开始', actual_api: '实际API', voice: '声音',
   child_entry: '儿童入口', reused: '沿用', reused_with_reason: '沿用并说明理由', plan_effective: '新计划已生效',
   not_changed: '未改变', recheck_demand_and_course: '复核需求和课程', accept: '接受', reject: '拒绝',
   restored_to_new_simulation: '已恢复到新运行目录', not_granted: '未授予', not_ready: '课程未就绪', adjusted: '已调整',
+  confirmed: '已确认', awaiting_generation: '确认后生成（下一批接入）', planned: '已列入清单，确认后生成',
 }
+const kindLabels: Record<string, string> = { image: '图片', audio: '音频', animation: '动画', video: '视频' }
 const directionLabels: Record<string, string> = {
   consolidate: '巩固', review: '复查', extend: '拓展', advance: '小步进阶', observe: '短观察',
 }
@@ -106,6 +108,21 @@ const startReasons: Record<string, string> = {
 }
 
 /** Explain a start that did not create a classroom, without turning a failed condition into a pass. */
+/** One line per planned teaching resource: kind, need, purpose, fallback and state. */
+export function resourceLines(preview: Body): string[] {
+  return (preview.resources ?? []).map((item: Body) =>
+    `${kindLabels[item.kind] ?? item.kind}（${item.required ? '必需' : '可选'}）：${item.purpose}；没有时：${item.fallback}——${valueLabels[item.state] ?? item.state}`)
+}
+
+/** Each discussion round as the parent's feedback and the model's note, then the confirmation. */
+export function discussionLines(preview: Body): [string, string][] {
+  const rounds = (preview.discussion ?? []).flatMap((item: Body, index: number): [string, string][] => [
+    [`第${index + 1}轮意见`, item.feedback], [`第${index + 1}轮修改说明`, item.note],
+  ])
+  const confirmation = preview.confirmation
+  return [...rounds, ['确认', confirmation ? `已确认（${confirmation.confirmed_at}）` : '待确认']]
+}
+
 export function startMessage(result: { decision: string; missing?: string[] | null; reason?: string | null }): string {
   if (result.missing?.length) return `尚不能开始，待确认：${result.missing.map(item => startItems[item] ?? item).join('、')}。`
   return (result.reason && startReasons[result.reason]) || `尚不能开始（${result.reason ?? result.decision}）。`

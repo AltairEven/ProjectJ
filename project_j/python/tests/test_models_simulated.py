@@ -103,7 +103,7 @@ def test_judgment_instructions_carry_the_reference_set_fixes():
 
 
 def test_started_class_binds_the_course_jane_version(application):
-    core = start(application)
+    core = asyncio.run(start(application))
     assert core.jane["identity"] == "Jane" and core.jane["rules"]
 
 

@@ -51,12 +51,20 @@ from project_j.platform.storage import (
 from project_j.platform.tts.contracts import Synthesizer, SynthesizerNotReady
 from project_j.platform.tts.simulated import SimulatedSynthesizer
 from project_j.preparation.contracts import CourseBody
+from project_j.preparation.drafting import (
+    DraftRejected,
+    PreparationUnavailable,
+    checked_course,
+    discussion_request,
+    preparation_request,
+    repair_request,
+)
 from project_j.preparation.packages import (
+    COURSES,
     FIRST,
-    PreparationNotReady,
-    compile_course,
+    library_entry,
     next_material,
-    template_gap,
+    template_draft,
 )
 from project_j.teacher.methods import JANE
 
@@ -81,6 +89,28 @@ def student_text(source: str) -> str:
 def story_text(source: str) -> str:
     """The story a course is compiled from: the student text without its title line."""
     return student_text(source).split("\n", 1)[1]
+
+
+STALE_COURSE = "课程已有更新版本或需求已变，请刷新后对当前版本操作。"
+
+
+def publications(objects: list[Document], revised: dict[str, int] | None = None):
+    """Course, brief, check and preview become effective together; material needs no publication."""
+    reasons = {
+        "course": "备课模型编写、规则核对的课程",
+        "brief": "同包简报合同",
+        "content_check": "原文依据与结构已核对",
+        "preview": "生成同版本预览；不代表已阅读、确认或开始",
+    }
+    return tuple(
+        Publication(
+            ref=obj.ref,
+            expected_revision=(revised or {}).get(obj.object_id),
+            reason=reasons[obj.kind],
+        )
+        for obj in objects
+        if obj.kind in reasons
+    )
 
 
 class Coordinator:
@@ -443,19 +473,20 @@ class Coordinator:
         # The next lesson follows the latest lesson, even when an older one is re-evaluated.
         facts = self.store.list_current(learner_id, "fact")
         latest = max(facts, key=lambda fact: fact.occurred_at)
-        return next_material(
-            self.taught_source(learner_id, latest),
-            # ponytail: any sealed fact counts its story as read, even a class stopped before
-            # the task; this only errs toward review, never toward new material.
-            {self.taught_source(learner_id, fact) for fact in facts},
-        )
+        return next_material(self.taught_source(learner_id, latest), self.read_sources(learner_id))
+
+    def read_sources(self, learner_id: str) -> set[str]:
+        # ponytail: any sealed fact counts its story as read, even a class stopped before
+        # the task; this only errs toward review, never toward new material.
+        facts = self.store.list_current(learner_id, "fact")
+        return {self.taught_source(learner_id, fact) for fact in facts}
 
     def taught_source(self, learner_id: str, fact: Document) -> str:
         course = self.store.read(RevisionRef.model_validate(fact.body["course_ref"]), learner_id)
         material_ref = RevisionRef.model_validate(course.body["material_refs"][0])
         return self.store.read(material_ref, learner_id).body["source"]
 
-    def prepare(self, request_id: str, learner_id: str):
+    async def prepare(self, request_id: str, learner_id: str):
         completed = self.ledger.completed_request(request_id, learner_id, "prepare", {})
         if completed:
             course = self.store.read(
@@ -489,19 +520,6 @@ class Coordinator:
         completed = self.ledger.result(operation, learner_id)
         if completed:
             return completed
-        labels = {
-            doc.body["dimension_id"]: doc.body["name"]
-            for doc in self.store.list_current(learner_id, "capability")
-        }
-        if gap := template_gap(body, labels):
-            # Checked before anything is saved: no Jane, material or course for this demand.
-            log.info(
-                "preparation not_ready demand=%s goals=%s/%s",
-                demand.ref.object_id,
-                body.primary_goal.dimension_id,
-                body.auxiliary_goal.dimension_id,
-            )
-            raise PreparationNotReady(gap)
         jane = self.store.current(identity("shared", "jane"), learner_id)
         if jane and active_restrictions(self, learner_id, (jane.ref,)):
             raise Conflict("selected Jane version is restricted; owner recheck required")
@@ -514,137 +532,412 @@ class Coordinator:
                 [jane],
                 publications=(Publication(ref=jane.ref, reason="唯一Jane模拟方法"),),
             )
-        source, familiar = self.chosen_material(learner_id, body)
-        material = self.saved_step(operation, learner_id, "material")
-        if material is None:
-            text = (self.root / source).read_text()
-            asset = self.files.asset(text)
-            obj = document(
-                "material",
-                identity(operation, "material"),
-                operation,
-                None,
-                {
-                    "status": "checked",
-                    "asset": asset,
-                    "source": source,
-                    "source_sha256": digest(text),
-                    "version": "1.1.0",
-                    "audience": "student",
-                    "visible_at": "task",
-                    "limitations": ["自编材料；未测Lexile或RAZ，不证明科学实物定律。"],
-                },
-            )
-            material = self.save_step(operation, learner_id, "material", [obj])
-        material = material[0]
         package = self.saved_step(operation, learner_id, "package")
         if package is None:
-            course_ref = RevisionRef(object_id=identity(operation, "course"), revision=1)
-            brief_ref = RevisionRef(object_id=identity(operation, "brief"), revision=1)
-            course = compile_course(
+            source, familiar = self.chosen_material(learner_id, body)
+            read = self.read_sources(learner_id)
+            library = self.library(read)
+            goals = (body.primary_goal.dimension_id, body.auxiliary_goal.dimension_id)
+            template = (
+                template_draft(body, source, library[source]["story"], familiar)
+                if goals == (PRIMARY_GOAL.dimension_id, AUXILIARY_GOAL.dimension_id)
+                else None
+            )
+            request = preparation_request(
                 body,
-                demand.ref,
-                jane.ref,
-                brief_ref,
-                material.ref,
-                material.body["source"],
-                familiar,
-                story_text((self.root / material.body["source"]).read_text()),
+                state.body,
+                household.body,
+                [doc.body for doc in self.store.list_current(learner_id, "capability")],
+                jane.body,
+                list(library.values()),
+                source,
+                template,
             )
-            brief = document(
-                "brief",
-                brief_ref.object_id,
-                operation,
-                learner_id,
-                {
-                    "status": "checked",
-                    "course_ref": course_ref.model_dump(),
-                    "demand_ref": demand.ref.model_dump(),
-                    "jane_ref": jane.ref.model_dump(),
-                    "goals": [course.primary_goal.model_dump(), course.auxiliary_goal.model_dump()],
-                    "history": "没有真实儿童历史，以明确模拟输入和初始未知状态开始。",
-                    "path": [t.model_dump(mode="json") for t in course.tasks],
-                    "budget": course.budget,
-                    "adjustments": "挑战替换活动，降阶/跳过/暂停/停止遵守原目标与预算。",
-                    "closing": "只总结实际范围，取得收到确认；停止不强迫小结。",
-                },
-                refs=(course_ref, demand.ref, jane.ref, material.ref),
+            refs = {
+                "course": RevisionRef(object_id=identity(operation, "course"), revision=1),
+                "brief": RevisionRef(object_id=identity(operation, "brief"), revision=1),
+                "material": RevisionRef(object_id=identity(operation, "material"), revision=1),
+            }
+            checked, draft = await self.draft_course(
+                request, "prepare", demand, jane, refs, library, read
             )
-            obj = document(
-                "course",
-                course_ref.object_id,
-                operation,
-                learner_id,
-                course,
-                refs=(demand.ref, state.ref, plan.ref, jane.ref, brief_ref, material.ref),
+            objects = self.package_objects(
+                operation, learner_id, checked, draft, demand, (state, plan), jane, refs, []
             )
             package = self.save_step(
                 operation,
                 learner_id,
                 "package",
-                [obj, brief],
-                publications=(
-                    Publication(ref=obj.ref, reason="固定模拟课程包"),
-                    Publication(ref=brief.ref, reason="同包简报合同"),
-                ),
+                objects,
+                publications=publications(objects),
                 baselines=(demand.ref, state.ref, plan.ref, household.ref, jane.ref),
             )
-        course, brief = package
-        checked = self.saved_step(operation, learner_id, "content-check")
-        if checked is None:
-            obj = document(
-                "content_check",
-                identity(operation, "content-check"),
-                operation,
-                learner_id,
-                check_content(CourseBody.model_validate(course.body), body, material, self.files),
-                refs=(course.ref, brief.ref, material.ref),
-            )
-            checked = self.save_step(
-                operation,
-                learner_id,
-                "content-check",
-                [obj],
-                publications=(Publication(ref=obj.ref, reason="固定素材与任务依据已核对"),),
-            )
-        preview = self.saved_step(operation, learner_id, "preview")
-        if preview is None:
-            obj = document(
-                "preview",
-                identity(operation, "preview"),
-                operation,
-                learner_id,
-                {
-                    "status": "checked",
-                    "course_ref": course.ref.model_dump(),
-                    "content": course.body["parent_preview"],
-                    "actual_read": "unknown",
-                    "current_start": "pending",
-                    "unverified": ["actual_api", "voice", "child_entry"],
-                },
-                refs=(course.ref, checked[0].ref),
-            )
-            preview = self.save_step(
-                operation,
-                learner_id,
-                "preview",
-                [obj],
-                publications=(
-                    Publication(ref=obj.ref, reason="生成同版本预览；不代表已阅读或开始"),
-                ),
-            )
+        course, _, _, checked, preview = package
         return self.ledger.finish(
             operation,
             learner_id,
             {
                 "course_ref": course.ref.model_dump(),
-                "preview_ref": preview[0].ref.model_dump(),
-                "check_ref": checked[0].ref.model_dump(),
-                "preparation": "fixed_simulation_checked",
+                "preview_ref": preview.ref.model_dump(),
+                "check_ref": checked.ref.model_dump(),
+                "preparation": "drafted",
                 "start": "pending",
                 "unverified": ["actual_api", "voice", "child_entry"],
             },
         )
+
+    def current_package(self, learner_id: str, course_ref: RevisionRef):
+        """The current course version under the current demand, and its preview."""
+        course = self.store.current(course_ref.object_id, learner_id)
+        demand = self.current(learner_id, "demand")
+        if (
+            course is None
+            or course.ref != course_ref
+            or course.body["demand_ref"] != demand.ref.model_dump()
+        ):
+            raise Conflict(STALE_COURSE)
+        previews = [
+            doc
+            for doc in self.store.list_current(learner_id, "preview")
+            if doc.body["course_ref"] == course_ref.model_dump()
+        ]
+        return course, demand, previews[0]
+
+    async def discuss(self, request_id: str, learner_id: str, course_ref: RevisionRef, feedback):
+        """The parent's feedback on one course version; the model revises it into the next."""
+        signature = {"course_ref": course_ref.model_dump(), "feedback": feedback}
+        completed = self.ledger.completed_request(request_id, learner_id, "discuss", signature)
+        if completed:
+            return completed
+        self.models.require()
+        # Saved steps are looked up before the staleness check: this round's own revision
+        # makes course_ref stale, and a retry must still resume it.
+        operation = self.request(
+            request_id,
+            learner_id,
+            "discuss",
+            signature,
+            sources=(course_ref,),
+            baselines=(course_ref, self.current(learner_id, "demand").ref),
+        )
+        completed = self.ledger.result(operation, learner_id)
+        if completed:
+            return completed
+        material = self.store.read(
+            RevisionRef.model_validate(
+                self.store.read(course_ref, learner_id).body["material_refs"][0]
+            ),
+            learner_id,
+        )
+        saved = self.saved_step(operation, learner_id, "revision")
+        if saved is None:
+            course, demand, preview = self.current_package(learner_id, course_ref)
+            body = DemandBody.model_validate(demand.body)
+            state, plan, household = [
+                self.store.read(ref, learner_id)
+                for ref in (body.state_ref, body.plan_ref, body.household_ref)
+            ]
+            jane = self.store.read(RevisionRef.model_validate(course.body["jane_ref"]), learner_id)
+            read = self.read_sources(learner_id)
+            library = self.library(read)
+            base = preparation_request(
+                body,
+                state.body,
+                household.body,
+                [doc.body for doc in self.store.list_current(learner_id, "capability")],
+                jane.body,
+                list(library.values()),
+                self.chosen_material(learner_id, body)[0],
+                None,
+            )
+            request = discussion_request(
+                base, preview.body["draft"], feedback, preview.body["discussion"]
+            )
+            brief_ref = RevisionRef.model_validate(course.body["brief_ref"])
+            # ponytail: the material gets a new revision every round even when the story stays;
+            # the asset itself is shared by checksum.
+            refs = {
+                "course": RevisionRef(object_id=course.object_id, revision=course.revision + 1),
+                "brief": RevisionRef(
+                    object_id=brief_ref.object_id, revision=brief_ref.revision + 1
+                ),
+                "material": RevisionRef(
+                    object_id=material.object_id, revision=material.revision + 1
+                ),
+            }
+            checked, draft = await self.draft_course(
+                request, "discuss", demand, jane, refs, library, read
+            )
+            discussion = [*preview.body["discussion"], {"feedback": feedback, "note": draft.note}]
+            objects = self.package_objects(
+                operation, learner_id, checked, draft, demand, (state, plan), jane, refs, discussion
+            )
+            saved = self.save_step(
+                operation,
+                learner_id,
+                "revision",
+                objects,
+                publications=publications(
+                    objects,
+                    {course.object_id: course.revision, brief_ref.object_id: brief_ref.revision},
+                ),
+                baselines=(course.ref, preview.ref, demand.ref),
+            )
+        new_course, _, new_material, check, new_preview = saved
+        log.info(
+            "preparation discussed course=%s revision=%d material=%s",
+            new_course.object_id,
+            new_course.revision,
+            "same"
+            if new_material.body["source_sha256"] == material.body["source_sha256"]
+            else "changed",
+        )
+        return self.ledger.finish(
+            operation,
+            learner_id,
+            {
+                "course_ref": new_course.ref.model_dump(),
+                "preview_ref": new_preview.ref.model_dump(),
+                "check_ref": check.ref.model_dump(),
+                "preparation": "drafted",
+                "start": "pending",
+                "unverified": ["actual_api", "voice", "child_entry"],
+            },
+        )
+
+    def confirm(self, request_id: str, learner_id: str, course_ref: RevisionRef):
+        """The parent confirms one exact course version; resources wait for generation."""
+        signature = {"course_ref": course_ref.model_dump()}
+        completed = self.ledger.completed_request(request_id, learner_id, "confirm", signature)
+        if completed:
+            return completed
+        course, demand, preview = self.current_package(learner_id, course_ref)
+        operation = self.request(
+            request_id,
+            learner_id,
+            "confirm",
+            signature,
+            sources=(course.ref,),
+            baselines=(course.ref, preview.ref),
+        )
+        completed = self.ledger.result(operation, learner_id)
+        if completed:
+            return completed
+        saved = self.saved_step(operation, learner_id, "confirmation")
+        if saved is None and preview.body.get("confirmation"):
+            saved = [preview]  # Already confirmed: another request does not add a revision.
+        if saved is None:
+            obj = document(
+                "preview",
+                preview.object_id,
+                operation,
+                learner_id,
+                preview.body
+                | {
+                    "confirmation": {
+                        "state": "confirmed",
+                        "course_ref": course.ref.model_dump(),
+                        "confirmed_at": datetime.now(UTC).isoformat(),
+                    },
+                    "resources": [
+                        item | {"state": "awaiting_generation"}
+                        for item in preview.body["resources"]
+                    ],
+                },
+                refs=preview.dependency_refs,
+                revision=preview.revision + 1,
+            )
+            saved = self.save_step(
+                operation,
+                learner_id,
+                "confirmation",
+                [obj],
+                publications=(
+                    Publication(
+                        ref=obj.ref,
+                        expected_revision=preview.revision,
+                        reason="家长确认这一课程版本；资源待生成",
+                    ),
+                ),
+                baselines=(course.ref, preview.ref),
+            )
+        resources = len(saved[0].body["resources"])
+        log.info(
+            "preparation confirmed course=%s revision=%d resources=%d",
+            course.object_id,
+            course.revision,
+            resources,
+        )
+        return self.ledger.finish(
+            operation,
+            learner_id,
+            {
+                "course_ref": course.ref.model_dump(),
+                "preview_ref": saved[0].ref.model_dump(),
+                "confirmation": "confirmed",
+                "resources": "awaiting_generation" if resources else "none",
+            },
+        )
+
+    def library(self, read: set[str]) -> dict[str, dict]:
+        return {
+            source: library_entry(
+                source, story_text((self.root / source).read_text()), source in read
+            )
+            for source in COURSES
+        }
+
+    async def draft_course(self, request, stage, demand, jane, refs, library, read):
+        """One model draft, one repair round on rule problems; nothing is saved here."""
+        subject = "课程" if stage == "prepare" else "修改"
+        body = DemandBody.model_validate(demand.body)
+        catalog = {
+            doc.body["dimension_id"]
+            for doc in self.store.list_current(demand.learner_id, "capability")
+        }
+        for attempt in (1, 2):
+            reply = await self.models.run(request)
+            if not reply.ok:
+                log.warning("preparation failure stage=%s failure=%s", stage, reply.failure)
+                raise PreparationUnavailable(reply.failure, subject)
+            draft = reply.output
+            try:
+                checked = checked_course(
+                    draft,
+                    body,
+                    demand.ref,
+                    jane.ref,
+                    refs["brief"],
+                    refs["material"],
+                    library,
+                    read,
+                    catalog,
+                )
+            except DraftRejected as rejected:
+                codes = ",".join(dict.fromkeys(code for code, _ in rejected.problems))
+                log.warning(
+                    "preparation refused stage=%s attempt=%d checks=%s", stage, attempt, codes
+                )
+                reasons = [text for _, text in rejected.problems]
+                if attempt == 2:
+                    raise PreparationUnavailable(
+                        "规则核对未通过：" + "；".join(reasons[:3]), subject
+                    ) from None
+                request = repair_request(request, draft, reasons)
+                continue
+            log.info(
+                "preparation drafted stage=%s attempt=%d material=%s tasks=%d read_aloud=%d "
+                "resources=%d",
+                stage,
+                attempt,
+                "library" if checked.source else "model",
+                len(draft.tasks),
+                len(checked.course.tasks) - len(draft.tasks),
+                len(draft.resources),
+            )
+            return checked, draft
+        raise AssertionError("unreachable")
+
+    def package_objects(
+        self, operation, learner_id, checked, draft, demand, sources, jane, refs, discussion
+    ) -> list[Document]:
+        """Course, brief, material, content check and preview of one checked draft."""
+        state, plan = sources
+        if checked.source:
+            text = (self.root / checked.source).read_text()
+            origin, source = "library", checked.source
+            limitation = "自编材料；未测Lexile或RAZ，不证明科学实物定律。"
+        else:
+            text = f"# {checked.title}\n\n{checked.story}\n"
+            origin, source = "model", f"model:{digest(text)}"
+            limitation = "模型自编；未测Lexile或RAZ，只经规则核对依据原文，不证明科学实物定律。"
+        material = document(
+            "material",
+            refs["material"].object_id,
+            operation,
+            None,
+            {
+                "status": "checked",
+                "asset": self.files.asset(text),
+                "source": source,
+                "origin": origin,
+                "title": checked.title,
+                "source_sha256": digest(text),
+                "version": "1.1.0" if origin == "library" else "1.0.0",
+                "audience": "student",
+                "visible_at": "task",
+                "limitations": [limitation],
+            },
+            revision=refs["material"].revision,
+        )
+        course_body = checked.course
+        course = document(
+            "course",
+            refs["course"].object_id,
+            operation,
+            learner_id,
+            course_body,
+            refs=(demand.ref, state.ref, plan.ref, jane.ref, refs["brief"], material.ref),
+            revision=refs["course"].revision,
+        )
+        brief = document(
+            "brief",
+            refs["brief"].object_id,
+            operation,
+            learner_id,
+            {
+                "status": "checked",
+                "course_ref": course.ref.model_dump(),
+                "demand_ref": demand.ref.model_dump(),
+                "jane_ref": jane.ref.model_dump(),
+                "goals": [
+                    course_body.primary_goal.model_dump(),
+                    course_body.auxiliary_goal.model_dump(),
+                ],
+                "history": draft.brief.history,
+                "path": [t.model_dump(mode="json") for t in course_body.tasks],
+                "budget": course_body.budget,
+                "adjustments": draft.brief.adjustments,
+                "closing": draft.brief.closing,
+            },
+            refs=(course.ref, demand.ref, jane.ref, material.ref),
+            revision=refs["brief"].revision,
+        )
+        check = document(
+            "content_check",
+            identity(operation, "content-check"),
+            operation,
+            learner_id,
+            check_content(
+                course_body, DemandBody.model_validate(demand.body), material, self.files
+            ),
+            refs=(course.ref, brief.ref, material.ref),
+        )
+        preview = document(
+            "preview",
+            identity(operation, "preview"),
+            operation,
+            learner_id,
+            {
+                "status": "checked",
+                "course_ref": course.ref.model_dump(),
+                "content": course_body.parent_preview,
+                "note": draft.note,
+                "resources": [
+                    item.model_dump(mode="json") | {"state": "planned"}
+                    for item in course_body.resources
+                ],
+                "discussion": discussion,
+                "confirmation": None,
+                # A discussion round revises this draft instead of rebuilding it from the course.
+                "draft": draft.model_dump(mode="json"),
+                "actual_read": "unknown",
+                "current_start": "pending",
+                "unverified": ["actual_api", "voice", "child_entry"],
+            },
+            refs=(course.ref, check.ref),
+        )
+        return [course, brief, material, check, preview]
 
     def start(self, request_id: str, learner_id: str, course_ref: RevisionRef, conditions: dict):
         signature = {
@@ -739,6 +1032,15 @@ class Coordinator:
                 "decision": "blocked",
                 "reason": "content check unavailable or affected restriction active",
             }
+        latest = self.store.current(course_ref.object_id, learner_id)
+        if latest is None or latest.ref != course_ref:
+            raise Conflict(STALE_COURSE)
+        if not any(
+            (preview.body.get("confirmation") or {}).get("course_ref") == course_ref.model_dump()
+            for preview in self.store.list_current(learner_id, "preview")
+        ):
+            log.info("start refused reason=unconfirmed")
+            raise Conflict("课程未确认：请先在本课安排里确认课程，确认后才能开始。")
         operation = self.request(
             request_id,
             learner_id,
@@ -1594,8 +1896,8 @@ class Coordinator:
         )
         adopted = await self.adopt(f"{request_id}:adopt", learner_id, evaluation)
         try:
-            package = self.prepare(f"{request_id}:prepare", learner_id)
-        except PreparationNotReady as gap:
+            package = await self.prepare(f"{request_id}:prepare", learner_id)
+        except PreparationUnavailable as gap:
             package = {"status": "not_ready", "reason": str(gap)}
         operation = self.request(
             request_id,
@@ -1625,7 +1927,7 @@ class Coordinator:
                 else "later_explicit",
                 "evaluation": "saved",
                 "state_demand": "effective",
-                "course": "fixed_checked" if "course_ref" in package else "not_ready",
+                "course": "drafted" if "course_ref" in package else "not_ready",
                 "unknown": ["独立条件、保持、迁移、真实声音、儿童与教学效果未验证。"],
             },
             refs=(

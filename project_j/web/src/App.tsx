@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { acknowledgePause, cancel, presentationCancelled, type Cancellation } from './cancellation'
 import { canConfirm } from './confirmation'
-import { describe, endLabels, evaluationLines, modelLines, startMessage } from './report'
+import { describe, discussionLines, endLabels, evaluationLines, modelLines, resourceLines, startMessage } from './report'
 import { finishRecording, idle, pauseRecording, recordedMs, resumeRecording, startRecording, type Recorder } from './recording'
 import { requestFailure, type RequestFailure } from './request'
 import { Speaker, reportsFor, startedReport } from './speaker'
@@ -18,7 +18,7 @@ const stateLabels: Record<string, string> = { running: '进行中', offscreen: '
 type Condition = 'materials' | 'time' | 'accompaniment'
 // No default to "available": a required condition must be reported, never assumed (E2E14).
 const conditionChoices: [Condition, string, [string, string][]][] = [
-  ['materials', '材料', [['unknown', '未确认'], ['reported_available', '纸、书和小车已备好'], ['unavailable', '没有备好']]],
+  ['materials', '材料', [['unknown', '未确认'], ['reported_available', '实物已按本课安排备好'], ['unavailable', '没有备好']]],
   ['time', '时间', [['unknown', '未确认'], ['reported_30_minutes', '有30分钟'], ['unavailable', '不足30分钟']]],
   ['accompaniment', '陪伴', [['unknown', '未确认'], ['reported_present', '家长可陪伴'], ['unavailable', '家长不能陪伴']]],
 ]
@@ -44,6 +44,7 @@ function Parent({ token }: { token: string }) {
   const [dashboard, setDashboard] = useState<Dashboard>()
   const [prepared, setPrepared] = useState<PrepareResult>()
   const [feedback, setFeedback] = useState('')
+  const [courseFeedback, setCourseFeedback] = useState('')
   const [report, setReport] = useState<unknown>()
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
@@ -69,7 +70,7 @@ function Parent({ token }: { token: string }) {
     const current = demand && demandRef?.object_id === demand.object_id && demandRef.revision === demand.revision
     setPrepared(selected && preview && checked && current ? {
       course_ref: ref(selected), preview_ref: ref(preview), check_ref: ref(checked),
-      preparation: 'fixed_simulation_checked', start: 'pending',
+      preparation: 'drafted', start: 'pending',
       unverified: ['actual_api', 'voice', 'child_entry'],
     } : undefined)
   }, [token])
@@ -94,8 +95,12 @@ function Parent({ token }: { token: string }) {
   const courses = dashboard?.objects?.filter(doc => doc.kind === 'course') ?? []
   const selectedCourse = courses.find(doc => doc.object_id === prepared?.course_ref.object_id)
   const previews = dashboard?.objects?.filter(doc => doc.kind === 'preview') ?? []
-  const previewsForCourse = previews.filter(doc => doc.dependency_refs?.some(dep => dep.object_id === prepared?.course_ref.object_id))
-  const preview = (previewsForCourse[0]?.body.content ?? selectedCourse?.body.parent_preview) as Record<string, unknown> | undefined
+  // Each discussion round adds a course revision; its preview names that exact revision.
+  const previewDoc = previews.find(doc => { const target = doc.body.course_ref as Ref | undefined
+    return target?.object_id === prepared?.course_ref.object_id && target?.revision === prepared?.course_ref.revision })
+  const preview = (previewDoc?.body.content ?? selectedCourse?.body.parent_preview) as Record<string, unknown> | undefined
+  const confirmed = Boolean(previewDoc?.body.confirmation)
+  const courseRequest = () => ({ request_id: uid(), learner_id: learner, course_ref: prepared?.course_ref })
   const parentControl = (command: Control['command']) => {
     const body = { command, event_id: uid(), activity_id: dashboard?.active?.activity_id }
     void run(async () => { await api(token, 'parent/control', body) })
@@ -127,12 +132,22 @@ function Parent({ token }: { token: string }) {
         <button disabled={busy} onClick={() => { const requestId = uid(); void run(async () => setPrepared(await api<PrepareResult>(token, 'parent/prepare', { request_id: requestId, learner_id: learner }))) }}>准备课程包</button>
         {prepared && <><div className="preview"><h3>本课安排</h3>{preview
           ? <dl>{Object.entries(preview).sort(([a], [b]) => previewRank(a) - previewRank(b)).map(([key, value]) => <div key={key}><dt>{previewLabels[key] ?? key}</dt><dd>{show(value)}</dd></div>)}</dl>
-          : <p>预览待取得</p>}</div>
+          : <p>预览待取得</p>}
+          {previewDoc?.body.note ? <p>说明：{String(previewDoc.body.note)}</p> : null}
+          {previewDoc && <><h3>教学资源清单</h3>{resourceLines(previewDoc.body).length
+            ? <ul>{resourceLines(previewDoc.body).map(line => <li key={line}>{line}</li>)}</ul> : <p>本课不需要额外资源。</p>}
+            <dl>{discussionLines(previewDoc.body).map(([label, value], index) => <div key={index}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></>}
+          <label>修改意见（改目标、30分钟预算或主要教学方式需回到学习规划）<textarea value={courseFeedback} onChange={event => setCourseFeedback(event.target.value)} /></label>
+          <div className="row"><button className="quiet" disabled={busy || !courseFeedback.trim()} onClick={() => void run(async () => {
+            setPrepared(await api<PrepareResult>(token, 'parent/discuss', { ...courseRequest(), feedback: courseFeedback.trim() })); setCourseFeedback('')
+          })}>提交修改意见</button>
+          <button disabled={busy || confirmed} onClick={() => void run(async () => { await api(token, 'parent/confirm', courseRequest()) })}>{confirmed ? '已确认这一版本' : '确认课程'}</button></div></div>
           <h3>本次{mode}条件报告</h3><div className="row">{conditionChoices.map(([key, name, options]) => <label key={key}>{name}
             <select value={conditions[key]} onChange={event => setConditions(current => ({ ...current, [key]: event.target.value }))}>
               {options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>)}</div>
           <label>补充说明（可选）<textarea value={household} onChange={event => setHousehold(event.target.value)} /></label>
-          <button disabled={busy} onClick={() => { const requestId = uid(); void run(async () => {
+          {!confirmed && <p>确认课程后才能开始。</p>}
+          <button disabled={busy || !confirmed} onClick={() => { const requestId = uid(); void run(async () => {
             const reported = conditionChoices.map(([key, name, options]) => `${name}：${options.find(([value]) => value === conditions[key])?.[1]}`).join('；')
             const data = await api<StartResult>(token, 'parent/start', { request_id: requestId, learner_id: learner, course_ref: prepared.course_ref,
               conditions: { ...conditions, raw_report: household.trim() ? `${reported}；补充：${household.trim()}` : reported, explicit_start: true } })

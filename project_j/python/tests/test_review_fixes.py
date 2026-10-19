@@ -7,7 +7,16 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
-from support import CONDITIONS, LEARNER, answer, complete_story, deliver_all, start, teach
+from support import (
+    CONDITIONS,
+    LEARNER,
+    answer,
+    complete_story,
+    confirmed,
+    deliver_all,
+    start,
+    teach,
+)
 
 from project_j.application.configuration import Settings
 from project_j.application.documents import identity
@@ -35,13 +44,13 @@ async def first_lesson_with_next_course(app, helped=False):
 
 def test_course_template_and_mapping_follow_the_saved_demand(application):
     app = application
-    first = app.store.read(ref(app.prepare("first", LEARNER)["course_ref"]), LEARNER)
+    first = app.store.read(ref(asyncio.run(app.prepare("first", LEARNER))["course_ref"]), LEARNER)
     assert first.body["tasks"][0]["prompt"] == "What does Mia want to make?"
 
     async def scenario():
         _, _, result = await first_lesson_with_next_course(app)
         demand = app.current(LEARNER, "demand")
-        again = app.store.read(ref(app.prepare("again", LEARNER)["course_ref"]), LEARNER)
+        again = app.store.read(ref((await app.prepare("again", LEARNER))["course_ref"]), LEARNER)
         # The current D2 decides the new-material template; no caller flag can select Mia again.
         assert again.body["demand_ref"] == demand.ref.model_dump()
         assert again.body["tasks"][0]["prompt"] == "Which bus did Ben try first?"
@@ -64,7 +73,7 @@ def test_two_fixed_courses_alternate_and_label_familiar_material(application):
     answers = {mia: ("a bridge", "She folded it."), ben: ("the small bus", "it fell")}
 
     async def scenario():
-        course_ref, seen = app.prepare("c1", LEARNER)["course_ref"], []
+        course_ref, seen = (await app.prepare("c1", LEARNER))["course_ref"], []
         for number in range(1, 5):
             course = app.store.read(ref(course_ref), LEARNER).body
             prompt = course["tasks"][0]["prompt"]
@@ -135,6 +144,7 @@ def test_feedback_correction_limits_derived_course_until_it_is_rechecked(applica
         assert app.store.read(fact.ref, LEARNER).body == fact.body
         rechecked = await app.next_course("recheck", LEARNER, core.activity_id)
         new_course = ref(rechecked["next_package"]["course_ref"])
+        confirmed(app, {"course_ref": new_course})
         assert app.start("new-c3", LEARNER, new_course, CONDITIONS)["decision"] == (
             "allow_simulation"
         )
@@ -149,7 +159,7 @@ def test_evaluation_reuse_requires_the_same_sealed_fact_revision(application):
         return len([call for call in app.models.calls if call["purpose"] == "evaluation"])
 
     async def scenario():
-        core = start(app)
+        core = await start(app)
         deliver_all(core)
         await answer(app, "收到", "confirmation")
         await app.adapter.text("speech", "a car")
@@ -206,6 +216,7 @@ def test_student_capability_cannot_steer_the_teaching_flow(application):
         prepared = client.post(
             "/api/parent/prepare", headers=parent, json={"request_id": "p", "learner_id": LEARNER}
         ).json()
+        confirmed(app, prepared)
         started = client.post(
             "/api/parent/start",
             headers=parent,
@@ -251,7 +262,7 @@ def test_failed_save_records_next_step_and_deadline_then_resumes(application):
 
     app.save_step = fail_package
     with pytest.raises(OSError):
-        app.prepare("prepare-failure", LEARNER)
+        asyncio.run(app.prepare("prepare-failure", LEARNER))
     app.save_step = original
     operation = app.request(
         "prepare-failure",
@@ -272,7 +283,7 @@ def test_failed_save_records_next_step_and_deadline_then_resumes(application):
         "package",
     )
     assert failed["deadline"] and failed["failure"] == "OSError"
-    app.prepare("prepare-failure", LEARNER)
+    asyncio.run(app.prepare("prepare-failure", LEARNER))
     steps = {row["step_id"]: row["payload"] for row in app.ledger.steps(operation, LEARNER)}
     assert steps["package"]["execution"] == "complete"
 
@@ -280,13 +291,13 @@ def test_failed_save_records_next_step_and_deadline_then_resumes(application):
 def test_lost_save_acknowledgement_is_queried_before_reporting_failure(application):
     app = application
     app.store.fail_at = "after_commit"
-    prepared = app.prepare("lost-ack", LEARNER)
+    prepared = asyncio.run(app.prepare("lost-ack", LEARNER))
     assert app.store.read(ref(prepared["course_ref"]), LEARNER).kind == "course"
 
 
 def test_seal_progress_database_error_keeps_the_durable_fact(application, monkeypatch):
     app = application
-    core = start(app)
+    core = asyncio.run(start(app))
     core.control("stop", "stop")
 
     def locked(*args, **kwargs):
@@ -304,6 +315,7 @@ def test_successful_seal_retry_clears_the_reported_error(application):
         prepared = client.post(
             "/api/parent/prepare", headers=parent, json={"request_id": "p", "learner_id": LEARNER}
         ).json()
+        confirmed(app, prepared)
         started = client.post(
             "/api/parent/start",
             headers=parent,
@@ -335,7 +347,8 @@ def test_inapplicable_plan_proposal_is_rejected_before_any_decision(application)
 
 def test_replayed_start_of_an_ended_activity_never_returns_its_old_result(application):
     app = application
-    course = ref(app.prepare("prepare", LEARNER)["course_ref"])
+    course = ref(asyncio.run(app.prepare("prepare", LEARNER))["course_ref"])
+    confirmed(app, {"course_ref": course})
     app.start("start-A", LEARNER, course, CONDITIONS)
     app.core.control(str(uuid4()), "stop")
     app.seal()

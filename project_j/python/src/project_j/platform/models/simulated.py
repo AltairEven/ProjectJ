@@ -32,7 +32,7 @@ class SimulatedAdapter:
         self.delay_seconds = 0.0
         self.fail_next = False
 
-    def respond(self, request: ModelRequest) -> dict:
+    def respond(self, request: ModelRequest) -> dict | None:
         context = request.context
         if request.purpose == "evaluation":
             return {
@@ -52,6 +52,12 @@ class SimulatedAdapter:
                 "uncertain": ["独立条件、保持与迁移未观察。"],
                 "alignment": "按实际已发生范围整理。",
             }
+        if request.purpose == "preparation":
+            if "feedback" in context:  # A discussion round keeps the course unchanged.
+                note = "模拟：已记录意见，未调用真实模型，课程内容不变。"
+                return context["previous"] | {"note": note}
+            # The simulated model only reproduces the fixed library template.
+            return context["template"]
         if request.purpose == "planning" and "demand" in context:
             demand, suggestion = context["demand"], context["suggestion"]
             return {
@@ -131,8 +137,11 @@ class SimulatedAdapter:
         if self.fail_next:
             self.fail_next = False
             return AdapterReply(data=None, failure="unavailable")
+        data = self.respond(request)
+        if data is None:  # Nothing the simulated model can reproduce.
+            return AdapterReply(data=None, failure="unavailable")
         return AdapterReply(
-            data=self.respond(request),
+            data=data,
             actual={
                 "model": ConfigCheck(
                     requested=binding.model, actual=binding.model, status="verified"

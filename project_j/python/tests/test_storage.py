@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import pytest
@@ -214,7 +215,7 @@ def test_candidate_save_does_not_activate_and_classroom_closes_disk_access(appli
 
 def test_export_backup_restore_preserve_objects_assets_and_reject_corruption(application, tmp_path):
     app = application
-    package = app.prepare("prepare", "fictional-L1")
+    package = asyncio.run(app.prepare("prepare", "fictional-L1"))
     exported = json.loads(app.files.export("fictional-L1").read_text())
     assert exported["qualification"] == "not_granted"
     assert "OPENAI_API_KEY" not in json.dumps(exported)

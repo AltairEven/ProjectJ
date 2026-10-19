@@ -5,7 +5,16 @@ import base64
 
 import pytest
 from fastapi.testclient import TestClient
-from support import CONDITIONS, LEARNER, answer, deliver_all, read_aloud_all, start
+from support import (
+    CONDITIONS,
+    LEARNER,
+    answer,
+    confirmed,
+    deliver_all,
+    judgments,
+    read_aloud_all,
+    start,
+)
 
 from project_j.application.configuration import Settings
 from project_j.contracts import RevisionRef
@@ -15,7 +24,7 @@ from project_j.interface.api import create_app
 @pytest.mark.parametrize("text", ["she wants a bridge", "She wants a bridge for her car."])
 def test_first_question_accepts_the_filled_sentence_frame_after_help(application, text):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
         await answer(application, "a car")
@@ -37,7 +46,7 @@ def test_all_template_sentence_frames_and_saved_c2_follow_the_corrected_flow(app
     app = application
 
     async def scenario():
-        core = start(app)
+        core = await start(app)
         deliver_all(core)
         await answer(app, "收到", "confirmation")
         await answer(app, "that thing")
@@ -58,6 +67,7 @@ def test_all_template_sentence_frames_and_saved_c2_follow_the_corrected_flow(app
         course_ref = RevisionRef.model_validate(result["next_package"]["course_ref"])
         course = app.store.read(course_ref, LEARNER)
         assert course.body["demand_ref"] == app.current(LEARNER, "demand").ref.model_dump()
+        confirmed(app, {"course_ref": course_ref})
         assert (
             app.start("c2-start", LEARNER, course_ref, CONDITIONS)["decision"] == "allow_simulation"
         )
@@ -79,13 +89,13 @@ def test_wrong_phase_confirmation_is_not_an_attempt_and_cannot_cancel_judgment(a
     app = application
 
     async def scenario():
-        core = start(app)
+        core = await start(app)
         deliver_all(core)
         await answer(app, "收到", "confirmation")
         revision, epoch, events = core.revision, core.epoch, len(core.events)
         with pytest.raises(ValueError, match="当前不需要确认"):
             await app.adapter.text("unexpected", "听到了，收到当前说明。", "confirmation")
-        assert not core.attempts and not app.models.calls
+        assert not core.attempts and not judgments(app)
         assert (core.revision, core.epoch, len(core.events)) == (revision, epoch, events)
         assert "unexpected" not in core.inputs
         app.models.adapters["simulated"].delay_seconds = 0.03
@@ -98,7 +108,7 @@ def test_wrong_phase_confirmation_is_not_an_attempt_and_cannot_cancel_judgment(a
         assert core.epoch == epoch and core.mode == "judging"
         assert (await pending)["ack"] == "accepted"
         deliver_all(core)
-        assert len(core.attempts) == len(app.models.calls) == 1 and core.task_index == 1
+        assert len(core.attempts) == len(judgments(app)) == 1 and core.task_index == 1
         core.control("stop", "stop")
         app.seal()
 
@@ -109,19 +119,19 @@ def test_legal_confirmation_replays_and_closes_without_learning_attempts(applica
     app = application
 
     async def scenario():
-        core = start(app)
+        core = await start(app)
         deliver_all(core)
         await app.adapter.text("goal-receipt", "听到了，收到当前说明。", "confirmation")
         deliver_all(core)
         assert (await app.adapter.text("goal-receipt", "听到了，收到当前说明。", "confirmation"))[
             "ack"
         ] == "replayed"
-        assert core.task_index == 0 and not core.attempts and not app.models.calls
+        assert core.task_index == 0 and not core.attempts and not judgments(app)
         core.control("close", "close")
         deliver_all(core)
         await app.adapter.text("closing-receipt", "收到小结", "confirmation")
         assert core.mode == "ended" and core.end["reason"] == "normal"
-        assert not core.attempts and not app.models.calls
+        assert not core.attempts and not judgments(app)
         assert app.seal().body["attempts"] == []
 
     asyncio.run(scenario())
@@ -136,6 +146,7 @@ def test_api_rejects_confirmation_at_answer_wait_without_a_model_call(applicatio
             headers=parent,
             json={"request_id": "prepare", "learner_id": LEARNER},
         ).json()
+        confirmed(app, prepared)
         started = client.post(
             "/api/parent/start",
             headers=parent,
@@ -164,7 +175,7 @@ def test_api_rejects_confirmation_at_answer_wait_without_a_model_call(applicatio
         )
         assert wrong.status_code == 400
         assert "当前不需要确认" in wrong.json()["message"]
-        assert not app.core.attempts and not app.models.calls
+        assert not app.core.attempts and not judgments(app)
         assert (
             client.post(
                 "/api/student/input",
@@ -188,6 +199,7 @@ def test_api_accepts_a_base64_recording_only_on_a_reading_segment(application):
             headers=parent,
             json={"request_id": "prepare", "learner_id": LEARNER},
         ).json()
+        confirmed(app, prepared)
         started = client.post(
             "/api/parent/start",
             headers=parent,

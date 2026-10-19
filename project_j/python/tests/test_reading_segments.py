@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -63,7 +64,7 @@ def test_a_read_aloud_task_needs_a_short_punctuated_reference():
 
 
 def test_prepared_course_ends_with_read_aloud_segments(application):
-    prepared = application.prepare("prepare-reading", "fictional-L1")
+    prepared = asyncio.run(application.prepare("prepare-reading", "fictional-L1"))
     from project_j.contracts import RevisionRef
 
     course = application.store.read(

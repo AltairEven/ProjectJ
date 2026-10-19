@@ -194,6 +194,29 @@ export type CorrectionRequest = {
 };
 
 /**
+ * CourseRequest
+ */
+export type CourseRequest = {
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    /**
+     * Realm
+     */
+    realm?: 'simulation';
+    /**
+     * Source Type
+     */
+    source_type?: 'simulated';
+    course_ref: RevisionRef;
+};
+
+/**
  * Dashboard
  */
 export type Dashboard = {
@@ -343,6 +366,33 @@ export type DeliveryFeedback = {
      * Occurred At
      */
     occurred_at: string;
+};
+
+/**
+ * DiscussRequest
+ */
+export type DiscussRequest = {
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    /**
+     * Realm
+     */
+    realm?: 'simulation';
+    /**
+     * Source Type
+     */
+    source_type?: 'simulated';
+    course_ref: RevisionRef;
+    /**
+     * Feedback
+     */
+    feedback: string;
 };
 
 /**
@@ -583,7 +633,7 @@ export type PreparationResult = {
     /**
      * Preparation
      */
-    preparation: 'fixed_simulation_checked';
+    preparation: 'drafted';
     /**
      * Start
      */
@@ -1021,6 +1071,66 @@ export type PrepareApiParentPreparePostResponses = {
 };
 
 export type PrepareApiParentPreparePostResponse = PrepareApiParentPreparePostResponses[keyof PrepareApiParentPreparePostResponses];
+
+export type DiscussApiParentDiscussPostData = {
+    body: DiscussRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/parent/discuss';
+};
+
+export type DiscussApiParentDiscussPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DiscussApiParentDiscussPostError = DiscussApiParentDiscussPostErrors[keyof DiscussApiParentDiscussPostErrors];
+
+export type DiscussApiParentDiscussPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: PreparationResult;
+};
+
+export type DiscussApiParentDiscussPostResponse = DiscussApiParentDiscussPostResponses[keyof DiscussApiParentDiscussPostResponses];
+
+export type ConfirmApiParentConfirmPostData = {
+    body: CourseRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/parent/confirm';
+};
+
+export type ConfirmApiParentConfirmPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ConfirmApiParentConfirmPostError = ConfirmApiParentConfirmPostErrors[keyof ConfirmApiParentConfirmPostErrors];
+
+export type ConfirmApiParentConfirmPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type StartApiParentStartPostData = {
     body: StartRequest;

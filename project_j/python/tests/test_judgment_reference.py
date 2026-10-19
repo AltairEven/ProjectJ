@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_course_tasks_match_the_prepared_course(application):
-    core = start(application)
+    core = asyncio.run(start(application))
     story = story_text((ROOT / FIRST).read_text())
     built = course_tasks(
         FIRST,
@@ -60,7 +60,7 @@ def test_course_tasks_match_the_prepared_course(application):
     ],
 )
 def test_is_help_request(application, text, intent, purpose, expected):
-    core = start(application)
+    core = asyncio.run(start(application))
     task_id = "reading-fact" if purpose == "answer" else "paper-experiment"
     task = next(t for t in core.course.tasks if t.task_id == task_id)
     assert is_help_request(task, text, intent) is expected
@@ -138,7 +138,7 @@ def case_and_task(case_id):
 
 
 async def captured_classroom_request(application, text):
-    core = start(application)
+    core = await start(application)
     deliver_all(core)
     await answer(application, "听到了，先读故事再试纸桥。", "confirmation")  # now at reading-fact
     seen, original = [], core.models.run

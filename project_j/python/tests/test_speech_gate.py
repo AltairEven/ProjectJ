@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from support import CONDITIONS, LEARNER
 
@@ -12,7 +14,7 @@ class NotReady(SimulatedScorer):
 
 
 def test_a_course_with_reading_segments_needs_a_ready_scorer(application):
-    prepared = application.prepare("prepare1", LEARNER)
+    prepared = asyncio.run(application.prepare("prepare1", LEARNER))
     application.scorer = NotReady()
     with pytest.raises(ScorerNotReady, match="发音评分未就绪：评分进程未启动"):
         application.start(

@@ -20,7 +20,7 @@ def test_model_dependent_use_cases_refuse_until_initialized(blocked):
     from project_j.learning.maintenance import review
 
     with pytest.raises(ModelsNotReady, match="模型未初始化"):
-        blocked.prepare("prep-1", LEARNER)
+        asyncio.run(blocked.prepare("prep-1", LEARNER))
     with pytest.raises(ModelsNotReady):
         blocked.start("start-1", LEARNER, RevisionRef(object_id="course", revision=1), {})
     with pytest.raises(ModelsNotReady):

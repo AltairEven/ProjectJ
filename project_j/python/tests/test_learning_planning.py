@@ -10,7 +10,6 @@ from project_j.application.configuration import Settings
 from project_j.application.documents import identity
 from project_j.contracts import RevisionRef
 from project_j.interface.api import create_app
-from project_j.learning.contracts import DemandBody
 from project_j.learning.maintenance import review
 from project_j.learning.planning import (
     DemandDraft,
@@ -20,7 +19,6 @@ from project_j.learning.planning import (
     review_request,
 )
 from project_j.platform.models.simulated import SimulatedAdapter
-from project_j.preparation.packages import template_gap
 
 LEVELS = ("long_term", "annual", "stage", "week")
 
@@ -184,25 +182,24 @@ def test_planning_failure_keeps_state_and_retries(application):
 
 
 def test_uncovered_goals_leave_the_course_not_ready(application, monkeypatch, caplog):
+    """The simulated model only reproduces the paper-bridge template; science goals fail."""
     activity = taught(application)
-    initial = DemandBody.model_validate(application.current(LEARNER, "demand").body)
-    assert template_gap(initial) is None
     kinds = ("course", "material", "brief", "preview")
     before = {kind: len(application.store.list_current(LEARNER, kind)) for kind in kinds}
     model_changes_goals(application, monkeypatch)
     caplog.set_level(logging.INFO, logger="project_j")
     result = asyncio.run(application.next_course("next1", LEARNER, activity))
     package = result["next_package"]
-    assert package["status"] == "not_ready" and package["reason"].startswith("课程未就绪")
-    assert "实际观察报告" in package["reason"]  # The catalog name, not the identity.
+    assert package["status"] == "not_ready"
+    assert package["reason"] == "课程未取得（模型暂不可用）。下节需求已保存，可以重试。"
     assert {kind: len(application.store.list_current(LEARNER, kind)) for kind in kinds} == before
-    assert "preparation not_ready" in caplog.text
+    assert "preparation failure stage=prepare failure=unavailable" in caplog.text
     with TestClient(create_app(Settings(), application)) as client:
         parent = {"Authorization": f"Bearer {application.parent_token}"}
         refused = client.post(
             "/api/parent/prepare", headers=parent, json={"request_id": "p2", "learner_id": LEARNER}
         )
-    assert refused.status_code == 409 and refused.json()["message"].startswith("课程未就绪")
+    assert refused.status_code == 503 and refused.json()["preparation"] == "failed"
 
 
 def model_reviews(application, monkeypatch, **reply):

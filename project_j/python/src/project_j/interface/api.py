@@ -44,6 +44,7 @@ from project_j.platform.speech.local import LocalScorer, ScorerUnavailable
 from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.local import LocalSynthesizer, SynthesizerUnavailable
+from project_j.preparation.drafting import PreparationUnavailable
 
 
 class ParentRequest(Contract):
@@ -64,6 +65,14 @@ class StartConditions(Contract):
 class StartRequest(ParentRequest):
     course_ref: RevisionRef
     conditions: StartConditions
+
+
+class CourseRequest(ParentRequest):
+    course_ref: RevisionRef
+
+
+class DiscussRequest(CourseRequest):
+    feedback: str = Field(min_length=1, max_length=2000)
 
 
 class FeedbackRequest(ParentRequest):
@@ -196,7 +205,7 @@ class PreparationResult(Contract):
     course_ref: RevisionRef
     preview_ref: RevisionRef
     check_ref: RevisionRef
-    preparation: Literal["fixed_simulation_checked"]
+    preparation: Literal["drafted"]
     start: Literal["pending"]
     unverified: tuple[str, ...]
 
@@ -424,6 +433,10 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
     async def planning_failed(request, error):
         return refused(request, error, 503, {"message": str(error), "planning": "failed"})
 
+    @app.exception_handler(PreparationUnavailable)
+    async def preparation_failed(request, error):
+        return refused(request, error, 503, {"message": str(error), "preparation": "failed"})
+
     @app.exception_handler(LookupError)
     async def not_found(request, error):
         return refused(request, error, 404, {"message": str(error)})
@@ -490,7 +503,19 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
         "/api/parent/prepare", dependencies=[Depends(parent)], response_model=PreparationResult
     )
     async def prepare(request: ParentRequest):
-        return controller().prepare(request.request_id, request.learner_id)
+        return await controller().prepare(request.request_id, request.learner_id)
+
+    @app.post(
+        "/api/parent/discuss", dependencies=[Depends(parent)], response_model=PreparationResult
+    )
+    async def discuss(request: DiscussRequest):
+        return await controller().discuss(
+            request.request_id, request.learner_id, request.course_ref, request.feedback
+        )
+
+    @app.post("/api/parent/confirm", dependencies=[Depends(parent)])
+    async def confirm(request: CourseRequest):
+        return controller().confirm(request.request_id, request.learner_id, request.course_ref)
 
     @app.post("/api/parent/start", dependencies=[Depends(parent)], response_model=StartResult)
     async def start(request: StartRequest):

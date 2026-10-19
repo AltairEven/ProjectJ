@@ -76,6 +76,19 @@ class TaskDefinition(Contract):
         return self
 
 
+class ResourceSpec(Contract):
+    """A teaching resource the course asks for; generated only after the parent confirms."""
+
+    resource_id: str = Field(min_length=1)
+    kind: Literal["image", "audio", "animation", "video"]
+    purpose: str = Field(min_length=1)
+    content: str = Field(min_length=1)
+    task_ids: tuple[str, ...]
+    audience: Literal["student", "parent", "teacher"]
+    required: bool
+    fallback: str = Field(min_length=1)
+
+
 class CourseBody(Contract):
     status: Literal["checked"] = "checked"
     demand_ref: RevisionRef
@@ -92,6 +105,7 @@ class CourseBody(Contract):
     demand_mapping: tuple[RequirementMapping, ...] = Field(min_length=1)
     parent_preview: dict[str, str]
     limitations: tuple[str, ...]
+    resources: tuple[ResourceSpec, ...] = ()
 
     @model_validator(mode="after")
     def consistent_package(self):
@@ -104,4 +118,6 @@ class CourseBody(Contract):
         task_ids = {task.task_id for task in self.tasks}
         if any(set(item.task_ids) - task_ids for item in self.demand_mapping):
             raise ValueError("demand mapping must point to tasks of this package")
+        if any(set(item.task_ids) - task_ids for item in self.resources):
+            raise ValueError("resources must point to tasks of this package")
         return self

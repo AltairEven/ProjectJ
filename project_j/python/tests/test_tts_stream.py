@@ -33,7 +33,7 @@ def speech(application, synthesizer, action_id=None, token=None):
     application.synthesizer = synthesizer
     # Storage is closed during a class, so the app initializes first and the class starts after.
     with TestClient(create_app(Settings(), application)) as client:
-        core = start(application)
+        core = asyncio.run(start(application))
         token = token or application.start_requests["start1"]["result"]["student_token"]
         action = core.actions[core.pending]
         reply = client.get(

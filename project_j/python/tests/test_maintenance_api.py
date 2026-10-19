@@ -3,7 +3,7 @@ import sys
 
 import pytest
 from fastapi.testclient import TestClient
-from support import CONDITIONS, LEARNER
+from support import CONDITIONS, LEARNER, confirmed
 
 from project_j.application.configuration import Settings
 from project_j.application.documents import document, identity
@@ -19,7 +19,7 @@ def test_E2E08_12_method_candidate_and_dimension_catalog_do_not_change_effective
     application,
 ):
     app = application
-    app.prepare("prepare", LEARNER)
+    asyncio.run(app.prepare("prepare", LEARNER))
     jane = app.store.current(identity("shared", "jane"), LEARNER)
     operation = app.request(
         "candidate", LEARNER, "jane-candidate", {"jane_ref": jane.ref.model_dump()}
@@ -128,7 +128,7 @@ def test_a_proposed_goal_outside_the_capability_catalog_is_rejected(application)
 
 def test_E2E08_content_restriction_owner_and_versioned_release(application):
     app = application
-    prepared = app.prepare("prepare", LEARNER)
+    prepared = asyncio.run(app.prepare("prepare", LEARNER))
     target = RevisionRef.model_validate(prepared["course_ref"])
     result = correct(
         app, "correction", LEARNER, target, "模拟内容缺口，需原主责复核。", "curriculum"
@@ -193,6 +193,7 @@ def test_API_role_separation_unknown_start_and_stop_do_not_expose_teacher_materi
             headers=parent,
             json={"request_id": "prepare-api", "learner_id": LEARNER},
         ).json()
+        confirmed(app, prepared)
         response = client.post(
             "/api/parent/start",
             headers=parent,
@@ -238,6 +239,7 @@ def test_API_websocket_reconnect_reads_the_same_memory_core(application):
         prepared = client.post(
             "/api/parent/prepare", headers=parent, json={"request_id": "prep-ws"}
         ).json()
+        confirmed(app, prepared)
         started = client.post(
             "/api/parent/start",
             headers=parent,
@@ -318,6 +320,7 @@ def test_old_student_socket_and_parent_control_cannot_access_the_next_activity(a
         package = client.post(
             "/api/parent/prepare", headers=parent, json={"request_id": "scope-prepare"}
         ).json()
+        confirmed(app, package)
         first = client.post(
             "/api/parent/start",
             headers=parent,

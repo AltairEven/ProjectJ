@@ -2,9 +2,7 @@
 
 from project_j.contracts import RevisionRef
 from project_j.learning.contracts import DemandBody
-from project_j.platform.storage import Conflict
 from project_j.preparation.contracts import (
-    CourseBody,
     RequirementMapping,
     Support,
     TaskDefinition,
@@ -15,8 +13,6 @@ from project_j.preparation.reading import segment_reading
 FIRST = "courses/paper-bridge/reading-main.md"
 TRANSFER = "courses/paper-bridge/reading-transfer.md"
 PRONUNCIATION = "english.speaking.pronunciation"
-# The only primary/auxiliary pair the fixed paper-bridge template can teach.
-COVERED = ("english.reading.facts", "english.speaking.report")
 # The two fixed simulation courses are each other's next course, so course switching can loop.
 COURSES = {
     FIRST: {
@@ -90,8 +86,13 @@ COURSES = {
 
 
 def next_material(taught: str, read: set[str]) -> dict:
-    """The other course of the pair; a story the learner already read is never new material."""
-    source = COURSES[taught]["next"]
+    """The other course of the pair; a story the learner already read is never new material.
+
+    After a story the model wrote, the first unread library story follows (else the first)."""
+    if taught in COURSES:
+        source = COURSES[taught]["next"]
+    else:
+        source = next((item for item in COURSES if item not in read), FIRST)
     course = COURSES[source]
     return {
         "source": source,
@@ -207,112 +208,120 @@ def course_tasks(
                 optional=purpose == "offscreen",
             )
         )
+    return (*tasks, *reading_tasks(story, material_ref))
+
+
+def reading_tasks(story: str, material_ref: RevisionRef) -> tuple[TaskDefinition, ...]:
+    """The story's read-aloud segments, each scored against its own reference text."""
     segments = segment_reading(story)
-    for index, segment in enumerate(segments, 1):
-        tasks.append(
-            TaskDefinition(
-                task_id=f"read-aloud-{index}",
-                dimension_id=PRONUNCIATION,
-                purpose="read_aloud",
-                prompt=f"请朗读故事第{index}/{len(segments)}段：按麦克风开始，读完按结束。",
-                material_ref=material_ref,
-                evidence="以发音评分模块对本段参考文本的评分为据；模型不另评发音。",
-                acceptable_simulated=(),
-                reference_text=segment,
-                reading_id="story-read-aloud",
-                supports=(
-                    Support(
-                        text="看着标出的词再读一遍，读慢一点。",
-                        help={PRONUNCIATION: "light_prompt"},
-                    ),
-                    Support(
-                        text="先听Jane示范这一段，再跟读。", help={PRONUNCIATION: "full_model"}
-                    ),
+    return tuple(
+        TaskDefinition(
+            task_id=f"read-aloud-{index}",
+            dimension_id=PRONUNCIATION,
+            purpose="read_aloud",
+            prompt=f"请朗读故事第{index}/{len(segments)}段：按麦克风开始，读完按结束。",
+            material_ref=material_ref,
+            evidence="以发音评分模块对本段参考文本的评分为据；模型不另评发音。",
+            acceptable_simulated=(),
+            reference_text=segment,
+            reading_id="story-read-aloud",
+            supports=(
+                Support(
+                    text="看着标出的词再读一遍，读慢一点。",
+                    help={PRONUNCIATION: "light_prompt"},
                 ),
-                exit_text="这一段可以先跳过，评分记为未知。",
-                optional=True,
-            )
+                Support(text="先听Jane示范这一段，再跟读。", help={PRONUNCIATION: "full_model"}),
+            ),
+            exit_text="这一段可以先跳过，评分记为未知。",
+            optional=True,
         )
-    return tuple(tasks)
+        for index, segment in enumerate(segments, 1)
+    )
 
 
-class PreparationNotReady(Conflict):
-    """The fixed template cannot teach the demanded goals; nothing was prepared for them."""
+BUDGET = {
+    "opening": 3,
+    "reading": 7,
+    "expression": 4,
+    "help_practice": 6,
+    "offscreen": 7,
+    "closing": 3,
+}
+PREVIEW_MATERIALS = "纸、同一本书和同一辆小车；陪伴与当前条件开始前另报。"
+BRIEF = {
+    "history": "没有真实儿童历史，以明确模拟输入和初始未知状态开始。",
+    "adjustments": "挑战替换活动，降阶/跳过/暂停/停止遵守原目标与预算。",
+    "closing": "只总结实际范围，取得收到确认；停止不强迫小结。",
+}
 
 
-def template_gap(demand: DemandBody, labels: dict[str, str] | None = None) -> str | None:
+def library_entry(source: str, story: str, read: bool) -> dict:
+    """One verified library story as the preparation model sees it."""
+    return {"material_id": source, "title": COURSES[source]["title"], "story": story, "read": read}
+
+
+def template_draft(demand: DemandBody, source: str, story: str, familiar: bool = False) -> dict:
+    """The fixed paper-bridge course written as a course draft the model may reuse or adapt."""
+    reference = RevisionRef(object_id="template", revision=1)
     goals = (demand.primary_goal.dimension_id, demand.auxiliary_goal.dimension_id)
-    if goals == COVERED:
-        return None
-    named = "与".join((labels or {}).get(goal, goal) for goal in goals)
-    return (
-        "课程未就绪：现有固定课程只覆盖英语阅读事实与英语短报告，"
-        f"下节需求为{named}；需等待真实备课。"
-    )
+    tasks = course_tasks(source, story, reference, *goals)
+    title = COURSES[source]["title"]
+    practice = uses_new_material(demand)
+    choice = f"选{title}复习模板，明示已读熟悉条件" if familiar else f"选{title}新材料短观察模板"
+    mapping = map_demand(demand, tasks, source, choice)
+    stage = "已读，复习" if familiar else "新材料" if practice else "首课"
 
+    def ids(task_ids):
+        named = [i for i in task_ids if not i.startswith("read-aloud-")]
+        return named + (["read_aloud"] if len(named) < len(task_ids) else [])
 
-def compile_course(
-    demand: DemandBody,
-    demand_ref: RevisionRef,
-    jane_ref: RevisionRef,
-    brief_ref: RevisionRef,
-    material_ref: RevisionRef,
-    source: str,
-    familiar: bool,
-    story: str,
-) -> CourseBody:
-    if gap := template_gap(demand):
-        raise PreparationNotReady(gap)
-    next_course = uses_new_material(demand)
-    if source not in COURSES or (not next_course and source != FIRST):
-        raise ValueError("material does not follow the saved demand")
-    course = COURSES[source]
-    title = course["title"]
-    stage = "已读，复习" if familiar else "新材料" if next_course else "首课"
-    tasks = course_tasks(
-        source,
-        story,
-        material_ref,
-        demand.primary_goal.dimension_id,
-        demand.auxiliary_goal.dimension_id,
-    )
-    return CourseBody(
-        demand_ref=demand_ref,
-        state_ref=demand.state_ref,
-        plan_ref=demand.plan_ref,
-        jane_ref=jane_ref,
-        brief_ref=brief_ref,
-        material_refs=(material_ref,),
-        primary_goal=demand.primary_goal,
-        auxiliary_goal=demand.auxiliary_goal,
-        budget={
-            "opening": 3,
-            "reading": 7,
-            "expression": 4,
-            "help_practice": 6,
-            "offscreen": 7,
-            "closing": 3,
-        },
-        lesson_type="review" if familiar else "practice" if next_course else "observation",
-        tasks=tasks,
-        demand_mapping=map_demand(
-            demand,
-            tasks,
-            source,
-            f"选{title}复习模板，明示已读熟悉条件" if familiar else f"选{title}新材料短观察模板",
-        ),
-        parent_preview={
+    return {
+        "material_id": source,
+        "title": None,
+        "story": None,
+        "lesson_type": "practice" if practice else "observation",
+        "tasks": [
+            {
+                "task_id": task.task_id,
+                "dimension_id": task.dimension_id,
+                "purpose": task.purpose,
+                "prompt": task.prompt,
+                "evidence": task.evidence,
+                "acceptable_answers": list(task.acceptable_simulated),
+                "known_incorrect": list(task.incorrect_simulated),
+                "supports": [
+                    {
+                        "text": support.text,
+                        "help": [
+                            {"dimension_id": dimension, "level": level}
+                            for dimension, level in support.help.items()
+                        ],
+                    }
+                    for support in task.supports
+                ],
+                "exit_text": task.exit_text,
+                "optional": task.optional,
+            }
+            for task in tasks
+            if task.purpose != "read_aloud"
+        ],
+        "read_aloud": True,
+        "budget": [{"part": part, "minutes": minutes} for part, minutes in BUDGET.items()],
+        "demand_mapping": [
+            {"index": index, "implementation": item.implementation, "task_ids": ids(item.task_ids)}
+            for index, item in enumerate(mapping)
+        ],
+        "resources": [],
+        "preview": {
             "story": f"{title}（{stage}）",
             "why": "复习已读故事：熟悉条件下的回答不作首次新材料观察或迁移，科学只按实际报告解释。"
             if familiar
             else "按当前需求观察阅读事实与短表达，科学只按实际报告解释。",
-            "materials": "纸、同一本书和同一辆小车；陪伴与当前条件开始前另报。",
+            "materials": PREVIEW_MATERIALS,
             "help": "定位提示和不同句框分开；家长额外帮助随后补充。",
             "exit": "30分钟内，挑战只替换；可跳过、暂停或停止。",
         },
-        limitations=(
-            "固定模拟编制；实际模型、声音、30分钟和儿童用途未验证。",
-            "朗读评分为模拟评分器结果，不代表真实发音。",
-        )
-        + (("已读材料复习：初答不代表首次阅读理解，也不作迁移证据。",) if familiar else ()),
-    )
+        "brief": BRIEF,
+        "note": "沿用课程库的纸桥模板。",
+        "limitations": [],
+    }

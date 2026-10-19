@@ -118,6 +118,116 @@
         }
       }
     },
+    "/api/parent/discuss": {
+      "post": {
+        "summary": "Discuss",
+        "operationId": "discuss_api_parent_discuss_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscussRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/parent/confirm": {
+      "post": {
+        "summary": "Confirm",
+        "operationId": "confirm_api_parent_confirm_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CourseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/parent/start": {
       "post": {
         "summary": "Start",
@@ -1892,6 +2002,43 @@
         ],
         "title": "CorrectionRequest"
       },
+      "CourseRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "course_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "course_ref"
+        ],
+        "title": "CourseRequest"
+      },
       "Dashboard": {
         "properties": {
           "realm": {
@@ -2153,6 +2300,50 @@
           "occurred_at"
         ],
         "title": "DeliveryFeedback"
+      },
+      "DiscussRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^fictional-[A-Za-z0-9_-]+$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "realm": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Realm",
+            "default": "simulation"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Source Type",
+            "default": "simulated"
+          },
+          "course_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "feedback": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Feedback"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "course_ref",
+          "feedback"
+        ],
+        "title": "DiscussRequest"
       },
       "Document": {
         "properties": {
@@ -2549,7 +2740,7 @@
           },
           "preparation": {
             "type": "string",
-            "const": "fixed_simulation_checked",
+            "const": "drafted",
             "title": "Preparation"
           },
           "start": {

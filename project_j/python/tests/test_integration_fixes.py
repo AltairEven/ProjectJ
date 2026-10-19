@@ -3,7 +3,7 @@
 import asyncio
 
 import pytest
-from support import CONDITIONS, LEARNER, answer, complete_story, deliver_all
+from support import CONDITIONS, LEARNER, answer, complete_story, confirmed, deliver_all
 
 from project_j.application.documents import document
 from project_j.contracts import RevisionRef
@@ -33,11 +33,12 @@ def test_corrected_sources_block_new_preparation_and_saved_preparation_replay(ap
         count = len(app.store.list_current(LEARNER, "course"))
         for request_id in ("reprepare-without-recheck", "next:prepare"):
             with pytest.raises(Conflict, match="restricted"):
-                app.prepare(request_id, LEARNER)
+                (await app.prepare(request_id, LEARNER))
         assert len(app.store.list_current(LEARNER, "course")) == count
         assert app.start("blocked-old", LEARNER, old_course, CONDITIONS)["decision"] == "blocked"
         rechecked = await app.next_course("recheck", LEARNER, core.activity_id)
         new_course = ref(rechecked["next_package"]["course_ref"])
+        confirmed(app, {"course_ref": new_course})
         assert app.start("allowed-new", LEARNER, new_course, CONDITIONS)["decision"] == (
             "allow_simulation"
         )
@@ -50,7 +51,7 @@ def test_corrected_sources_block_new_preparation_and_saved_preparation_replay(ap
 
 def test_start_checks_restricted_dependencies_even_without_a_direct_course_restriction(application):
     app = application
-    package = app.prepare("prepare", LEARNER)
+    package = asyncio.run(app.prepare("prepare", LEARNER))
     course = ref(package["course_ref"])
     demand = app.current(LEARNER, "demand")
     operation = app.request("source-restriction", LEARNER, "test-restriction", {})
@@ -58,9 +59,10 @@ def test_start_checks_restricted_dependencies_even_without_a_direct_course_restr
     assert course not in restriction.dependency_refs
     assert app.start("blocked", LEARNER, course, CONDITIONS)["decision"] == "blocked"
     with pytest.raises(Conflict, match="restricted"):
-        app.prepare("prepare", LEARNER)
+        asyncio.run(app.prepare("prepare", LEARNER))
     release(app, "release", LEARNER, restriction.ref, "learning", "明确模拟：主责已复核原需求依据")
-    assert app.prepare("prepare", LEARNER) == package
+    assert asyncio.run(app.prepare("prepare", LEARNER)) == package
+    confirmed(app, {"course_ref": course})
     assert app.start("allowed", LEARNER, course, CONDITIONS)["decision"] == "allow_simulation"
     app.core.control("cleanup-stop", "stop")
     app.seal()
@@ -103,7 +105,8 @@ def test_reused_state_retry_keeps_newer_evidence_and_rechecks_demand(application
         assert state_step["execution"] == "complete"
         assert state_step["effect_refs"] == [reused.model_dump()]
 
-        package = app.prepare("newer-prepare", LEARNER)
+        package = await app.prepare("newer-prepare", LEARNER)
+        confirmed(app, {"course_ref": ref(package["course_ref"])})
         assert (
             app.start("newer-start", LEARNER, ref(package["course_ref"]), CONDITIONS)["decision"]
             == "allow_simulation"

@@ -10,6 +10,11 @@ WORD = re.compile(r"[A-Za-z]+(?:['’][A-Za-z]+)?")
 SENTENCE = re.compile(r"[^.!?]+[.!?]+[”\"’]?")
 
 
+def flat(text: str) -> str:
+    """Line breaks and runs of spaces are one space: a quote may join lines of a story."""
+    return " ".join(text.split())
+
+
 def words(text: str) -> list[str]:
     return WORD.findall(text)
 

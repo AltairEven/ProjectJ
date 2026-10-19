@@ -84,7 +84,7 @@ def adult(tmp_path):
 
 
 def test_adult_class_takes_adult_inputs_and_seals_adult_facts(adult):
-    core = start(adult)
+    core = asyncio.run(start(adult))
     assert core.snapshot()["realm"] == "adult_check"
     assert core.snapshot()["source_type"] == "adult"
     deliver_all(core)
@@ -97,7 +97,7 @@ def test_adult_class_takes_adult_inputs_and_seals_adult_facts(adult):
 
 
 def test_simulation_core_refuses_adult_inputs(application):
-    core = start(application)
+    core = asyncio.run(start(application))
     deliver_all(core)
     submitted = SubmittedInput(
         **InputAdapter(core).binding(),

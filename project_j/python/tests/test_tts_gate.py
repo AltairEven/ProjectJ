@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from support import CONDITIONS, LEARNER
 
@@ -12,7 +14,7 @@ class NotReady(SimulatedSynthesizer):
 
 
 def test_a_class_needs_a_ready_synthesizer(application):
-    prepared = application.prepare("prepare1", LEARNER)
+    prepared = asyncio.run(application.prepare("prepare1", LEARNER))
     application.synthesizer = NotReady()
     with pytest.raises(SynthesizerNotReady, match="语音合成未就绪：合成进程未启动"):
         application.start(

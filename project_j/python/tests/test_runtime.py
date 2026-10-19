@@ -8,7 +8,9 @@ from support import (
     LEARNER,
     answer,
     complete_story,
+    confirmed,
     deliver_all,
+    judgments,
     read,
     read_aloud_all,
     start,
@@ -108,7 +110,7 @@ def test_E2E02_state_records_english_expression_only_where_help_marked_it(applic
 
 def test_E2E03_stop_during_model_does_not_wait_or_deliver_late_result(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
         application.models.adapters["simulated"].delay_seconds = 5
@@ -131,7 +133,7 @@ def test_E2E03_stop_during_model_does_not_wait_or_deliver_late_result(applicatio
 
 @pytest.mark.parametrize("failure", ["before_commit", "after_commit"])
 def test_E2E04_seal_failure_or_lost_receipt_retries_same_fact_without_model(application, failure):
-    core = start(application)
+    core = asyncio.run(start(application))
     core.control("stop", "stop")
     application.store.fail_at = failure
     with pytest.raises(OSError):
@@ -139,12 +141,12 @@ def test_E2E04_seal_failure_or_lost_receipt_retries_same_fact_without_model(appl
     fact = application.seal()
     assert application.activity_facts(core.activity_id, LEARNER).ref == fact.ref
     assert application.seal().ref == fact.ref
-    assert not application.models.calls
+    assert not judgments(application)
 
 
 def test_parent_skip_works_while_the_model_is_slow_and_while_offscreen(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
         first = core.task_instance_id
@@ -192,7 +194,7 @@ def test_report_tasks_treat_only_a_bare_plea_as_help(text, plea):
 
 def test_a_typed_report_mentioning_help_is_a_report_and_a_bare_plea_is_help(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "听到了。", "confirmation")
         await answer(application, "a bridge")
@@ -215,7 +217,7 @@ def test_a_typed_report_mentioning_help_is_a_report_and_a_bare_plea_is_help(appl
 
 def test_step_scoped_debug_fault_skips_other_saves_and_fails_only_the_seal_once(application):
     application.store.fail_at = "fact:before_commit"
-    core = start(application)
+    core = asyncio.run(start(application))
     core.control("stop", "stop")
     with pytest.raises(OSError):
         application.seal()
@@ -223,12 +225,12 @@ def test_step_scoped_debug_fault_skips_other_saves_and_fails_only_the_seal_once(
 
 
 def test_E2E04_progress_failure_cannot_undo_successful_fact(application):
-    core = start(application)
+    core = asyncio.run(start(application))
     core.control("stop", "stop")
     application.store.fail_at = "ledger"
     fact = application.seal()
     assert application.activity_facts(core.activity_id, LEARNER).ref == fact.ref
-    assert not application.models.calls
+    assert not judgments(application)
 
 
 def test_E2E05_state_saved_demand_failure_resumes_without_rewriting_state(application, monkeypatch):
@@ -286,7 +288,7 @@ def test_E2E06_feedback_correction_keeps_original_facts_and_changes_sources(appl
 
 def test_E2E07_old_course_demand_does_not_start_after_next_demand(application):
     async def scenario():
-        old = application.prepare("prepare1", LEARNER)
+        old = await application.prepare("prepare1", LEARNER)
         core, _ = await complete_story(application)
         application.feedback("feedback", LEARNER, core.activity_id, "无额外补充")
         await application.next_course("next", LEARNER, core.activity_id)
@@ -320,7 +322,7 @@ def test_E2E09_later_choice_and_dashboard_never_call_evaluation(application):
 
 def test_supplement_before_delivery_keeps_one_attempt_and_invalidates_old_action(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
         first = await application.adapter.text("first", "that thing")
@@ -338,7 +340,7 @@ def test_supplement_before_delivery_keeps_one_attempt_and_invalidates_old_action
 
 def test_student_view_shows_the_story_without_adult_material_metadata(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
         [text] = application.student_view(core)["materials"].values()
@@ -350,7 +352,7 @@ def test_student_view_shows_the_story_without_adult_material_metadata(applicatio
 
 def test_reopened_student_page_can_show_the_last_presented_action(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         assert core.snapshot()["presented_action"] is None
         deliver_all(core)
         await answer(application, "收到", "confirmation")
@@ -364,7 +366,7 @@ def test_reopened_student_page_can_show_the_last_presented_action(application):
 
 def test_supplement_after_delivered_response_is_ruled_a_new_attempt(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
         await application.adapter.text("first", "that thing")
@@ -388,7 +390,7 @@ def test_supplement_after_delivered_response_is_ruled_a_new_attempt(application)
 
 def test_two_same_answers_are_two_attempts_but_transport_replay_is_one(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
         await application.adapter.text("answer1", "a car")
@@ -402,7 +404,7 @@ def test_two_same_answers_are_two_attempts_but_transport_replay_is_one(applicati
 
 
 def test_pause_keeps_memory_and_prevents_seal_or_database_access(application):
-    core = start(application)
+    core = asyncio.run(start(application))
     core.control("pause", "pause")
     assert core.mode == "paused"
     with pytest.raises(ValueError):
@@ -416,7 +418,7 @@ def test_pause_keeps_memory_and_prevents_seal_or_database_access(application):
 
 
 def test_E2E14_missing_failed_and_unverified_start_are_distinct(application):
-    prepared = application.prepare("prepare", LEARNER)
+    prepared = asyncio.run(application.prepare("prepare", LEARNER))
     course = RevisionRef.model_validate(prepared["course_ref"])
     result = application.start("missing", LEARNER, course, CONDITIONS | {"materials": "unknown"})
     assert result["decision"] == "waiting"
@@ -450,7 +452,7 @@ def test_E2E18_feedback_arriving_during_model_cannot_publish_old_source(applicat
 
 
 def test_E2E19_cross_learner_course_and_late_results_cannot_publish(application):
-    package = application.prepare("prepare", LEARNER)
+    package = asyncio.run(application.prepare("prepare", LEARNER))
     application.initialize("fictional-L2")
     with pytest.raises(ValueError, match="cross-learner"):
         application.store.read(RevisionRef.model_validate(package["course_ref"]), "fictional-L2")
@@ -462,8 +464,9 @@ def test_E2E19_cross_learner_course_and_late_results_cannot_publish(application)
 
 def test_persisted_start_does_not_reopen_an_activity_after_memory_loss(application):
     app = application
-    package = app.prepare("prepare1", LEARNER)
+    package = asyncio.run(app.prepare("prepare1", LEARNER))
     course = RevisionRef.model_validate(package["course_ref"])
+    confirmed(app, {"course_ref": course})
     app.start("start1", LEARNER, course, CONDITIONS)
     app.store.active_activity_id = (
         None  # Explicitly simulate loss, not a recovery of classroom facts.
@@ -477,7 +480,8 @@ def test_persisted_start_does_not_reopen_an_activity_after_memory_loss(applicati
 
 def test_dashboard_shows_the_gap_of_an_activity_lost_with_process_memory(application):
     app = application
-    course = RevisionRef.model_validate(app.prepare("prepare1", LEARNER)["course_ref"])
+    course = RevisionRef.model_validate(asyncio.run(app.prepare("prepare1", LEARNER))["course_ref"])
+    confirmed(app, {"course_ref": course})
     started = app.start("start1", LEARNER, course, CONDITIONS)
     app.store.active_activity_id = None  # Explicitly simulate process loss.
     reopened = Coordinator(app.store, app.root, verification=app.verification)
@@ -489,7 +493,8 @@ def test_dashboard_shows_the_gap_of_an_activity_lost_with_process_memory(applica
 
 def test_parent_report_on_a_lost_activity_is_only_saved_as_a_new_source(application):
     app = application
-    course = RevisionRef.model_validate(app.prepare("prepare1", LEARNER)["course_ref"])
+    course = RevisionRef.model_validate(asyncio.run(app.prepare("prepare1", LEARNER))["course_ref"])
+    confirmed(app, {"course_ref": course})
     activity = app.start("start1", LEARNER, course, CONDITIONS)["snapshot"]["activity_id"]
     app.store.active_activity_id = None  # Explicitly simulate process loss.
     reopened = Coordinator(app.store, app.root, verification=app.verification)
@@ -517,14 +522,14 @@ def test_sealed_activity_is_not_reported_lost(application):
 
 def test_completed_requests_replay_after_later_effective_versions_without_new_calls(application):
     async def scenario():
-        prepared = application.prepare("first-prepare", LEARNER)
+        prepared = await application.prepare("first-prepare", LEARNER)
         core, _ = await complete_story(application)
         application.feedback("first-feedback", LEARNER, core.activity_id, "无额外补充")
         result = await application.next_course("first-next", LEARNER, core.activity_id)
         state = application.current(LEARNER, "state").ref
         demand = application.current(LEARNER, "demand").ref
         calls = len(application.models.calls)
-        assert application.prepare("first-prepare", LEARNER) == prepared
+        assert (await application.prepare("first-prepare", LEARNER)) == prepared
         assert await application.next_course("first-next", LEARNER, core.activity_id) == result
         assert application.current(LEARNER, "state").ref == state
         assert application.current(LEARNER, "demand").ref == demand
@@ -538,8 +543,8 @@ def test_completed_requests_replay_after_later_effective_versions_without_new_ca
 def test_recovered_successful_retry_preserves_original_attempt_count(application):
     app = application
     app.store.fail_at = "temporary_save"
-    prepared = app.prepare("temporary-save", LEARNER)
-    assert app.prepare("temporary-save", LEARNER) == prepared
+    prepared = asyncio.run(app.prepare("temporary-save", LEARNER))
+    assert asyncio.run(app.prepare("temporary-save", LEARNER)) == prepared
     assert any(
         row["payload"]["attempts"] == 2
         for row in app.ledger.steps(
@@ -562,7 +567,7 @@ def test_recovered_successful_retry_preserves_original_attempt_count(application
 
 
 async def reach_reading(app):
-    core = start(app)
+    core = await start(app)
     deliver_all(core)
     await answer(app, "收到", "confirmation")
     await answer(app, "a bridge")
@@ -611,7 +616,7 @@ def test_E2E13_reading_is_scored_first_and_a_reread_is_a_new_attempt(application
 
 def test_a_recording_on_a_question_is_rejected(application):
     async def scenario():
-        core = start(application)
+        core = await start(application)
         deliver_all(core)
         await answer(application, "收到", "confirmation")
         with pytest.raises(ValueError):

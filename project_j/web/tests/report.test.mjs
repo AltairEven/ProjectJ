@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { describe, evaluationLines, modelLines, startMessage } from '../src/report.ts'
+import { describe, discussionLines, evaluationLines, modelLines, resourceLines, startMessage } from '../src/report.ts'
 
 const doc = (object_id, revision, kind, body) => ({ object_id, revision, kind, body })
 const docs = [
@@ -128,4 +128,31 @@ test('a model-planned demand explains its change and an uncovered goal reads as 
   assert.equal(rows.get('计划理由'), '本周先补样本')
   assert.equal(rows.get('仍未知'), '家庭负担')
   assert.equal(rows.get('规则调整'), '预算固定30分钟，改动不生效。')
+})
+
+test('a planned resource list says what each item is for and that it waits for confirmation', () => {
+  const lines = resourceLines({ resources: [
+    { resource_id: 'cup', kind: 'image', purpose: '展示两个杯子', required: false, fallback: '拿出实物杯子。', state: 'planned' },
+    { resource_id: 'demo', kind: 'audio', purpose: '朗读示范', required: true, fallback: '家长读一遍。', state: 'awaiting_generation' },
+  ] })
+  assert.deepEqual(lines, [
+    '图片（可选）：展示两个杯子；没有时：拿出实物杯子。——已列入清单，确认后生成',
+    '音频（必需）：朗读示范；没有时：家长读一遍。——确认后生成（下一批接入）',
+  ])
+  assert.deepEqual(resourceLines({ resources: [] }), [])
+})
+
+test('discussion rounds read as the parent feedback and what the model changed', () => {
+  assert.deepEqual(discussionLines({ discussion: [{ feedback: '第一题再简单一点。', note: '第一题改得更直接。' }], confirmation: null }), [
+    ['第1轮意见', '第一题再简单一点。'],
+    ['第1轮修改说明', '第一题改得更直接。'],
+    ['确认', '待确认'],
+  ])
+  assert.deepEqual(discussionLines({ discussion: [], confirmation: { state: 'confirmed', confirmed_at: '2026-10-19T12:00:00+00:00' } }), [
+    ['确认', '已确认（2026-10-19T12:00:00+00:00）'],
+  ])
+})
+
+test('a drafted course in the next-course report reads as waiting for confirmation', () => {
+  assert.equal(new Map(describe({ next_package: { preparation: 'drafted' } }, docs)).get('备课'), '已编写，待确认')
 })
