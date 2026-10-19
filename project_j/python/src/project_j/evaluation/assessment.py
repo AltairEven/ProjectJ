@@ -173,7 +173,7 @@ def evaluation_request(
             "limitations": fact["limitations"],
         },
         output=EvaluationDraft,
-        deadline_seconds=60,
+        deadline_seconds=180,
     )
 
 

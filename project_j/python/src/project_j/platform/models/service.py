@@ -1,6 +1,7 @@
 """Unified model entry: purpose bindings, admission, output checks and call records."""
 
 import asyncio
+import logging
 import time
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -21,6 +22,8 @@ from project_j.platform.models.contracts import (
 )
 from project_j.platform.models.simulated import SIMULATED_MODEL, SimulatedAdapter
 from project_j.platform.storage import Conflict
+
+log = logging.getLogger(__name__)
 
 
 class ModelsNotReady(Conflict):
@@ -116,6 +119,8 @@ class ModelService:
             raise
         finally:
             entry["elapsed_ms"] = round((time.perf_counter() - started) * 1000, 3)
+            if entry["failure"] == "cancelled":
+                self.log(entry)
         output, failure = None, reply.failure
         if failure is None and any(check.status == "mismatch" for check in reply.actual.values()):
             failure = "config_mismatch"
@@ -130,8 +135,26 @@ class ModelService:
             "usage": reply.usage,
             "request_id": reply.request_id,
         }
+        self.log(entry)
         return ModelResult(
             entry["call_id"], request.purpose, binding, output, failure, reply.actual
+        )
+
+    @staticmethod
+    def log(entry: dict):
+        log.info(
+            "model %s adapter=%s model=%s effort=%s tier=%s failure=%s elapsed_ms=%.0f "
+            "error_type=%s request_id=%s usage=%s",
+            entry["purpose"],
+            entry["adapter"],
+            entry["model"],
+            entry["effort"],
+            entry["tier"],
+            entry["failure"],
+            entry["elapsed_ms"],
+            entry.get("error_type"),
+            entry["request_id"],
+            entry["usage"],
         )
 
     def status(self) -> dict:

@@ -1,6 +1,7 @@
 """Simulation use cases. Each saved step can resume without rerunning successful work."""
 
 import asyncio
+import logging
 import re
 import time
 from datetime import UTC, datetime, timedelta
@@ -51,6 +52,8 @@ PRIMARY_GOAL = Goal(
     dimension_id="english.reading.facts", description="观察故事事实、顺序与文本依据"
 )
 AUXILIARY_GOAL = Goal(dimension_id="english.speaking.report", description="用短英语报告实际结果")
+
+log = logging.getLogger(__name__)
 
 
 def student_text(source: str) -> str:
@@ -877,6 +880,14 @@ class Coordinator:
                 (Publication(ref=fact.ref, reason="结束事实结构核对；无模型评价"),),
             )
         self.pending_seals.pop(core.activity_id, None)
+        log.info(
+            "seal activity=%s events=%d attempts=%d end=%s receipt=%s",
+            core.activity_id,
+            len(fact.body["events"]),
+            len(fact.body["attempts"]),
+            fact.body["end"]["reason"],
+            "existing" if receipt else "new",
+        )
         try:
             self.ledger.accept(
                 Request(
@@ -1231,8 +1242,11 @@ class Coordinator:
                     )
                 )
                 if not result.ok:
+                    log.warning("evaluation activity=%s failure=%s", activity_id, result.failure)
                     raise EvaluationUnavailable(result.failure)
                 draft = result.output
+            else:
+                log.info("evaluation activity=%s reused the checked draft", activity_id)
             current_revision, current_feedback = self.source_revision(activity_id, learner_id)
             if current_revision != source_revision:
                 # Re-enter with the new source, never publish the late old interpretation.
@@ -1253,6 +1267,7 @@ class Coordinator:
                     [fb.body for fb in current_feedback],
                 )
             except DraftMismatch as error:
+                log.warning("evaluation activity=%s draft does not match the facts", activity_id)
                 raise EvaluationUnavailable(str(error)) from error
             obj = document(
                 "evaluation",

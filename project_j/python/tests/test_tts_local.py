@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import logging
 import sys
 import time
 from contextlib import aclosing
@@ -182,3 +183,19 @@ def test_reasons_follow_models_probe_record_and_identity(tmp_path):
         "合成器版本、声音配置或模型与探针记录不一致，请重新运行 project-j-tts-init probe"
     ]
     assert asyncio.run(running("r1")) == []
+
+
+def test_synthesis_logs_each_stream_outcome_without_the_text(tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+
+    async def go():
+        local = synth(tmp_path)
+        await local.start()
+        await collect(local, "Mia has a toy car.")
+        await collect(local, "Mia has a toy car.", limit=1)
+        await local.aclose()
+
+    asyncio.run(go())
+    assert "synthesizer ready device=gpu" in caplog.text
+    assert "synthesis outcome=completed chars=18 first_chunk_ms=" in caplog.text
+    assert "synthesis outcome=cancelled" in caplog.text and "Mia" not in caplog.text

@@ -8,6 +8,7 @@ import asyncio
 import base64
 import contextlib
 import json
+import logging
 import shutil
 import tempfile
 import time
@@ -45,6 +46,7 @@ from project_j.platform.models.contracts import (
 )
 from project_j.platform.models.openai_api import FAILURE_TEXT, PROBE, ColorAnswer, solid_png
 
+log = logging.getLogger(__name__)
 ERRORS = {
     "unauthorized": "auth",
     "usageLimitExceeded": "quota",
@@ -143,6 +145,7 @@ class CodexAdapter:
         if self._codex is None:
             self._workdir = Path(tempfile.mkdtemp(prefix="project-j-codex-"))
             self._codex = self._factory(self._workdir)
+            log.info("codex runtime launched")  # It starts with the first thread.
         return self._codex
 
     async def aclose(self):
@@ -162,6 +165,22 @@ class CodexAdapter:
     async def call(
         self, binding: Binding, instructions: str, input, output: type[BaseModel], timeout=60.0
     ) -> AdapterReply:
+        timing: dict[str, float | None] = {"thread": None, "turn": None}
+        started, reply = time.perf_counter(), None
+        try:
+            reply = await self.exchange(binding, instructions, input, output, timeout, timing)
+            return reply
+        finally:
+            # Thread time includes the runtime's own start on the first call of a process.
+            log.info(
+                "codex thread_ms=%s turn_ms=%s total_ms=%.0f status=%s",
+                timing["thread"],
+                timing["turn"],
+                (time.perf_counter() - started) * 1000,
+                "cancelled" if reply is None else reply.failure or "completed",
+            )
+
+    async def exchange(self, binding, instructions, input, output, timeout, timing) -> AdapterReply:
         actual = {
             "model": ConfigCheck(requested=binding.model, actual=None, status="unverified"),
             "effort": ConfigCheck(requested=binding.effort, actual=None, status="unverified"),
@@ -170,7 +189,7 @@ class CodexAdapter:
             actual["service_tier"] = ConfigCheck(
                 requested=binding.tier, actual=None, status="unverified"
             )
-        handle = None
+        handle, begun = None, time.perf_counter()
         try:
             async with asyncio.timeout(timeout):
                 codex = self.codex()
@@ -184,10 +203,12 @@ class CodexAdapter:
                     cwd=str(self._workdir),
                     service_tier=SERVICE_TIERS.get(binding.tier),
                 )
+                timing["thread"] = round((time.perf_counter() - begun) * 1000)
                 handle = await thread.turn(
                     input, effort=binding.effort, output_schema=to_strict_json_schema(output)
                 )
                 text, turn, usage, tools = await collect(handle)
+                timing["turn"] = round((time.perf_counter() - begun) * 1000) - timing["thread"]
         except (asyncio.CancelledError, TimeoutError) as stop:
             if handle is not None:  # Stop the server-side turn too, not only our wait.
                 with contextlib.suppress(Exception):
@@ -213,7 +234,9 @@ class CodexAdapter:
 
     async def invoke(self, request: ModelRequest, binding: Binding) -> AdapterReply:
         context = json.dumps(request.context, ensure_ascii=False)
-        return await self.call(binding, request.instructions, context, request.output)
+        return await self.call(
+            binding, request.instructions, context, request.output, request.deadline_seconds
+        )
 
     async def probe(
         self, model: str, efforts: tuple[Effort, ...], tiers: tuple[Tier, ...] = ()

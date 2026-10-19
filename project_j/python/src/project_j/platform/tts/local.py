@@ -7,6 +7,7 @@ import asyncio
 import base64
 import hashlib
 import json
+import logging
 import os
 import time
 from collections.abc import Sequence
@@ -15,6 +16,7 @@ from uuid import uuid4
 
 from project_j.platform.tts.contracts import SynthesisFailed
 
+log = logging.getLogger(__name__)
 MODELS = Path("project_j/private/tts/models")
 INIT = Path("project_j/private/tts/init.json")
 BINARY = Path("project_j/tts/.venv/bin/project-j-tts")
@@ -69,7 +71,7 @@ class LocalSynthesizer:
         start_timeout: float = 180.0,
         chunk_timeout: float = 30.0,
         cancel_timeout: float = 3.0,
-        inherit_stderr: bool = False,
+        inherit_stderr: bool = True,  # Child errors land in the service log.
     ):
         self.root = root
         self.command = (
@@ -119,11 +121,21 @@ class LocalSynthesizer:
             await self.aclose()
             ready = ready if isinstance(ready, dict) else {"error": "invalid_ready_line"}
             detail = f"（{ready['detail']}）" if ready.get("detail") else ""
+            log.warning(
+                "synthesizer not ready error=%s detail=%s", ready.get("error"), ready.get("detail")
+            )
             raise SynthesizerUnavailable(f"合成进程未就绪：{ready.get('error')}{detail}")
         self.ready, self.exited = ready, False
         self.service, self.version = ready["synthesizer"], ready["version"]
         self.voice, self.sample_rate = ready["voice"], ready["sample_rate"]
         self.model = f"{ready['model']}@{ready['revision']}"
+        log.info(
+            "synthesizer ready device=%s load_ms=%s model=%s voice=%s",
+            ready.get("device"),
+            ready.get("load_ms"),
+            self.model,
+            self.voice,
+        )
         return ready
 
     async def stream(self, text: str, *, seed: int | None = None):
@@ -137,7 +149,7 @@ class LocalSynthesizer:
                 ("first_chunk_ms", "elapsed_ms", "audio_seconds", "truncated", "memory_bytes")
             ) | {"chunks": 0, "cancel_ms": None}
             self.last_stats = stats
-            started, finished = time.perf_counter(), False
+            started, finished, outcome = time.perf_counter(), False, "cancelled"
             request = {"id": request_id, "op": "synthesize", "text": text, "seed": seed}
             try:
                 await self.send(request)
@@ -164,10 +176,26 @@ class LocalSynthesizer:
                     }
                     if reply.get("truncated"):
                         raise SynthesisFailed("truncated")
+                    outcome = "completed"
                     return
+            except SynthesisFailed as error:
+                outcome = f"failed:{error.reason}"
+                raise
             finally:
                 if not finished and not self.exited:
                     await self.cancel(request_id)
+                log.info(
+                    "synthesis outcome=%s chars=%d first_chunk_ms=%s elapsed_ms=%s chunks=%d "
+                    "audio_seconds=%s cancel_ms=%s exited=%s",
+                    outcome,
+                    len(text),
+                    stats["first_chunk_ms"],
+                    stats["elapsed_ms"],
+                    stats["chunks"],
+                    stats["audio_seconds"],
+                    stats["cancel_ms"],
+                    self.exited,
+                )
 
     async def send(self, message: dict):
         try:

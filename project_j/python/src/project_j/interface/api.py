@@ -5,6 +5,9 @@ import asyncio
 import base64
 import binascii
 import json
+import logging
+import time
+import traceback
 from collections.abc import AsyncIterator
 from contextlib import aclosing, asynccontextmanager
 from pathlib import Path
@@ -22,7 +25,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.responses import JSONResponse, Response, StreamingResponse
-from pydantic import Field, JsonValue
+from pydantic import Field, JsonValue, ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
 from project_j.application.configuration import Settings
@@ -214,6 +217,52 @@ class InputResult(Contract):
     event_id: str | None = None
 
 
+log = logging.getLogger(__name__)
+
+
+def describe(error: Exception) -> str:
+    """Error kind and message for logs; validation and database messages echo stored content."""
+    if isinstance(error, ValidationError):
+        return f"ValidationError({error.error_count()} errors)"
+    if isinstance(error, SQLAlchemyError):
+        return type(error).__name__
+    return f"{type(error).__name__}: {str(error)[:200]}"
+
+
+class AccessLog:
+    """One log line per API request after its response (streams included) has finished."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not scope["path"].startswith("/api/"):
+            return await self.app(scope, receive, send)
+        started, status = time.perf_counter(), 500
+
+        async def capture(message):
+            nonlocal status
+            if message["type"] == "http.response.start":
+                status = message["status"]
+            await send(message)
+
+        try:
+            await self.app(scope, receive, capture)
+        except Exception as error:
+            # Frames only: an exception's message may quote request content.
+            log.error(
+                "unhandled %s %s %s\n%s",
+                scope["method"],
+                scope["path"],
+                type(error).__name__,
+                "".join(traceback.format_tb(error.__traceback__)),
+            )
+            raise
+        finally:
+            elapsed = (time.perf_counter() - started) * 1000
+            log.info("%s %s %d %.0fms", scope["method"], scope["path"], status, elapsed)
+
+
 def build_coordinator(settings: Settings) -> Coordinator:
     """Simulation keeps its simulated providers; the adult check binds the real local ones."""
     root = settings.project_root
@@ -255,7 +304,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
                 try:
                     await part.start()
                 except (ScorerUnavailable, SynthesizerUnavailable) as error:
-                    print(error)
+                    log.warning("%s", error)
         dist = settings.project_root / "project_j/web/dist"
         types = {
             ".html": "text/html",
@@ -329,6 +378,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
         redoc_url=None,
         openapi_url="/api/openapi.json",
     )
+    app.add_middleware(AccessLog)
 
     def controller():
         return app.state.coordinator
@@ -345,11 +395,19 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
 
     StudentCore = Annotated[Harness, Depends(student)]
 
+    def refused(request, error, status_code: int, content: dict) -> JSONResponse:
+        log.warning(
+            "refused %s %s %d %s", request.method, request.url.path, status_code, describe(error)
+        )
+        return JSONResponse(status_code=status_code, content=content)
+
     @app.exception_handler(ValueError)
     async def value_error(request, error):
-        return JSONResponse(
-            status_code=409 if isinstance(error, Conflict) else 400,
-            content={
+        return refused(
+            request,
+            error,
+            409 if isinstance(error, Conflict) else 400,
+            {
                 "message": str(error),
                 "current": error.current.model_dump()
                 if isinstance(error, Conflict) and error.current
@@ -359,31 +417,28 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
 
     @app.exception_handler(EvaluationUnavailable)
     async def evaluation_failed(request, error):
-        return JSONResponse(
-            status_code=503, content={"message": str(error), "evaluation": "failed"}
-        )
+        return refused(request, error, 503, {"message": str(error), "evaluation": "failed"})
 
     @app.exception_handler(LookupError)
     async def not_found(request, error):
-        return JSONResponse(status_code=404, content={"message": str(error)})
+        return refused(request, error, 404, {"message": str(error)})
 
     @app.exception_handler(PermissionError)
     async def forbidden(request, error):
-        return JSONResponse(status_code=403, content={"message": str(error)})
+        return refused(request, error, 403, {"message": str(error)})
 
     @app.exception_handler(StorageBlocked)
     async def classroom_storage_closed(request, error):
-        return JSONResponse(status_code=423, content={"message": str(error)})
+        return refused(request, error, 423, {"message": str(error)})
 
     @app.exception_handler(OSError)
     @app.exception_handler(SQLAlchemyError)
     async def save_unknown(request, error):
-        return JSONResponse(
-            status_code=503,
-            content={
-                "message": "保存或回执未取得，请查询原操作，不要更换身份重建。",
-                "save": "unknown",
-            },
+        return refused(
+            request,
+            error,
+            503,
+            {"message": "保存或回执未取得，请查询原操作，不要更换身份重建。", "save": "unknown"},
         )
 
     async def save_after_end():
@@ -395,6 +450,9 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
                 seal_errors.pop(app_controller.core.activity_id, None)
             except (OSError, ValueError, SQLAlchemyError) as error:
                 seal_errors[app_controller.core.activity_id] = type(error).__name__
+                log.warning(
+                    "seal failed activity=%s %s", app_controller.core.activity_id, describe(error)
+                )
 
     def ended(core, background: BackgroundTasks):
         if core.mode == "ended":
@@ -431,12 +489,19 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
 
     @app.post("/api/parent/start", dependencies=[Depends(parent)], response_model=StartResult)
     async def start(request: StartRequest):
-        return controller().start(
+        result = controller().start(
             request.request_id,
             request.learner_id,
             request.course_ref,
             request.conditions.model_dump(),
         )
+        log.info(
+            "start decision=%s missing=%s reason=%s",
+            result["decision"],
+            result.get("missing"),
+            result.get("reason"),
+        )
+        return result
 
     @app.post("/api/parent/feedback", dependencies=[Depends(parent)])
     async def feedback(request: FeedbackRequest):
@@ -675,6 +740,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
             return
         await socket.accept(subprotocol=f"project-j.{token}")
         connections[socket] = core.activity_id
+        log.info("student socket opened activity=%s", core.activity_id)
         send_lock = asyncio.Lock()
         jobs = set()
 
@@ -711,6 +777,9 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
                 await socket.close(code=1008)
                 connections.pop(socket, None)
             except (ValueError, LookupError) as error:
+                log.warning(
+                    "student socket refused kind=%s %s", message.get("kind"), describe(error)
+                )
                 async with send_lock:
                     await socket.send_json({"reply_to": message.get("id"), "error": str(error)})
 
@@ -726,6 +795,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
             pass
         finally:
             connections.pop(socket, None)
+            log.info("student socket closed activity=%s", core.activity_id)
             for job in jobs:
                 job.cancel()
 
@@ -791,6 +861,13 @@ def main(argv: list[str] | None = None):
             f"隔离模拟工作台：http://127.0.0.1:{settings.port}/#parent={coordinator.parent_token}"
         )
         print("真实API/声音/儿童入口未验证且关闭；不加载.env、不调用麦克风。")
+    # Diagnostics go to standard error, metadata only; the app itself writes no log file.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s.%(msecs)03dZ %(levelname)s %(name)s %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+    logging.Formatter.converter = time.gmtime  # UTC, the clock of the sealed facts.
     uvicorn.run(
         create_app(settings, coordinator),
         host=settings.host,

@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -111,3 +112,18 @@ def test_reasons_follow_files_and_the_probed_identity(tmp_path):
     assert asyncio.run(go(scorer(tmp_path))) == []
     write_init(tmp_path, identity_revision="r0")
     assert "不一致" in asyncio.run(go(scorer(tmp_path)))[0]
+
+
+def test_scoring_logs_round_trip_and_compute_time_without_the_text(tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+
+    async def go():
+        local = scorer(tmp_path)
+        await local.start()
+        await local.score(b"... brige ...", "She wants a bridge.")
+        await local.aclose()
+
+    asyncio.run(go())
+    assert "scorer ready device=cpu load_ms=5" in caplog.text
+    assert "scorer status=scored reason=None audio_bytes=13 round_trip_ms=" in caplog.text
+    assert "compute_ms=7" in caplog.text and "bridge" not in caplog.text

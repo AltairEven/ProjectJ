@@ -137,7 +137,12 @@ class OpenAIAdapter:
             self._client = None
 
     async def call(
-        self, binding: Binding, instructions: str, content, output: type[BaseModel]
+        self,
+        binding: Binding,
+        instructions: str,
+        content,
+        output: type[BaseModel],
+        timeout: float = 60.0,
     ) -> AdapterReply:
         if not self._api_key:
             return AdapterReply(data=None, failure="auth")
@@ -153,6 +158,7 @@ class OpenAIAdapter:
                     {"role": "developer", "content": instructions},
                     {"role": "user", "content": content},
                 ],
+                timeout=timeout,
             )
         except ValidationError, ValueError:
             return AdapterReply(data=None, failure="invalid_output")
@@ -187,7 +193,9 @@ class OpenAIAdapter:
 
     async def invoke(self, request: ModelRequest, binding: Binding) -> AdapterReply:
         context = json.dumps(request.context, ensure_ascii=False)
-        return await self.call(binding, request.instructions, context, request.output)
+        return await self.call(
+            binding, request.instructions, context, request.output, request.deadline_seconds
+        )
 
     async def probe(
         self, model: str, efforts: tuple[Effort, ...], tiers: tuple[Tier, ...] = ()

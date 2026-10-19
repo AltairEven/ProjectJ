@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import json
 
 import httpx2
@@ -201,3 +202,14 @@ def test_one_adapter_serves_many_calls_and_closes_on_request():
 
     asyncio.run(scenario())
     assert len(calls) == 2
+
+
+def test_the_request_deadline_sets_the_http_timeout_not_a_fixed_minute():
+    seen = {}
+
+    def respond(request):
+        seen["timeout"] = request.extensions["timeout"]
+        return httpx2.Response(200, json=body(GOOD))
+
+    run(respond, request=dataclasses.replace(REQUEST, deadline_seconds=180))
+    assert seen["timeout"]["read"] == 180

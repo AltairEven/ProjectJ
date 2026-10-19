@@ -7,7 +7,9 @@ import asyncio
 import base64
 import hashlib
 import json
+import logging
 import os
+import time
 from collections.abc import Sequence
 from pathlib import Path
 from uuid import uuid4
@@ -16,6 +18,7 @@ from pydantic import ValidationError
 
 from project_j.platform.speech.contracts import PRODUCT_LIMITS, PronunciationResult, WordScore
 
+log = logging.getLogger(__name__)
 MODELS = Path("project_j/private/scorer/models")
 INIT = Path("project_j/private/scorer/init.json")
 BINARY = Path("project_j/scorer/.venv/bin/project-j-scorer")
@@ -67,7 +70,7 @@ class LocalScorer:
         *,
         start_timeout: float = 120.0,
         score_timeout: float = 30.0,
-        inherit_stderr: bool = False,
+        inherit_stderr: bool = True,  # Child errors land in the service log.
     ):
         self.root = root
         self.command = (
@@ -115,14 +118,40 @@ class LocalScorer:
         if not ready.get("ready"):
             await self.aclose()
             detail = f"（{ready['detail']}）" if ready.get("detail") else ""
+            log.warning(
+                "scorer not ready error=%s detail=%s", ready.get("error"), ready.get("detail")
+            )
             raise ScorerUnavailable(f"评分进程未就绪：{ready.get('error')}{detail}")
         self.ready, self.exited = ready, False
         self.service, self.version = ready["scorer"], ready["version"]
         self.thresholds = ready["thresholds"]
         self.model = f"{ready['model']}@{ready['revision']}"
+        log.info(
+            "scorer ready device=%s load_ms=%s model=%s thresholds=%s",
+            ready.get("device"),
+            ready.get("load_ms"),
+            self.model,
+            self.thresholds,
+        )
         return ready
 
     async def score(self, audio: bytes, reference_text: str) -> PronunciationResult:
+        started = time.perf_counter()
+        self.last_stats = {}
+        result = await self.exchange(audio, reference_text)
+        # Compute is the child's own time; the rest of the round trip is queueing and transfer.
+        log.info(
+            "scorer status=%s reason=%s audio_bytes=%d round_trip_ms=%.0f compute_ms=%s exited=%s",
+            result.status,
+            result.reason,
+            len(audio),
+            (time.perf_counter() - started) * 1000,
+            self.last_stats.get("elapsed_ms"),
+            self.exited,
+        )
+        return result
+
+    async def exchange(self, audio: bytes, reference_text: str) -> PronunciationResult:
         # ponytail: a dead process is not restarted mid-class (another ~6 s load, and ADR-0015
         # keeps the model fixed during class); the next class start launches a new one.
         async with self.lock:

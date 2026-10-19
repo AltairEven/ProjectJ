@@ -1,6 +1,9 @@
 import asyncio
+import dataclasses
 import json
+import logging
 import tempfile
+import time
 from pathlib import Path
 
 import pytest
@@ -315,3 +318,21 @@ def test_close_stops_runtime_and_removes_workdir(tmp_path):
 
     workdir = asyncio.run(scenario())
     assert fake.closed and not workdir.exists()
+
+
+def test_each_call_logs_thread_and_turn_time(tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    asyncio.run(adapter(FakeCodex(), tmp_path).invoke(REQUEST, BINDING))
+    assert "codex runtime launched" in caplog.text
+    assert "codex thread_ms=" in caplog.text and "status=completed" in caplog.text
+    assert "a bridge" not in caplog.text
+
+
+def test_the_request_deadline_bounds_the_call_not_a_fixed_minute(tmp_path):
+    # Evaluation asks for 180 s; a fixed internal 60 s cut it short (adult check, 2026-10-19).
+    short = dataclasses.replace(REQUEST, deadline_seconds=0.2)
+    fake = FakeCodex(events=[], hang=True)
+    started = time.perf_counter()
+    reply = asyncio.run(adapter(fake, tmp_path).invoke(short, BINDING))
+    assert reply.failure == "timeout" and time.perf_counter() - started < 2
+    assert fake.handles[0].interrupted

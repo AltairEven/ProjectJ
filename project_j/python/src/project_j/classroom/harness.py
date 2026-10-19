@@ -1,6 +1,7 @@
 """Explicit state/action boundary. Providers propose; only this core can advance."""
 
 import asyncio
+import logging
 import re
 import time
 from datetime import UTC, datetime
@@ -16,6 +17,14 @@ from project_j.platform.speech.contracts import PronunciationResult, Pronunciati
 from project_j.platform.storage import REALMS, Conflict, canonical, digest
 from project_j.preparation.contracts import CourseBody, TaskDefinition
 
+log = logging.getLogger(__name__)
+# Diagnostic logs carry identities, kinds and outcomes only, never what was said or shown.
+LOGGED_FIELDS = (
+    "event_id", "action_id", "task_id", "task_instance_id", "dimension_id", "purpose", "kind",
+    "after_delivery", "status", "modality", "intent", "relation", "completion_trigger",
+    "recording_ms", "delivered_range", "failure", "deadline_seconds", "judgment", "call_id",
+    "command", "reason", "unconfirmed", "unfinished_tasks", "elapsed_seconds",
+)  # fmt: skip
 TRANSITIONS = {
     "delivering": {"waiting_input", "delivering", "offscreen", "paused", "ended"},
     "waiting_input": {"judging", "delivering", "paused", "ended"},
@@ -155,6 +164,8 @@ class Harness:
                 "payload": payload,
             }
         )
+        fields = " ".join(f"{key}={payload[key]}" for key in LOGGED_FIELDS if key in payload)
+        log.info("event %s activity=%s seq=%d %s", kind, self.activity_id, len(self.events), fields)
 
     def move(self, mode: str):
         if mode not in TRANSITIONS[self.mode]:
@@ -567,14 +578,25 @@ class Harness:
         async def judge():
             pronunciation = None
             if audio is not None:  # The recording lives only in this call, never in a record.
+                scoring = time.perf_counter()
                 try:
                     pronunciation = await self.scorer.score(audio, task.reference_text)
                 except Exception:  # A scorer must not raise; treat it as an unknown score.
                     pronunciation = PronunciationResult.unknown("failed", self.scorer)
+                # Counts against the 10-second answer deadline, so it is kept with the attempt.
+                scoring_ms = round((time.perf_counter() - scoring) * 1000, 1)
+                log.info(
+                    "pronunciation task=%s status=%s scoring_ms=%.0f reason=%s",
+                    task.task_id,
+                    pronunciation.status,
+                    scoring_ms,
+                    pronunciation.reason,
+                )
                 if self.epoch != binding["cancellation_epoch"]:
                     raise asyncio.CancelledError  # Stopped meanwhile: drop the late score.
                 if attempt is not None:
                     attempt["pronunciation"] = pronunciation.model_dump(mode="json")
+                    attempt["scoring_ms"] = scoring_ms
             return await self.models.run(
                 judgment_request(
                     task,
