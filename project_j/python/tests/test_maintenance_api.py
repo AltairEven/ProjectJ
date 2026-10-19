@@ -1,3 +1,4 @@
+import asyncio
 import sys
 
 import pytest
@@ -70,19 +71,27 @@ def test_E2E15_16_reviews_reuse_evidence_and_stale_proposals_do_not_apply(applic
     app = application
     before = app.current(LEARNER, "state")
     for level in ("week", "stage", "annual", "long_term"):
-        result = review(app, f"review:{level}", LEARNER, level)
+        result = asyncio.run(review(app, f"review:{level}", LEARNER, level))
         assert result["plan_effect"] == "reused"
     assert app.current(LEARNER, "state").ref == before.ref
     assert not app.store.list_current(LEARNER, "fact")
-    proposal = review(
-        app, "proposal", LEARNER, "week", {"verification": "在相近新材料中观察，不预填保持或迁移。"}
+    proposal = asyncio.run(
+        review(
+            app,
+            "proposal",
+            LEARNER,
+            "week",
+            {"verification": "在相近新材料中观察，不预填保持或迁移。"},
+        )
     )
     old_plan = app.current(LEARNER, "plan:week")
     decision_ref = RevisionRef.model_validate(proposal["decision_ref"])
     result = decide(app, "accept", LEARNER, decision_ref, "accept")
     assert result["effect"] == "plan_effective"
     assert app.current(LEARNER, "plan:week").revision == old_plan.revision + 1
-    second = review(app, "proposal2", LEARNER, "week", {"verification": "另一项模拟复查"})
+    second = asyncio.run(
+        review(app, "proposal2", LEARNER, "week", {"verification": "另一项模拟复查"})
+    )
     old = app.current(LEARNER, "plan:week")
     update = document(
         "plan",
@@ -113,7 +122,7 @@ def test_E2E15_16_reviews_reuse_evidence_and_stale_proposals_do_not_apply(applic
 def test_a_proposed_goal_outside_the_capability_catalog_is_rejected(application):
     patch = {"main_goal": {"dimension_id": "no.such.dimension", "description": "换个说法的新目标"}}
     with pytest.raises(ValueError, match="established capability identity"):
-        review(application, "unknown-goal", LEARNER, "week", patch)
+        asyncio.run(review(application, "unknown-goal", LEARNER, "week", patch))
     assert not application.store.list_current(LEARNER, "decision")
 
 

@@ -203,3 +203,13 @@ def test_adult_check_prepares_the_next_course_after_feedback(adult):
         RevisionRef.model_validate(result["adoption"]["state_ref"]), core.learner_id
     )
     assert (state.realm, state.source_type) == ("adult_check", "adult")
+
+
+def test_adult_state_wording_is_not_simulated(adult):
+    core, fact = asyncio.run(complete_story(adult))
+    activity = fact.body["activity_id"]
+    adult.feedback("fb1", core.learner_id, activity, "无额外补充", [])
+    asyncio.run(adult.next_course("next1", core.learner_id, activity))
+    for item in adult.current(core.learner_id, "state").body["dimensions"]:
+        if item["observed_at"]:
+            assert "模拟" not in item["task_scope"] + item["material_condition"]

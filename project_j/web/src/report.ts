@@ -7,12 +7,16 @@ const keyLabels: Record<string, string> = {
   start: '开始', unverified: '未验证', state_ref: '学习状态', plan_ref: '计划', plan_effect: '计划处理',
   demand_ref: '下一课需求', suggestion_ref: '下节建议', review_ref: '复盘', decision_ref: '具体方案', choice: '家长选择',
   effect: '结果', next_step: '下一步', run_id: '新运行目录', result: '结果', qualification: '使用资格',
+  status: '课程状态', reason: '原因', plan_reason: '计划理由',
 }
 const valueLabels: Record<string, string> = {
   fixed_simulation_checked: '固定模拟包已核对', pending: '待开始', actual_api: '实际API', voice: '声音',
   child_entry: '儿童入口', reused: '沿用', reused_with_reason: '沿用并说明理由', plan_effective: '新计划已生效',
   not_changed: '未改变', recheck_demand_and_course: '复核需求和课程', accept: '接受', reject: '拒绝',
-  restored_to_new_simulation: '已恢复到新运行目录', not_granted: '未授予',
+  restored_to_new_simulation: '已恢复到新运行目录', not_granted: '未授予', not_ready: '课程未就绪', adjusted: '已调整',
+}
+const directionLabels: Record<string, string> = {
+  consolidate: '巩固', review: '复查', extend: '拓展', advance: '小步进阶', observe: '短观察',
 }
 const judgmentLabels: Record<string, string> = {
   unknown: '未知', needs_help: '需要帮助', single_independent: '单次独立',
@@ -35,7 +39,7 @@ function summary(doc: Doc, docs: Doc[]): string | undefined {
     case 'evaluation': return body.report?.summary
     case 'preview': return body.content?.story
     case 'suggestion': return body.direction
-    case 'demand': return body.primary_goal?.description
+    case 'demand': return `${body.direction ? `${directionLabels[body.direction] ?? body.direction}：` : ''}${body.primary_goal?.description}`
     case 'plan': return body.main_goal?.description
     case 'review': return body.conclusion
     case 'decision': return body.reason
@@ -50,17 +54,31 @@ function reference(ref: Ref, docs: Doc[]): string {
   return `修订${ref.revision}${about ? `：${about}` : ''}`
 }
 
+const joined = (items: unknown) => Array.isArray(items) && items.length ? items.join('；') : '无'
+
+/** What a planned demand or a review adds beyond its one-line summary. */
+function details(ref: Ref, docs: Doc[]): [string, string][] {
+  const doc = docs.find(item => item.object_id === ref.object_id && item.revision === ref.revision)
+  const body = doc?.body as Body | undefined
+  if (doc?.kind === 'demand' && body?.note) {
+    const note = body.note
+    return [['原安排', note.before], ['新安排', note.after], ['为什么', note.why], ['还不确定', joined(note.uncertain)], ['下节预期', note.expectation]]
+  }
+  if (doc?.kind === 'review' && body) {
+    return [['仍未知', joined(body.unknown)], ...(body.checks?.length ? [['规则调整', joined(body.checks)] as [string, string]] : [])]
+  }
+  return []
+}
+
 /** Flatten an operation result into labelled rows; references show what the saved object says. */
 export function describe(value: unknown, docs: Doc[]): [string, string][] {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return [['结果', text(value)]]
   return Object.entries(value).flatMap(([key, item]): [string, string][] => {
-    if (isRef(item)) return [[keyLabels[key] ?? key, reference(item, docs)]]
+    if (isRef(item)) return [[keyLabels[key] ?? key, reference(item, docs)], ...details(item, docs)]
     if (typeof item === 'object' && item !== null && !Array.isArray(item)) return describe(item, docs)
     return [[keyLabels[key] ?? key, text(item)]]
   })
 }
-
-const joined = (items: unknown) => Array.isArray(items) && items.length ? items.join('；') : '无'
 
 /** A model-drafted evaluation as rows: summary first, then each attempt and any rule changes. */
 export function evaluationLines(doc: Doc, docs: Doc[]): [string, string][] {

@@ -1,13 +1,7 @@
 from datetime import datetime
 
-from project_j.contracts import Document, RevisionRef
-from project_j.learning.contracts import (
-    DemandBody,
-    DimensionState,
-    LearningState,
-    StateBody,
-    SuggestionChoice,
-)
+from project_j.contracts import Document
+from project_j.learning.contracts import DimensionState, LearningState, StateBody
 
 HELP_ORDER = ("none", "light_prompt", "scaffold", "full_model")
 
@@ -49,13 +43,15 @@ def adopt_state(current: LearningState, evaluation: Document) -> StateBody:
             max(known, key=HELP_ORDER.index) if known and len(known) == len(levels) else "unknown"
         )
         names = "、".join(sorted({task["task_id"] for task in tasks}))
+        # The stored state carries the partition; a just-made evaluation is not labelled yet.
+        source = "成人检查" if current.realm == "adult_check" else "模拟"
         dimensions[dimension_id] = DimensionState(
             dimension_id=dimension_id,
-            task_scope=f"模拟任务{names}及当前材料条件",
+            task_scope=f"{source}任务{names}及当前材料条件",
             judgment=judgment,
             evidence_refs=(evaluation.ref,),
             help=level,
-            material_condition="当时固定课程的模拟使用条件",
+            material_condition=f"当时课程的{source}使用条件",
             observed_at=evaluation.occurred_at,
             retention=previous.retention if previous else None,
             transfer=previous.transfer if previous else None,
@@ -63,32 +59,6 @@ def adopt_state(current: LearningState, evaluation: Document) -> StateBody:
             + ("不因当堂正确填独立或长期掌握。",),
         )
     return StateBody(status="checked", dimensions=tuple(dimensions.values()))
-
-
-def adopt_demand(
-    current: DemandBody, state_ref: RevisionRef, plan_ref: RevisionRef, suggestion: Document
-) -> DemandBody:
-    return DemandBody(
-        **(
-            current.model_dump()
-            | {
-                "status": "checked",
-                "state_ref": state_ref,
-                "plan_ref": plan_ref,
-                "sampling_requirements": tuple(suggestion.body["sampling"]),
-                "help_requirements": tuple(suggestion.body["help"]),
-                "suggestion_choices": (
-                    SuggestionChoice(
-                        suggestion_ref=suggestion.ref,
-                        action="adopt",
-                        reason=f"在既定目标与30分钟预算内采用{suggestion.body['direction']}，"
-                        "保留帮助与未知。",
-                    ),
-                ),
-                "gaps": ("保持、迁移、外部帮助与真实声音条件仍待观察。",),
-            }
-        )
-    )
 
 
 def review_due(plans: list[Document], now: datetime) -> list[dict]:

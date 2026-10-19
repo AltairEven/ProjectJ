@@ -15,6 +15,16 @@ class Goal(Contract):
     description: Text
 
 
+class ParentNote(Contract):
+    """What the parent reads about one revision: before, after, why, unknowns, next lesson."""
+
+    before: Text
+    after: Text
+    why: Text
+    uncertain: tuple[Text, ...]
+    expectation: Text
+
+
 class DimensionState(Contract):
     dimension_id: Text
     task_scope: Text
@@ -93,6 +103,11 @@ class DemandBody(Contract):
     fallback: Text
     gaps: tuple[Text, ...]
     suggestion_choices: tuple[SuggestionChoice, ...] = ()
+    # Set when the planning model proposed this revision and the rules accepted it.
+    direction: Literal["consolidate", "review", "extend", "advance", "observe"] | None = None
+    plan_effect: Literal["reused", "adjusted"] | None = None
+    plan_reason: Text | None = None
+    note: ParentNote | None = None
 
     @model_validator(mode="after")
     def goals_and_choices(self) -> Self:

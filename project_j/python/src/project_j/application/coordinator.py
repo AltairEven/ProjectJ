@@ -27,8 +27,14 @@ from project_j.evaluation.assessment import (
     next_suggestion,
 )
 from project_j.interface.submission import InputAdapter
-from project_j.learning.adoption import adopt_demand, adopt_state, review_due
+from project_j.learning.adoption import adopt_state, review_due
 from project_j.learning.contracts import DemandBody, Goal, LearningState, PlanBody
+from project_j.learning.planning import (
+    PlanningUnavailable,
+    apply_demand_draft,
+    demand_request,
+    week_plan_after,
+)
 from project_j.platform.files import PrivateFiles
 from project_j.platform.models.service import ModelService
 from project_j.platform.retries import retry_save
@@ -45,7 +51,13 @@ from project_j.platform.storage import (
 from project_j.platform.tts.contracts import Synthesizer, SynthesizerNotReady
 from project_j.platform.tts.simulated import SimulatedSynthesizer
 from project_j.preparation.contracts import CourseBody
-from project_j.preparation.packages import FIRST, compile_course, next_material
+from project_j.preparation.packages import (
+    FIRST,
+    PreparationNotReady,
+    compile_course,
+    next_material,
+    template_gap,
+)
 from project_j.teacher.methods import JANE
 
 PRIMARY_GOAL = Goal(
@@ -477,6 +489,19 @@ class Coordinator:
         completed = self.ledger.result(operation, learner_id)
         if completed:
             return completed
+        labels = {
+            doc.body["dimension_id"]: doc.body["name"]
+            for doc in self.store.list_current(learner_id, "capability")
+        }
+        if gap := template_gap(body, labels):
+            # Checked before anything is saved: no Jane, material or course for this demand.
+            log.info(
+                "preparation not_ready demand=%s goals=%s/%s",
+                demand.ref.object_id,
+                body.primary_goal.dimension_id,
+                body.auxiliary_goal.dimension_id,
+            )
+            raise PreparationNotReady(gap)
         jane = self.store.current(identity("shared", "jane"), learner_id)
         if jane and active_restrictions(self, learner_id, (jane.ref,)):
             raise Conflict("selected Jane version is restricted; owner recheck required")
@@ -1339,7 +1364,7 @@ class Coordinator:
         adapter = self.models.adapters.get(binding.adapter) if binding else None
         return adapter is None or adapter.simulated
 
-    def adopt(self, request_id: str, learner_id: str, evaluation: Document):
+    async def adopt(self, request_id: str, learner_id: str, evaluation: Document):
         completed = self.ledger.completed_request(
             request_id, learner_id, "adopt", {"evaluation_ref": evaluation.ref.model_dump()}
         )
@@ -1414,22 +1439,6 @@ class Coordinator:
             # Later evidence survives; retry continues against the currently valid state.
             state = self.current(learner_id, "state")
         plan = self.current(learner_id, "plan:week")
-        self.ledger.checkpoint(
-            operation,
-            learner_id,
-            Step(
-                step_id=f"plan-recheck:{plan.revision}",
-                source_revision=current_revision,
-                owner="learning",
-                input_digest=digest(canonical([plan.ref.model_dump()])),
-                input_refs=(plan.ref,),
-                attempts=1,
-                execution="complete",
-                save="succeeded",
-                effect_refs=(plan.ref,),
-                required_input=("沿用当前周计划：既定目标与预算未发生必要变化。",),
-            ),
-        )
         suggestion = self.store.current(
             identity(evaluation.body["activity_id"], "suggestion"), learner_id
         )
@@ -1449,10 +1458,68 @@ class Coordinator:
                         break
         if demand is None:
             old = self.current(learner_id, "demand")
-            data = adopt_demand(
-                DemandBody.model_validate(old.body), state.ref, plan.ref, suggestion
+            current = DemandBody.model_validate(old.body)
+            household = self.store.read(current.household_ref, learner_id)
+            catalog = [doc.body for doc in self.store.list_current(learner_id, "capability")]
+            known = {item["dimension_id"] for item in catalog}
+            self.models.require()
+            result = await self.models.run(
+                demand_request(
+                    evaluation.body,
+                    state.body,
+                    {
+                        level: self.current(learner_id, f"plan:{level}").body
+                        for level in ("long_term", "annual", "stage", "week")
+                    },
+                    household.body,
+                    catalog,
+                    suggestion.body,
+                    old.body,
+                )
             )
-            baselines = (old.ref, state.ref, plan.ref, data.household_ref)
+            activity_id = evaluation.body["activity_id"]
+            if not result.ok:
+                log.warning("planning activity=%s failure=%s", activity_id, result.failure)
+                raise PlanningUnavailable(result.failure)
+            week_before = plan
+            try:
+                adjusted = week_plan_after(result.output, plan.body, known)
+                objects, publications = [], []
+                if adjusted is not None:
+                    new_plan = document(
+                        "plan",
+                        plan.object_id,
+                        operation,
+                        learner_id,
+                        adjusted,
+                        revision=plan.revision + 1,
+                        source_revision=current_revision,
+                        refs=plan.dependency_refs,
+                        sources=(evaluation.ref,),
+                        occurred_at=evaluation.occurred_at,
+                    )
+                    objects.append(new_plan)
+                    publications.append(
+                        Publication(
+                            ref=new_plan.ref,
+                            expected_revision=plan.revision,
+                            reason=f"授权内周计划小调整：{result.output.plan_reason}",
+                        )
+                    )
+                    plan = new_plan
+                data = apply_demand_draft(
+                    result.output,
+                    current,
+                    known,
+                    state.ref,
+                    plan.ref,
+                    suggestion.ref,
+                    plan_adjusted=adjusted is not None,
+                )
+            except PlanningUnavailable as error:
+                log.warning("planning activity=%s rejected: %s", activity_id, error)
+                raise
+            baselines = (old.ref, state.ref, week_before.ref, data.household_ref)
             input_digest = digest(canonical([ref.model_dump() for ref in baselines]))
             previous = [
                 row["payload"]
@@ -1477,28 +1544,40 @@ class Coordinator:
                 sources=(evaluation.ref,),
                 occurred_at=evaluation.occurred_at,
             )
+            # The plan revision and the demand that cites it are saved as one step.
             demand = self.save_step(
                 operation,
                 learner_id,
                 step_id,
-                [obj],
+                [obj, *objects],
                 source_revision=current_revision,
                 publications=(
                     Publication(
                         ref=obj.ref,
                         expected_revision=old.revision,
-                        reason="综合当前状态/计划，采用建议并记录理由",
+                        reason="规划模型提出、规则核对后的下节需求",
                     ),
+                    *publications,
                 ),
                 baselines=baselines,
             )
+            log.info(
+                "planning activity=%s goals=%s/%s action=%s plan_effect=%s",
+                activity_id,
+                data.primary_goal.dimension_id,
+                data.auxiliary_goal.dimension_id,
+                result.output.suggestion_action,
+                data.plan_effect,
+            )
+        body = demand[0].body
         return self.ledger.finish(
             operation,
             learner_id,
             {
                 "state_ref": state.ref.model_dump(),
-                "plan_ref": plan.ref.model_dump(),
-                "plan_effect": "reused_with_reason",
+                "plan_ref": body["plan_ref"],
+                "plan_effect": body.get("plan_effect") or "reused",
+                "plan_reason": body.get("plan_reason"),
                 "demand_ref": demand[0].ref.model_dump(),
                 "suggestion_ref": suggestion.ref.model_dump(),
             },
@@ -1513,8 +1592,11 @@ class Coordinator:
         evaluation = await self.evaluate(
             f"{request_id}:evaluate", learner_id, activity_id, "next_course"
         )
-        adopted = self.adopt(f"{request_id}:adopt", learner_id, evaluation)
-        package = self.prepare(f"{request_id}:prepare", learner_id)
+        adopted = await self.adopt(f"{request_id}:adopt", learner_id, evaluation)
+        try:
+            package = self.prepare(f"{request_id}:prepare", learner_id)
+        except PreparationNotReady as gap:
+            package = {"status": "not_ready", "reason": str(gap)}
         operation = self.request(
             request_id,
             learner_id,
@@ -1543,13 +1625,17 @@ class Coordinator:
                 else "later_explicit",
                 "evaluation": "saved",
                 "state_demand": "effective",
-                "course": "fixed_checked",
+                "course": "fixed_checked" if "course_ref" in package else "not_ready",
                 "unknown": ["独立条件、保持、迁移、真实声音、儿童与教学效果未验证。"],
             },
             refs=(
                 evaluation.ref,
                 RevisionRef.model_validate(adopted["demand_ref"]),
-                RevisionRef.model_validate(package["course_ref"]),
+                *(
+                    (RevisionRef.model_validate(package["course_ref"]),)
+                    if "course_ref" in package
+                    else ()
+                ),
             ),
             source_revision=evaluation.source_revision,
         )

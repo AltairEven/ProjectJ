@@ -1,35 +1,42 @@
 """Reviews and explicit decisions reuse existing evidence, never add observations."""
 
+import logging
 from datetime import UTC, datetime
 
 from project_j.application.documents import document, identity
 from project_j.contracts import RevisionRef
 from project_j.learning.contracts import DemandBody, PlanBody
+from project_j.learning.planning import (
+    PlanningUnavailable,
+    ReviewDraft,
+    apply_review_draft,
+    checked_plan,
+    review_request,
+)
 from project_j.platform.storage import Conflict, Publication
+
+log = logging.getLogger(__name__)
+LEVELS = ("long_term", "annual", "stage", "week")
+
+
+def catalog_ids(app, learner_id: str) -> set[str]:
+    return {doc.body["dimension_id"] for doc in app.store.list_current(learner_id, "capability")}
 
 
 def applicable_plan(app, learner_id: str, body: dict) -> PlanBody:
-    data = PlanBody.model_validate(body)
-    known = {doc.body["dimension_id"] for doc in app.store.list_current(learner_id, "capability")}
-    if data.main_goal.dimension_id not in known:
-        # Rewording a goal never creates a capability; new identities go through the catalog.
-        raise ValueError("plan goal must use an established capability identity")
-    if data.budget_minutes != 30:
-        raise ValueError(
-            "the adopted MVP remains 30 minutes; "
-            "a different baseline needs a separate design decision"
-        )
-    return data
+    return checked_plan(body, catalog_ids(app, learner_id))
 
 
-def review(app, request_id: str, learner_id: str, level: str, proposed_patch: dict | None = None):
+async def review(
+    app, request_id: str, learner_id: str, level: str, proposed_patch: dict | None = None
+):
     completed = app.ledger.completed_request(
         request_id, learner_id, "review", {"level": level, "patch": proposed_patch}
     )
     if completed:
         return completed
     app.models.require()
-    if level not in {"week", "stage", "annual", "long_term"}:
+    if level not in LEVELS:
         raise ValueError("unknown review level")
     plan = app.current(learner_id, f"plan:{level}")
     if proposed_patch:
@@ -50,6 +57,30 @@ def review(app, request_id: str, learner_id: str, level: str, proposed_patch: di
         return result
     saved = app.saved_step(operation, learner_id, "review")
     if saved is None:
+        demand = app.current(learner_id, "demand")
+        household = app.store.read(
+            RevisionRef.model_validate(demand.body["household_ref"]), learner_id
+        )
+        catalog = [doc.body for doc in app.store.list_current(learner_id, "capability")]
+        reply = await app.models.run(
+            review_request(
+                level,
+                {lv: app.current(learner_id, f"plan:{lv}").body for lv in LEVELS},
+                state.body,
+                [e.body for e in evaluations],
+                household.body,
+                catalog,
+            )
+        )
+        if not reply.ok:
+            log.warning("review level=%s failure=%s", level, reply.failure)
+            raise PlanningUnavailable(reply.failure, "复盘")
+        draft = reply.output
+        adjusted, pending, checks = apply_review_draft(
+            level, draft, plan.body, {item["dimension_id"] for item in catalog}
+        )
+        if proposed_patch:  # The parent's own proposal replaces the model's patch and notes.
+            adjusted, pending, checks = None, proposed_patch, []
         obj = document(
             "review",
             identity(operation, "review"),
@@ -61,29 +92,60 @@ def review(app, request_id: str, learner_id: str, level: str, proposed_patch: di
                 "plan_baseline": plan.ref.model_dump(),
                 "cutoff": datetime.now(UTC).isoformat(),
                 "evidence_refs": [e.ref.model_dump() for e in evaluations],
-                "conclusion": "只汇总已有范围；日期和课时不产生完成或掌握。",
-                "unknown": ["保持、迁移及真实家庭负担仍未知。"],
-                "plan_effect": "reused",
-                "next_review_condition": "取得新日期、材料或重要家庭条件后再复核。",
+                "conclusion": draft.conclusion,
+                "unknown": list(draft.unknown),
+                "plan_effect": "adjusted" if adjusted else "reused",
+                "next_review_condition": draft.next_review_condition,
+                "checks": checks,
+                "pending_patch": pending,
+                # A retry rebuilds the proposal from this draft instead of asking again.
+                "draft": draft.model_dump(mode="json"),
             },
             refs=(plan.ref, state.ref),
             sources=tuple(e.ref for e in evaluations),
         )
+        objects = [obj]
+        publications = [Publication(ref=obj.ref, reason="复盘复用原证据，不新增活动")]
+        if adjusted:
+            new_plan = document(
+                "plan",
+                plan.object_id,
+                operation,
+                learner_id,
+                adjusted,
+                refs=plan.dependency_refs,
+                sources=(obj.ref,),
+                revision=plan.revision + 1,
+            )
+            objects.append(new_plan)
+            publications.append(
+                Publication(
+                    ref=new_plan.ref,
+                    expected_revision=plan.revision,
+                    reason=f"授权内周计划小调整：{draft.reason}",
+                )
+            )
         saved = app.save_step(
             operation,
             learner_id,
             "review",
-            [obj],
-            publications=(Publication(ref=obj.ref, reason="复盘复用原证据，不新增活动"),),
+            objects,
+            publications=tuple(publications),
+            baselines=(plan.ref,) if adjusted else (),
         )
+    body = saved[0].body
+    draft = ReviewDraft.model_validate(body["draft"])
     result = {
         "review_ref": saved[0].ref.model_dump(),
-        "plan_ref": plan.ref.model_dump(),
-        "plan_effect": "reused",
+        "plan_ref": saved[-1].ref.model_dump() if len(saved) > 1 else plan.ref.model_dump(),
+        "plan_effect": body["plan_effect"],
     }
-    if proposed_patch:
+    if body["plan_effect"] == "adjusted":
+        result["next_step"] = "recheck_demand_and_course"
+    if patch := body.get("pending_patch"):
         decision = app.saved_step(operation, learner_id, "decision")
         if decision is None:
+            parents = proposed_patch is not None
             obj = document(
                 "decision",
                 identity(operation, "decision"),
@@ -94,10 +156,14 @@ def review(app, request_id: str, learner_id: str, level: str, proposed_patch: di
                     "decision_state": "pending",
                     "plan_ref": plan.ref.model_dump(),
                     "state_ref": state.ref.model_dump(),
-                    "patch": proposed_patch,
-                    "reason": "重要计划变化须对具体版本决定。",
-                    "impact": "保留既有有效安排，接受后仍需保存与后续需求/课程复核。",
-                    "alternatives": ["沿用原安排", "取得更多依据后修改方案"],
+                    "patch": patch,
+                    "reason": "重要计划变化须对具体版本决定。" if parents else draft.reason,
+                    "impact": "保留既有有效安排，接受后仍需保存与后续需求/课程复核。"
+                    if parents
+                    else draft.impact,
+                    "alternatives": ["沿用原安排", "取得更多依据后修改方案"]
+                    if parents
+                    else list(draft.alternatives) or ["沿用原安排"],
                     "review_condition": "基线或重要条件变化时待重新确认。",
                 },
                 refs=(plan.ref, state.ref, saved[0].ref),
@@ -110,6 +176,13 @@ def review(app, request_id: str, learner_id: str, level: str, proposed_patch: di
                 publications=(Publication(ref=obj.ref, reason="具体方案待决定，不改变原计划"),),
             )
         result["decision_ref"] = decision[0].ref.model_dump()
+    log.info(
+        "review level=%s plan_effect=%s decision=%s checks=%d",
+        level,
+        result["plan_effect"],
+        "pending" if "decision_ref" in result else "none",
+        len(body.get("checks", ())),
+    )
     return app.ledger.finish(operation, learner_id, result)
 
 

@@ -24,7 +24,7 @@ def test_model_dependent_use_cases_refuse_until_initialized(blocked):
     with pytest.raises(ModelsNotReady):
         blocked.start("start-1", LEARNER, RevisionRef(object_id="course", revision=1), {})
     with pytest.raises(ModelsNotReady):
-        review(blocked, "review-1", LEARNER, "week")
+        asyncio.run(review(blocked, "review-1", LEARNER, "week"))
     with pytest.raises(ModelsNotReady):
         asyncio.run(blocked.evaluate("eval-1", LEARNER, "no-activity", "next_course"))
 

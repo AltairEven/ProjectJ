@@ -2,6 +2,7 @@
 
 from project_j.contracts import RevisionRef
 from project_j.learning.contracts import DemandBody
+from project_j.platform.storage import Conflict
 from project_j.preparation.contracts import (
     CourseBody,
     RequirementMapping,
@@ -14,6 +15,8 @@ from project_j.preparation.reading import segment_reading
 FIRST = "courses/paper-bridge/reading-main.md"
 TRANSFER = "courses/paper-bridge/reading-transfer.md"
 PRONUNCIATION = "english.speaking.pronunciation"
+# The only primary/auxiliary pair the fixed paper-bridge template can teach.
+COVERED = ("english.reading.facts", "english.speaking.report")
 # The two fixed simulation courses are each other's next course, so course switching can loop.
 COURSES = {
     FIRST: {
@@ -233,6 +236,21 @@ def course_tasks(
     return tuple(tasks)
 
 
+class PreparationNotReady(Conflict):
+    """The fixed template cannot teach the demanded goals; nothing was prepared for them."""
+
+
+def template_gap(demand: DemandBody, labels: dict[str, str] | None = None) -> str | None:
+    goals = (demand.primary_goal.dimension_id, demand.auxiliary_goal.dimension_id)
+    if goals == COVERED:
+        return None
+    named = "与".join((labels or {}).get(goal, goal) for goal in goals)
+    return (
+        "课程未就绪：现有固定课程只覆盖英语阅读事实与英语短报告，"
+        f"下节需求为{named}；需等待真实备课。"
+    )
+
+
 def compile_course(
     demand: DemandBody,
     demand_ref: RevisionRef,
@@ -243,11 +261,8 @@ def compile_course(
     familiar: bool,
     story: str,
 ) -> CourseBody:
-    if (
-        demand.primary_goal.dimension_id != "english.reading.facts"
-        or demand.auxiliary_goal.dimension_id != "english.speaking.report"
-    ):
-        raise ValueError("the fixed paper-bridge template does not cover the selected dimensions")
+    if gap := template_gap(demand):
+        raise PreparationNotReady(gap)
     next_course = uses_new_material(demand)
     if source not in COURSES or (not next_course and source != FIRST):
         raise ValueError("material does not follow the saved demand")

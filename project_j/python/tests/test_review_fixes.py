@@ -192,7 +192,7 @@ def test_one_evaluation_object_per_activity_and_review_uses_only_the_latest(appl
         final = await app.evaluate("final", LEARNER, core.activity_id, "final_feedback")
         assert final.object_id == provisional.object_id and final.supersedes == provisional.ref
         assert [doc.ref for doc in app.store.list_current(LEARNER, "evaluation")] == [final.ref]
-        saved = review(app, "week-review", LEARNER, "week")
+        saved = await review(app, "week-review", LEARNER, "week")
         body = app.store.read(ref(saved["review_ref"]), LEARNER).body
         assert body["evidence_refs"] == [final.ref.model_dump()]
 
@@ -329,7 +329,7 @@ def test_successful_seal_retry_clears_the_reported_error(application):
 def test_inapplicable_plan_proposal_is_rejected_before_any_decision(application):
     app = application
     with pytest.raises(ValueError, match="30 minutes"):
-        review(app, "too-long", LEARNER, "week", {"budget_minutes": 45})
+        asyncio.run(review(app, "too-long", LEARNER, "week", {"budget_minutes": 45}))
     assert not app.store.list_current(LEARNER, "decision")
 
 

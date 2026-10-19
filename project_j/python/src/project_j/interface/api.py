@@ -36,6 +36,7 @@ from project_j.curriculum.corrections import correct, release
 from project_j.evaluation.assessment import EvaluationUnavailable
 from project_j.learning.catalog import Capability, define, resolve
 from project_j.learning.maintenance import decide, review, revise_demand_after_plan
+from project_j.learning.planning import PlanningUnavailable
 from project_j.platform.files import PrivateFiles
 from project_j.platform.models.config import ModelFiles
 from project_j.platform.models.registry import load_service
@@ -419,6 +420,10 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
     async def evaluation_failed(request, error):
         return refused(request, error, 503, {"message": str(error), "evaluation": "failed"})
 
+    @app.exception_handler(PlanningUnavailable)
+    async def planning_failed(request, error):
+        return refused(request, error, 503, {"message": str(error), "planning": "failed"})
+
     @app.exception_handler(LookupError)
     async def not_found(request, error):
         return refused(request, error, 404, {"message": str(error)})
@@ -540,7 +545,7 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
 
     @app.post("/api/parent/review", dependencies=[Depends(parent)])
     async def review_plan(request: ReviewRequest):
-        return review(
+        return await review(
             controller(),
             request.request_id,
             request.learner_id,

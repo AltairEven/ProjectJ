@@ -74,7 +74,7 @@ def test_reused_state_retry_keeps_newer_evidence_and_rechecks_demand(application
         first, _ = await complete_story(app, helped=True)
         app.feedback("fb1", LEARNER, first.activity_id, "明确模拟：无额外补充")
         evaluation1 = await app.evaluate("eval1", LEARNER, first.activity_id, "final_feedback")
-        app.adopt("initial-adopt", LEARNER, evaluation1)
+        await app.adopt("initial-adopt", LEARNER, evaluation1)
         reused = app.current(LEARNER, "state").ref
         original = app.save_step
 
@@ -85,7 +85,7 @@ def test_reused_state_retry_keeps_newer_evidence_and_rechecks_demand(application
 
         app.save_step = fail_demand
         with pytest.raises(OSError):
-            app.adopt("reused-state-adopt", LEARNER, evaluation1)
+            await app.adopt("reused-state-adopt", LEARNER, evaluation1)
         app.save_step = original
         operation = app.request(
             "reused-state-adopt",
@@ -116,7 +116,7 @@ def test_reused_state_retry_keeps_newer_evidence_and_rechecks_demand(application
         app.seal()
         app.feedback("fb2", LEARNER, second.activity_id, "明确模拟：无额外补充")
         evaluation2 = await app.evaluate("eval2", LEARNER, second.activity_id, "final_feedback")
-        app.adopt("newer-adopt", LEARNER, evaluation2)
+        await app.adopt("newer-adopt", LEARNER, evaluation2)
         newer = app.current(LEARNER, "state")
         assert newer.revision == reused.revision + 1
         old_finish = app.ledger.finish
@@ -129,10 +129,10 @@ def test_reused_state_retry_keeps_newer_evidence_and_rechecks_demand(application
         if lose_completion:
             app.ledger.finish = fail_finish
             with pytest.raises(OSError):
-                app.adopt("reused-state-adopt", LEARNER, evaluation1)
+                await app.adopt("reused-state-adopt", LEARNER, evaluation1)
             app.ledger.finish = old_finish
             already_saved = app.current(LEARNER, "demand").ref
-        result = app.adopt("reused-state-adopt", LEARNER, evaluation1)
+        result = await app.adopt("reused-state-adopt", LEARNER, evaluation1)
         assert app.current(LEARNER, "state").ref == newer.ref
         assert app.current(LEARNER, "state").source_refs == (evaluation2.ref,)
         assert result["state_ref"] == newer.ref.model_dump()
@@ -150,7 +150,7 @@ def test_reused_state_retry_keeps_newer_evidence_and_rechecks_demand(application
             for row in steps
         )
         calls = len(app.models.calls)
-        assert app.adopt("reused-state-adopt", LEARNER, evaluation1) == result
+        assert await app.adopt("reused-state-adopt", LEARNER, evaluation1) == result
         assert app.current(LEARNER, "demand").ref == demand.ref
         assert len(app.models.calls) == calls
 

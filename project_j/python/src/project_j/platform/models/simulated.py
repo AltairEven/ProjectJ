@@ -52,6 +52,42 @@ class SimulatedAdapter:
                 "uncertain": ["独立条件、保持与迁移未观察。"],
                 "alignment": "按实际已发生范围整理。",
             }
+        if request.purpose == "planning" and "demand" in context:
+            demand, suggestion = context["demand"], context["suggestion"]
+            return {
+                "suggestion_action": "adopt",
+                "suggestion_reason": "模拟规划：在既定目标与30分钟预算内采用候选建议。",
+                "direction": "consolidate",
+                "primary_goal": demand["primary_goal"],
+                "auxiliary_goal": demand["auxiliary_goal"],
+                "prerequisites": demand["prerequisites"],
+                "sampling_requirements": suggestion["sampling"],
+                "help_requirements": suggestion["help"],
+                "offscreen_requirements": demand["offscreen_requirements"],
+                "fallback": demand["fallback"],
+                "gaps": ["保持、迁移、外部帮助与真实声音条件仍待观察。"],
+                "plan_effect": "reused",
+                "plan_reason": "沿用当前周计划：既定目标与预算未发生必要变化。",
+                "plan_patch": None,
+                "note": {
+                    "before": "当前需求与周计划。",
+                    "after": "模拟规划：沿用目标并采纳候选建议。",
+                    "why": "按已保存评价与候选建议，未调用真实模型。",
+                    "uncertain": ["独立条件、保持与迁移未观察。"],
+                    "expectation": suggestion["sampling"][0],
+                },
+            }
+        if request.purpose == "planning":
+            return {
+                "conclusion": "只汇总已有范围；日期和课时不产生完成或掌握。",
+                "unknown": ["保持、迁移及真实家庭负担仍未知。"],
+                "next_review_condition": "取得新日期、材料或重要家庭条件后再复核。",
+                "plan_effect": "reused",
+                "patch": None,
+                "reason": "模拟复盘：依据不足以调整。",
+                "impact": "保留既有有效安排。",
+                "alternatives": ["沿用原安排"],
+            }
         evidence = context["evidence"]
         if context["core_decided_help"]:  # The core decides help; the model only words it.
             supports, count = context["allowed_supports"], context["help_count"]

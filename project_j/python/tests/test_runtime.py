@@ -247,12 +247,12 @@ def test_E2E05_state_saved_demand_failure_resumes_without_rewriting_state(applic
 
         monkeypatch.setattr(application, "save_step", fail_demand)
         with pytest.raises(OSError):
-            application.adopt("adopt", LEARNER, evaluation)
+            await application.adopt("adopt", LEARNER, evaluation)
         state = application.current(LEARNER, "state")
         assert state.revision == 2
         assert application.current(LEARNER, "demand").revision == 1
         monkeypatch.setattr(application, "save_step", original)
-        result = application.adopt("adopt", LEARNER, evaluation)
+        result = await application.adopt("adopt", LEARNER, evaluation)
         assert application.current(LEARNER, "state").ref == state.ref
         assert result["demand_ref"]["revision"] == 2
 

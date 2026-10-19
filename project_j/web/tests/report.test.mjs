@@ -101,3 +101,31 @@ test('a restored run is labelled without saying simulation', () => {
   assert.equal(rows.get('结果'), '已恢复到新运行目录')
   assert.equal(rows.get('新运行目录'), 'restored-1')
 })
+
+test('a model-planned demand explains its change and an uncovered goal reads as not ready', () => {
+  const planned = [...docs,
+    doc('cap2', 1, 'capability', { dimension_id: 'science.observation.report', name: '实际观察报告' }),
+    doc('d', 3, 'demand', {
+      direction: 'observe', primary_goal: { dimension_id: 'science.observation.report', description: '说出纸桥的实际条件与结果' },
+      note: { before: '阅读事实', after: '实际观察报告', why: '阅读两题都需要提示', uncertain: ['保持', '迁移'], expectation: '先报告实际条件' },
+    }),
+    doc('r', 1, 'review', { conclusion: '先补实际报告', unknown: ['家庭负担'], checks: ['预算固定30分钟，改动不生效。'] }),
+  ]
+  const rows = new Map(describe({
+    next_package: { status: 'not_ready', reason: '课程未就绪：现有固定课程只覆盖英语阅读事实与英语短报告。' },
+    adoption: { demand_ref: { object_id: 'd', revision: 3 }, plan_effect: 'adjusted', plan_reason: '本周先补样本' },
+    review: { review_ref: { object_id: 'r', revision: 1 } },
+  }, planned))
+  assert.equal(rows.get('下一课需求'), '修订3：短观察：说出纸桥的实际条件与结果')
+  assert.equal(rows.get('原安排'), '阅读事实')
+  assert.equal(rows.get('新安排'), '实际观察报告')
+  assert.equal(rows.get('为什么'), '阅读两题都需要提示')
+  assert.equal(rows.get('还不确定'), '保持；迁移')
+  assert.equal(rows.get('下节预期'), '先报告实际条件')
+  assert.equal(rows.get('课程状态'), '课程未就绪')
+  assert.match(rows.get('原因'), /^课程未就绪：现有固定课程/)
+  assert.equal(rows.get('计划处理'), '已调整')
+  assert.equal(rows.get('计划理由'), '本周先补样本')
+  assert.equal(rows.get('仍未知'), '家庭负担')
+  assert.equal(rows.get('规则调整'), '预算固定30分钟，改动不生效。')
+})
