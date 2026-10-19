@@ -11,6 +11,7 @@ def fingerprint(root: Path) -> str:
     files += list((root / "project_j/python/tests/fixtures").glob("*.json"))
     files += list((root / "project_j/web/tests").glob("*.mjs"))
     files += list((root / "courses/paper-bridge").glob("*.md"))
+    files += list((root / "courses/paper-bridge").glob("*.json"))
     for pattern in ("*.tsx", "*.ts", "*.json", "*.mjs", "*.css"):
         files += list((root / "project_j/web/src").rglob(pattern))
     for directory in (

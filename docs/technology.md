@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.5.4；更新：2026年10月18日；状态：实施基线已采用，P1隔离工程已实现，真实接入未验证。
+版本：1.6.0；更新：2026年10月19日；状态：实施基线已采用，P1隔离工程已实现，真实接入未验证。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -140,6 +140,14 @@ download按固定修订52f4770fd9726457eae3d3b6aa92047a25a10776只取运行所�
 模型、评分与合成的初始化都显示就绪后，用`project_j/scripts/start.sh --adult-check --run-id <id>`启动成人实际检查：同一回环后端，课堂判断等用途按project-j-init的真实绑定（课堂判断codex:gpt-6.1-sol:low:fast），朗读交本机评分器，Jane的声音由本机合成器流式生成；数据写`project_j/private/adult_checks/<run_id>/`，对象realm为adult_check、来源adult，课程仍为固定模板备课。该入口不能与`--simulation-root`、`--model-delay`、`--fail-once`同用。
 
 评分与合成两个本机进程在服务启动时各加载一次（再次加载约6–7秒，模型刚复制后首次更久），启动失败时服务照常运行、开课准入列出原因；停止服务时关闭两个进程与Codex运行时。M3 Pro（18 GB）上合成峰值约5.1 GB、评分约3.3 GB，同时常驻。学生页经`GET /api/student/speech/{action_id}`取已批准动作的24 kHz单声道16位PCM流，声音先出、播完再显示文字（见[实时语音](../design/platform/realtime-voice.md#播放与打断)）；朗读录音为16 kHz单声道WAV，接口上限10 MiB（容纳300秒）。该入口只供成人检查，不开放儿童入口；课中不运行工程检查或Git。
+
+### 课堂判断参考题集
+
+题集在courses/paper-bridge/judgment-reference.json，共37题：两课四道回答题的标准答案、换说法、纯中文、中英混答、错答、含糊、连续三次求助与帮助后再答，另有4道朗读纠正题（给模型构造的发音评分结果，不录音）。多数作答不在课程包答案表里，测的是语义判断。何时重跑或补题以[总验收](acceptance.md#最小版本质量门槛)为准。
+
+模型初始化显示课堂判断就绪、且没有课堂在运行时，用`project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-judge-reference --run-id <id>`运行（`--repeats N`每题调用N次）。请求与真实课堂逐字段相同（同一指令、Jane方法、本课目标、核心求助判定，截止10秒），顺序调用、不重试，超时或格式无效都算不通过。自动比对判断标签、原文依据是否原样返回（课堂会拒收改写）、禁止词（防泄露答案，子串粗查）与必含词（如第二次求助须给句框）；报告写`project_j/private/adult_checks/<run_id>/judgment-reference.json`，保存每题回应原文供成人逐条阅读。全部通过退出码0，有不通过1，模型未就绪、题集与课程不一致或报告已存在为2。
+
+不通过时先修代码、调整指令或限制用途，不改预期迎合模型。报告只是判断质量与判断耗时的证据，不是声音延迟，也不授予使用资格。一次约37次调用，每次输入约1.1万token。
 
 ### P0官方事实复核与接入缺口
 

@@ -139,34 +139,21 @@ def map_demand(demand: DemandBody, tasks: tuple[TaskDefinition, ...], source: st
     return tuple(mapping)
 
 
-def compile_course(
-    demand: DemandBody,
-    demand_ref: RevisionRef,
-    jane_ref: RevisionRef,
-    brief_ref: RevisionRef,
-    material_ref: RevisionRef,
+def course_tasks(
     source: str,
-    familiar: bool,
     story: str,
-) -> CourseBody:
-    if (
-        demand.primary_goal.dimension_id != "english.reading.facts"
-        or demand.auxiliary_goal.dimension_id != "english.speaking.report"
-    ):
-        raise ValueError("the fixed paper-bridge template does not cover the selected dimensions")
-    next_course = uses_new_material(demand)
-    if source not in COURSES or (not next_course and source != FIRST):
-        raise ValueError("material does not follow the saved demand")
-    course = COURSES[source]
-    title = course["title"]
-    stage = "已读，复习" if familiar else "新材料" if next_course else "首课"
-    specifications = course["tasks"]
+    material_ref: RevisionRef,
+    primary_dimension: str,
+    auxiliary_dimension: str,
+) -> tuple[TaskDefinition, ...]:
+    """Every task of a fixed course: answers, point, offscreen and reading segments."""
+    specifications = COURSES[source]["tasks"]
     tasks = []
     for identity, prompt, evidence, correct, incorrect, hint, scaffold in specifications:
         tasks.append(
             TaskDefinition(
                 task_id=identity,
-                dimension_id=demand.primary_goal.dimension_id,
+                dimension_id=primary_dimension,
                 purpose="answer",
                 prompt=prompt,
                 material_ref=material_ref,
@@ -174,12 +161,12 @@ def compile_course(
                 acceptable_simulated=correct,
                 incorrect_simulated=incorrect,
                 supports=(
-                    Support(text=hint, help={demand.primary_goal.dimension_id: "light_prompt"}),
+                    Support(text=hint, help={primary_dimension: "light_prompt"}),
                     Support(
                         text=scaffold,
                         help={
-                            demand.primary_goal.dimension_id: "scaffold",
-                            demand.auxiliary_goal.dimension_id: "scaffold",
+                            primary_dimension: "scaffold",
+                            auxiliary_dimension: "scaffold",
                         },
                     ),
                 ),
@@ -243,7 +230,37 @@ def compile_course(
                 optional=True,
             )
         )
-    tasks = tuple(tasks)
+    return tuple(tasks)
+
+
+def compile_course(
+    demand: DemandBody,
+    demand_ref: RevisionRef,
+    jane_ref: RevisionRef,
+    brief_ref: RevisionRef,
+    material_ref: RevisionRef,
+    source: str,
+    familiar: bool,
+    story: str,
+) -> CourseBody:
+    if (
+        demand.primary_goal.dimension_id != "english.reading.facts"
+        or demand.auxiliary_goal.dimension_id != "english.speaking.report"
+    ):
+        raise ValueError("the fixed paper-bridge template does not cover the selected dimensions")
+    next_course = uses_new_material(demand)
+    if source not in COURSES or (not next_course and source != FIRST):
+        raise ValueError("material does not follow the saved demand")
+    course = COURSES[source]
+    title = course["title"]
+    stage = "已读，复习" if familiar else "新材料" if next_course else "首课"
+    tasks = course_tasks(
+        source,
+        story,
+        material_ref,
+        demand.primary_goal.dimension_id,
+        demand.auxiliary_goal.dimension_id,
+    )
     return CourseBody(
         demand_ref=demand_ref,
         state_ref=demand.state_ref,

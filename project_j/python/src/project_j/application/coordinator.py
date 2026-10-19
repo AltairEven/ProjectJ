@@ -19,7 +19,7 @@ from project_j.curriculum.corrections import active_restrictions, affected
 from project_j.evaluation.assessment import evaluation_request, interpret, next_suggestion
 from project_j.interface.submission import InputAdapter
 from project_j.learning.adoption import adopt_demand, adopt_state, review_due
-from project_j.learning.contracts import DemandBody, LearningState, PlanBody
+from project_j.learning.contracts import DemandBody, Goal, LearningState, PlanBody
 from project_j.platform.files import PrivateFiles
 from project_j.platform.models.service import ModelService
 from project_j.platform.retries import retry_save
@@ -39,6 +39,11 @@ from project_j.preparation.contracts import CourseBody
 from project_j.preparation.packages import FIRST, compile_course, next_material
 from project_j.teacher.methods import JANE
 
+PRIMARY_GOAL = Goal(
+    dimension_id="english.reading.facts", description="观察故事事实、顺序与文本依据"
+)
+AUXILIARY_GOAL = Goal(dimension_id="english.speaking.report", description="用短英语报告实际结果")
+
 
 def student_text(source: str) -> str:
     """Only the story reaches the student; the source's provenance line is adult metadata."""
@@ -48,6 +53,11 @@ def student_text(source: str) -> str:
         line.removeprefix("# ") for line in source.splitlines() if not line.startswith("素材版本：")
     ]
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip() + "\n"
+
+
+def story_text(source: str) -> str:
+    """The story a course is compiled from: the student text without its title line."""
+    return student_text(source).split("\n", 1)[1]
 
 
 class Coordinator:
@@ -246,7 +256,7 @@ class Coordinator:
 
     def initialize(self, learner_id="fictional-L1"):
         from project_j.learning.catalog import INITIAL, define
-        from project_j.learning.contracts import DimensionState, Goal, HouseholdBody, StateBody
+        from project_j.learning.contracts import DimensionState, HouseholdBody, StateBody
 
         operation = self.request(
             f"initialize:{learner_id}", learner_id, "initialize", {"fixture_version": 1}
@@ -262,10 +272,7 @@ class Coordinator:
             )
             for entry in INITIAL
         )
-        primary = Goal(
-            dimension_id="english.reading.facts", description="观察故事事实、顺序与文本依据"
-        )
-        auxiliary = Goal(dimension_id="english.speaking.report", description="用短英语报告实际结果")
+        primary, auxiliary = PRIMARY_GOAL, AUXILIARY_GOAL
         state = self.saved_step(operation, learner_id, "state")
         if state is None:
             body = StateBody(
@@ -506,7 +513,7 @@ class Coordinator:
                 material.ref,
                 material.body["source"],
                 familiar,
-                student_text((self.root / material.body["source"]).read_text()).split("\n", 1)[1],
+                story_text((self.root / material.body["source"]).read_text()),
             )
             brief = document(
                 "brief",

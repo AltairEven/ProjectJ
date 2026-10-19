@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from pydantic import AwareDatetime, Field
 
-from project_j.classroom.judgment import ModelProposal, judgment_request
+from project_j.classroom.judgment import ModelProposal, judgment_request, method_context
 from project_j.contracts import Contract, RevisionRef, SubmittedInput
 from project_j.platform.models.service import ModelService
 from project_j.platform.speech.contracts import PronunciationResult, PronunciationScorer
@@ -28,6 +28,18 @@ TRANSITIONS = {
 PLEA = re.compile(
     r"帮帮我|帮我|帮助|需要|一下|还是|请|能|可以|吗|我|不懂|不会|help|please|need|can|you|me|i|[\W_]+"
 )
+
+
+def is_help_request(task: TaskDefinition, text: str, intent: str) -> bool:
+    """The core, not the model, decides whether an input asks for help."""
+    return intent == "help" or (
+        # A report task asks what help was used, so there only a bare plea is a help request.
+        not PLEA.sub("", text.casefold())
+        if task.purpose in {"point", "offscreen"}
+        else any(word in text for word in ("帮我", "不懂", "help"))
+    )
+
+
 HELP_ORDER = {"none": 0, "light_prompt": 1, "scaffold": 2, "full_model": 3, "unknown": 4}
 
 
@@ -505,12 +517,7 @@ class Harness:
             raise ValueError("repeat or stop after a failed delivery; do not rescore the answer")
         task = self.course.tasks[self.task_index]
         text = submitted.text or ""
-        is_help = submitted.intent == "help" or (
-            # A report task asks what help was used, so there only a bare plea is a help request.
-            not PLEA.sub("", text.casefold())
-            if task.purpose in {"point", "offscreen"}
-            else any(word in text for word in ("帮我", "不懂", "help"))
-        )
+        is_help = is_help_request(task, text, submitted.intent)
         attempt = None
         if not is_help:
             if supplement:
@@ -567,9 +574,7 @@ class Harness:
                     is_help,
                     timeout,
                     pronunciation,
-                    jane_method={k: self.jane[k] for k in ("rules", "strategies")}
-                    if self.jane
-                    else None,
+                    jane_method=method_context(self.jane),
                     goals=(
                         self.course.primary_goal.description,
                         self.course.auxiliary_goal.description,

@@ -66,6 +66,12 @@ class SaveReceipt(SaveKey):
     save: Literal["succeeded"] = "succeeded"
 
 
+def check_run_id(run_id: str) -> str:
+    if not run_id or len(run_id) > 64 or not all(c.isalnum() or c in "-_" for c in run_id):
+        raise ValueError("invalid run identity")
+    return run_id
+
+
 class SimulationStore:
     def __init__(
         self, root: Path, run_id: str, realm: Literal["simulation", "adult_check"] = "simulation"
@@ -75,8 +81,7 @@ class SimulationStore:
         self.realm = realm
         if root.name != partition or root.is_symlink():
             raise ValueError(f"storage requires an explicit {partition} root")
-        if not run_id or len(run_id) > 64 or not all(c.isalnum() or c in "-_" for c in run_id):
-            raise ValueError("invalid run identity")
+        check_run_id(run_id)
         others = {"family", "credentials"} | {p for p, _ in REALMS.values()} - {partition}
         if any(part in others for part in root.parts):
             raise ValueError(f"{realm} cannot access another private partition")

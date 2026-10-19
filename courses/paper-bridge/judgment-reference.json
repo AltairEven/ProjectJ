@@ -1,0 +1,472 @@
+{
+  "version": "1.0.0",
+  "course": "L-C2026-01-001",
+  "authored": "成人编写的虚构作答；预期逐句核对reading-main.md与reading-transfer.md 1.1.0；不依赖模型自评。",
+  "cases": [
+    {
+      "case_id": "F1-correct",
+      "category": "correct",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "She wants a bridge for her car.",
+      "expected": "correct",
+      "basis": "She wants a bridge for her car."
+    },
+    {
+      "case_id": "F1-variant-1",
+      "category": "variant",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "A bridge for her toy car.",
+      "expected": "correct",
+      "basis": "She wants a bridge for her car."
+    },
+    {
+      "case_id": "F1-variant-2",
+      "category": "variant",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "Mia wants to make a bridge so her car can go on it.",
+      "expected": "correct",
+      "basis": "She wants a bridge for her car."
+    },
+    {
+      "case_id": "F1-chinese",
+      "category": "chinese",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "她想做一座桥",
+      "expected": "correct",
+      "basis": "She wants a bridge for her car."
+    },
+    {
+      "case_id": "F1-mixed-1",
+      "category": "mixed",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "She wants a 桥.",
+      "expected": "correct",
+      "basis": "She wants a bridge for her car."
+    },
+    {
+      "case_id": "F1-mixed-2",
+      "category": "mixed",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "Mia想要一个bridge给她的car",
+      "expected": "correct",
+      "basis": "She wants a bridge for her car."
+    },
+    {
+      "case_id": "F1-wrong-known",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "a car",
+      "expected": "incorrect",
+      "forbidden": [
+        "bridge",
+        "桥"
+      ],
+      "basis": "Mia has a toy car. 她已有车，想要的是桥。"
+    },
+    {
+      "case_id": "F1-wrong-books",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "two books",
+      "expected": "incorrect",
+      "forbidden": [
+        "bridge",
+        "桥"
+      ],
+      "basis": "She puts two books on the table. 书是搭桥用的材料。"
+    },
+    {
+      "case_id": "F1-unclear-1",
+      "category": "unclear",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "that thing",
+      "expected": "unclear",
+      "forbidden": [
+        "bridge",
+        "桥"
+      ],
+      "basis": "作答没有可辨认的所指。"
+    },
+    {
+      "case_id": "F1-unclear-2",
+      "category": "unclear",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "我不知道",
+      "expected": "unclear",
+      "forbidden": [
+        "bridge",
+        "桥"
+      ],
+      "basis": "没有作答内容；不含求助词，核心不判求助。"
+    },
+    {
+      "case_id": "F1-help-1",
+      "category": "help",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "帮我一下",
+      "expected": "help",
+      "forbidden": [
+        "bridge",
+        "桥"
+      ],
+      "required_any": [
+        "wants"
+      ],
+      "basis": "第一级支持：找到含wants的句子。"
+    },
+    {
+      "case_id": "F1-help-2",
+      "category": "help",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "还是不懂，帮我一下",
+      "help_count": 1,
+      "expected": "help",
+      "forbidden": [
+        "bridge",
+        "桥"
+      ],
+      "required_any": [
+        "She wants a"
+      ],
+      "basis": "第二级支持：句框She wants a ___."
+    },
+    {
+      "case_id": "F1-help-3",
+      "category": "help",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "help",
+      "help_count": 2,
+      "expected": "help",
+      "forbidden": [
+        "bridge",
+        "桥"
+      ],
+      "required_any": [
+        "跳过",
+        "未知"
+      ],
+      "basis": "支持用完，给exit_text。"
+    },
+    {
+      "case_id": "F1-after-help-right",
+      "category": "after_help",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "a bridge",
+      "help_count": 2,
+      "expected": "correct",
+      "basis": "帮助后再试答对：She wants a bridge for her car."
+    },
+    {
+      "case_id": "F1-after-help-wrong",
+      "category": "after_help",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "a table",
+      "help_count": 1,
+      "expected": "incorrect",
+      "forbidden": [
+        "bridge",
+        "桥"
+      ],
+      "basis": "帮助后再试仍错；She puts two books on the table. 桌子是放书的地方。"
+    },
+    {
+      "case_id": "F2-variant",
+      "category": "variant",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-sequence",
+      "answer": "She folded the paper.",
+      "expected": "correct",
+      "basis": "She folds a new piece of paper."
+    },
+    {
+      "case_id": "F2-chinese",
+      "category": "chinese",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-sequence",
+      "answer": "她把纸对折了",
+      "expected": "correct",
+      "basis": "She folds a new piece of paper."
+    },
+    {
+      "case_id": "F2-mixed",
+      "category": "mixed",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-sequence",
+      "answer": "她fold了新的纸",
+      "expected": "correct",
+      "basis": "She folds a new piece of paper."
+    },
+    {
+      "case_id": "F2-wrong-cut",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-sequence",
+      "answer": "She cut it.",
+      "expected": "incorrect",
+      "forbidden": [
+        "fold",
+        "折"
+      ],
+      "basis": "原文没有剪纸；She folds a new piece of paper."
+    },
+    {
+      "case_id": "F2-wrong-draw",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-sequence",
+      "answer": "She drew a bridge on it.",
+      "expected": "incorrect",
+      "forbidden": [
+        "fold",
+        "折"
+      ],
+      "basis": "She draws the two bridges for Dad. 画桥在成功之后，且不是对新纸做的。"
+    },
+    {
+      "case_id": "F2-unclear",
+      "category": "unclear",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-sequence",
+      "answer": "she did something",
+      "expected": "unclear",
+      "forbidden": [
+        "fold",
+        "折"
+      ],
+      "basis": "没有说出做了什么。"
+    },
+    {
+      "case_id": "B1-correct",
+      "category": "correct",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-first",
+      "answer": "the small bus",
+      "expected": "correct",
+      "basis": "He puts the small bus on the bridge."
+    },
+    {
+      "case_id": "B1-variant",
+      "category": "variant",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-first",
+      "answer": "The little one.",
+      "expected": "correct",
+      "basis": "He puts the small bus on the bridge. little与small同义。"
+    },
+    {
+      "case_id": "B1-chinese",
+      "category": "chinese",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-first",
+      "answer": "小的那辆",
+      "expected": "correct",
+      "basis": "He puts the small bus on the bridge."
+    },
+    {
+      "case_id": "B1-mixed",
+      "category": "mixed",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-first",
+      "answer": "small的那辆bus",
+      "expected": "correct",
+      "basis": "He puts the small bus on the bridge."
+    },
+    {
+      "case_id": "B1-wrong",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-first",
+      "answer": "The big one.",
+      "expected": "incorrect",
+      "forbidden": [
+        "small bus",
+        "小巴士",
+        "小的那",
+        "little"
+      ],
+      "basis": "He puts the big bus on the bridge.是第二次试。"
+    },
+    {
+      "case_id": "B1-unclear",
+      "category": "unclear",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-first",
+      "answer": "the bus",
+      "expected": "unclear",
+      "forbidden": [
+        "small bus",
+        "小巴士",
+        "小的那",
+        "little"
+      ],
+      "basis": "Ben has two toy buses. 没说哪一辆。"
+    },
+    {
+      "case_id": "B2-variant",
+      "category": "variant",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-result",
+      "answer": "The paper bent and the bus fell down.",
+      "expected": "correct",
+      "basis": "The paper bends. The big bus falls."
+    },
+    {
+      "case_id": "B2-chinese",
+      "category": "chinese",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-result",
+      "answer": "纸弯下去，大车掉下来了",
+      "expected": "correct",
+      "basis": "The paper bends. The big bus falls."
+    },
+    {
+      "case_id": "B2-mixed",
+      "category": "mixed",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-result",
+      "answer": "the big bus 掉下去了",
+      "expected": "correct",
+      "basis": "The paper bends. The big bus falls."
+    },
+    {
+      "case_id": "B2-wrong-stayed",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-result",
+      "answer": "It didn't fall.",
+      "expected": "incorrect",
+      "forbidden": [
+        "falls",
+        "fell",
+        "掉了",
+        "掉下"
+      ],
+      "basis": "The big bus falls."
+    },
+    {
+      "case_id": "B2-wrong-bus",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-result",
+      "answer": "The small bus fell.",
+      "expected": "incorrect",
+      "forbidden": [
+        "big bus falls",
+        "大巴士掉",
+        "大车掉"
+      ],
+      "basis": "小巴士It stays on the paper.，掉下的是大巴士。"
+    },
+    {
+      "case_id": "B2-unclear",
+      "category": "unclear",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-result",
+      "answer": "it did that",
+      "expected": "unclear",
+      "forbidden": [
+        "falls",
+        "fell",
+        "掉了",
+        "掉下"
+      ],
+      "basis": "没有说出发生了什么。"
+    },
+    {
+      "case_id": "RA-good",
+      "category": "read_aloud",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "read-aloud-1",
+      "pronunciation": {
+        "status": "scored"
+      },
+      "expected": "correct",
+      "forbidden": [
+        "90",
+        "分数",
+        "等级"
+      ],
+      "basis": "各词无错误；门槛未校准，不向孩子报分数或等级。"
+    },
+    {
+      "case_id": "RA-mispronounced",
+      "category": "read_aloud",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "read-aloud-1",
+      "pronunciation": {
+        "status": "scored",
+        "flagged": {
+          "between": [
+            35,
+            "mispronounced"
+          ]
+        }
+      },
+      "expected": "incorrect",
+      "forbidden": [
+        "35",
+        "分数",
+        "等级"
+      ],
+      "required_any": [
+        "between"
+      ],
+      "basis": "between读错（准确度35），要点出这个词。"
+    },
+    {
+      "case_id": "RA-omitted",
+      "category": "read_aloud",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "read-aloud-1",
+      "pronunciation": {
+        "status": "scored",
+        "flagged": {
+          "table": [
+            0,
+            "omitted"
+          ]
+        }
+      },
+      "expected": "incorrect",
+      "forbidden": [
+        "分数",
+        "等级"
+      ],
+      "required_any": [
+        "table"
+      ],
+      "basis": "table漏读，要点出这个词。"
+    },
+    {
+      "case_id": "RA-unknown",
+      "category": "read_aloud",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "read-aloud-1",
+      "pronunciation": {
+        "status": "unknown",
+        "reason": "too_short"
+      },
+      "expected": "unclear",
+      "forbidden": [
+        "分数",
+        "等级"
+      ],
+      "basis": "评分为unknown（too_short），不判对错。"
+    }
+  ]
+}

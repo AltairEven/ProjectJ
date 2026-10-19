@@ -22,7 +22,10 @@ INSTRUCTIONS = (
     "不另评发音，不改写评分。"
     "evidence必须原样使用上下文中的evidence；text是给孩子的简短中文回应。"
     "text按jane_method的规则与本学科策略组织，围绕goals；"
-    "incorrect或unclear时引导孩子回到依据再试，不直接说出reference_answers。"
+    "text是对孩子说的话，用孩子能懂的词，不出现“依据”“证据”“参考答案”这类说法。"
+    "incorrect或unclear时引导孩子回到原文再试，不直接说出reference_answers，"
+    "也不说出evidence中能直接回答本题的词（可以使用allowed_supports里的说法）。"
+    "correct时肯定孩子，可以示范英语说法，但不再要求孩子重说或改用英语再答，核心随后直接进入下一题。"
 )
 
 
@@ -42,6 +45,11 @@ class ModelProposal(ClassroomJudgment):
     cancellation_epoch: int
     event_id: str
     call_id: str
+
+
+def method_context(jane: dict | None) -> dict | None:
+    """The part of the bound Jane method a judgment needs."""
+    return {k: jane[k] for k in ("rules", "strategies")} if jane else None
 
 
 def judgment_request(

@@ -94,6 +94,14 @@ def test_judgment_request_carries_the_bound_jane_method_and_goals():
     assert "不直接说出reference_answers" in request.instructions
 
 
+def test_judgment_instructions_carry_the_reference_set_fixes():
+    """Baseline judgment-ref-20261019: answer words leaked, retries invited, adult wording."""
+    request = judgment_request(task(), "a car", 0, False, 10)
+    assert "不说出evidence中能直接回答本题的词" in request.instructions
+    assert "不再要求孩子重说" in request.instructions
+    assert "不出现“依据”" in request.instructions
+
+
 def test_started_class_binds_the_course_jane_version(application):
     core = start(application)
     assert core.jane["identity"] == "Jane" and core.jane["rules"]
