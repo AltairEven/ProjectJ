@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.33.0；更新：2026年10月20日。
+版本：1.36.0；更新：2026年10月21日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -741,4 +741,47 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 未修（按用户内存决定或待定）：本次Chrome、ChatGPT/Codex、飞书、微信、iOS模拟器都开着（交换区26–31GB已用），评分之后的下一句合成首段多为17–29秒（一次5秒），一次30秒超时改文字；学生朗读完到听到回应常要20–37秒。退出语、收尾语等固定句仍现场合成，若在开课时预录可避开评分后的等待。备课模型对“目标”仍保留阅读为主、发音为辅（学生说最想加强发音和口语），goal_reason有说明，学生可不认可。两堂课实际只用3.5–4.5分钟（题目2–3道加1–2段朗读）。
 - 未验证：关掉其他程序后的实际语音延迟；浏览器真实播放与录音；教学效果与长期使用。
 - 接续：用户关掉占内存的程序后开始正式学习；若评分后的合成仍常超过10秒，再考虑预录固定句或换较小合成模型。
+
+## FIX-3 用户首次自学后的六处问题
+
+- 状态：实现与自测完成，未提交（2026年10月20日）。用户以运行编号`me`在正式学习入口完成建档与小测后记下六个问题。
+- 负责人/集成：Claude Opus。
+- 范围与修复（依据为该次运行的元数据日志）：
+  1. 建档聊天语音慢：第一问的语音接口被请求了13次（按钮在取声音时没有反应、可以连点），合成器闲置16分钟后首段27.5秒，逐次排队使每次等22–40秒。修：四个固定问题在服务启动时若建档还没聊完就后台预先合成，学生点“听 Jane 问”时整句播放；取声音和播放期间按钮换成进度提示，不能再点。
+  2. 耗时任务缺少进度：新增共用进度条（原生progress）。后台任务有项数时（准备资源第n/m项）按比例填充，其余显示移动的进度条；各页操作等待返回时显示进度条；课堂里取声音时显示“Jane 正在准备要说的话”，提交后等判断时显示“Jane 正在看你的回答”。
+  3. 页面禁用浏览器右键菜单，输入框保留（粘贴与拼写检查）。
+  4. 一段语音有电流音：现场合成的句子边收边播，学生页把每段24 kHz音频各自重采样到设备48 kHz再拼接，段间留接缝（此前录音句流式播放也有电流音、整段播放后没有）。修：学生页按24 kHz建立播放环境，段与段按采样点衔接，由浏览器统一转换一次。用户记不清是哪一段，日志里所有现场句都无迟到与输出断档。
+  5. 课堂布局改为占满窗口：顶部课堂进度条与控制，左侧Jane（说的话、图片、材料），右侧朗读录音与作答框，两栏各自滚动；窄屏上下排列。
+  6. 课堂顶部进度条：课堂快照新增`task_index`（开场为-1）与`task_count`，显示开场、第n/N题、收尾。
+- 文件边界：project_j/python/src/project_j/{classroom/harness.py,interface/api.py}；tests/{test_runtime,test_maintenance_api,test_onboarding}.py；project_j/web/src/{Classroom.tsx,main.tsx,speaker.ts,style.css,ui.tsx,progress.ts,pages/{Home,Courses,Onboarding}.tsx}、tests/progress.test.mjs，以及重新导出的schema/openapi.json与client/types.gen.ts；文档design/interface/main-page.md 2.1.0、design/interface/student-classroom.md 1.2.0、design/learning/profile.md 2.0.1、design/platform/realtime-voice.md 2.6.0、design/platform/failures-performance.md 1.8.1。
+- 检查证据：新增测试先失败后通过（课堂快照的题号与题数、接口快照带题号、建档四问预合成后整句返回且日志只有句数/失败数/耗时、建档完成后不预合成、课堂与后台进度条规则）。10项登记命令全部通过（三份sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：p95 4500毫秒、not_granted）；统一check含主工程528项、评分39项、合成15项pytest，另有50项前端回归与1项文档检查自测，UTC 2026-10-20T14:16:51.575921+00:00，工程摘要8e20b5580d85dcadf29e76b537942de8e49004df3ba3e2211c9ff1f828fbe2d4。模拟服务（project_j/test/simulation）中以Playwright走完一节课截图核对：1280×800下整页不滚动，进度条依次为第4/6题至收尾，窄屏上下排列；截图与脚本在本机project_j/test/output/fix3-ui、test/ui/fix3_layout.mjs。
+- 未验证：真实合成器下的建档预合成耗时（用户已建档，需新运行编号才会触发）；电流音是否消失与24 kHz播放环境的实际听感；正式学习页的取声音/判断进度提示（模拟入口不出声、判断即时）。
+- 接续：用户下次上课时留意电流音与等待提示；若仍有电流音，记下是哪一句（Jane说话或示范朗读）与大致时间以便对日志。
+
+## SELF-6 备课按兴趣自编、每课勾选加强技能
+
+- 状态：实现与自测完成，未提交（2026年10月20日）。用户提出并确认设计（docs/superpowers/specs/2026-10-20-interest-material-and-skill-focus-design.md），实施计划在docs/superpowers/plans/2026-10-20-interest-material-and-skill-focus.md。
+- 负责人/集成：Claude Opus。
+- 范围：
+  1. 题材按兴趣：用户的建档小测与第一课（FIX-3之后备的）仍是库内玩具车图画书故事（日志`material=library`）。现在真实模型备课不再收到课程库、库内候选与固定模板课，一律按学习资料里的一项兴趣、按蓝思值自编，并附最近三课标题要求换兴趣或换角度；只会复现模板的模拟模型照旧拿到它们。判断依据是备课用途绑定的适配器是否为模拟（`Coordinator.stands_in`），而不是数据空间，正式学习空间里用模拟模型的测试因此不受影响。
+  2. 每课加强项目：固定13项清单（词类、时态、句型），每课最多3项，另可写100字以内说明，可不选。规划随下节需求建议0–2项并写依据（清单外或多余的由规则丢弃）。主页下一步新增“下一课想加强什么”（新目标确认之后），选择写成需求新一版（`skill_focus`、`skill_note`，建议为`focus_suggestions`），未选时不备课；`POST /api/focus`同一请求可重发，旧版本返回冲突。建档小测不选择；模拟初始需求定为不特别加强。
+  3. 落实：所选项目进入需求逐条要求，备课须逐条写怎样落实（规则已有核对，缺一条会被退回修正）；提示词要求故事多处使用、至少两道问答题用到、可接受回答给正确形式、常见错答列典型误用、帮助指向该形式。课后评价请求附上这些要求，在概括里写实际表现。课堂判断的指令与请求未改，参考题集无需重跑。
+- 文件边界：project_j/python/src/project_j/{learning/contracts.py,learning/planning.py,preparation/contracts.py,preparation/drafting.py,preparation/packages.py,evaluation/assessment.py,application/progress.py,application/coordinator.py,interface/api.py}；tests/{test_learning_contracts,test_learning_planning,test_progress,test_maintenance_api,test_onboarding,test_goal_confirmation,test_evaluation_flow,test_evaluation_model,test_preparation_drafting,test_preparation_model,test_models_simulated}.py；project_j/web/src/{next-step.ts,pages/Home.tsx,style.css}、tests/next-step.test.mjs及重新导出的schema与client；文档design/learning/README.md 1.6.0、design/preparation/README.md 2.1.0、design/interface/main-page.md 2.2.0、design/evaluation/README.md 1.9.0、docs/product.md 2.0.1。
+- 偏离设计的取舍：模拟入口的初始需求不出现选择（设计写的是“只给清单”），以免改动原有模拟流程；从第一个规划出的需求起出现选择。模板课不能按所选项目改写，对应写“固定模板课不专门安排该项目”。
+- 检查证据：新增测试先失败后通过（清单与需求校验及要求、主页等选择与选择接口含日志、规划建议过滤、正式学习备课不给课程库且漏写所选项目被退回修正含日志`focus=1`、评价请求附所选项目、主页勾选规则）；原有自动推进测试按设计补上选择。10项登记命令全部通过（三份sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：p95 4500毫秒、not_granted）；统一check含主工程535项、评分39项、合成15项pytest，前端51项与文档检查自测1项，UTC 2026-10-20T15:45:01.572585+00:00，工程摘要8cf4e680e50654c080c91859259fb8a0faa8747aaf7d66f98cf152cd593ea466（含FIX-3）。模拟服务里以浏览器认可评价、在主页勾选“一般过去时”“形容词”并写说明，备好的课逐条列出这三项；截图与脚本在本机project_j/test/output/self6-ui、test/ui/self6_focus.mjs。
+- 未验证：真实模型是否真把所选项目写进故事与题目、按兴趣换题材的效果；规划模型的建议质量。
+- 接续：用户的第一节正式课已按旧逻辑备好（库内故事）；从下一课起出现选择与按兴趣自编。新代码需重启学习服务后生效。
+
+## FIX-4 确认课程与开始上课分开、课堂三栏
+
+- 状态：实现与自测完成，未提交（2026年10月21日）。用户在SELF-6后实际试用提出两点。
+- 负责人/集成：Claude Opus。
+- 范围：
+  1. 确认后直接开课不合理（日志：讨论改稿后按“确认并开始上课”，48秒后进入课堂，用户54秒后停止）。新增`POST /api/course/confirm`：后台任务`confirm:<课程>:<修订>`只保存确认并生成、采用资源（页面显示第几项），不开课；主页下一步变为“课程已确认，准备好就开始上课”，课程详情按“开始上课”才开课（原开课任务照旧，确认与资源已具备时直接开课，缺的先补）。课程状态“准备中”改称“待上课”。建档小测仍一键“开始小测”。
+  2. 课堂改为三栏1:2:1：左Jane（说的话与等待提示）、中课文与图片、右作答与朗读；窄屏上下排列。
+  3. 随后（10月21日）用户要求“帮我一下”“重复当前内容”放到Jane一栏，在她说的话下方；启用与显示条件不变。沙盒里核对：两个按钮只在Jane一栏，可用；离屏与结束时不显示，暂停时不可点。统一check再次通过（主工程536、评分39、合成15项pytest，前端51、文档1），UTC 2026-10-20T16:27:03.302301+00:00，工程摘要1e68897511b7c2c16b38a6f6ac7b47a5d7d8f63b67d13e34bf6c7e143e22b340。
+  4. 用户要求“确认收到说明”改为弹框：目标说明与收尾小结呈现完后用浏览器原生对话框请学生确认（重述Jane这段话；“确认收到说明”“先不确认”）；先不确认或按Esc后确认按钮留在作答区；同一确认等待中Jane说了新的话（如回答提问）再弹一次（`confirmationKey`，前端测试先失败后通过）。沙盒核对：开场与收尾弹出、先不确认/Esc后作答区出现按钮、求助后重新弹出、发送确认期间关闭、正式模式在Jane说完后才弹出，页面无报错。统一check通过（主工程536、评分39、合成15项pytest，前端52、文档1），UTC 2026-10-20T16:32:54.800252+00:00，工程摘要89f764eb689f387a993ee6d91f01a875f95d3fb73b52eb7d016a26f83ef963fb。
+- 文件边界：project_j/python/src/project_j/{application/coordinator.py,application/progress.py,interface/api.py}；tests/test_confirm_and_start.py；project_j/web/src/{Classroom.tsx,confirmation.ts,courses.ts,next-step.ts,pages/Courses.tsx,pages/Home.tsx,style.css}、tests/{next-step,courses,confirmation}.test.mjs及重新导出的schema与client；文档design/interface/{preview-start.md 2.1.0,main-page.md 2.3.0,README.md 2.0.1,student-classroom.md 1.3.2}、design/preparation/{parent-preview.md,readiness.md} 2.0.1、docs/product.md 2.0.2、docs/mvp.md 2.0.1。
+- 检查证据：新增测试先失败后通过（确认接口作为任务保存确认、采用资源、不开课，之后开始上课不再重复生成；主页下一步与任务文字；课程状态）。10项登记命令全部通过（三份sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：p95 4500毫秒、not_granted）；统一check含主工程536项、评分39项、合成15项pytest，前端51项与文档检查自测1项，UTC 2026-10-20T16:11:58.491069+00:00，工程摘要10f2ddab836b10df42eca349aeb794de76c8142b40be1e49f3ef93b8b5913691（含FIX-3、SELF-6）。模拟服务里以浏览器确认课程：任务完成后没有课堂、主页显示“课程已确认，准备好就开始上课”，按“开始上课”后进入课堂；1440宽下三栏实测338:676:338；截图与脚本在本机project_j/test/output/fix4-ui、test/ui/fix4_confirm_layout.mjs。
+- 用户状态：第一节正式课已被自动开始并在54秒后停止，事实已封存、评价已生成；下一步是认可这份评价，然后规划下一课并出现技能选择。
 

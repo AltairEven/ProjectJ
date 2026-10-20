@@ -220,6 +220,21 @@ export type CorrectionRequest = {
 };
 
 /**
+ * CourseConfirmRequest
+ */
+export type CourseConfirmRequest = {
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    course_ref: RevisionRef;
+};
+
+/**
  * CourseStartRequest
  */
 export type CourseStartRequest = {
@@ -518,6 +533,29 @@ export type FeedbackRequest = {
 };
 
 /**
+ * FocusRequest
+ */
+export type FocusRequest = {
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    demand_ref: RevisionRef;
+    /**
+     * Skills
+     */
+    skills: Array<string>;
+    /**
+     * Note
+     */
+    note?: string | null;
+};
+
+/**
  * GoalDecision
  */
 export type GoalDecision = {
@@ -646,7 +684,7 @@ export type NextStep = {
     /**
      * Kind
      */
-    kind: 'lexile' | 'chat' | 'placement' | 'profile' | 'class' | 'interrupted' | 'decision' | 'evaluation' | 'goal' | 'course' | 'resources' | 'waiting' | 'none';
+    kind: 'lexile' | 'chat' | 'placement' | 'profile' | 'class' | 'interrupted' | 'decision' | 'evaluation' | 'goal' | 'focus' | 'course' | 'resources' | 'waiting' | 'none';
     /**
      * Subject
      */
@@ -978,6 +1016,14 @@ export type Snapshot = {
      */
     attempt_count: number;
     /**
+     * Task Index
+     */
+    task_index: number;
+    /**
+     * Task Count
+     */
+    task_count: number;
+    /**
      * Elapsed Seconds
      */
     elapsed_seconds: number;
@@ -1271,6 +1317,35 @@ export type ResourceDownloadApiResourceFileGetResponses = {
     200: unknown;
 };
 
+export type ConfirmCourseApiCourseConfirmPostData = {
+    body: CourseConfirmRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/course/confirm';
+};
+
+export type ConfirmCourseApiCourseConfirmPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ConfirmCourseApiCourseConfirmPostError = ConfirmCourseApiCourseConfirmPostErrors[keyof ConfirmCourseApiCourseConfirmPostErrors];
+
+export type ConfirmCourseApiCourseConfirmPostResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
+};
+
 export type StartApiCourseStartPostData = {
     body: CourseStartRequest;
     headers?: {
@@ -1468,6 +1543,35 @@ export type DecideGoalApiGoalDecidePostErrors = {
 export type DecideGoalApiGoalDecidePostError = DecideGoalApiGoalDecidePostErrors[keyof DecideGoalApiGoalDecidePostErrors];
 
 export type DecideGoalApiGoalDecidePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ChooseFocusApiFocusPostData = {
+    body: FocusRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/focus';
+};
+
+export type ChooseFocusApiFocusPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ChooseFocusApiFocusPostError = ChooseFocusApiFocusPostErrors[keyof ChooseFocusApiFocusPostErrors];
+
+export type ChooseFocusApiFocusPostResponses = {
     /**
      * Successful Response
      */

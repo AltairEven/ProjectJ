@@ -63,8 +63,13 @@ export function visualReport(action: AllowedAction, shown: string[], now: Date):
 export const speechPath = (actionId: string) => `/api/class/speech/${encodeURIComponent(actionId)}`
 export const playbackPath = '/api/class/playback'
 
+// Jane's synthesized voice. Streamed pieces resampled one by one to the device rate (48 kHz)
+// each left a seam, heard as hiss; at her own rate they join sample-exactly and the browser
+// resamples the joined stream once.
+const VOICE_RATE = 24000
+
 export class Speaker {
-  private context = new AudioContext()
+  private context = new AudioContext({ sampleRate: VOICE_RATE })
   private sources: AudioBufferSourceNode[] = []
   private element?: HTMLAudioElement
   private abort?: AbortController

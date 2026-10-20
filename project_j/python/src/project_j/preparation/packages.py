@@ -124,6 +124,9 @@ def map_demand(demand: DemandBody, tasks: tuple[TaskDefinition, ...], source: st
         ),
         "help_requirements": ("每题两级不同支持：定位提示与句框。", answers),
         "gaps": ("沿用：本包不验证此项，课后保持未知。", ()),
+        # The fixed course cannot be rewritten around a ticked skill; it says so.
+        "skill_focus": ("固定模板课不专门安排该项目；回答里用到时课后据实记录。", answers),
+        "skill_note": ("固定模板课不专门安排；课后据实记录。", ()),
     }
     mapping = []
     for field, requirement in demand_requirements(demand):

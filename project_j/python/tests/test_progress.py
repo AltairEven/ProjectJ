@@ -1,13 +1,14 @@
 import asyncio
 import logging
 
+import pytest
 from conftest import ROOT
 from support import LEARNER, start, wait_jobs
 
 from project_j.application.coordinator import Coordinator
 from project_j.application.documents import document
 from project_j.application.progress import advance, next_step, retry
-from project_j.platform.storage import Publication, SaveKey
+from project_j.platform.storage import Conflict, Publication, SaveKey
 
 PASS = {"result": "pass", "method": "explicit_test_fixture", "scope": "simulation_only"}
 
@@ -175,3 +176,61 @@ def test_dashboard_shows_the_next_step_and_retry_restarts_a_job(application):
         body = {"learner_id": LEARNER, "name": name}
         assert client.post("/api/jobs/retry", headers=auth, json=body).json()["started"] == name
         assert until(lambda data: data["next"]["kind"] == "course")["jobs"] == []
+
+
+REASON = "上节课两处过去时用成了原形"
+
+
+def waiting_demand(app):
+    """A planned demand revision that still waits for the student's ticks."""
+    demand = app.current(LEARNER, "demand")
+    body = demand.body | {
+        "skill_focus": None,
+        "focus_suggestions": [{"skill_id": "past_simple", "reason": REASON}],
+    }
+    obj = document(
+        "demand",
+        demand.object_id,
+        "focus-op",
+        LEARNER,
+        body,
+        refs=demand.dependency_refs,
+        sources=demand.source_refs,
+        revision=demand.revision + 1,
+        occurred_at=demand.occurred_at,
+    )
+    app.store.save(
+        SaveKey(operation_id="focus-op", step_id="demand", source_revision=1),
+        LEARNER,
+        [obj],
+        (Publication(ref=obj.ref, expected_revision=demand.revision, reason="测试：等选择"),),
+    )
+    return obj
+
+
+def test_planned_demand_waits_for_the_focus_choice(application, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+
+    async def scenario():
+        demand = waiting_demand(application)
+        step = next_step(application, LEARNER)
+        assert step["kind"] == "focus"
+        assert len(step["subject"]["options"]) == 13
+        assert step["subject"]["suggestions"] == [{"skill_id": "past_simple", "reason": REASON}]
+        assert advance(application, LEARNER) is None  # no preparation before the choice
+        note = "多练不规则动词"
+        first = application.choose_focus("f1", LEARNER, demand.ref, ["past_simple"], note)
+        assert application.choose_focus("f1", LEARNER, demand.ref, ["past_simple"], note) == first
+        chosen = application.current(LEARNER, "demand")
+        assert chosen.revision == demand.revision + 1
+        assert chosen.body["skill_focus"] == ["past_simple"] and chosen.body["skill_note"] == note
+        with pytest.raises(Conflict):
+            application.choose_focus("f2", LEARNER, demand.ref, [], None)
+        assert next_step(application, LEARNER)["kind"] == "none"
+        assert advance(application, LEARNER).startswith("prepare:")
+        await wait_jobs(application)
+        assert next_step(application, LEARNER)["kind"] == "course"
+
+    asyncio.run(scenario())
+    assert "focus chosen skills=1 note=True" in caplog.text
+    assert "不规则" not in caplog.text and REASON not in caplog.text

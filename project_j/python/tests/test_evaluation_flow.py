@@ -93,6 +93,10 @@ def test_acknowledgement_adopts_and_plans_then_prepares(application):
         await wait_jobs(application)
         demand = application.current(LEARNER, "demand")
         assert evaluation.ref in demand.source_refs
+        assert next_step(application, LEARNER)["kind"] == "focus"  # the student ticks first
+        application.choose_focus("f1", LEARNER, demand.ref, [], None)
+        advance(application, LEARNER)
+        await wait_jobs(application)
         assert next_step(application, LEARNER)["kind"] == "course"
         # Acknowledging again is the same request, not a second adoption.
         again = application.acknowledge("ack1", LEARNER, activity, evaluation.ref)

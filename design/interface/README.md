@@ -1,6 +1,6 @@
 # 主页面与课堂界面
 
-版本：2.0.0；更新：2026年10月20日；范围：模块设计；按[ADR-0018](../../decisions/ADR-0018.md)改为单一主页面（实施中）。
+版本：2.0.1；更新：2026年10月21日；范围：模块设计；按[ADR-0018](../../decisions/ADR-0018.md)改为单一主页面（实施中）。
 
 提供主页面、全屏课堂和交互适配，串起建档、课程详情、开始、课堂/离屏、评价与下一课。interface取得实际输入并按许可呈现，classroom维护教学状态/动作，platform提供媒介、会话/权限等能力；不另建评分、能力、计划或转场。
 
@@ -10,7 +10,7 @@
 | --- | --- |
 | [main-page.md](main-page.md) | 主页面：左侧导航、下一步、栏目与子页面、全屏课堂 |
 | [student-classroom.md](student-classroom.md) | 当前任务/材料、输入与实际状态、求助/控制、指认离屏 |
-| [preview-start.md](preview-start.md) | 课程详情、修改意见改稿、确认并开始与开课核对 |
+| [preview-start.md](preview-start.md) | 课程详情、修改意见改稿、确认课程、开始上课与开课核对 |
 | [feedback-reports.md](feedback-reports.md) | 课后评价页：补记、异议、认可与更正 |
 | [input-submission.md](input-submission.md) | 输入完成、自动提交、更正、重发和优先控制的统一规则 |
 | [input-output-adapters.md](input-output-adapters.md) | 不同媒介组合、统一事件/动作/交付反馈及任务条件 |

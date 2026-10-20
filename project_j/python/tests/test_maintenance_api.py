@@ -197,6 +197,7 @@ def test_API_needs_the_token_and_class_view_hides_teacher_material(application):
         student = parent
         snapshot = client.get("/api/class/snapshot", headers=student).json()
         assert not snapshot["materials"]
+        assert (snapshot["task_index"], snapshot["task_count"]) == (-1, len(app.core.course.tasks))
         assert "acceptable_simulated" not in str(snapshot) and "supports" not in str(snapshot)
         parent_during_class = client.get("/api/dashboard", headers=parent).json()
         assert parent_during_class["objects"] == [] and parent_during_class["active"]
@@ -368,3 +369,17 @@ def test_one_token_covers_management_and_the_class(application):
         with pytest.raises(WebSocketDisconnect):
             with client.websocket_connect("/api/class/events", subprotocols=["project-j.x"]):
                 pass
+
+
+def test_focus_route_refuses_more_than_three_skills(application):
+    from test_progress import waiting_demand
+
+    demand = waiting_demand(application)
+    with TestClient(create_app(Settings(), application)) as client:
+        auth = {"Authorization": f"Bearer {application.token}"}
+        body = {"request_id": "f1", "learner_id": LEARNER, "demand_ref": demand.ref.model_dump()}
+        many = body | {"skills": ["verbs", "adjectives", "adverbs", "articles"], "note": None}
+        assert client.post("/api/focus", headers=auth, json=many).status_code == 400
+        assert client.get("/api/dashboard", headers=auth).json()["next"]["kind"] == "focus"
+        none = body | {"request_id": "f2", "skills": [], "note": None}
+        assert client.post("/api/focus", headers=auth, json=none).status_code == 200

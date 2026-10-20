@@ -112,7 +112,7 @@ def test_failure_switch_fails_once_and_evaluation_has_a_draft():
     adapter.fail_next = True
     fact = {"end": {"reason": "normal"}, "attempts": [], "limitations": []}
     course = {"primary_goal": {"description": "a"}, "auxiliary_goal": {"description": "b"}}
-    request = evaluation_request(fact, course | {"tasks": []}, [], None)
+    request = evaluation_request(fact, course | {"tasks": [], "demand_mapping": []}, [], None)
     assert asyncio.run(adapter.invoke(request, BINDING)).failure == "unavailable"
     reply = asyncio.run(adapter.invoke(request, BINDING))
     assert EvaluationDraft.model_validate(reply.data).summary

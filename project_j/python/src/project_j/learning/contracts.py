@@ -97,6 +97,30 @@ class ProposedCapability(Contract):
     definition: Text
 
 
+# What the student may tick to train in the next lesson: id -> (group, name, hint for the model).
+SKILLS: dict[str, tuple[str, str, str]] = {
+    "verbs": ("词类", "动词", "实义动词的意思与搭配"),
+    "adjectives": ("词类", "形容词", "形容词的意思、位置与描述"),
+    "adverbs": ("词类", "副词", "副词修饰动作的方式、频率与程度"),
+    "nouns": ("词类", "名词单复数", "可数名词单复数与不可数名词"),
+    "prepositions": ("词类", "介词", "表示时间、地点与方向的介词"),
+    "articles": ("词类", "冠词", "a、an与the的用法"),
+    "present_simple": ("时态", "一般现在时", "习惯、事实与第三人称单数"),
+    "past_simple": ("时态", "一般过去时", "过去发生的事，规则与不规则动词过去式"),
+    "present_continuous": ("时态", "现在进行时", "be加动词ing表示正在进行"),
+    "future": ("时态", "将来时", "will与be going to表示将来"),
+    "present_perfect": ("时态", "现在完成时", "have/has加过去分词表示经历或结果"),
+    "comparatives": ("句型", "比较级与最高级", "比较两个或多个事物"),
+    "questions": ("句型", "疑问句", "一般疑问句与特殊疑问句的语序"),
+}
+MAX_FOCUS = 3
+
+
+class FocusSuggestion(Contract):
+    skill_id: Text
+    reason: Text
+
+
 class DemandBody(Contract):
     status: Literal["draft", "checked"]
     state_ref: RevisionRef
@@ -122,11 +146,22 @@ class DemandBody(Contract):
     goal_confirmation: Literal["needed", "confirmed"] | None = None
     proposed_capabilities: tuple[ProposedCapability, ...] = ()
     goal_reason: Text | None = None
+    # The student's ticks for this lesson: None not chosen yet, () nothing in particular.
+    skill_focus: tuple[str, ...] | None = None
+    skill_note: Annotated[str, Field(min_length=1, max_length=100)] | None = None
+    focus_suggestions: tuple[FocusSuggestion, ...] = Field(default=(), max_length=2)
 
     @model_validator(mode="after")
     def goals_and_choices(self) -> Self:
         if self.primary_goal == self.auxiliary_goal:
             raise ValueError("primary and auxiliary goals must be distinct")
+        ticked = (*(self.skill_focus or ()), *(item.skill_id for item in self.focus_suggestions))
+        if any(skill not in SKILLS for skill in ticked):
+            raise ValueError("skills come from the fixed list")
+        if self.skill_focus and len(set(self.skill_focus)) != len(self.skill_focus):
+            raise ValueError("each skill is ticked once")
+        if self.skill_focus and len(self.skill_focus) > MAX_FOCUS:
+            raise ValueError(f"at most {MAX_FOCUS} skills a lesson")
         refs = [choice.suggestion_ref for choice in self.suggestion_choices]
         if len(set(refs)) != len(refs):
             raise ValueError("each suggestion has one adoption decision")

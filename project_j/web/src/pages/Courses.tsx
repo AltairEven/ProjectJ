@@ -2,9 +2,8 @@ import { useRef, useState } from 'react'
 import { api, fileUrl, show, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
 import { courseRows, needsMaterials, previewLabels, previewOf, previewRank } from '../courses'
-import { jobLines } from '../next-step'
 import { discussionLines, resourceLines } from '../report'
-import { Rows, useRun, type PageProps } from '../ui'
+import { JobLine, Rows, useRun, type PageProps } from '../ui'
 
 // Resource kinds with a connected generator: voice by local synthesis, the rest by the model.
 const generatable = ['audio', 'image', 'animation']
@@ -25,7 +24,8 @@ function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & 
   const taught = state === '已上' || state === '已评价'
   const courseRef = { object_id: course.object_id, revision: course.revision }
   const resources = (preview?.body.resources ?? []) as Resource[]
-  const starting = (dashboard.jobs ?? []).find(job => job.name === `start:${course.object_id}:${course.revision}`)
+  const job = (kind: string) => (dashboard.jobs ?? []).find(item => item.name === `${kind}:${course.object_id}:${course.revision}`)
+  const confirming = job('confirm'), starting = job('start')
   const materials = needsMaterials(course)
   const fact = objects.find(doc => doc.kind === 'fact' && (doc.body.course_ref as Doc | undefined)?.object_id === course.object_id)
   // Request bodies are made once, so resuming a failed operation repeats the same request.
@@ -59,14 +59,18 @@ function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & 
       <label>想改哪里就写哪里，Jane 会改出新版本（改目标或30分钟预算要回到学习计划）<textarea value={feedback} onChange={event => setFeedback(event.target.value)} /></label>
       <button className="quiet" disabled={busy || !feedback.trim()} onClick={() => { const body = { request_id: uid(), learner_id: learner, course_ref: courseRef, feedback: feedback.trim() }
         void run(async () => { await api(token, 'course/discuss', body); setFeedback('') }, '按修改意见修订课程') }}>提交修改意见</button></section>}
-    {!taught && <section><h2>开始上课</h2>
-      {starting && <p className="notice" role="status">{jobLines([starting])[0]}</p>}
+    {!confirmed && <section><h2>确认课程</h2>
+      <p>确认后保存这一版，Jane 在后台生成本课的语音、图片等资源；不会自动开课，准备好后由你开始上课。</p>
+      <button disabled={busy} onClick={() => { const body = { request_id: uid(), learner_id: learner, course_ref: courseRef }
+        void run(async () => { await api(token, 'course/confirm', body) }, '确认课程') }}>确认课程</button></section>}
+    {confirmed && !taught && <section><h2>开始上课</h2>
+      {(starting ?? confirming) && <JobLine job={(starting ?? confirming)!} />}
       {materials && <label className="check"><input type="checkbox" checked={ready} onChange={event => setReady(event.target.checked)} />
         实物已按本课安排备好{content?.materials ? `（${show(content.materials)}）` : ''}</label>}
-      <p>确认后 Jane 会生成本课的语音、图片等资源，完成后直接进入课堂。</p>
-      <button disabled={busy || starting?.state === 'running' || (materials && !ready)} onClick={() => {
+      <p>{confirming?.state === 'running' ? '资源准备好后就可以开始。' : '准备好就开始：开课后约30分钟，可以随时暂停或停止。'}</p>
+      <button disabled={busy || confirming?.state === 'running' || starting?.state === 'running' || (materials && !ready)} onClick={() => {
         const body = { request_id: uid(), learner_id: learner, course_ref: courseRef, materials_ready: materials && ready }
-        void run(async () => { await api(token, 'course/start', body) }, '确认课程并准备资源') }}>{starting?.state === 'failed' ? '再试一次' : '确认并开始上课'}</button></section>}
+        void run(async () => { await api(token, 'course/start', body) }, '开始上课') }}>{starting?.state === 'failed' ? '再试一次' : '开始上课'}</button></section>}
     {taught && fact && <section><h2>这节课已上</h2><button className="quiet" onClick={() => go('evaluations', String(fact.body.activity_id))}>查看课后评价</button></section>}
     {confirmed && preview && <section><h2>教学资源</h2>
       {resources.length ? <ul>{resourceLines(preview.body).map((line, index) => {
@@ -95,7 +99,7 @@ export default function Courses(props: PageProps) {
   const preparing = (dashboard.jobs ?? []).filter(job => job.name.startsWith('prepare:'))
   const rows = courseRows(objects)
   return <section><h2>课程</h2>
-    {jobLines(preparing).map(line => <p key={line} className="notice">{line}</p>)}
+    {preparing.map(job => <JobLine key={job.name} job={job} />)}
     {rows.length ? <ul className="list">{rows.map(row => <li key={row.object_id}>
       <button className="link" onClick={() => go('courses', row.object_id)}>{row.title}</button><span className="tag">{row.state}</span></li>)}</ul>
       : <p>还没有课程。</p>}</section>

@@ -1,6 +1,6 @@
 import type { Document as Doc, RevisionRef as Ref } from './client'
 
-export type CourseState = '备课中' | '等你确认' | '准备中' | '已上' | '已评价'
+export type CourseState = '备课中' | '等你确认' | '待上课' | '已上' | '已评价'
 type Shape = Pick<Doc, 'object_id' | 'revision' | 'kind' | 'body'> & { created_at?: string }
 
 export const previewLabels: Record<string, string> = { story: '本课故事', why: '本课目的', materials: '实物准备', help: '帮助方式', exit: '时长与退出' }
@@ -17,7 +17,7 @@ function state(course: Shape, objects: Shape[]): CourseState {
   if (facts.length) return objects.some(doc => doc.kind === 'evaluation' && facts.some(fact => fact.body.activity_id === doc.body.activity_id)) ? '已评价' : '已上'
   const preview = previewOf(course, objects)
   if (!preview) return '备课中'
-  return same((preview.body.confirmation as Record<string, unknown> | undefined)?.course_ref, course) ? '准备中' : '等你确认'
+  return same((preview.body.confirmation as Record<string, unknown> | undefined)?.course_ref, course) ? '待上课' : '等你确认'
 }
 
 export function courseRows(objects: Shape[]) {

@@ -7,7 +7,9 @@ from pydantic import Field
 from project_j.contracts import Contract, RevisionRef
 from project_j.evaluation.assessment import FAILURE_TEXT
 from project_j.learning.contracts import (
+    SKILLS,
     DemandBody,
+    FocusSuggestion,
     Goal,
     PlanBody,
     PlanNote,
@@ -34,6 +36,8 @@ PLANNING_INSTRUCTIONS = (
     "周计划可小调整：plan_effect为adjusted时plan_patch只改main_goal、verification或exit_conditions，"
     "plan_reason写如何服务当前重点；不需要调整时为reused。阶段、年度、长期的变化不在这里改，写进gaps。"
     "note给学生：before原安排，after新安排，why为什么，uncertain还不确定的事，expectation下节预期。"
+    "focus_suggestions从skills里选0–2项建议下节加强的语言项目（学生会在备课前自己勾选），"
+    "reason写评价里实际观察到的依据；没有依据就不建议。"
 )
 
 REVIEW_INSTRUCTIONS = (
@@ -76,6 +80,7 @@ class DemandDraft(Contract):
     note: PlanNote
     goal_reason: Text
     new_capabilities: tuple[ProposedCapability, ...] = ()
+    focus_suggestions: tuple[FocusSuggestion, ...] = ()
 
 
 class ReviewDraft(Contract):
@@ -171,6 +176,10 @@ def demand_request(
                 "fallback",
                 "gaps",
             ),
+            "skills": [
+                {"skill_id": skill, "group": group, "label": label, "hint": hint}
+                for skill, (group, label, hint) in SKILLS.items()
+            ],
         },
         DemandDraft,
         180,
@@ -279,6 +288,10 @@ def apply_demand_draft(
         note=draft.note,
         proposed_capabilities=used,
         goal_reason=draft.goal_reason,
+        # Only known skills, at most two; a stray one never voids the plan.
+        focus_suggestions=tuple(
+            item for item in draft.focus_suggestions if item.skill_id in SKILLS
+        )[:2],
     )
     needed = needs_goal_confirmation(current, body)
     return body.model_copy(update={"goal_confirmation": "needed" if needed else None})

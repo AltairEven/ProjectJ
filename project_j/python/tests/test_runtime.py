@@ -26,6 +26,19 @@ from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
 from project_j.preparation.contracts import demand_requirements
 
 
+def test_the_class_view_says_which_task_of_how_many(application):
+    async def scenario():
+        core = await start(application)
+        total = len(core.course.tasks)
+        view = application.student_view(core)
+        assert (view["task_index"], view["task_count"]) == (-1, total)  # the goal comes first
+        deliver_all(core)
+        await answer(application, "听到了，先读故事。", "confirmation")
+        assert application.student_view(core)["task_index"] == 0
+
+    asyncio.run(scenario())
+
+
 def test_E2E01_complete_simulation_reaches_actual_C2_and_survives_reopen(application):
     async def scenario():
         core, fact = await complete_story(application)

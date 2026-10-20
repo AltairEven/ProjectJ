@@ -108,6 +108,8 @@ EVALUATION_INSTRUCTIONS = (
     "strongest列最有依据的表现或帮助；uncertain列仍未确定的事项；"
     "alignment说明课程安排与实际课堂的关键差异及原因（如中途停止、未做的任务）。"
     "补记里写明是异议的，按异议重新核对相关题目，在explanation里回应。"
+    "skill_focus是学生为本课勾选的加强项目：有时在summary里写学生在这些项目上的实际表现与依据，"
+    "没有观察写未知，不另立评分。"
 )
 
 
@@ -174,6 +176,12 @@ def evaluation_request(
             ],
             "jane_method": method_context(jane),
             "limitations": fact["limitations"],
+            # What the student ticked to train, as the course mapped it.
+            "skill_focus": [
+                item["requirement"]
+                for item in course["demand_mapping"]
+                if item["field"] in ("skill_focus", "skill_note")
+            ],
         },
         output=EvaluationDraft,
         deadline_seconds=180,

@@ -10,7 +10,7 @@ export const pages: [Page, string][] = [
 ]
 
 const jobNames: Record<string, string> = {
-  prepare: '备课', evaluate: '评价', adopt: '更新学习状态与计划', summarize: '整理学习资料', review: '复盘', start: '准备资源并开课',
+  prepare: '备课', evaluate: '评价', adopt: '更新学习状态与计划', summarize: '整理学习资料', review: '复盘', start: '准备资源并开课', confirm: '确认课程并准备资源',
 }
 
 function jobLine({ name, state, reason, progress }: Job): string {
@@ -31,7 +31,10 @@ const views: Record<string, (subject: Subject) => { title: string, action?: stri
   decision: () => ({ title: '有一个计划方案等你决定', action: '去决定', page: 'plan' }),
   evaluation: subject => ({ title: '课后评价已生成', action: '查看并认可', page: 'evaluations', detail: subject.activity_id }),
   goal: () => ({ title: '新目标等你确认', action: '确认新目标', page: 'plan' }),
-  course: subject => ({ title: '下一课已备好', action: '查看并确认', page: 'courses', detail: subject.course_ref?.object_id }),
+  focus: () => ({ title: '下一课想加强什么？', page: 'home' }),  // Ticked right on the main page.
+  course: subject => subject.confirmed
+    ? { title: '课程已确认，准备好就开始上课', action: '去上课', page: 'courses', detail: subject.course_ref?.object_id }
+    : { title: '下一课已备好', action: '查看并确认', page: 'courses', detail: subject.course_ref?.object_id },
   resources: subject => ({ title: jobLine(subject as Job), action: subject.state === 'failed' ? '回到课程' : undefined, page: 'courses', detail: String(subject.name ?? '').split(':')[1] }),
   waiting: subject => ({ title: subject.failed?.length ? '有AI任务没有完成，见下方原因' : 'AI 正在处理，稍等即可', page: 'home' }),
   none: () => ({ title: '目前没有要做的事', page: 'home' }),
@@ -48,4 +51,14 @@ export function inOnboarding(dashboard: { next?: { kind: string } | null, object
   if (onboardingKinds.includes(dashboard.next?.kind ?? '')) return true
   if (dashboard.active) return false
   return !(dashboard.objects ?? []).some(doc => doc.kind === 'profile' && doc.body.confirmed)
+}
+
+/** Jane's suggested skills start ticked; the student may untick them. */
+export const initialFocus = (suggestions: { skill_id: string }[]): string[] => suggestions.map(item => item.skill_id)
+
+/** Mirrors the server: at most three skills a lesson and a short note. */
+export function focusError(count: number, note: string): string | null {
+  if (count > 3) return '每课最多选3项。'
+  if (note.trim().length > 100) return '其他想练的最多100字。'
+  return null
 }

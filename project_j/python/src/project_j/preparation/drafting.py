@@ -7,7 +7,7 @@ from pydantic import Field
 
 from project_j.contracts import Contract, RevisionRef
 from project_j.evaluation.assessment import FAILURE_TEXT
-from project_j.learning.contracts import DemandBody, Text
+from project_j.learning.contracts import SKILLS, DemandBody, Text
 from project_j.learning.planning import learning_context, pick
 from project_j.platform.models.contracts import ModelRequest
 from project_j.preparation.contracts import (
@@ -31,7 +31,8 @@ PREPARATION_INSTRUCTIONS = (
     "你是备课助手。Jane是唯一的AI教师，不是学生；学习者不具名，一律称“学生”。"
     "按demand与requirements为下一课编写文字课程。只依据上下文里的需求、学习状态、学习资料（profile）、"
     "Jane的规则与策略、能力目录、课程库故事与模板；不补造未观察的表现。不预设学生的年龄，"
-    "故事难度按profile.lexile，题材尽量贴近profile.interests。"
+    "故事难度按profile.lexile，题材取自profile.interests里的一项兴趣；recent_titles是最近几课的"
+    "短文标题，换一项兴趣或换个角度，不重复最近的题材；note里写本课取自哪项兴趣。library为空时一律自编。"
     "材料：library里的故事合适时复用，material_id填它的material_id，title与story为null；"
     "candidate是规则按课程顺序给的候选，只作参考：它的难度明显不合profile.lexile，"
     "或题材不贴近profile.interests时不用它，改为自编；"
@@ -45,6 +46,9 @@ PREPARATION_INSTRUCTIONS = (
     "offscreen只用profile.materials里有的实物；profile.materials为空时不写offscreen题。不要写其他题型。"
     "read_aloud为true时规则会把整篇故事逐段切开生成朗读题（发音评分），不能只选一句朗读；主要或辅助目标为"
     "english.speaking.pronunciation时必须为true。"
+    "demand.skill_focus非空时是学生勾选的本课加强项目（skill_note是学生的补充）：故事里有意多处使用；"
+    "至少两道answer题的回答需要用到，acceptable_answers给正确形式，known_incorrect列典型误用；"
+    "这些题至少一级帮助指向该形式；preview的why写本课加强什么。"
     "主要目标至少有一题；辅助目标要有题，或由某级帮助覆盖。先取未提示的初答，观察不前置答案，"
     "题目与帮助不泄露后续题的答案。每题至少两级帮助，后一级要换方法而不是只换措辞；"
     "help列这一级影响的维度与程度（light_prompt、scaffold、full_model），维度只能是本题维度或本课主辅目标。"
@@ -159,8 +163,9 @@ def preparation_request(
     catalog: list[dict],
     jane: dict,
     library: list[dict],
-    candidate: str,
+    candidate: str | None,
     template: dict | None,
+    recent_titles: list[str],
 ) -> ModelRequest:
     """Learning data only: no learner, provider or object identity reaches the model."""
     learning = learning_context(state, {}, profile, catalog)
@@ -182,7 +187,15 @@ def preparation_request(
                 "offscreen_requirements",
                 "fallback",
                 "gaps",
-            ),
+            )
+            | {
+                "skill_focus": [
+                    {"label": SKILLS[skill][1], "hint": SKILLS[skill][2]}
+                    for skill in demand.skill_focus or ()
+                ],
+                "skill_note": demand.skill_note,
+            },
+            "recent_titles": recent_titles,
             "requirements": [
                 {"index": index, "field": field, "requirement": requirement}
                 for index, (field, requirement) in enumerate(demand_requirements(demand))

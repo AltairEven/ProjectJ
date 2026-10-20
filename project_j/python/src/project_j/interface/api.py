@@ -64,8 +64,11 @@ class ParentRequest(Contract):
     learner_id: str = Field(default="fictional-L1", pattern=LEARNER_PATTERN)
 
 
-class CourseStartRequest(ParentRequest):
+class CourseConfirmRequest(ParentRequest):
     course_ref: RevisionRef
+
+
+class CourseStartRequest(CourseConfirmRequest):
     materials_ready: bool = False  # Only asked when the course uses things off screen.
 
 
@@ -120,6 +123,12 @@ class ProfileRequest(ParentRequest, ProfileEdit):
 class GoalDecision(ParentRequest):
     demand_ref: RevisionRef
     choice: Literal["accept", "reject"]
+
+
+class FocusRequest(ParentRequest):
+    demand_ref: RevisionRef
+    skills: list[str]
+    note: str | None = None
 
 
 class ReviewRequest(ParentRequest):
@@ -213,6 +222,8 @@ class Snapshot(Contract):
     pending_action: AllowedAction | None
     presented_action: AllowedAction | None = None
     attempt_count: int
+    task_index: int
+    task_count: int
     elapsed_seconds: float
     end: dict[str, JsonValue] | None
     actual_api: Literal["未验证"]
@@ -232,6 +243,7 @@ class NextStep(Contract):
         "decision",
         "evaluation",
         "goal",
+        "focus",
         "course",
         "resources",
         "waiting",
@@ -379,6 +391,26 @@ def create_app(
     seal_errors: dict[str, str] = {}
     seal_attempted: set[str] = set()
     connections: dict[WebSocket, str] = {}
+    chat_voice: dict[str, bytes] = {}  # The fixed chat questions, said once ahead.
+
+    async def say_chat_ahead(synthesizer):
+        """Live, the first question waited 27 s on a synthesizer paged out after idling."""
+        began, failed = time.monotonic(), 0
+        for question in QUESTIONS:
+            pcm = bytearray()
+            try:
+                async with aclosing(synthesizer.stream(question)) as live:
+                    async for chunk in live:
+                        pcm += chunk
+                chat_voice[question] = bytes(pcm)
+            except SynthesisFailed:
+                failed += 1
+        log.info(
+            "onboarding speech pregenerated count=%d failed=%d elapsed_ms=%d",
+            len(chat_voice),
+            failed,
+            (time.monotonic() - began) * 1000,
+        )
 
     @asynccontextmanager
     async def lifespan(app):
@@ -396,6 +428,9 @@ def create_app(
         for adapter in app.state.coordinator.models.adapters.values():
             if hasattr(adapter, "prewarm"):
                 await adapter.prewarm()
+        learner = app.state.coordinator.learner_id
+        chatting = next_step(app.state.coordinator, learner)["kind"] in {"lexile", "chat"}
+        ahead = asyncio.create_task(say_chat_ahead(local[1])) if chatting else None
         dist = settings.project_root / "project_j/web/dist"
         types = {
             ".html": "text/html",
@@ -446,6 +481,9 @@ def create_app(
             yield
         finally:
             budget_task.cancel()
+            if ahead:
+                ahead.cancel()
+                await asyncio.gather(ahead, return_exceptions=True)
             try:
                 await budget_task
             except asyncio.CancelledError:
@@ -648,30 +686,41 @@ def create_app(
         headers = {"Cache-Control": "no-store", "Content-Security-Policy": "sandbox"}
         return Response(data, media_type=media_type, headers=headers)
 
-    @app.post("/api/course/start", dependencies=[Depends(operator)], status_code=202)
-    async def start(request: CourseStartRequest):
-        """Confirm, make and adopt resources, start: a background job the page follows."""
-        app_controller, course = controller(), request.course_ref
-        name = f"start:{course.object_id}:{course.revision}"
+    def background(learner_id: str, name: str, work) -> dict:
+        """Run work(progress) as the background job name; the page follows its n/m progress."""
+        app_controller = controller()
         if name not in app_controller.jobs:
             app_controller.job_failures.pop(name, None)
 
             def progress(done: int, total: int):
                 app_controller.job_progress[name] = f"{done}/{total}"
 
-            run(
-                app_controller,
-                request.learner_id,
-                name,
-                lambda: app_controller.confirm_and_start(
-                    request.request_id,
-                    request.learner_id,
-                    course,
-                    request.materials_ready,
-                    progress,
-                ),
-            )
+            run(app_controller, learner_id, name, lambda: work(progress))
         return {"job": name}
+
+    @app.post("/api/course/confirm", dependencies=[Depends(operator)], status_code=202)
+    async def confirm_course(request: CourseConfirmRequest):
+        """Confirm the version and make its resources; the class waits for the student."""
+        course = request.course_ref
+        return background(
+            request.learner_id,
+            f"confirm:{course.object_id}:{course.revision}",
+            lambda progress: controller().confirm_course(
+                request.request_id, request.learner_id, course, progress
+            ),
+        )
+
+    @app.post("/api/course/start", dependencies=[Depends(operator)], status_code=202)
+    async def start(request: CourseStartRequest):
+        """Start when the student chooses (confirming and making resources if still needed)."""
+        course = request.course_ref
+        return background(
+            request.learner_id,
+            f"start:{course.object_id}:{course.revision}",
+            lambda progress: controller().confirm_and_start(
+                request.request_id, request.learner_id, course, request.materials_ready, progress
+            ),
+        )
 
     @app.post("/api/evaluation/feedback", dependencies=[Depends(operator)])
     async def feedback(request: FeedbackRequest):
@@ -704,6 +753,12 @@ def create_app(
     async def decide_goal(request: GoalDecision):
         return await controller().decide_goal(
             request.request_id, request.learner_id, request.demand_ref, request.choice
+        )
+
+    @app.post("/api/focus", dependencies=[Depends(operator)])
+    async def choose_focus(request: FocusRequest):
+        return controller().choose_focus(
+            request.request_id, request.learner_id, request.demand_ref, request.skills, request.note
         )
 
     @app.post("/api/evaluation/acknowledge", dependencies=[Depends(operator)])
@@ -902,7 +957,7 @@ def create_app(
     async def onboarding_speech(index: int):
         if not 0 <= index < len(QUESTIONS):
             raise LookupError("no such onboarding question")
-        return await spoken((QUESTIONS[index],), {})
+        return await spoken((QUESTIONS[index],), chat_voice)
 
     async def spoken(parts, recorded):
         """Jane's sentence as a stream; whole recorded sentences arrive at once."""

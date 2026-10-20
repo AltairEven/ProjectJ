@@ -2,13 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { api, uid } from '../api'
 import { decodePcm16, encodeWav } from '../audio'
 import type { Document as Doc, JobRow, RevisionRef as Ref } from '../client/types.gen'
-import { jobLines } from '../next-step'
 import { chatComplete, lexileError } from '../onboarding'
 import { evaluationLines } from '../report'
-import { Rows, useRun, type PageProps } from '../ui'
+import { JobLine, Progress, Rows, useRun, type PageProps } from '../ui'
 
 // Jane asks each question aloud first; the whole sentence is played as one file.
-async function askAloud(token: string, index: number, player: { current?: HTMLAudioElement }) {
+async function askAloud(token: string, index: number, player: { current?: HTMLAudioElement }, onPlaying: () => void) {
   const response = await fetch(`/api/onboarding/speech/${index}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
   if (!response.ok) throw new Error('Jane 的声音未取得')
   const rate = Number(/rate=(\d+)/.exec(response.headers.get('content-type') ?? '')?.[1] ?? 24000)
@@ -17,6 +16,7 @@ async function askAloud(token: string, index: number, player: { current?: HTMLAu
   player.current?.pause()
   const element = new Audio(url)
   player.current = element
+  element.onplaying = onPlaying
   await new Promise<void>((done, fail) => {
     element.onended = () => done()
     element.onerror = () => fail(new Error('播放失败'))
@@ -44,13 +44,20 @@ function Chat({ token, learner, questions, voiced, refresh }: Pick<PageProps, 't
   const [answers, setAnswers] = useState<string[]>([])
   const [index, setIndex] = useState(0)
   const [heard, setHeard] = useState(!voiced)
+  // While Jane's question is fetched or played the button is gone: a second press used to queue it again.
+  const [asking, setAsking] = useState<'' | 'preparing' | 'speaking'>('')
   const player = useRef<{ current?: HTMLAudioElement }>({})
   useEffect(() => () => player.current.current?.pause(), [])
-  const listen = () => void askAloud(token, index, player.current)
-    .catch(error => setMessage(`${(error as Error).message}，先看文字回答。`)).finally(() => setHeard(true))
+  const listen = () => {
+    setAsking('preparing')
+    void askAloud(token, index, player.current, () => setAsking('speaking'))
+      .catch(error => setMessage(`${(error as Error).message}，先看文字回答。`)).finally(() => { setAsking(''); setHeard(true) })
+  }
   const last = index === questions.length - 1
   return <section><h2>和 Jane 聊几句</h2><p>第{index + 1}/{questions.length}题。用文字回答，中文或英文都可以。</p>
-    {!heard && <button onClick={listen}>听 Jane 问</button>}
+    {!heard && (asking === 'preparing' ? <Progress label="Jane 正在准备问题……" />
+      : asking === 'speaking' ? <p className="notice" role="status">Jane 正在问……</p>
+      : <button onClick={listen}>听 Jane 问</button>)}
     {heard && <><p className="question">{questions[index]}</p>
       <textarea aria-label="你的回答" value={answers[index] ?? ''} onChange={event => setAnswers(current => { const next = [...current]; next[index] = event.target.value; return next })} /></>}
     {status}
@@ -66,7 +73,7 @@ function Placement({ token, learner, refresh, course, starting }: Pick<PageProps
   const { busy, run, status } = useRun(refresh)
   return <section><h2>建档小测</h2>
     <p>一节约30分钟的小课：读一段英文、回答几个问题，再朗读一段。结果只用来了解你现在的起点。</p>
-    {starting && <p className="notice" role="status">{jobLines([starting])[0]}</p>}
+    {starting && <JobLine job={starting} />}
     {starting?.state !== 'running' && <>{status}
       <button disabled={busy} onClick={() => { const requestId = uid(); void run(async () => {
         await api(token, 'course/start', { request_id: requestId, learner_id: learner, course_ref: course, materials_ready: false })
@@ -119,12 +126,12 @@ export default function Onboarding({ token, dashboard, learner, refresh }: PageP
     return <>{head}{profile && <ProfileForm {...props} profile={profile} evaluation={evaluation} objects={objects} title="确认学习资料"
       intro="Jane 根据聊天和小测整理了下面的资料，之后选课和备课都参考它。可以直接修改，确认后建档完成。" action="确认资料" />}</>
   }
-  return <>{head}<Waiting {...props} lines={jobLines(jobs)} failed={jobs.filter(job => job.state === 'failed').map(job => job.name)} /></>
+  return <>{head}<Waiting {...props} jobs={jobs} failed={jobs.filter(job => job.state === 'failed').map(job => job.name)} /></>
 }
 
-function Waiting({ token, learner, refresh, lines, failed }: Pick<PageProps, 'token' | 'learner' | 'refresh'> & { lines: string[], failed: string[] }) {
+function Waiting({ token, learner, refresh, jobs, failed }: Pick<PageProps, 'token' | 'learner' | 'refresh'> & { jobs: JobRow[], failed: string[] }) {
   const { busy, run, status } = useRun(refresh)
-  return <section><h2>Jane 正在准备</h2>{lines.length ? <ul>{lines.map(line => <li key={line}>{line}</li>)}</ul> : <p>稍等即可，页面会自动更新。</p>}
+  return <section><h2>Jane 正在准备</h2>{jobs.length ? jobs.map(job => <JobLine key={job.name} job={job} />) : <Progress label="稍等即可，页面会自动更新。" />}
     {status}
     {failed.map(name => <button key={name} className="quiet" disabled={busy} onClick={() => void run(async () => {
       await api(token, 'jobs/retry', { learner_id: learner, name })

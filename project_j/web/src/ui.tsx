@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { show } from './api'
-import type { Dashboard } from './client/types.gen'
-import type { Target } from './next-step'
+import type { Dashboard, JobRow } from './client/types.gen'
+import { jobLines, type Target } from './next-step'
+import { jobProgress } from './progress'
 import type { RequestFailure } from './request'
 
 export type PageProps = {
@@ -27,7 +28,7 @@ export function useRun(refresh: () => Promise<void>) {
   }
   const status = <>
     {message && <div className="notice" role="alert">{message}</div>}
-    {busy && doing && <p className="notice" role="status">正在{doing}……</p>}
+    {busy && doing && <Progress label={`正在${doing}……`} />}
     {failed.current && <button className="quiet" disabled={busy} onClick={() => void run(failed.current!)}>接续原操作</button>}
   </>
   return { busy, run, setMessage, status }
@@ -36,4 +37,14 @@ export function useRun(refresh: () => Promise<void>) {
 export function Rows({ rows }: { rows: [string, unknown][] }) {
   return <dl className="rows">{rows.map(([label, value], index) =>
     <div key={index}><dt>{label}</dt><dd>{value == null || value === '' ? '无' : show(value)}</dd></div>)}</dl>
+}
+
+/** A wait the student can see: the bar fills when the amount is known, otherwise it keeps moving. */
+export function Progress({ label, value, max }: { label: string, value?: number, max?: number }) {
+  return <p className="notice progress" role="status">{label}<progress value={value} max={max} aria-label={label} /></p>
+}
+
+export function JobLine({ job }: { job: JobRow }) {
+  const line = jobLines([job])[0]
+  return job.state === 'failed' ? <p className="notice">{line}</p> : <Progress label={line} {...jobProgress(job.progress)} />
 }

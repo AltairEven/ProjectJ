@@ -61,6 +61,7 @@ def build(application, template=True):
         library,
         FIRST,
         template_draft(demand, FIRST, STORY) if template else None,
+        [],
     )
 
 
@@ -401,3 +402,15 @@ def test_no_offscreen_task_without_materials(application):
             offscreen_allowed=False,
         )
     assert ("offscreen", "学习资料里没有可用实物，不能安排离屏任务") in error.value.problems
+
+
+def test_instructions_take_the_topic_from_interests_and_train_the_chosen_skills():
+    from project_j.preparation.drafting import PREPARATION_INSTRUCTIONS
+
+    for words in (
+        "recent_titles",
+        "取自profile.interests",
+        "skill_focus",
+        "known_incorrect列典型误用",
+    ):
+        assert words in PREPARATION_INSTRUCTIONS

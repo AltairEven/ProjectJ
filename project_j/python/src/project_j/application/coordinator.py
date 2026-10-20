@@ -14,7 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from project_j.application.acceptance import simulation_evidence
 from project_j.application.documents import document, identity
 from project_j.application.ledger import Ledger, Request, Step
-from project_j.application.progress import advance, jobs, next_step
+from project_j.application.progress import advance, jobs, latest_facts, next_step
 from project_j.classroom.harness import Harness
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.content import check_content
@@ -474,6 +474,7 @@ class Coordinator:
                 offscreen_requirements="离屏停止采集，返回取得实际条件/结果报告。",
                 fallback="已核实不依赖声音评价的任务可使用文字模拟。",
                 gaps=("尚无学习样本，用短观察取样。",),
+                skill_focus=(),  # The simulation's fixture lesson trains nothing in particular.
             )
             obj = document(
                 "demand",
@@ -510,6 +511,27 @@ class Coordinator:
         facts = self.store.list_current(learner_id, "fact")
         latest = max(facts, key=lambda fact: fact.occurred_at)
         return next_material(self.taught_source(learner_id, latest), self.read_sources(learner_id))
+
+    def stands_in(self) -> bool:
+        """The simulated model only reproduces the library's fixed course, so it gets the library;
+        a real model writes every lesson anew from the student's interests."""
+        binding = self.models.bindings.get("preparation")
+        adapter = self.models.adapters.get(binding.adapter) if binding else None
+        return bool(getattr(adapter, "simulated", False))
+
+    def recent_titles(self, learner_id: str, limit: int = 3) -> list[str]:
+        """The latest lessons' story titles, so the next one turns to another interest."""
+        titles = []
+        for fact in latest_facts(self, learner_id)[:limit]:
+            course = self.store.read(
+                RevisionRef.model_validate(fact.body["course_ref"]), learner_id
+            )
+            material = self.store.read(
+                RevisionRef.model_validate(course.body["material_refs"][0]), learner_id
+            )
+            if material.body.get("title"):
+                titles.append(material.body["title"])
+        return titles
 
     def read_sources(self, learner_id: str) -> set[str]:
         # ponytail: any sealed fact counts its story as read, even a class stopped before
@@ -583,10 +605,10 @@ class Coordinator:
             read = self.read_sources(learner_id)
             library = self.library(read)
             goals = (body.primary_goal.dimension_id, body.auxiliary_goal.dimension_id)
-            # The fixed course fits the first goals; a placement lesson gets it only in a
-            # simulation, where it stands in for the model (a real one writes by Lexile).
-            fits = goals == (PRIMARY_GOAL.dimension_id, AUXILIARY_GOAL.dimension_id) or (
-                body.purpose == "placement" and self.store.realm == "simulation"
+            simulated = self.stands_in()
+            fits = simulated and (
+                goals == (PRIMARY_GOAL.dimension_id, AUXILIARY_GOAL.dimension_id)
+                or body.purpose == "placement"
             )
             offscreen = bool(profile.body.get("materials"))  # checked_course rule
             template = (
@@ -600,9 +622,10 @@ class Coordinator:
                 profile.body,
                 [doc.body for doc in self.store.list_current(learner_id, "capability")],
                 jane.body,
-                list(library.values()),
-                source,
+                list(library.values()) if simulated else [],
+                source if simulated else None,
                 template,
+                self.recent_titles(learner_id),
             )
             refs = {
                 "course": RevisionRef(object_id=identity(operation, "course"), revision=1),
@@ -704,9 +727,10 @@ class Coordinator:
                 profile.body,
                 [doc.body for doc in self.store.list_current(learner_id, "capability")],
                 jane.body,
-                list(library.values()),
-                self.chosen_material(learner_id, body)[0],
+                list(library.values()) if self.stands_in() else [],
+                self.chosen_material(learner_id, body)[0] if self.stands_in() else None,
                 None,
+                self.recent_titles(learner_id),
             )
             request = discussion_request(
                 base, preview.body["draft"], feedback, preview.body["discussion"]
@@ -895,13 +919,14 @@ class Coordinator:
                 continue
             log.info(
                 "preparation drafted stage=%s attempt=%d material=%s tasks=%d read_aloud=%d "
-                "resources=%d",
+                "resources=%d focus=%d",
                 stage,
                 attempt,
                 "library" if checked.source else "model",
                 len(draft.tasks),
                 len(checked.course.tasks) - len(draft.tasks),
                 len(draft.resources),
+                len(body.skill_focus or ()),
             )
             return checked, draft
         raise AssertionError("unreachable")
@@ -1987,6 +2012,17 @@ class Coordinator:
             },
         )
 
+    async def confirm_course(
+        self, request_id: str, learner_id: str, course_ref: RevisionRef, on_progress=None
+    ) -> dict:
+        """The student confirms this version; its resources are made and adopted now, and the
+        class starts only when the student chooses (confirm_and_start then reuses them)."""
+        result = self.confirm(f"{request_id}:confirm", learner_id, course_ref)
+        failed = await ready_resources(self, learner_id, course_ref, on_progress)
+        if failed:
+            raise Conflict(f"资源未就绪：{'、'.join(failed)}。可以重试。")
+        return result
+
     async def confirm_and_start(
         self,
         request_id: str,
@@ -2096,6 +2132,66 @@ class Coordinator:
         return self.ledger.finish(
             operation, learner_id, {"demand_ref": saved[0].ref.model_dump(), "choice": choice}
         )
+
+    def choose_focus(
+        self,
+        request_id: str,
+        learner_id: str,
+        demand_ref: RevisionRef,
+        skills: list[str],
+        note: str | None,
+    ) -> dict:
+        """The student's ticks for the next lesson, a new demand revision; preparation waits."""
+        signature = {"demand_ref": demand_ref.model_dump(), "skills": list(skills), "note": note}
+        completed = self.ledger.completed_request(request_id, learner_id, "focus", signature)
+        if completed:
+            return completed
+        demand = self.current(learner_id, "demand")
+        if demand.ref != demand_ref or demand.body.get("skill_focus") is not None:
+            raise Conflict("这一版需求已不需要选择，请刷新。", demand.ref)
+        chosen = DemandBody.model_validate(
+            demand.body | {"skill_focus": list(skills), "skill_note": (note or "").strip() or None}
+        )
+        operation = self.request(
+            request_id,
+            learner_id,
+            "focus",
+            signature,
+            sources=(demand.ref,),
+            baselines=(demand.ref,),
+        )
+        result = self.ledger.result(operation, learner_id)
+        if result:
+            return result
+        saved = self.saved_step(operation, learner_id, "demand")
+        if saved is None:
+            obj = document(
+                "demand",
+                demand.object_id,
+                operation,
+                learner_id,
+                chosen,
+                refs=demand.dependency_refs,
+                sources=demand.source_refs,  # Still planned from the same evaluation.
+                revision=demand.revision + 1,
+                occurred_at=demand.occurred_at,
+            )
+            saved = self.save_step(
+                operation,
+                learner_id,
+                "demand",
+                [obj],
+                publications=(
+                    Publication(
+                        ref=obj.ref,
+                        expected_revision=demand.revision,
+                        reason="学生选择本课加强项目",
+                    ),
+                ),
+                baselines=(demand.ref,),
+            )
+        log.info("focus chosen skills=%d note=%s", len(skills), chosen.skill_note is not None)
+        return self.ledger.finish(operation, learner_id, {"demand_ref": saved[0].ref.model_dump()})
 
     async def replan_keeping_goals(self, learner_id: str, demand: Document, body: DemandBody):
         """Planning again from the same evaluation, told to keep the previous two goals."""

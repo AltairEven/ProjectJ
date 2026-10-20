@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -88,6 +89,8 @@ def test_onboarding_walks_from_lexile_to_the_first_goal(tmp_path):
         assert step["kind"] == "goal"
         assert app.current(LEARNER, "demand").body["purpose"] == "lesson"
         await app.decide_goal("g1", LEARNER, app.current(LEARNER, "demand").ref, "accept")
+        assert next_step(app, LEARNER)["kind"] == "focus"  # the placement itself never asked
+        app.choose_focus("f1", LEARNER, app.current(LEARNER, "demand").ref, [], None)
         advance(app, LEARNER)
         await wait_jobs(app)  # the first lesson is prepared, in a simulation from the template
         assert not app.job_failures
@@ -156,3 +159,26 @@ def test_onboarding_logs_never_carry_answers_or_lexile(tmp_path, caplog):
 
 def test_simulation_default_skips_onboarding(application):
     assert next_step(application, LEARNER)["kind"] not in {"lexile", "chat", "placement"}
+
+
+def test_the_chat_questions_are_said_ahead_while_onboarding_waits(tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    app = onboarding_app(tmp_path)
+    with TestClient(create_app(Settings(), app)) as client:
+        for _ in range(200):
+            if "onboarding speech pregenerated" in caplog.text:
+                break
+            time.sleep(0.05)
+        auth = {"Authorization": f"Bearer {app.token}"}
+        speech = client.get("/api/onboarding/speech/0", headers=auth)
+        assert speech.headers["x-speech-source"] == "recorded"  # whole, no waiting on synthesis
+    assert f"onboarding speech pregenerated count={len(QUESTIONS)} failed=0" in caplog.text
+    for question in QUESTIONS:
+        assert question not in caplog.text
+
+
+def test_no_chat_questions_are_said_ahead_after_onboarding(application, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    with TestClient(create_app(Settings(), application)):
+        pass
+    assert "onboarding speech pregenerated" not in caplog.text

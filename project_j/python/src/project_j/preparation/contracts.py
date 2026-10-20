@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from project_j.contracts import Contract, RevisionRef
-from project_j.learning.contracts import DemandBody, Goal, Help
+from project_j.learning.contracts import SKILLS, DemandBody, Goal, Help
 from project_j.preparation.reading import MAX_SEGMENT_WORDS, sentences, words
 
 
@@ -25,6 +25,13 @@ def demand_requirements(demand: DemandBody) -> list[tuple[str, str]]:
         )
         for choice in demand.suggestion_choices
     ]
+    # What the student ticked must show in the story, the questions and the help.
+    items += [
+        ("skill_focus", f"{SKILLS[skill][1]}：{SKILLS[skill][2]}")
+        for skill in demand.skill_focus or ()
+    ]
+    if demand.skill_note:
+        items.append(("skill_note", demand.skill_note))
     return items
 
 

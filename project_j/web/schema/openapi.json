@@ -386,10 +386,65 @@
         }
       }
     },
+    "/api/course/confirm": {
+      "post": {
+        "summary": "Confirm Course",
+        "description": "Confirm the version and make its resources; the class waits for the student.",
+        "operationId": "confirm_course_api_course_confirm_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CourseConfirmRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/course/start": {
       "post": {
         "summary": "Start",
-        "description": "Confirm, make and adopt resources, start: a background job the page follows.",
+        "description": "Start when the student chooses (confirming and making resources if still needed).",
         "operationId": "start_api_course_start_post",
         "parameters": [
           {
@@ -729,6 +784,60 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/GoalDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/focus": {
+      "post": {
+        "summary": "Choose Focus",
+        "operationId": "choose_focus_api_focus_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FocusRequest"
               }
             }
           }
@@ -2486,6 +2595,31 @@
         ],
         "title": "CorrectionRequest"
       },
+      "CourseConfirmRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "course_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "course_ref"
+        ],
+        "title": "CourseConfirmRequest"
+      },
       "CourseStartRequest": {
         "properties": {
           "request_id": {
@@ -3014,6 +3148,50 @@
         "title": "FeedbackRequest",
         "description": "A note on a lesson; an objection is also a correction to recheck (ADR-0018)."
       },
+      "FocusRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "demand_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skills"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "demand_ref",
+          "skills"
+        ],
+        "title": "FocusRequest"
+      },
       "GoalDecision": {
         "properties": {
           "request_id": {
@@ -3232,6 +3410,7 @@
               "decision",
               "evaluation",
               "goal",
+              "focus",
               "course",
               "resources",
               "waiting",
@@ -3808,6 +3987,14 @@
             "type": "integer",
             "title": "Attempt Count"
           },
+          "task_index": {
+            "type": "integer",
+            "title": "Task Index"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
           "elapsed_seconds": {
             "type": "number",
             "title": "Elapsed Seconds"
@@ -3876,6 +4063,8 @@
           "input_policy_ref",
           "pending_action",
           "attempt_count",
+          "task_index",
+          "task_count",
           "elapsed_seconds",
           "end",
           "actual_api",

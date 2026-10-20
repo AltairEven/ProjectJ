@@ -233,3 +233,17 @@ def test_no_new_facts_reuses_the_prior_draft_without_a_call(application):
     assert evaluation_calls(application) == calls
     assert second.revision == first.revision + 1
     assert second.body["draft"] == first.body["draft"]
+
+
+def test_evaluation_sees_the_chosen_skills(application):
+    fact, course = sealed(application)
+    assert evaluation_request(fact.body, course.body, [], JANE).context["skill_focus"] == []
+    ticked = {
+        "field": "skill_focus",
+        "requirement": "一般过去时：过去发生的事",
+        "implementation": "x",
+    }
+    body = course.body | {"demand_mapping": [*course.body["demand_mapping"], ticked]}
+    request = evaluation_request(fact.body, body, [], JANE)
+    assert request.context["skill_focus"] == ["一般过去时：过去发生的事"]
+    assert "勾选的加强项目" in request.instructions

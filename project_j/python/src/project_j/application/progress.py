@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from project_j.application.documents import identity
 from project_j.contracts import RevisionRef
 from project_j.learning.adoption import review_due
+from project_j.learning.contracts import SKILLS
 from project_j.learning.maintenance import review
 from project_j.learning.onboarding import (
     QUESTIONS,
@@ -52,6 +53,15 @@ def lesson(app, learner_id: str):
         for preview in app.store.list_current(learner_id, "preview")
     )
     return course, confirmed, taught
+
+
+def focus_needed(demand) -> bool:
+    """A lesson's demand waits for the student's ticks (skills to train); a placement never asks."""
+    return (
+        demand is not None
+        and demand.body.get("purpose") != "placement"
+        and demand.body.get("skill_focus") is None
+    )
 
 
 def latest_facts(app, learner_id: str):
@@ -111,7 +121,12 @@ def next_job(app, learner_id: str) -> Job | None:
         return found
     demand = app.store.current(identity(learner_id, "demand"), learner_id)
     waiting = demand is not None and demand.body.get("goal_confirmation") == "needed"
-    if demand is not None and not waiting and lesson(app, learner_id) is None:
+    if (
+        demand is not None
+        and not waiting
+        and not focus_needed(demand)
+        and lesson(app, learner_id) is None
+    ):
         name = f"prepare:{demand.object_id}:{demand.revision}"
         if not app.ledger.done(f"auto:{name}"):
             return name, lambda: app.prepare(f"auto:{name}", learner_id)
@@ -253,8 +268,20 @@ def next_step(app, learner_id: str) -> dict:
                 "proposed_capabilities": demand.body.get("proposed_capabilities", []),
             },
         }
-    starting = [row for row in jobs(app) if row["name"].startswith("start:")]
-    if starting:  # Confirmed: resources are made and adopted, then the class opens.
+    if focus_needed(demand) and lesson(app, learner_id) is None:
+        return {
+            "kind": "focus",
+            "subject": {
+                "demand_ref": demand.ref.model_dump(),
+                "options": [
+                    {"skill_id": skill, "group": group, "label": label}
+                    for skill, (group, label, _) in SKILLS.items()
+                ],
+                "suggestions": list(demand.body.get("focus_suggestions", [])),
+            },
+        }
+    starting = [row for row in jobs(app) if row["name"].startswith(("confirm:", "start:"))]
+    if starting:  # Confirmed: resources are made and adopted; start: the class then opens.
         return {"kind": "resources", "subject": starting[0]}
     current = lesson(app, learner_id)
     if current is not None and not current[2]:

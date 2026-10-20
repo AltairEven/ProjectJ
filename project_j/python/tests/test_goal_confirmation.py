@@ -61,10 +61,14 @@ async def acknowledged_lesson(app):
     return app.current(LEARNER, "demand")
 
 
-def test_unchanged_goals_go_straight_to_preparation(application):
+def test_unchanged_goals_go_straight_to_the_focus_choice(application):
     async def scenario():
         demand = await acknowledged_lesson(application)
         assert demand.body["goal_confirmation"] is None
+        assert next_step(application, LEARNER)["kind"] == "focus"
+        application.choose_focus("f1", LEARNER, demand.ref, ["past_simple"], None)
+        advance(application, LEARNER)
+        await wait_jobs(application)
         assert next_step(application, LEARNER)["kind"] == "course"
 
     asyncio.run(scenario())
@@ -107,6 +111,9 @@ def test_accepting_creates_the_new_capability_then_prepares(application, monkeyp
     confirmed = application.current(LEARNER, "demand")
     assert confirmed.body["goal_confirmation"] == "confirmed"
     assert confirmed.source_refs == demand.source_refs  # Still planned from that evaluation.
+
+    assert next_step(application, LEARNER)["kind"] == "focus"
+    application.choose_focus("f1", LEARNER, confirmed.ref, [], None)
 
     async def scenario():
         assert advance(application, LEARNER).startswith("prepare:")

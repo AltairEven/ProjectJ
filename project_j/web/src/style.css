@@ -33,3 +33,33 @@ label.check input { width: auto; margin: 0; }
 .more { margin: 0; }
 .more summary { padding: 10px 4px; }
 textarea, input { font-weight: 400; }
+progress { display: block; width: 100%; height: 8px; margin-top: 8px; accent-color: #256d66; }
+.notice.progress { background: #eef6f5; border-color: #cfe3e0; color: #2b5a57; }
+.jobs li { display: block; border-top: 0; padding: 0; }
+.hint { font-size: 13px; color: #7b8d97; }
+/* The class fills the window: a bar on top, Jane left and the student right, each scrolling alone. */
+.classroom { max-width: 1480px; height: 100vh; display: flex; flex-direction: column; padding: 16px 24px; }
+.class-bar { display: flex; align-items: center; gap: 12px 28px; flex-wrap: wrap; margin-bottom: 14px; }
+.class-bar h1 { font-size: 20px; margin: 2px 0 0; }
+.class-progress { flex: 1 1 240px; display: flex; align-items: center; gap: 12px; font-weight: 700; color: #256d66; white-space: nowrap; }
+.class-progress progress { margin: 0; height: 10px; }
+.classroom .controls { position: static; padding: 0; background: none; }
+.stage { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); gap: 20px; }
+.stage .jane { flex-direction: column; gap: 10px; }
+.stage .jane p { font-size: 17px; }
+.stage .text .hint { text-align: center; margin-top: 40px; }
+.side { min-height: 0; overflow-y: auto; padding: 2px 4px 2px 2px; }
+.side > section:last-of-type { margin-bottom: 8px; }
+@media (max-width: 860px) {
+  .classroom { height: auto; }
+  .class-bar { position: sticky; top: 0; z-index: 1; background: #f4f6f6ed; padding: 8px 0; }
+  .stage { grid-template-columns: 1fr; }
+  .side { overflow: visible; }
+}
+.skills { border: 0; padding: 0; margin: 0 0 8px; }
+.skills legend { font-weight: 700; color: #345967; padding: 0; margin-bottom: 2px; }
+.skills label.check { margin: 4px 0; }
+.skills .tag { white-space: normal; }
+.confirm-box { width: min(520px, calc(100vw - 32px)); border: 0; border-radius: 16px; padding: 24px; color: inherit; box-shadow: 0 12px 40px #233a4d33; }
+.confirm-box::backdrop { background: #233a4d59; }
+.confirm-box p { white-space: pre-wrap; }

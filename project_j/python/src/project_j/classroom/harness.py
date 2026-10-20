@@ -282,6 +282,9 @@ class Harness:
             if self.presented
             else None,
             "attempt_count": len(self.attempts),
+            # Which task of how many; -1 while the goal is being confirmed.
+            "task_index": self.task_index,
+            "task_count": len(self.course.tasks),
             "elapsed_seconds": time.monotonic() - self.started_clock,
             "recording": {
                 "max_seconds": self.scorer.limits.max_seconds,

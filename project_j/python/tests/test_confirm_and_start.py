@@ -153,3 +153,38 @@ def test_start_route_runs_as_a_job_and_the_class_appears(application, monkeypatc
                 break
             time.sleep(0.02)
         assert data["active"] and data["next"]["kind"] == "class"
+
+
+def test_confirming_saves_and_makes_resources_but_waits_for_the_student(
+    application, monkeypatch, caplog
+):
+    course_ref = science_lesson(application, monkeypatch, visual_draft)
+    caplog.set_level(logging.INFO, logger="project_j")
+    with TestClient(create_app(Settings(), application)) as client:
+        auth = {"Authorization": f"Bearer {application.token}"}
+        body = {"request_id": "c1", "learner_id": LEARNER, "course_ref": course_ref.model_dump()}
+        confirmed = client.post("/api/course/confirm", headers=auth, json=body)
+        assert confirmed.status_code == 202
+        assert confirmed.json()["job"] == f"confirm:{course_ref.object_id}:{course_ref.revision}"
+        for _ in range(200):
+            data = client.get("/api/dashboard", headers=auth).json()
+            if not data["jobs"]:
+                break
+            time.sleep(0.02)
+        assert not data.get("active")  # no class by itself
+        before = application.core and application.core.activity_id
+        assert application.core is None or application.core.mode == "ended"
+        assert data["next"]["kind"] == "course" and data["next"]["subject"]["confirmed"] is True
+        generated = [item for item in preview_of(application, course_ref).body["resources"]]
+        made = [item for item in generated if "versions" in item]
+        assert made and all(item["adopted_version"] == 1 for item in made)
+        assert f"job done name=confirm:{course_ref.object_id}" in caplog.text
+        start = body | {"request_id": "s1", "materials_ready": True}
+        assert client.post("/api/course/start", headers=auth, json=start).status_code == 202
+        for _ in range(200):
+            if client.get("/api/dashboard", headers=auth).json().get("active"):
+                break
+            time.sleep(0.02)
+        assert application.core.activity_id != before and application.core.mode != "ended"
+        assert caplog.text.count("resource generated") == len(made)  # made once, at confirmation
+        end_class(application)

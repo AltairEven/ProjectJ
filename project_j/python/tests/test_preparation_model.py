@@ -364,3 +364,100 @@ def test_discussion_saved_before_a_crash_resumes_without_the_model(application, 
     before = calls(application)
     result = asyncio.run(application.discuss("d1", LEARNER, course_ref, FEEDBACK))
     assert ref(result["course_ref"]).revision == 2 and calls(application) == before
+
+
+def reading_draft(context, skip=()):
+    """A reading lesson on a model-written story; skip leaves those requirements unmapped."""
+    answer = {
+        "task_id": "cup-fact",
+        "dimension_id": READING,
+        "purpose": "answer",
+        "prompt": "What does Sam put in the cup?",
+        "evidence": "He fills it with water.",
+        "acceptable_answers": ["water", "He fills it with water."],
+        "known_incorrect": ["milk"],
+        "supports": [
+            support("找到fills这个词，看它后面是什么。", (READING, "light_prompt")),
+            support("用句框回答：He fills it with ___.", (REPORT, "scaffold")),
+        ],
+        "exit_text": "可以先跳过这题。",
+        "optional": False,
+    }
+    report = answer | {
+        "task_id": "cup-pour",
+        "dimension_id": REPORT,
+        "prompt": "What did Sam do with the water? Answer in a short sentence.",
+        "evidence": "Sam pours the water into a bowl.",
+        "acceptable_answers": ["He poured the water into a bowl."],
+        "known_incorrect": ["He pour the water into a bowl."],
+        "supports": [
+            support("看pours这一句。", (REPORT, "light_prompt")),
+            support("用过去式说：He ___ the water into a bowl.", (REPORT, "scaffold")),
+        ],
+    }
+    draft = science_draft(context) | {
+        "lesson_type": "practice",
+        "tasks": [answer, report],
+        "budget": [
+            {"part": "opening", "minutes": 3},
+            {"part": "reading", "minutes": 12},
+            {"part": "expression", "minutes": 12},
+            {"part": "closing", "minutes": 3},
+        ],
+        "resources": [],
+    }
+    draft["demand_mapping"] = [
+        {"index": item["index"], "implementation": "本课落实。", "task_ids": ["cup-pour"]}
+        for item in context["requirements"]
+        if item["field"] not in skip
+    ]
+    return draft
+
+
+def test_study_preparation_writes_by_interests_and_maps_the_chosen_skill(
+    tmp_path, monkeypatch, caplog
+):
+    from conftest import ROOT
+
+    from project_j.application.coordinator import Coordinator
+    from project_j.application.documents import document
+    from project_j.platform.storage import Publication, SaveKey, SimulationStore
+
+    store = SimulationStore(tmp_path / "private/study", "a1", realm="study")
+    app = Coordinator(store, ROOT, verification={"result": "pass"}, onboarding=False)
+    app.initialize()
+    learner = app.learner_id
+    demand = app.current(learner, "demand")
+    chosen = document(
+        "demand",
+        demand.object_id,
+        "focus-op",
+        learner,
+        demand.body | {"skill_focus": ["past_simple"]},
+        refs=demand.dependency_refs,
+        revision=demand.revision + 1,
+        occurred_at=demand.occurred_at,
+    )
+    store.save(
+        SaveKey(operation_id="focus-op", step_id="demand", source_revision=1),
+        learner,
+        [chosen],
+        (Publication(ref=chosen.ref, expected_revision=demand.revision, reason="测试"),),
+    )
+    seen = []
+
+    def unmapped(context):
+        seen.append(context)
+        return reading_draft(context, skip=("skill_focus",))
+
+    model_prepares(app, monkeypatch, unmapped, reading_draft)
+    monkeypatch.setattr(app.models.adapters["simulated"], "simulated", False)  # a real model
+    caplog.set_level(logging.INFO, logger="project_j")
+    asyncio.run(app.prepare("p1", learner))
+    context = seen[0]
+    assert context["library"] == [] and context["candidate"] is None and context["template"] is None
+    assert context["recent_titles"] == []
+    assert context["demand"]["skill_focus"][0]["label"] == "一般过去时"
+    assert any(item["field"] == "skill_focus" for item in context["requirements"])
+    assert calls(app) == 2  # the unmapped skill was sent back for repair
+    assert "attempt=2 material=model tasks=2 read_aloud=0 resources=0 focus=1" in caplog.text

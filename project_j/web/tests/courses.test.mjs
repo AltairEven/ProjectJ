@@ -21,7 +21,7 @@ test('each course has one row, newest first, with its state from the saved objec
   assert.deepEqual(courseRows(objects).map(row => [row.object_id, row.revision, row.title, row.state]), [
     ['c5', 2, '还在改的课', '备课中'],
     ['c4', 3, '等确认的课', '等你确认'],
-    ['c3', 2, '确认过的课', '准备中'],
+    ['c3', 2, '确认过的课', '待上课'],
     ['c2', 1, '上过的课', '已上'],
     ['c1', 1, '已评价的课', '已评价'],
   ])

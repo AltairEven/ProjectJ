@@ -300,3 +300,30 @@ def test_a_claimed_adjustment_that_changes_nothing_is_recorded_as_reused(applica
     assert application.current(LEARNER, "plan:week").ref == week.ref
     assert result["plan_effect"] == "reused"
     assert application.current(LEARNER, "demand").body["plan_effect"] == "reused"
+
+
+def test_planning_suggests_at_most_two_known_skills(application, monkeypatch):
+    activity = taught(application)
+    adapter = application.models.adapters["simulated"]
+    original, seen = adapter.respond, []
+
+    def respond(request):
+        reply = original(request)
+        if request.purpose == "planning" and "demand" in request.context:
+            seen.append(request)
+            reply |= {
+                "focus_suggestions": [
+                    {"skill_id": "unknown", "reason": "清单外"},
+                    {"skill_id": "past_simple", "reason": "两处过去时用成原形"},
+                    {"skill_id": "articles", "reason": "漏了冠词"},
+                    {"skill_id": "verbs", "reason": "第三项"},
+                ]
+            }
+        return reply
+
+    monkeypatch.setattr(adapter, "respond", respond)
+    asyncio.run(application.adopt("adopt1", LEARNER, evaluation_of(application, activity)))
+    demand = application.current(LEARNER, "demand")
+    kept = [item["skill_id"] for item in demand.body["focus_suggestions"]]
+    assert kept == ["past_simple", "articles"] and demand.body["skill_focus"] is None
+    assert len(seen[0].context["skills"]) == 13 and "0–2项" in seen[0].instructions

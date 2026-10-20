@@ -86,3 +86,31 @@ def test_demand_does_not_change_budget_or_claim_activation_in_its_body(change):
     demand["body"].update(change)
     with pytest.raises(ValidationError):
         record_adapter.validate_python(demand)
+
+
+def test_skill_focus_is_checked_and_becomes_requirements():
+    from project_j.learning.contracts import MAX_FOCUS, SKILLS, DemandBody
+    from project_j.preparation.contracts import demand_requirements
+
+    assert len(SKILLS) == 13 and MAX_FOCUS == 3
+    assert {group for group, _, _ in SKILLS.values()} == {"词类", "时态", "句型"}
+    demand = initial_records()[3].body
+    before = demand_requirements(demand)
+    assert demand.skill_focus is None and demand.focus_suggestions == ()  # older demands read
+    base = demand.model_dump(mode="json")
+    for bad in (
+        {"skill_focus": ["no_such_skill"]},
+        {"skill_focus": ["verbs", "adjectives", "adverbs", "articles"]},
+        {"skill_focus": ["verbs"], "skill_note": "x" * 101},
+        {"focus_suggestions": [{"skill_id": "verbs", "reason": "r"}] * 3},
+        {"focus_suggestions": [{"skill_id": "unknown", "reason": "r"}]},
+    ):
+        with pytest.raises(ValidationError):
+            DemandBody.model_validate(base | bad)
+    chosen = DemandBody.model_validate(
+        base | {"skill_focus": ["past_simple"], "skill_note": "多练不规则动词"}
+    )
+    added = demand_requirements(chosen)[len(before) :]
+    assert added[0][0] == "skill_focus" and added[0][1].startswith("一般过去时：")
+    assert added[1] == ("skill_note", "多练不规则动词")
+    assert demand_requirements(DemandBody.model_validate(base | {"skill_focus": []})) == before
