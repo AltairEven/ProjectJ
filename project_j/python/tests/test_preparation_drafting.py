@@ -377,6 +377,15 @@ def test_instructions_keep_notes_out_of_what_jane_says():
     assert "写进preview或brief" in PREPARATION_INSTRUCTIONS
 
 
+def test_instructions_say_the_library_candidate_yields_to_lexile_and_interests():
+    """A real run reused the library's picture-book stories for an 850L adult (SELF-5)."""
+    from project_j.preparation.drafting import PREPARATION_INSTRUCTIONS
+
+    assert "candidate是规则按课程顺序给的候选" in PREPARATION_INSTRUCTIONS
+    assert "不贴近profile.interests时不用它" in PREPARATION_INSTRUCTIONS
+    assert "整篇故事逐段切开" in PREPARATION_INSTRUCTIONS  # Not "one short sentence".
+
+
 def test_no_offscreen_task_without_materials(application):
     demand, _ = initial(application)
     draft = template_draft(demand, FIRST, STORY)

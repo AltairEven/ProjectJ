@@ -675,6 +675,41 @@ def test_asking_for_help_after_the_last_support_moves_on(application):
     asyncio.run(scenario())
 
 
+def test_a_reading_whose_judgment_fails_is_answered_from_its_score(application, caplog):
+    caplog.set_level("INFO", logger="project_j")
+
+    async def scenario():
+        core = await reach_reading(application)
+        task, instance = core.reading_task(), core.task_instance_id
+        model = application.models.adapters["simulated"]
+        model.fail_next = True
+        misread = task.reference_text.replace("bridge", "brige", 1)
+        assert (await read(application, "misread", misread))["ack"] == "accepted"
+        action = core.actions[core.pending]
+        assert action.kind == "help" and action.after_delivery == "retry"
+        assert action.help == task.supports[0].help
+        assert "bridge" in action.text and task.supports[0].text in action.text
+        attempt = core.attempts[-1]
+        assert attempt["judgment"] == "incorrect" and attempt["evidence"] == task.evidence
+        assert any("固定规则" in note for note in attempt["limitations"])
+        assert f"event_id=misread task_instance_id={instance} judgment=incorrect" in caplog.text
+        deliver_all(core)
+        model.fail_next = True
+        await read(application, "good", task.reference_text)
+        action = core.actions[core.pending]
+        assert (action.kind, action.after_delivery) == ("feedback", "next_task")
+        assert core.attempts[-1]["judgment"] == "correct"
+        deliver_all(core)
+        assert core.task_instance_id != instance
+        model.fail_next = True
+        await read(application, "silent", "")
+        action = core.actions[core.pending]
+        assert action.after_delivery == "clarification" and "不算读错" in action.text
+        assert core.attempts[-1]["judgment"] == "unclear"
+
+    asyncio.run(scenario())
+
+
 def test_the_scorer_is_warmed_whenever_a_reading_wait_begins(application):
     async def scenario():
         warmed = []

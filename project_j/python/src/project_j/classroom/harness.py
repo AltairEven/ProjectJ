@@ -64,6 +64,21 @@ LIMITATIONS = {
     ),
 }
 HELP_ORDER = {"none": 0, "light_prompt": 1, "scaffold": 2, "full_model": 3, "unknown": 4}
+SCORE_RULE_NOTE = "课堂判断未在期限内取得，本段回应按评分结果的固定规则给出。"
+
+
+def score_rule(pronunciation: dict | None) -> tuple[str, str]:
+    """A reading's prepared response when no judgment came: the scorer's own word flags."""
+    if not pronunciation or pronunciation["status"] != "scored":
+        return "unclear", "这一段没有取得朗读结果，不算读错。可以按麦克风再读一次，也可以跳过。"
+    flagged = dict.fromkeys(
+        word["word"].strip(".,!?;:\"'")
+        for word in pronunciation["words"]
+        if word["error"] in {"mispronounced", "omitted"}
+    )
+    if not flagged:
+        return "correct", "这一段读完了，我们接着往下。"
+    return "incorrect", f"这几个词再注意一下：{'、'.join(list(flagged)[:3])}。"
 
 
 class AllowedAction(Contract):
@@ -686,7 +701,6 @@ class Harness:
             self.jobs.discard(job)
         if result is None or not result.ok:
             if self.mode == "judging" and self.epoch == binding["cancellation_epoch"]:
-                self.move("waiting_input")
                 self.record(
                     "model_failure",
                     {
@@ -695,6 +709,22 @@ class Harness:
                         "failure": result.failure if result else "timeout",
                     },
                 )
+                if task.purpose == "read_aloud" and attempt is not None:
+                    # Scoring plus a judgment often passes 10 s; the score's own flags answer.
+                    judgment, text = score_rule(attempt.get("pronunciation"))
+                    attempt["limitations"].append(SCORE_RULE_NOTE)
+                    self.record(
+                        "judgment_fallback",
+                        {
+                            "event_id": submitted.event_id,
+                            "task_instance_id": self.task_instance_id,
+                            "judgment": judgment,
+                        },
+                    )
+                    return self.respond(
+                        task, submitted.event_id, attempt, judgment, task.evidence, text, True
+                    )
+                self.move("waiting_input")
                 self.action(
                     "clarification",
                     "判断未取得。原输入已保留，可补充、跳过或停止。",
@@ -714,15 +744,20 @@ class Harness:
                     "clarification",
                 )
             return {"ack": "rejected_proposal", "snapshot": self.snapshot()}
+        return self.respond(
+            task, submitted.event_id, attempt, proposal.judgment, proposal.evidence, proposal.text
+        )
+
+    def respond(self, task, event_id, attempt, judgment, evidence, text, by_rule=False):
         if attempt:
-            attempt["judgment"] = proposal.judgment
-            attempt["evidence"] = proposal.evidence
+            attempt["judgment"] = judgment
+            attempt["evidence"] = evidence
         # Each wrong answer and each plea gets the next support of its own ladder; past the last
         # one the task exits instead of asking for yet another try.
         help_map, ladder = {}, None
-        if proposal.judgment == "incorrect":
+        if judgment == "incorrect":
             ladder = self.wrong_count
-        elif proposal.judgment == "help":
+        elif judgment == "help":
             ladder = self.help_count
         if ladder is not None:
             count = ladder.get(self.task_instance_id, 0)
@@ -733,9 +768,11 @@ class Harness:
                     {"task_instance_id": self.task_instance_id, "reason": "supports_used"},
                 )
                 action = self.action("feedback", task.exit_text, "next_task")
-                self.inputs[submitted.event_id]["response_action"] = action.action_id
+                self.inputs[event_id]["response_action"] = action.action_id
                 return {"ack": "accepted", "snapshot": self.snapshot()}
             help_map = task.supports[count].help
+            if by_rule:  # No model wording: the support is said as prepared.
+                text += task.supports[count].text
         speech = ()
         # The full-model help of a reading segment plays its adopted demonstration.
         if (
@@ -743,20 +780,20 @@ class Harness:
             and "full_model" in help_map.values()
             and task.reference_text in self.voiced
         ):
-            speech = (proposal.text, task.reference_text)
+            speech = (text, task.reference_text)
         action = self.action(
             "help" if help_map else "feedback",
-            proposal.text,
+            text,
             "next_task"
-            if proposal.judgment in {"correct", "reported"}
+            if judgment in {"correct", "reported"}
             else "clarification"
-            if proposal.judgment == "unclear"
+            if judgment == "unclear"
             else "retry",
             help_map,
             speech=speech,
             visuals=self.shown((task.task_id,), "help") if help_map else (),
         )
-        self.inputs[submitted.event_id]["response_action"] = action.action_id
+        self.inputs[event_id]["response_action"] = action.action_id
         return {"ack": "accepted", "snapshot": self.snapshot()}
 
     def approve(self, proposal: ModelProposal):

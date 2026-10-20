@@ -633,7 +633,7 @@ class Coordinator:
                 "check_ref": checked.ref.model_dump(),
                 "preparation": "drafted",
                 "start": "pending",
-                "unverified": ["actual_api", "voice", "child_entry"],
+                "unverified": ["actual_api", "voice"],
             },
         )
 
@@ -759,7 +759,7 @@ class Coordinator:
                 "check_ref": check.ref.model_dump(),
                 "preparation": "drafted",
                 "start": "pending",
-                "unverified": ["actual_api", "voice", "child_entry"],
+                "unverified": ["actual_api", "voice"],
             },
         )
 
@@ -1001,7 +1001,7 @@ class Coordinator:
                 "draft": draft.model_dump(mode="json"),
                 "actual_read": "unknown",
                 "current_start": "pending",
-                "unverified": ["actual_api", "voice", "child_entry"],
+                "unverified": ["actual_api", "voice"],
             },
             refs=(course.ref, check.ref),
         )
@@ -1035,7 +1035,7 @@ class Coordinator:
             return {
                 "decision": "waiting",
                 "missing": ["build-bound simulation verification"],
-                "unverified": ["actual_api", "voice", "child_entry"],
+                "unverified": ["actual_api", "voice"],
             }
         course = self.store.read(course_ref, learner_id)
         data = CourseBody.model_validate(course.body)
