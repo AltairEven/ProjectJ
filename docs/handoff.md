@@ -728,7 +728,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## SELF-5 正式学习入口真实整课核对
 
-- 状态：实现与自测完成，未提交（2026年10月20日）。用户要求“边跑边测试，有问题再修”。
+- 状态：实现与自测完成，已本地提交ce1c5cc（2026年10月20日）。用户要求“边跑边测试，有问题再修”。
 - 负责人/集成：Claude Opus。
 - 范围：以测试编号`start.sh --study --run-id self5-check`（真实模型、本机评分与合成），由代理经接口扮演学生，从蓝思值、聊天、小测、确认资料与目标，到两堂正式课（含讨论改稿、读错逐级帮助与退出、评价认可）和第三课备好；朗读用macOS say。结束后`project-j-reset --run-id self5-check`清空；用户的正式学习空间未创建、不受影响。细节在本机project_j/test/records/self-5-20261020.md，驱动self5_drive.py，日志test/output/self5-study-server.log。
 - 文件边界：project_j/python/src/project_j/{classroom/harness.py,preparation/drafting.py,application/coordinator.py}；tests/{test_runtime,test_preparation_drafting}.py；文档design/platform/failures-performance.md 1.8.0、design/platform/realtime-voice.md 2.5.0、design/preparation/README.md 2.0.1。
