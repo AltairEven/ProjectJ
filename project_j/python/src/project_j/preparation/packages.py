@@ -232,7 +232,7 @@ def reading_tasks(story: str, material_ref: RevisionRef) -> tuple[TaskDefinition
                 ),
                 Support(text="先听Jane示范这一段，再跟读。", help={PRONUNCIATION: "full_model"}),
             ),
-            exit_text="这一段可以先跳过，评分记为未知。",
+            exit_text="这一段先读到这里，我们接着往下。",
             optional=True,
         )
         for index, segment in enumerate(segments, 1)

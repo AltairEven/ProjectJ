@@ -635,6 +635,67 @@ def test_help_still_works_on_a_reading_segment(application):
     asyncio.run(scenario())
 
 
+def test_each_wrong_reading_gets_the_next_support_then_the_segment_moves_on(application, caplog):
+    caplog.set_level("INFO", logger="project_j")
+
+    async def scenario():
+        core = await reach_reading(application)
+        task, instance = core.reading_task(), core.task_instance_id
+        misread = task.reference_text.replace("bridge", "brige", 1)
+        responses = []
+        for index in range(len(task.supports) + 1):
+            await read(application, f"misread-{index}", misread)
+            action = core.actions[core.pending]
+            responses.append((action.help, action.text, action.after_delivery))
+            deliver_all(core)
+        assert [help for help, _, _ in responses[:-1]] == [s.help for s in task.supports]
+        assert all(after == "retry" for _, _, after in responses[:-1])
+        assert responses[-1] == ({}, task.exit_text, "next_task")
+        assert core.task_instance_id != instance
+        judged = [a["judgment"] for a in core.attempts if a["task_instance_id"] == instance]
+        assert judged == ["incorrect"] * (len(task.supports) + 1)
+        exited = [e["payload"] for e in core.events if e["kind"] == "task_exited"]
+        assert exited == [{"task_instance_id": instance, "reason": "supports_used"}]
+        assert f"task_instance_id={instance} reason=supports_used" in caplog.text
+
+    asyncio.run(scenario())
+
+
+def test_asking_for_help_after_the_last_support_moves_on(application):
+    async def scenario():
+        core = await reach_reading(application)
+        task, instance = core.reading_task(), core.task_instance_id
+        for _ in task.supports:
+            await answer(application, "帮我一下", "help")
+            assert core.task_instance_id == instance
+        await answer(application, "帮我一下", "help")
+        assert core.task_instance_id != instance
+        assert task.exit_text in [action.text for action in core.actions.values()]
+
+    asyncio.run(scenario())
+
+
+def test_the_scorer_is_warmed_whenever_a_reading_wait_begins(application):
+    async def scenario():
+        warmed = []
+
+        async def warm():
+            warmed.append(application.core.wait_kind)
+
+        application.scorer.warm = warm
+        core = await reach_reading(application)
+        await asyncio.sleep(0)
+        assert warmed == ["answer"]
+        await read(
+            application, "misread", core.reading_task().reference_text.replace("bridge", "brige", 1)
+        )
+        deliver_all(core)
+        await asyncio.sleep(0)
+        assert warmed == ["answer", "retry"]
+
+    asyncio.run(scenario())
+
+
 def test_over_limit_recording_is_rejected_and_max_duration_is_accepted(application):
     async def scenario():
         core = await reach_reading(application)

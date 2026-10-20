@@ -89,6 +89,8 @@ class LocalSynthesizer:
         self.last_stats: dict = {}
         self.process: asyncio.subprocess.Process | None = None
         self.exited = False
+        self.reviving: asyncio.Task | None = None
+        self.closing = False  # Service shutdown: a process that ends now is not replaced.
         self.lock = asyncio.Lock()
 
     async def start(self) -> dict:
@@ -118,7 +120,7 @@ class LocalSynthesizer:
         except ValueError:
             ready = {"ready": False, "error": "invalid_ready_line"}
         if not isinstance(ready, dict) or not ready.get("ready"):
-            await self.aclose()
+            await self.close_process()
             ready = ready if isinstance(ready, dict) else {"error": "invalid_ready_line"}
             detail = f"（{ready['detail']}）" if ready.get("detail") else ""
             log.warning(
@@ -139,8 +141,8 @@ class LocalSynthesizer:
         return ready
 
     async def stream(self, text: str, *, seed: int | None = None):
-        # ponytail: one sentence at a time and a dead process is not restarted mid-class
-        # (another ~7 s load); the next class start launches a new one.
+        # ponytail: one sentence at a time; a dead process comes back in the background
+        # (another ~7 s load) and the class speaks in text meanwhile.
         async with self.lock:
             if self.ready is None or self.exited or self.process is None:
                 raise SynthesisFailed("not_ready")
@@ -202,7 +204,7 @@ class LocalSynthesizer:
             self.process.stdin.write(json.dumps(message).encode() + b"\n")
             await self.process.stdin.drain()
         except BrokenPipeError, ConnectionResetError:
-            self.exited = True
+            self.died()
             raise SynthesisFailed("failed") from None
 
     async def reply(self, request_id: str) -> dict:
@@ -215,7 +217,7 @@ class LocalSynthesizer:
             except ValueError:  # Line over the stream limit.
                 raise SynthesisFailed("failed") from None
             if not line:
-                self.exited = True
+                self.died()
                 raise SynthesisFailed("failed")
             try:
                 reply = json.loads(line)
@@ -243,11 +245,31 @@ class LocalSynthesizer:
         if self.process and self.process.returncode is None:
             self.process.kill()
             await self.process.wait()
+        self.died()
+
+    def died(self):
+        """Without this, speech stayed off until the service restarted (SELF-4, after a 47 s
+        stall under memory pressure); one new process at a time, requests meanwhile fail fast."""
+        self.exited = True
+        if not self.closing and (self.reviving is None or self.reviving.done()):
+            self.reviving = asyncio.create_task(self.revive())
+
+    async def revive(self):
+        started = time.perf_counter()
+        await self.close_process()
+        try:
+            await self.start()
+            outcome = "ready"
+        except SynthesizerUnavailable:
+            outcome = "failed"
+        log.info("synthesizer revive outcome=%s ms=%d", outcome, elapsed_ms(started))
 
     def reasons(self) -> list[str]:
         reasons = file_reasons(self.root)
         if self.ready is None:
             reasons.append("合成进程未启动")
+        elif self.reviving and not self.reviving.done():
+            reasons.append("合成进程正在重新启动，请稍候")
         elif self.exited or self.process is None or self.process.returncode is not None:
             reasons.append("合成进程已退出")
         else:
@@ -260,6 +282,16 @@ class LocalSynthesizer:
         return reasons
 
     async def aclose(self) -> None:
+        self.closing = True
+        if self.reviving and not self.reviving.done():
+            self.reviving.cancel()
+            try:
+                await self.reviving
+            except asyncio.CancelledError:
+                pass
+        await self.close_process()
+
+    async def close_process(self) -> None:
         process = self.process
         if process is None:
             return

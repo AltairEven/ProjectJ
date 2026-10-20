@@ -27,6 +27,9 @@ if MODE == "not_ready":
 say({"ready": True, **IDENTITY, "load_ms": 5, "memory_bytes": 100})
 if MODE == "exit_after_ready":
     sys.exit(0)
+if MODE == "exit_once" and not os.path.exists(sys.argv[2]):  # Dies on the first launch only.
+    open(sys.argv[2], "w").close()
+    sys.exit(0)
 for line in sys.stdin:
     request = json.loads(line)
     if MODE == "slow":

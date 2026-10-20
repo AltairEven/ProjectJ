@@ -6,10 +6,12 @@ The recording goes through the process's stdin in memory; nothing is written to 
 import asyncio
 import base64
 import hashlib
+import io
 import json
 import logging
 import os
 import time
+import wave
 from collections.abc import Sequence
 from pathlib import Path
 from uuid import uuid4
@@ -24,6 +26,16 @@ INIT = Path("project_j/private/scorer/init.json")
 BINARY = Path("project_j/scorer/.venv/bin/project-j-scorer")
 LIMITATIONS = ("本机评分器，门槛未校准",)
 IDENTITY_KEYS = ("scorer", "version", "thresholds", "model", "revision")
+
+
+def silence(seconds: int = 1) -> bytes:
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(16000)
+        out.writeframes(bytes(32000 * seconds))
+    return buffer.getvalue()
 
 
 def identity(ready: dict) -> dict:
@@ -87,6 +99,8 @@ class LocalScorer:
         self.last_stats: dict = {}
         self.process: asyncio.subprocess.Process | None = None
         self.exited = False
+        self.reviving: asyncio.Task | None = None
+        self.closing = False  # Service shutdown: a process that ends now is not replaced.
         self.lock = asyncio.Lock()
 
     async def start(self) -> dict:
@@ -116,7 +130,7 @@ class LocalScorer:
         except ValueError:
             ready = {"ready": False, "error": "invalid_ready_line"}
         if not ready.get("ready"):
-            await self.aclose()
+            await self.close_process()
             detail = f"（{ready['detail']}）" if ready.get("detail") else ""
             log.warning(
                 "scorer not ready error=%s detail=%s", ready.get("error"), ready.get("detail")
@@ -151,9 +165,21 @@ class LocalScorer:
         )
         return result
 
+    async def warm(self):
+        """Page the model back in while the student reads: after synthesis a first score took
+        8–28 s under memory pressure, then under 2 s once warmed (2026-10-20, M3 Pro 18 GB)."""
+        started = time.perf_counter()
+        result = await self.exchange(silence(), "Warm up.")
+        log.info(
+            "scorer warm status=%s ms=%.0f exited=%s",
+            result.status,
+            (time.perf_counter() - started) * 1000,
+            self.exited,
+        )
+
     async def exchange(self, audio: bytes, reference_text: str) -> PronunciationResult:
-        # ponytail: a dead process is not restarted mid-class (another ~6 s load, and ADR-0015
-        # keeps the model fixed during class); the next class start launches a new one.
+        # ponytail: a dead process comes back in the background (another ~6 s load, the same
+        # fixed model of ADR-0015); readings meanwhile score unknown.
         async with self.lock:
             if self.ready is None or self.exited or self.process is None:
                 return PronunciationResult.unknown("failed", self)
@@ -170,17 +196,35 @@ class LocalScorer:
                     while True:
                         line = await self.process.stdout.readline()
                         if not line:
-                            self.exited = True
+                            self.died()
                             return PronunciationResult.unknown("failed", self)
                         reply = json.loads(line)
                         if reply.get("id") == request_id:  # Late replies of cancelled requests.
                             break
             except BrokenPipeError, ConnectionResetError:
-                self.exited = True
+                self.died()
                 return PronunciationResult.unknown("failed", self)
             except TimeoutError, ValueError:
                 return PronunciationResult.unknown("failed", self)
             return self.result(reply)
+
+    def died(self):
+        """One new process at a time; without it scoring stayed off until the service restarted."""
+        self.exited = True
+        if not self.closing and (self.reviving is None or self.reviving.done()):
+            self.reviving = asyncio.create_task(self.revive())
+
+    async def revive(self):
+        started = time.perf_counter()
+        await self.close_process()
+        try:
+            await self.start()
+            outcome = "ready"
+        except ScorerUnavailable:
+            outcome = "failed"
+        log.info(
+            "scorer revive outcome=%s ms=%.0f", outcome, (time.perf_counter() - started) * 1000
+        )
 
     def result(self, reply: dict) -> PronunciationResult:
         self.last_stats = {
@@ -211,6 +255,8 @@ class LocalScorer:
         reasons = file_reasons(self.root)
         if self.ready is None:
             reasons.append("评分进程未启动")
+        elif self.reviving and not self.reviving.done():
+            reasons.append("评分进程正在重新启动，请稍候")
         elif self.exited or self.process is None or self.process.returncode is not None:
             reasons.append("评分进程已退出")
         else:
@@ -222,6 +268,16 @@ class LocalScorer:
         return reasons
 
     async def aclose(self) -> None:
+        self.closing = True
+        if self.reviving and not self.reviving.done():
+            self.reviving.cancel()
+            try:
+                await self.reviving
+            except asyncio.CancelledError:
+                pass
+        await self.close_process()
+
+    async def close_process(self) -> None:
         process = self.process
         if process is None:
             return

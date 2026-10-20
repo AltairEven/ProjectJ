@@ -153,7 +153,9 @@ class Harness:
         # Pictures and animations the page reported as displayed, by task instance.
         self.seen: dict[str, dict[str, str]] = {}
         self.help_count: dict[str, int] = {}
+        self.wrong_count: dict[str, int] = {}
         self.jobs: set[asyncio.Task] = set()
+        self.warming: set[asyncio.Task] = set()
         self.paused_from: str | None = None
         self.end: dict | None = None
         self.last_response_event: str | None = None
@@ -342,6 +344,12 @@ class Harness:
             self.wait_kind = {"retry": "retry", "clarification": "clarification"}.get(
                 action.after_delivery, "goal_confirmation" if self.task_index < 0 else "answer"
             )
+            if self.reading_task() and hasattr(self.scorer, "warm"):
+                # After synthesis the scorer's first score took 8–28 s under memory pressure,
+                # past the 10-second deadline; paging it in while the student reads avoids that.
+                warm = asyncio.create_task(self.scorer.warm())
+                self.warming.add(warm)
+                warm.add_done_callback(self.warming.discard)
         return self.snapshot()
 
     def next_task(self):
@@ -709,14 +717,25 @@ class Harness:
         if attempt:
             attempt["judgment"] = proposal.judgment
             attempt["evidence"] = proposal.evidence
-        help_map = {}
+        # Each wrong answer and each plea gets the next support of its own ladder; past the last
+        # one the task exits instead of asking for yet another try.
+        help_map, ladder = {}, None
         if proposal.judgment == "incorrect":
-            help_map = task.supports[0].help
+            ladder = self.wrong_count
         elif proposal.judgment == "help":
-            count = self.help_count.get(self.task_instance_id, 0)
-            self.help_count[self.task_instance_id] = count + 1
-            if count < len(task.supports):
-                help_map = task.supports[count].help
+            ladder = self.help_count
+        if ladder is not None:
+            count = ladder.get(self.task_instance_id, 0)
+            ladder[self.task_instance_id] = count + 1
+            if count >= len(task.supports):
+                self.record(
+                    "task_exited",
+                    {"task_instance_id": self.task_instance_id, "reason": "supports_used"},
+                )
+                action = self.action("feedback", task.exit_text, "next_task")
+                self.inputs[submitted.event_id]["response_action"] = action.action_id
+                return {"ack": "accepted", "snapshot": self.snapshot()}
+            help_map = task.supports[count].help
         speech = ()
         # The full-model help of a reading segment plays its adopted demonstration.
         if (

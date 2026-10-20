@@ -127,3 +127,36 @@ def test_scoring_logs_round_trip_and_compute_time_without_the_text(tmp_path, cap
     assert "scorer ready device=cpu load_ms=5" in caplog.text
     assert "scorer status=scored reason=None audio_bytes=13 round_trip_ms=" in caplog.text
     assert "compute_ms=7" in caplog.text and "bridge" not in caplog.text
+
+
+def test_a_dead_scorer_comes_back_in_the_background(tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    command = [sys.executable, str(FAKE), "exit_once", str(tmp_path / "died")]
+
+    async def go():
+        local = LocalScorer(tmp_path, command)
+        await local.start()
+        died = await local.score(b"x", "car")
+        await local.reviving
+        again = await local.score(b"x", "car")
+        await local.aclose()
+        return died, again
+
+    died, again = asyncio.run(go())
+    assert (died.status, died.reason) == ("unknown", "failed") and again.status == "scored"
+    assert "scorer revive outcome=ready ms=" in caplog.text
+
+
+def test_warming_scores_silence_and_logs_only_timing(tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+
+    async def go():
+        local = scorer(tmp_path)
+        await local.start()
+        await local.warm()
+        result = await local.score(b"x", "car")
+        await local.aclose()
+        return result
+
+    assert asyncio.run(go()).status == "scored"
+    assert "scorer warm status=scored ms=" in caplog.text

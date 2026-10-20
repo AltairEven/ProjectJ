@@ -124,16 +124,42 @@ def test_truncated_and_refused_text_raise_after_what_was_delivered(tmp_path):
     assert refused == ([], "empty_text")
 
 
-def test_a_cancel_that_is_never_acknowledged_kills_the_process(tmp_path):
+def test_a_cancel_that_is_never_acknowledged_kills_and_restarts_the_process(tmp_path):
     async def go():
         local = synth(tmp_path, "stuck_cancel", cancel_timeout=0.3)
         await local.start()
         started = time.perf_counter()
         await collect(local, "x" * 30, limit=1)
-        return local, time.perf_counter() - started
+        elapsed, killed = time.perf_counter() - started, local.exited
+        reasons = local.reasons()
+        await local.reviving
+        alive = not local.exited and local.process.returncode is None
+        await local.aclose()
+        return elapsed, killed, reasons, alive
 
-    local, elapsed = asyncio.run(go())
-    assert elapsed < 2 and local.exited and "合成进程已退出" in local.reasons()
+    elapsed, killed, reasons, alive = asyncio.run(go())
+    assert elapsed < 2 and killed and alive
+    assert "合成进程正在重新启动，请稍候" in reasons
+
+
+def test_a_dead_process_comes_back_in_the_background(tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    command = [sys.executable, str(FAKE), "exit_once", str(tmp_path / "died")]
+
+    async def go():
+        local = LocalSynthesizer(tmp_path, command)
+        await local.start()
+        died = await until_failure(local, "x" * 30)
+        meanwhile = await until_failure(local, "hi")  # Fails fast while the new one loads.
+        await local.reviving
+        again = await collect(local, "hi")
+        await local.aclose()
+        return died, meanwhile, again
+
+    died, meanwhile, again = asyncio.run(go())
+    assert died[1] == "failed" and meanwhile == ([], "not_ready")
+    assert again == [pattern("hi")]
+    assert "synthesizer revive outcome=ready ms=" in caplog.text
 
 
 def test_the_child_process_gets_no_api_key(tmp_path, monkeypatch):
@@ -199,3 +225,19 @@ def test_synthesis_logs_each_stream_outcome_without_the_text(tmp_path, caplog):
     assert "synthesizer ready device=gpu" in caplog.text
     assert "synthesis outcome=completed chars=18 first_chunk_ms=" in caplog.text
     assert "synthesis outcome=cancelled" in caplog.text and "Mia" not in caplog.text
+
+
+def test_closing_never_restarts_a_process_that_ends_mid_stream(tmp_path):
+    async def go():
+        local = synth(tmp_path, "stuck_cancel")
+        await local.start()
+        job = asyncio.create_task(collect(local, "x" * 30))
+        await asyncio.sleep(0.3)  # The child is now silent mid-stream.
+        await local.aclose()
+        with pytest.raises(SynthesisFailed):
+            await job
+        await asyncio.sleep(0.1)
+        return local
+
+    local = asyncio.run(go())
+    assert local.reviving is None and local.exited

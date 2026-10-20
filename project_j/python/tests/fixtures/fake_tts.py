@@ -10,6 +10,10 @@ import threading
 import time
 
 MODE = sys.argv[1]
+DIE = MODE == "exit_mid_stream"
+if MODE == "exit_once" and not os.path.exists(sys.argv[2]):  # Dies mid-stream on the first launch.
+    open(sys.argv[2], "w").close()
+    DIE = True
 IDENTITY = {
     "synthesizer": "local-qwen3-tts",
     "version": "1",
@@ -72,7 +76,7 @@ while True:
         audio = base64.b64encode(pattern(text)).decode()
         say({"id": request_id, "chunk": sent, "audio": audio})
         sent += 1
-        if MODE == "exit_mid_stream":
+        if DIE:
             sys.exit(0)
         if MODE == "stuck_cancel":
             time.sleep(3600)
