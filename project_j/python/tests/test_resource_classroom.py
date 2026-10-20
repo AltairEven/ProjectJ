@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -8,6 +9,8 @@ from support import CONDITIONS, LEARNER, answer, deliver_all, ready, start
 from test_preparation_model import ref, science_draft, science_lesson
 
 from project_j.application.configuration import Settings
+from project_j.classroom.harness import DeliveryFeedback
+from project_j.evaluation.assessment import evaluation_request
 from project_j.interface.api import create_app
 from project_j.platform.models.openai_api import solid_png
 from project_j.platform.storage import Conflict
@@ -161,4 +164,71 @@ def test_speech_plays_the_recorded_demonstration(application):
         )
         assert reply.status_code == 200
         assert reply.content.endswith(application.recorded[core.reading_task().reference_text])
+        assert reply.headers["x-speech-source"] == "live"  # Jane's own words come first, live.
         core.control(str(uuid4()), "stop")
+
+
+def test_a_fully_recorded_sentence_says_so(application):
+    with TestClient(create_app(Settings(), application)) as client:
+        core = asyncio.run(to_reading(application))
+        token = application.start_requests["start1"]["result"]["student_token"]
+        question = core.actions[core.pending or core.presented]
+        application.recorded[question.speech[0]] = b"\x01\x00" * 8  # As if adopted.
+        reply = client.get(
+            f"/api/student/speech/{question.action_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        # The whole recording is there at once; the page plays it as one file.
+        assert reply.headers["x-speech-source"] == "recorded"
+        assert reply.content == application.recorded[question.speech[0]]
+        core.control(str(uuid4()), "stop")
+
+
+def shown(core, action, resources, status="completed"):
+    return core.delivery(
+        DeliveryFeedback(
+            delivery_event_id=str(uuid4()),
+            delivery_id=f"{action.action_id}:visual",
+            action_id=action.action_id,
+            activity_id=core.activity_id,
+            task_instance_id=action.task_instance_id,
+            sequence=1,
+            output_device_id="browser-screen",
+            modality="image",
+            status=status,
+            delivered_range=resources,
+            occurred_at=datetime.now(UTC),
+        )
+    )
+
+
+def test_picture_report_is_a_fact_that_moves_nothing(application, monkeypatch):
+    _, core = visual_class(application, monkeypatch)
+    question = core.actions[core.presented]
+    before = (core.mode, core.wait_kind, core.pending, core.revision, dict(core.help_by_task))
+    shown(core, question, ("cup-picture",))
+    assert (core.mode, core.wait_kind, core.pending, core.revision) == before[:4]
+    assert core.help_by_task == before[4]
+    event = core.events[-1]
+    assert event["kind"] == "delivery" and event["payload"]["modality"] == "image"
+    assert event["payload"]["delivered_range"] == ["cup-picture"]
+
+
+def test_picture_report_names_only_the_actions_own_visuals(application, monkeypatch):
+    _, core = visual_class(application, monkeypatch)
+    with pytest.raises(ValueError, match="visual"):
+        shown(core, core.actions[core.presented], ("cup-motion",))
+
+
+def test_an_attempt_keeps_the_pictures_seen_before_it(application, monkeypatch):
+    _, core = visual_class(application, monkeypatch)
+    shown(core, core.actions[core.presented], ("cup-picture",))
+    asyncio.run(answer(application, "帮我一下", "help"))
+    help_action = core.actions[core.presented]
+    shown(core, help_action, (), status="failed")  # The animation never displayed.
+    asyncio.run(answer(application, "the cup"))
+    attempt = core.attempts[-1]
+    assert attempt["visuals"] == [{"resource_id": "cup-picture", "stage": "question"}]
+    fact = {"end": {}, "attempts": core.attempts, "limitations": []}
+    context = evaluation_request(fact, core.course.model_dump(mode="json"), [], None).context
+    assert context["attempts"][-1]["visuals"] == attempt["visuals"]

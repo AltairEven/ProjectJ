@@ -3,6 +3,7 @@ import base64
 import json
 import logging
 
+import pytest
 from openai_codex.generated.v2_all import ItemCompletedNotification
 from openai_codex.models import Notification
 from test_models_codex import (  # private_tmp keeps adapter work directories here.
@@ -47,6 +48,23 @@ def drawn(result="", failure=None, saved_path=None):
 PNG = base64.b64encode(solid_png()).decode()
 
 
+def mcp(tool, server="codex"):
+    item = {
+        "type": "mcpToolCall",
+        "id": tool,
+        "server": server,
+        "tool": tool,
+        "status": "completed",
+        "arguments": {},
+    }
+    return Notification(
+        "item/completed",
+        ItemCompletedNotification.model_validate(
+            {"completedAtMs": 1, "threadId": "th", "turnId": "tu", "item": item}
+        ),
+    )
+
+
 def test_simulated_image_request_returns_one_png():
     result = asyncio.run(ModelService.simulated().run(DRAW))
     assert result.ok and len(result.media) == 1 and image_type(result.media[0]) == "png"
@@ -88,6 +106,33 @@ def test_codex_without_an_image_is_incomplete(tmp_path):
 def test_codex_image_request_refuses_other_tools(tmp_path):
     fake = FakeCodex(events=[command(), drawn(PNG), message(NOTE), completed()])
     reply = asyncio.run(adapter(fake, tmp_path).invoke(DRAW, BINDING))
+    assert reply.actual["tools"].status == "mismatch"
+
+
+def test_codex_picture_may_list_mcp_resources(tmp_path):
+    # Seen on the real runtime (2026-10-20): the picture's code may first list the runtime's
+    # own MCP resources. Read-only and empty in this isolated home, so it does not fail.
+    listing = [mcp("list_mcp_resources"), mcp("list_mcp_resource_templates")]
+    fake = FakeCodex(events=[*listing, drawn(PNG), message(NOTE), completed()])
+    reply = asyncio.run(adapter(fake, tmp_path).invoke(DRAW, BINDING))
+    assert reply.failure is None and reply.actual["tools"].status == "verified"
+    assert reply.actual["tools"].actual == (
+        "imageGeneration,mcpToolCall:codex/list_mcp_resource_templates,"
+        "mcpToolCall:codex/list_mcp_resources"
+    )
+
+
+@pytest.mark.parametrize("call", [mcp("read_mcp_resource"), mcp("list_mcp_resources", "other")])
+def test_codex_picture_refuses_other_mcp_calls(tmp_path, call):
+    fake = FakeCodex(events=[call, drawn(PNG), message(NOTE), completed()])
+    reply = asyncio.run(adapter(fake, tmp_path).invoke(DRAW, BINDING))
+    assert reply.actual["tools"].status == "mismatch"
+
+
+def test_codex_text_request_refuses_mcp_listing(tmp_path):
+    fake = FakeCodex(events=[mcp("list_mcp_resources"), message(NOTE), completed()])
+    text = ModelRequest("preparation", "write", {"content": "x"}, ImageNote)
+    reply = asyncio.run(adapter(fake, tmp_path).invoke(text, BINDING))
     assert reply.actual["tools"].status == "mismatch"
 
 

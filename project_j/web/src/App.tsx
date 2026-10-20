@@ -4,7 +4,7 @@ import { canConfirm } from './confirmation'
 import { describe, discussionLines, endLabels, evaluationLines, missingResources, modelLines, resourceLines, startMessage } from './report'
 import { finishRecording, idle, pauseRecording, recordedMs, resumeRecording, startRecording, type Recorder } from './recording'
 import { requestFailure, type RequestFailure } from './request'
-import { Speaker, reportsFor, startedReport } from './speaker'
+import { Speaker, reportsFor, startedReport, visualReport } from './speaker'
 import { Microphone } from './microphone'
 import { toBase64 } from './audio'
 import type { AllowedAction, Snapshot, Dashboard, RevisionRef as Ref, Document as Doc, Control, StudentControl, DeliveryFeedback, TextInput, PreparationResult as PrepareResult, StartResult, StartConditions, InputResult as Ack } from './client/types.gen'
@@ -34,21 +34,30 @@ async function fileUrl(token: string, path: string): Promise<string> {
   return URL.createObjectURL(await response.blob())
 }
 
-// Pictures and animations the core approved with an action; shown as images only.
-function Visuals({ token, action }: { token: string, action?: AllowedAction }) {
-  const [urls, setUrls] = useState<string[]>([])
+// Pictures and animations the core approved with an action; shown as images only. Once each
+// has displayed or failed, onShown names the ones the child could see.
+function Visuals({ token, action, onShown }: { token: string, action?: AllowedAction, onShown: (action: AllowedAction, shown: string[]) => void }) {
+  const [items, setItems] = useState<{ resource: string, url: string }[]>([])
+  const outcomes = useRef(new Map<string, boolean>())
   const id = action?.action_id, visuals = action?.visuals ?? []
   const key = visuals.join(' ')
+  const settle = (resource: string, displayed: boolean) => {
+    outcomes.current.set(resource, displayed)
+    if (action && outcomes.current.size === visuals.length) onShown(action, visuals.filter(item => outcomes.current.get(item)))
+  }
   useEffect(() => {
-    if (!id || !key) { setUrls([]); return }
+    outcomes.current = new Map()
+    if (!id || !key) { setItems([]); return }
     let alive = true
     const made: string[] = []
     void Promise.all(key.split(' ').map(resource => fileUrl(token, `/api/student/visual/${encodeURIComponent(id)}/${encodeURIComponent(resource)}`)
-      .then(url => { made.push(url); return url }).catch(() => undefined)))
-      .then(list => { if (alive) setUrls(list.filter((url): url is string => Boolean(url))) })
+      .then(url => { if (!alive) { URL.revokeObjectURL(url); return undefined } made.push(url); return { resource, url } })
+      .catch(() => { if (alive) settle(resource, false); return undefined })))
+      .then(list => { if (alive) setItems(list.filter(item => item !== undefined)) })
     return () => { alive = false; made.forEach(url => URL.revokeObjectURL(url)) }
   }, [token, id, key])
-  return urls.length ? <section className="visuals">{urls.map(url => <img key={url} src={url} alt="Jane 展示的图" />)}</section> : null
+  return items.length ? <section className="visuals">{items.map(({ resource, url }) => <img key={url} src={url} alt="Jane 展示的图"
+    onLoad={() => settle(resource, true)} onError={() => settle(resource, false)} />)}</section> : null
 }
 
 async function api<T>(token: string, path: string, body?: unknown): Promise<T> {
@@ -75,6 +84,7 @@ function Parent({ token }: { token: string }) {
   const [report, setReport] = useState<unknown>()
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [doing, setDoing] = useState('')
   const [backupId, setBackupId] = useState('')
   const [household, setHousehold] = useState('')
   const [conditions, setConditions] = useState<Pick<StartConditions, Condition>>({ materials: 'unknown', time: 'unknown', accompaniment: 'unknown' })
@@ -83,6 +93,7 @@ function Parent({ token }: { token: string }) {
   const [planGoal, setPlanGoal] = useState('在相近新材料中观察阅读依据，继续保留短英语报告支架。')
   const failedOperation = useRef<(() => Promise<void>) | null>(null)
   const [shown, setShown] = useState<Record<string, string>>({})
+  const [picked, setPicked] = useState<Record<string, number>>({})
   const listening = useRef<HTMLAudioElement | null>(null)
   const refresh = useCallback(async () => {
     const data = await api<Dashboard>(token, `parent/dashboard?learner_id=${learner}`)
@@ -103,15 +114,16 @@ function Parent({ token }: { token: string }) {
       unverified: ['actual_api', 'voice', 'child_entry'],
     } : undefined)
   }, [token])
-  const run = async (operation: () => Promise<void>) => {
-    setBusy(true); setMessage('')
+  // label names what is under way while every button waits for it.
+  const run = async (operation: () => Promise<void>, label = '') => {
+    setBusy(true); setDoing(label); setMessage('')
     try { await operation(); failedOperation.current = null; await refresh() }
     catch (error) {
       const failure = error as RequestFailure
       failedOperation.current = failure.unknown ? operation : null
       setMessage(failure.detail && failure.detail !== failure.message ? `${failure.message}（${failure.detail}）` : failure.message)
     }
-    finally { setBusy(false) }
+    finally { setBusy(false); setDoing('') }
   }
   useEffect(() => { void refresh().catch(error => setMessage((error as Error).message)) }, [refresh])
   const facts = dashboard?.objects?.filter(doc => doc.kind === 'fact').sort((a, b) => b.created_at.localeCompare(a.created_at)) ?? []
@@ -135,7 +147,10 @@ function Parent({ token }: { token: string }) {
   // Request bodies are made once, so resuming a failed operation repeats the same request.
   const generate = (item: Resource) => {
     const body = { ...courseRequest(), resource_id: item.resource_id }
-    return async () => { await api(token, 'parent/generate-resource', body) }
+    return async () => {
+      await api(token, 'parent/generate-resource', body)
+      setPicked(current => { const rest = { ...current }; delete rest[item.resource_id]; return rest })
+    }
   }
   const adopt = (item: Resource, version: number) => {
     const body = { ...courseRequest(), resource_id: item.resource_id, version }
@@ -150,8 +165,13 @@ function Parent({ token }: { token: string }) {
     else setShown(current => ({ ...current, [item.resource_id]: url }))
   }
   const generateAll = () => {
-    const steps = resources.filter(item => generatable.includes(item.kind) && !item.versions?.length).map(generate)
-    return async () => { for (const step of steps) await step() }
+    const items = resources.filter(item => generatable.includes(item.kind) && !item.versions?.length)
+    return async () => {
+      for (const [index, item] of items.entries()) {
+        setDoing(`生成全部待生成的资源：第${index + 1}/${items.length}项 ${item.resource_id}`)
+        await generate(item)()
+      }
+    }
   }
   const parentControl = (command: Control['command']) => {
     const body = { command, event_id: uid(), activity_id: dashboard?.active?.activity_id }
@@ -166,12 +186,13 @@ function Parent({ token }: { token: string }) {
       await api(token, 'parent/feedback', body)
       const result = await api(token, 'parent/next-course', { request_id: `${requestId}:next`, learner_id: learner, activity_id: activity })
       setReport(result); setFeedback('')
-    })
+    }, '保存反馈并准备下一课（评价、规划、备课）')
   }
   return <main>
     <header><span className="eyebrow">{dashboard?.realm === 'adult_check' ? 'PROJECT J · 成人实际检查' : 'PROJECT J · 隔离模拟'}</span><h1>Jane 的家长工作台</h1>
       <p>虚构学习者 · 本课到下一课程包 · 真实 API、声音和儿童入口未验证</p></header>
     {message && <div className="notice" role="alert">{message}</div>}
+    {busy && doing && <p className="notice" role="status">正在{doing}，完成前按钮暂不可用。</p>}
     {failedOperation.current && <button onClick={() => void run(failedOperation.current!)} disabled={busy}>接续原操作</button>}
     <section><div className="section-title"><h2>准备与开始</h2><button className="quiet" onClick={() => void run(refresh)} disabled={busy}>刷新状态</button></div>
       <p>{dashboard?.verification?.result === 'pass' ? '已有与当前构建匹配的隔离程序检查依据。' : '隔离程序检查尚未取得匹配依据，开始保持待处理。'}</p>
@@ -181,21 +202,25 @@ function Parent({ token }: { token: string }) {
           <button className="quiet" onClick={() => parentControl('skip')}>跳过当前题</button><button className="quiet" onClick={() => parentControl('close')}>收尾</button>
           <button className="quiet" onClick={() => parentControl('end_unconfirmed')}>结束并保留未确认</button>
           <button className="danger" onClick={() => parentControl('stop')}>立即停止</button></div></> : <>
-        <button disabled={busy} onClick={() => { const requestId = uid(); void run(async () => setPrepared(await api<PrepareResult>(token, 'parent/prepare', { request_id: requestId, learner_id: learner }))) }}>准备课程包</button>
+        <button disabled={busy} onClick={() => { const requestId = uid(); void run(async () => setPrepared(await api<PrepareResult>(token, 'parent/prepare', { request_id: requestId, learner_id: learner })), '准备课程包') }}>准备课程包</button>
         {prepared && <><div className="preview"><h3>本课安排</h3>{preview
           ? <dl>{Object.entries(preview).sort(([a], [b]) => previewRank(a) - previewRank(b)).map(([key, value]) => <div key={key}><dt>{previewLabels[key] ?? key}</dt><dd>{show(value)}</dd></div>)}</dl>
           : <p>预览待取得</p>}
           {previewDoc?.body.note ? <p>说明：{String(previewDoc.body.note)}</p> : null}
           {previewDoc && <><h3>教学资源清单</h3>
             {confirmed && resources.some(item => generatable.includes(item.kind) && !item.versions?.length)
-              && <button className="quiet" disabled={busy} onClick={() => void run(generateAll())}>生成全部待生成的资源</button>}
+              && <button className="quiet" disabled={busy} onClick={() => void run(generateAll(), '生成全部待生成的资源')}>生成全部待生成的资源</button>}
             {resources.length ? <ul>{resourceLines(previewDoc.body).map((line, index) => {
               const item = resources[index], latest = item.versions?.length ?? 0
+              const version = Math.min(picked[item.resource_id] ?? latest, latest)
               return <li key={item.resource_id}>{line}
                 {confirmed && generatable.includes(item.kind) && <div className="row">
-                  <button className="quiet" disabled={busy} onClick={() => void run(generate(item))}>{latest ? '重新生成' : '生成'}</button>
-                  {latest > 0 && <><button className="quiet" disabled={busy} onClick={() => void run(look(item, latest))}>{item.kind === 'audio' ? '试听' : '查看'}第{latest}版</button>
-                    <button disabled={busy || item.adopted_version === latest} onClick={() => void run(adopt(item, latest))}>采用第{latest}版</button></>}
+                  <button className="quiet" disabled={busy} onClick={() => void run(generate(item), `生成 ${item.resource_id}`)}>{latest ? '重新生成' : '生成'}</button>
+                  {latest > 1 && <select aria-label="选择版本" value={version} disabled={busy}
+                    onChange={event => setPicked(current => ({ ...current, [item.resource_id]: Number(event.target.value) }))}>
+                    {Array.from({ length: latest }, (_, i) => i + 1).map(n => <option key={n} value={n}>第{n}版{item.adopted_version === n ? '（已采用）' : ''}</option>)}</select>}
+                  {latest > 0 && <><button className="quiet" disabled={busy} onClick={() => void run(look(item, version))}>{item.kind === 'audio' ? '试听' : '查看'}第{version}版</button>
+                    <button disabled={busy || item.adopted_version === version} onClick={() => void run(adopt(item, version))}>采用第{version}版</button></>}
                 </div>}
                 {shown[item.resource_id] && <img className="resource-preview" src={shown[item.resource_id]} alt={item.purpose} />}
               </li>
@@ -204,7 +229,7 @@ function Parent({ token }: { token: string }) {
           <label>修改意见（改目标、30分钟预算或主要教学方式需回到学习规划）<textarea value={courseFeedback} onChange={event => setCourseFeedback(event.target.value)} /></label>
           <div className="row"><button className="quiet" disabled={busy || !courseFeedback.trim()} onClick={() => void run(async () => {
             setPrepared(await api<PrepareResult>(token, 'parent/discuss', { ...courseRequest(), feedback: courseFeedback.trim() })); setCourseFeedback('')
-          })}>提交修改意见</button>
+          }, '按修改意见修订课程')}>提交修改意见</button>
           <button disabled={busy || confirmed} onClick={() => void run(async () => { await api(token, 'parent/confirm', courseRequest()) })}>{confirmed ? '已确认这一版本' : '确认课程'}</button></div></div>
           <h3>本次{mode}条件报告</h3><div className="row">{conditionChoices.map(([key, name, options]) => <label key={key}>{name}
             <select value={conditions[key]} onChange={event => setConditions(current => ({ ...current, [key]: event.target.value }))}>
@@ -244,7 +269,7 @@ function Parent({ token }: { token: string }) {
             await api(token, 'parent/later-feedback', { request_id: requestId, learner_id: learner, activity_id: activity })
             setMessage('已记录稍后反馈；这一步没有调用评价模型。')
           }) }}>稍后反馈</button>
-          <button className="quiet" disabled={busy || !feedbackChosen} onClick={() => { const requestId = uid(); void run(async () => setReport(await api(token, 'parent/next-course', { request_id: requestId, learner_id: learner, activity_id: activity }))) }}>{feedbackChosen ? '按需准备下一课' : '按需准备下一课（先选稍后反馈）'}</button></div>
+          <button className="quiet" disabled={busy || !feedbackChosen} onClick={() => { const requestId = uid(); void run(async () => setReport(await api(token, 'parent/next-course', { request_id: requestId, learner_id: learner, activity_id: activity })), '准备下一课（评价、规划、备课）') }}>{feedbackChosen ? '按需准备下一课' : '按需准备下一课（先选稍后反馈）'}</button></div>
         <details><summary>查看原答、帮助、交付与结束事实</summary><pre>{show(fact.body)}</pre></details></> : <p>{dashboard?.note ?? '课堂结束后先封存事实，不等待反馈或模型评价。'}</p>}
       {(dashboard?.pending_seals?.length ?? 0) > 0 || Object.keys(dashboard?.seal_errors ?? {}).length > 0 ?
         <button disabled={busy} onClick={() => void run(async () => { await api(token, 'parent/retry-seal', {}) })}>查询并接续原封存</button> : null}
@@ -300,6 +325,7 @@ function Student({ token }: { token: string }) {
   const [readingText, setReadingText] = useState('')
   const reading = snapshot?.recording
   const delivered = useRef(new Set<string>())
+  const pictured = useRef(new Set<string>())
   // Adult check: Jane speaks first and her text appears only after the audio (parent's decision).
   const adult = snapshot?.realm === 'adult_check'
   const speaker = useRef<Speaker | null>(null)
@@ -488,7 +514,11 @@ function Student({ token }: { token: string }) {
       : locked ? '请点“打开声音”，听 Jane 说话。' : speaking ? 'Jane 正在说话……' : snapshot?.presented_action?.text ?? '等待同一核心的下一动作。'}</p>
       {adult && locked && <button onClick={() => void speaker.current?.resume().then(() => setLocked(false))}>打开声音</button>}</div></section>
     {!localCancelled && <Visuals token={token} action={!adult ? (snapshot?.pending_action ?? snapshot?.presented_action) ?? undefined
-      : locked || speaking ? undefined : snapshot?.presented_action ?? undefined} />}
+      : locked || speaking ? undefined : snapshot?.presented_action ?? undefined} onShown={(action, shown) => {
+        if (pictured.current.has(action.action_id)) return  // Once per action, though it may show again.
+        pictured.current.add(action.action_id)
+        void sendDelivery(visualReport(action, shown, new Date()))
+      }} />}
     {!localCancelled && Object.entries(snapshot?.materials ?? {}).map(([id, material]) => <section key={id} className="reading"><pre>{material}</pre></section>)}
     {reading && snapshot?.mode !== 'ended' && <section className="reading-aloud">
       <h2>朗读这一段</h2><p>{String(reading.reference_text)}</p>

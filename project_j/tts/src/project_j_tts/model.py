@@ -84,6 +84,9 @@ class QwenEngine:
             # Warm up at load, not mid-class: the first generation compiles GPU kernels.
             for _ in self.stream("你好。", None):
                 pass
+            # Keep the weights (plus 256 MiB) resident: after five idle minutes the first chunk
+            # took 25 s unwired and 1.8 s wired (2026-10-20, Apple M3 Pro 18 GB).
+            mx.set_wired_limit(mx.get_active_memory() + (256 << 20))
             device = "gpu" if mx.default_device().type == mx.gpu else "cpu"
         except Exception as error:  # Kind only; library messages may carry local paths.
             raise ModelError("load_failed", type(error).__name__) from error

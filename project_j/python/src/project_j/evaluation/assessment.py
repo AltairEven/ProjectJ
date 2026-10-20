@@ -100,6 +100,8 @@ EVALUATION_INSTRUCTIONS = (
     "working_judgment：single_independent只用于初答judgment为correct、help里没有任何帮助、"
     "且家长反馈明确说没有额外帮助的尝试；needs_help用于课中有帮助、家长报告了帮助，或答错的尝试；"
     "其余为unknown。“无额外补充”“没观察到”都不等于没有帮助。"
+    "attempts的visuals是作答前学生页实际显示过的图片或动画：stage为question属于题目材料，"
+    "为help属于帮助、随help说明；没列出的不能当作孩子看到了。"
     "external_help：家长反馈明确说没有帮忙为none，明确说帮了或代答为reported，否则unknown；"
     "none或reported时help_quote必须逐字摘自feedback的text。"
     "explanation用一两句给家长说明这次尝试的依据和限制。summary概括实际完成与结束情况；"
@@ -161,6 +163,7 @@ def evaluation_request(
                     "answers": [item.get("text") for item in attempt["inputs"]],
                     "judgment": attempt["judgment"],
                     "help": attempt["help"],
+                    "visuals": attempt.get("visuals", []),
                     "pronunciation": attempt.get("pronunciation"),
                 }
                 for attempt in fact["attempts"]

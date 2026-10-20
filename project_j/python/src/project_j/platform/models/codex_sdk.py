@@ -1,7 +1,8 @@
 """Codex SDK adapter: ChatGPT subscription through a local codex app-server with its own CODEX_HOME.
 
 Each call is a fresh ephemeral, read-only thread in an empty directory with every escalation
-denied; context is assembled by the caller, never kept by Codex.
+denied; context is assembled by the caller, never kept by Codex. Pictures need code mode, so
+they get a runtime of their own; text requests run where code mode is off.
 """
 
 import asyncio
@@ -29,6 +30,7 @@ from openai_codex.generated.v2_all import (
     AgentMessageThreadItem,
     ImageGenerationThreadItem,
     ItemCompletedNotification,
+    McpToolCallThreadItem,
     ThreadTokenUsageUpdatedNotification,
     TurnCompletedNotification,
     TurnStatus,
@@ -78,6 +80,8 @@ OVERRIDES = (
     "features.plugins=false",
     "features.skills=false",
 )
+# A tool called from code mode is no turn item, so the tool check could not see it.
+NO_CODE_MODE = "features.code_mode_host=false"
 # Replaces Codex's coding-agent prompt; the request's own instructions follow as developer text.
 BASE_INSTRUCTIONS = (
     "Answer the single request in the developer and user messages. "
@@ -89,14 +93,21 @@ IMAGE_INSTRUCTIONS = (
     "user messages, then reply only with JSON matching the required schema."
 )
 IMAGE_TOOL = "imageGeneration"
+# Seen on the real runtime (2026-10-20): a picture's code may first list the runtime's own MCP
+# resources. Read-only, and empty in this home with no MCP servers; nothing else is allowed.
+IMAGE_LISTINGS = {
+    "mcpToolCall:codex/list_mcp_resources",
+    "mcpToolCall:codex/list_mcp_resource_templates",
+}
 # Turn items that are not tool use; anything else means tools were not actually closed.
 QUIET_ITEMS = {"userMessage", "agentMessage", "reasoning", "plan", "contextCompaction"}
 # Subscription service tier ids; the default tier sends none.
 SERVICE_TIERS = {"fast": "priority"}
 
 
-def codex_config(home: Path, workdir: Path) -> CodexConfig:
-    return CodexConfig(env={"CODEX_HOME": str(home)}, cwd=str(workdir), config_overrides=OVERRIDES)
+def codex_config(home: Path, workdir: Path, image: bool = False) -> CodexConfig:
+    overrides = OVERRIDES if image else (*OVERRIDES, NO_CODE_MODE)
+    return CodexConfig(env={"CODEX_HOME": str(home)}, cwd=str(workdir), config_overrides=overrides)
 
 
 def error_kind(turn) -> str:
@@ -114,6 +125,8 @@ async def collect(handle):
             item = getattr(payload.item, "root", payload.item)
             if isinstance(item, AgentMessageThreadItem):
                 text = item.text
+            elif isinstance(item, McpToolCallThreadItem):
+                tools.add(f"{item.type}:{item.server}/{item.tool}")
             elif item.type not in QUIET_ITEMS:
                 tools.add(item.type)
                 if isinstance(item, ImageGenerationThreadItem):
@@ -145,7 +158,7 @@ def picture(item: ImageGenerationThreadItem) -> bytes:
 
 class CodexAdapter:
     adapter_id = "codex"
-    version = "2"
+    version = "3"
     efforts: tuple[Effort, ...] = ("low", "medium", "high", "xhigh")
     tiers: tuple[Tier, ...] = ("default", "fast")
     simulated = False
@@ -153,7 +166,7 @@ class CodexAdapter:
     def __init__(self, home: Path, factory=None):
         self.home = home.absolute()  # The runtime runs elsewhere; keep the home fixed.
         self._factory = factory or self.launch
-        self._codex = None
+        self._runtimes: dict[bool, AsyncCodex] = {}  # By whether it draws pictures.
         self._workdir: Path | None = None
 
     def __repr__(self) -> str:
@@ -163,23 +176,35 @@ class CodexAdapter:
     def logged_in(home: Path) -> bool:
         return (home / "auth.json").exists()
 
-    def launch(self, workdir: Path) -> AsyncCodex:
+    def launch(self, workdir: Path, image: bool) -> AsyncCodex:
         self.home.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.home.chmod(0o700)
-        return AsyncCodex(codex_config(self.home, workdir))
+        return AsyncCodex(codex_config(self.home, workdir, image))
 
-    def codex(self):
-        if self._codex is None:
-            self._workdir = Path(tempfile.mkdtemp(prefix="project-j-codex-"))
-            self._codex = self._factory(self._workdir)
-            log.info("codex runtime launched")  # It starts with the first thread.
-        return self._codex
+    def codex(self, image: bool = False):
+        if image not in self._runtimes:
+            if self._workdir is None:
+                self._workdir = Path(tempfile.mkdtemp(prefix="project-j-codex-"))
+            self._runtimes[image] = self._factory(self._workdir, image)
+            # It starts with the first thread.
+            log.info("codex runtime launched kind=%s", "image" if image else "text")
+        return self._runtimes[image]
+
+    async def prewarm(self):
+        """Start the text runtime at service start, not inside the first in-class judgment."""
+        started, result = time.perf_counter(), "ok"
+        try:
+            await self.codex().account()
+        except RUNTIME_ERRORS:
+            result = "unavailable"  # The first request then reports it.
+        ms = (time.perf_counter() - started) * 1000
+        log.info("codex runtime warmed result=%s ms=%.0f", result, ms)
 
     async def aclose(self):
-        if self._codex is not None:
+        for runtime in self._runtimes.values():
             with contextlib.suppress(*RUNTIME_ERRORS):
-                await self._codex.close()
-            self._codex = None
+                await runtime.close()
+        self._runtimes = {}
         if self._workdir is not None:
             shutil.rmtree(self._workdir, ignore_errors=True)
             self._workdir = None
@@ -229,7 +254,7 @@ class CodexAdapter:
         handle, begun = None, time.perf_counter()
         try:
             async with asyncio.timeout(timeout):
-                codex = self.codex()
+                codex = self.codex(image=bool(media))
                 thread = await codex.thread_start(
                     model=binding.model,
                     ephemeral=True,
@@ -255,7 +280,7 @@ class CodexAdapter:
             return AdapterReply(data=None, failure="timeout", actual=actual)
         except RUNTIME_ERRORS:
             return AdapterReply(data=None, failure="unavailable", actual=actual)
-        allowed = {IMAGE_TOOL} if media else set()
+        allowed = {IMAGE_TOOL, *IMAGE_LISTINGS} if media else set()
         used = ",".join(sorted(tools)) or "none"
         actual["tools"] = ConfigCheck(
             requested=IMAGE_TOOL if media else "none",

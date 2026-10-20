@@ -22,7 +22,7 @@ export function toMono(channels: Float32Array[]): Float32Array {
 }
 
 // Mono PCM16 WAV, the format the local pronunciation scorer reads (16 kHz from the page).
-export function encodeWav(samples: Float32Array, sampleRate: number): Uint8Array {
+export function encodeWav(samples: Float32Array, sampleRate: number): Uint8Array<ArrayBuffer> {
   const wav = new Uint8Array(44 + samples.length * 2)
   const view = new DataView(wav.buffer)
   const text = (offset: number, value: string) => wav.set(new TextEncoder().encode(value), offset)

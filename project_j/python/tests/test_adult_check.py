@@ -173,6 +173,27 @@ def test_a_process_that_fails_to_start_leaves_class_start_blocked(tmp_path):
         assert dashboard.status_code == 200 and dashboard.json()["realm"] == "adult_check"
 
 
+def test_workbench_link_is_printed_once_the_service_has_started(application, capsys):
+    # Printed earlier, it showed before the local models had loaded; unflushed, a redirected
+    # log did not show it at all.
+    app = create_app(Settings(), application, announce=("工作台：http://127.0.0.1:8765/",))
+    assert capsys.readouterr().out == ""
+    with TestClient(app):
+        assert "工作台：http://127.0.0.1:8765/" in capsys.readouterr().out
+
+
+def test_service_start_prewarms_model_runtimes(application):
+    class Warmable:
+        warmed = False
+
+        async def prewarm(self):
+            self.warmed = True
+
+    application.models.adapters["warmable"] = warmable = Warmable()
+    with TestClient(create_app(Settings(), application)):
+        assert warmable.warmed
+
+
 def test_adult_entry_refuses_simulation_debug_switches():
     with pytest.raises(SystemExit) as stop:
         main(["--adult-check", "--model-delay", "1"])

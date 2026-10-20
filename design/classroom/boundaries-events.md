@@ -1,6 +1,6 @@
 # 课堂核心、交互层与统一交接
 
-文档版本：1.5.0；更新：2026年10月16日；范围：逻辑设计与P0接口，课堂未实现。
+文档版本：1.6.0；更新：2026年10月20日；范围：逻辑设计与P0接口，课堂未实现。
 
 classroom管理教学含义与本堂状态，interface管理交互适配，platform提供技术能力。网页、手机、纯语音或未来其他入口可接入同一课堂核心。
 
@@ -70,7 +70,7 @@ interface不必须先替课堂判断自然语言意图；“我不知道”“�
 
 - `ModelProposal`连接model_request_id、A/Q/wait/core_revision/取消代次、输入修订，包含判断/核实依据/未知、一个回应目的及拟议动作。不能修改状态/等待、长期对象或材料权限。Harness拒绝越界、依据不够及过期提案；只有核对后的`AllowedAction`可交付。
 - `AllowedAction`包含action_id、上述绑定、文本/内容确切版本、受众/媒介、动作种类、帮助分维度及允许分支、执行依赖、下一等待和备用/取消。动作重发按action_id去重，重播须核心允许并另列实际交付身份；不新增尝试。
-- `DeliveryFeedback`包含delivery_event_id、delivery_id/action_id、A/Q、output_device_id、媒介和内容修订、started/partial/completed/failed/cancelled/interrupted/unknown、实际时间与delivered_range（已知内容单元或unknown）。按每个delivery递增sequence去重/排序，不能用较早completed覆盖较新interrupted；技术生成完成无已交付范围。停止后到达的报告仅回查真实范围，不再安排播放或转场。
+- `DeliveryFeedback`包含delivery_event_id、delivery_id/action_id、A/Q、output_device_id、媒介和内容修订、started/partial/completed/failed/cancelled/interrupted/unknown、实际时间与delivered_range（已知内容单元或unknown）。按每个delivery递增sequence去重/排序，不能用较早completed覆盖较新interrupted；技术生成完成无已交付范围。停止后到达的报告仅回查真实范围，不再安排播放或转场。动作附带的图片或动画另以媒介image单独回报，delivered_range只能列该动作自己的资源、写实际显示出来的那些（全部completed、部分partial、都没有failed）；它只作为事实记入封存，不推动转场或帮助层级，学生页每个动作只报一次（2026年10月20日P1实现）。
 - `ControlRequest`包含event_id、activity_id、权限/来源、stop/pause/resume及明确识别依据。直接按钮与可靠明确语音控制无需教学模型；UI先停本端，再同步核心，分别回报local_cancelled/core_acknowledged/unknown。stop即刻结束教学并提高取消代次；pause仍为内存活动，不能偷偷封存；resume由核心检查原状态与实际能力，结束后不可恢复。
 - 收到确认经`SubmittedInput`关联必要动作/等待；理解依据任务尝试。播放完成不制造确认事件，确认也不制造理解结论。
 

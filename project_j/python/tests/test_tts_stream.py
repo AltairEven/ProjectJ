@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import pytest
 from fastapi.testclient import TestClient
@@ -51,6 +52,7 @@ def test_speech_streams_the_approved_action_text(application):
     content_type = reply.headers["content-type"]
     assert content_type.startswith("audio/L16") and "rate=24000" in content_type
     assert fake.texts == [action.text]
+    assert reply.headers["x-speech-source"] == "live"
 
 
 def test_speech_refuses_unknown_actions(application):
@@ -80,3 +82,61 @@ def test_closing_the_body_closes_the_synthesizer_stream():
         return fake
 
     assert asyncio.run(scenario()).closed
+
+
+PLAYED = {
+    "player": "webaudio",
+    "outcome": "completed",
+    "sample_rate": 48000,
+    "reads": 17,
+    "late": 0,
+    "underruns": 3,
+    "underrun_ms": 12.5,
+    "latency_ms": 28.0,
+}
+
+
+def playback(application, *bodies, token=None):
+    with TestClient(create_app(Settings(), application)) as client:
+        core = asyncio.run(start(application))
+        token = token or application.start_requests["start1"]["result"]["student_token"]
+        action = core.actions[core.pending]
+        codes = [
+            client.post(
+                "/api/student/playback",
+                json={"action_id": action.action_id} | body,
+                headers={"Authorization": f"Bearer {token}"},
+            ).status_code
+            for body in bodies
+        ]
+    return codes, action
+
+
+def test_playback_report_is_logged_as_metadata_only(application, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    codes, action = playback(application, PLAYED)
+    assert codes == [204]
+    assert (
+        f"playback action={action.action_id} player=webaudio outcome=completed rate=48000 "
+        "reads=17 late=0 "
+        "underruns=3 underrun_ms=12.5 latency_ms=28.0"
+    ) in caplog.text
+    assert action.text not in caplog.text
+
+
+def test_playback_report_without_browser_stats(application, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    unknown = {"underruns": None, "underrun_ms": None, "latency_ms": None}
+    whole = PLAYED | {"player": "element"} | unknown
+    assert playback(application, whole)[0] == [204]
+    assert "player=element" in caplog.text
+    assert "underruns=None underrun_ms=None latency_ms=None" in caplog.text
+
+
+def test_playback_report_needs_a_known_action(application):
+    codes, _ = playback(application, PLAYED | {"action_id": "not-approved"}, PLAYED | {"reads": -1})
+    assert codes == [404, 422]
+
+
+def test_playback_report_needs_the_student_token(application):
+    assert playback(application, PLAYED, token="wrong")[0] == [403]

@@ -18,7 +18,7 @@ from openai_codex.models import Notification
 
 from project_j.classroom.judgment import ClassroomJudgment
 from project_j.platform.models.codex_sdk import BASE_INSTRUCTIONS, CodexAdapter, codex_config
-from project_j.platform.models.contracts import Binding, ModelRequest
+from project_j.platform.models.contracts import Binding, ImageNote, ModelRequest
 
 BINDING = Binding(adapter="codex", model="gpt-6.1-sol", effort="low")
 REQUEST = ModelRequest(
@@ -152,7 +152,7 @@ class FakeCodex:
 
 
 def adapter(fake, tmp_path):
-    return CodexAdapter(tmp_path / "codex-home", factory=lambda workdir: fake)
+    return CodexAdapter(tmp_path / "codex-home", factory=lambda workdir, image: fake)
 
 
 def test_each_call_is_an_isolated_read_only_ephemeral_thread(tmp_path):
@@ -220,8 +220,16 @@ def test_runtime_uses_its_own_codex_home(tmp_path):
         "features.apps=false",
         "features.plugins=false",
         "features.skills=false",
+        # Text requests run without code mode: a tool called from code would not show as a
+        # turn item, so the tool check could not see it.
+        "features.code_mode_host=false",
     }
-    assert CodexAdapter.version == "2"  # behavior changed: old init records must be re-probed
+    # Pictures come only through code mode; that runtime is used for nothing else.
+    drawing = codex_config(tmp_path / "codex-home", tmp_path / "work", image=True)
+    assert set(drawing.config_overrides) == set(config.config_overrides) - {
+        "features.code_mode_host=false"
+    }
+    assert CodexAdapter.version == "3"  # behavior changed: old init records must be re-probed
     # The runtime runs in a temporary directory, so a relative home would point elsewhere.
     assert CodexAdapter(Path("project_j/private/models/codex-home")).home.is_absolute()
 
@@ -304,6 +312,61 @@ def test_probe_flags_a_model_missing_from_the_subscription(tmp_path):
     fake = FakeCodex(models=("gpt-other",))
     report = asyncio.run(adapter(fake, tmp_path).probe("gpt-6.1-sol", ("low",)))
     assert report.items["model"].status == "failed"
+
+
+def test_pictures_use_a_separate_runtime(tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    text, drawing, launched = FakeCodex(), FakeCodex(), []
+    draw = ModelRequest("preparation", "draw", {"content": "a bridge"}, ImageNote, media="image")
+
+    def factory(workdir, image):
+        launched.append(image)
+        return drawing if image else text
+
+    instance = CodexAdapter(tmp_path / "codex-home", factory=factory)
+
+    async def scenario():
+        await instance.invoke(REQUEST, BINDING)
+        await instance.invoke(REQUEST, BINDING)
+        await instance.invoke(draw, BINDING)
+        await instance.aclose()
+
+    asyncio.run(scenario())
+    assert launched == [False, True]  # Each launched once, the picture one only when needed.
+    assert len(text.starts) == 2 and len(drawing.starts) == 1
+    assert text.closed and drawing.closed
+    assert "codex runtime launched kind=text" in caplog.text
+    assert "codex runtime launched kind=image" in caplog.text
+
+
+def test_prewarm_starts_the_text_runtime_before_any_request(tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    fake, launched = FakeCodex(), []
+
+    def factory(workdir, image):
+        launched.append(image)
+        return fake
+
+    instance = CodexAdapter(tmp_path / "codex-home", factory=factory)
+
+    async def scenario():
+        await instance.prewarm()
+        await instance.invoke(REQUEST, BINDING)
+        await instance.aclose()
+
+    asyncio.run(scenario())
+    assert launched == [False] and len(fake.starts) == 1  # The request reused it.
+    assert "codex runtime warmed result=ok ms=" in caplog.text
+
+
+def test_prewarm_survives_a_runtime_that_cannot_start(tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+
+    def factory(workdir, image):
+        raise OSError("no binary")
+
+    asyncio.run(CodexAdapter(tmp_path / "codex-home", factory=factory).prewarm())
+    assert "codex runtime warmed result=unavailable ms=" in caplog.text
 
 
 def test_close_stops_runtime_and_removes_workdir(tmp_path):

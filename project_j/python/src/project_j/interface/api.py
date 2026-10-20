@@ -8,7 +8,7 @@ import json
 import logging
 import time
 import traceback
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import aclosing, asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Literal
@@ -169,6 +169,22 @@ class StudentControl(Contract):
     command: Literal["stop", "pause", "return", "repeat"]
 
 
+class PlaybackReport(Contract):
+    """How the page played one sentence; diagnosis only, nothing of what was said."""
+
+    action_id: str
+    # webaudio streams live speech; element plays a whole recording as one file.
+    player: Literal["webaudio", "element"]
+    outcome: Literal["completed", "failed", "interrupted"]
+    sample_rate: int = Field(gt=0)
+    reads: int = Field(ge=0)  # Network reads, one audio buffer each.
+    late: int = Field(ge=0)  # Buffers that arrived after the previous one had ended.
+    # From the browser's playback statistics, when it has them.
+    underruns: int | None = Field(default=None, ge=0)
+    underrun_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    latency_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+
 class Snapshot(Contract):
     activity_id: str
     learner_id: str
@@ -313,7 +329,12 @@ async def speech_body(stream: AsyncIterator[bytes], first: bytes) -> AsyncIterat
             yield chunk
 
 
-def create_app(settings: Settings | None = None, coordinator: Coordinator | None = None):
+def create_app(
+    settings: Settings | None = None,
+    coordinator: Coordinator | None = None,
+    announce: Sequence[str] = (),
+):
+    """announce: lines for the person at the terminal, printed once the service has started."""
     settings = settings or Settings()
     static: dict[str, tuple[bytes, str]] = {}
     seal_errors: dict[str, str] = {}
@@ -333,6 +354,9 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
                     await part.start()
                 except (ScorerUnavailable, SynthesizerUnavailable) as error:
                     log.warning("%s", error)
+        for adapter in app.state.coordinator.models.adapters.values():
+            if hasattr(adapter, "prewarm"):
+                await adapter.prewarm()
         dist = settings.project_root / "project_j/web/dist"
         types = {
             ".html": "text/html",
@@ -377,6 +401,8 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
                                 connections.pop(socket, None)
 
         budget_task = asyncio.create_task(watch_budget())
+        for line in announce:
+            print(line, flush=True)
         try:
             yield
         finally:
@@ -786,13 +812,32 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
         controller().late_delivery(request)
         return controller().student_view(core)
 
+    @app.post("/api/student/playback", status_code=204)
+    async def playback(report: PlaybackReport, core: StudentCore):
+        if report.action_id not in core.actions:
+            raise LookupError("unknown approved action")
+        log.info(
+            "playback action=%s player=%s outcome=%s rate=%d reads=%d late=%d underruns=%s "
+            "underrun_ms=%s latency_ms=%s",
+            report.action_id,
+            report.player,
+            report.outcome,
+            report.sample_rate,
+            report.reads,
+            report.late,
+            report.underruns,
+            report.underrun_ms,
+            report.latency_ms,
+        )
+
     @app.get("/api/student/speech/{action_id}")
     async def speech(action_id: str, core: StudentCore):
         action = core.actions.get(action_id)
         if action is None:
             raise LookupError("unknown approved action")
-        synthesizer = controller().synthesizer
-        stream = speak(action.speech or (action.text,), controller().recorded, synthesizer)
+        synthesizer, recorded = controller().synthesizer, controller().recorded
+        parts = action.speech or (action.text,)
+        stream = speak(parts, recorded, synthesizer)
         try:
             first = await anext(stream)
         except (SynthesisFailed, StopAsyncIteration) as error:
@@ -805,6 +850,8 @@ def create_app(settings: Settings | None = None, coordinator: Coordinator | None
         return StreamingResponse(
             speech_body(stream, first),
             media_type=f"audio/L16;rate={synthesizer.sample_rate};channels=1",
+            # All recorded: it arrives at once and the page plays it as one file.
+            headers={"X-Speech-Source": "recorded" if set(parts) <= recorded.keys() else "live"},
         )
 
     @app.get("/api/student/visual/{action_id}/{resource_id}")
@@ -947,26 +994,27 @@ def main(argv: list[str] | None = None):
         parser.error("--adult-check 不能与模拟调试选项同用：" + "、".join(sorted(simulation_only)))
     settings = Settings(**args, realm="adult_check" if adult else "simulation")
     coordinator = build_coordinator(settings)
+    link = f"http://127.0.0.1:{settings.port}/#parent={coordinator.parent_token}"
     if adult:
-        print(
-            f"成人实际检查工作台：http://127.0.0.1:{settings.port}/#parent={coordinator.parent_token}"
-        )
-        print("真实模型、本机发音评分与本机合成；录音只在本机内存交评分，不落盘；儿童入口仍关闭。")
+        announce = [
+            f"成人实际检查工作台：{link}",
+            "真实模型、本机发音评分与本机合成；录音只在本机内存交评分，不落盘；儿童入口仍关闭。",
+        ]
     else:
         simulated = coordinator.models.adapters["simulated"]
         simulated.delay_seconds = settings.model_delay
         simulated.fail_next = settings.fail_once == "model"
         if settings.fail_once != "model":
             coordinator.store.fail_at = settings.fail_once
+        announce = [
+            f"隔离模拟工作台：{link}",
+            "真实API/声音/儿童入口未验证且关闭；不加载.env、不调用麦克风。",
+        ]
         if settings.model_delay or settings.fail_once:
-            print(
+            announce.append(
                 f"调试注入：模型延迟{settings.model_delay}秒；"
                 f"一次失败{settings.fail_once or '无'}。"
             )
-        print(
-            f"隔离模拟工作台：http://127.0.0.1:{settings.port}/#parent={coordinator.parent_token}"
-        )
-        print("真实API/声音/儿童入口未验证且关闭；不加载.env、不调用麦克风。")
     # Diagnostics go to standard error, metadata only; the app itself writes no log file.
     logging.basicConfig(
         level=logging.INFO,
@@ -975,7 +1023,7 @@ def main(argv: list[str] | None = None):
     )
     logging.Formatter.converter = time.gmtime  # UTC, the clock of the sealed facts.
     uvicorn.run(
-        create_app(settings, coordinator),
+        create_app(settings, coordinator, announce),
         host=settings.host,
         port=settings.port,
         access_log=False,

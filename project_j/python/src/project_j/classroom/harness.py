@@ -97,7 +97,8 @@ class DeliveryFeedback(Contract):
     task_instance_id: str
     sequence: int = Field(ge=1, strict=True)
     output_device_id: str
-    modality: Literal["text", "simulated_audio", "audio"]
+    # image: which of the action's pictures or animations actually displayed (resource ids).
+    modality: Literal["text", "simulated_audio", "audio", "image"]
     status: Literal[
         "started", "partial", "completed", "failed", "cancelled", "interrupted", "unknown"
     ]
@@ -149,6 +150,8 @@ class Harness:
         # The last action the student fully saw, so a reopened page can show it again.
         self.presented: str | None = None
         self.help_by_task: dict[str, dict] = {}
+        # Pictures and animations the page reported as displayed, by task instance.
+        self.seen: dict[str, dict[str, str]] = {}
         self.help_count: dict[str, int] = {}
         self.jobs: set[asyncio.Task] = set()
         self.paused_from: str | None = None
@@ -285,12 +288,21 @@ class Harness:
         action = self.actions.get(feedback.action_id)
         if action is None or action.task_instance_id != feedback.task_instance_id:
             raise ValueError("delivery must refer to an approved action and its task")
+        if feedback.modality == "image" and not set(feedback.delivered_range) <= set(
+            action.visuals
+        ):
+            raise ValueError("a picture report may name only the action's own visuals")
         previous = self.delivery_sequences.get(feedback.delivery_id, 0)
         if feedback.sequence <= previous:
             raise Conflict("out-of-order delivery feedback")
         self.delivery_sequences[feedback.delivery_id] = feedback.sequence
         self.delivery_events[feedback.delivery_event_id] = fingerprint
         self.record("delivery", feedback.model_dump(mode="json"))
+        if feedback.modality == "image":  # A fact for evaluation; the speech or text moves on.
+            stages = {item.resource_id: item.stage for item in self.visible}
+            seen = self.seen.setdefault(action.task_instance_id, {})
+            seen.update({resource: stages[resource] for resource in feedback.delivered_range})
+            return self.snapshot()
         if feedback.delivered_range and feedback.status in {
             "started",
             "partial",
@@ -593,6 +605,10 @@ class Harness:
                     "purpose": task.purpose,
                     "inputs": [],
                     "help": dict(self.help_by_task.get(self.task_instance_id, {})),
+                    "visuals": [
+                        {"resource_id": resource, "stage": stage}
+                        for resource, stage in self.seen.get(self.task_instance_id, {}).items()
+                    ],
                     "external_help": "unknown",
                     "judgment": "unclear",
                     "limitations": [LIMITATIONS[self.realm][submitted.modality == "audio"]],

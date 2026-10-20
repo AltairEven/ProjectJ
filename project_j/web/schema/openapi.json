@@ -1676,6 +1676,55 @@
         }
       }
     },
+    "/api/student/playback": {
+      "post": {
+        "summary": "Playback",
+        "operationId": "playback_api_student_playback_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaybackReport"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/student/speech/{action_id}": {
       "get": {
         "summary": "Speech",
@@ -2584,7 +2633,8 @@
             "enum": [
               "text",
               "simulated_audio",
-              "audio"
+              "audio",
+              "image"
             ],
             "title": "Modality"
           },
@@ -3056,6 +3106,94 @@
           "request_id"
         ],
         "title": "ParentRequest"
+      },
+      "PlaybackReport": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "player": {
+            "type": "string",
+            "enum": [
+              "webaudio",
+              "element"
+            ],
+            "title": "Player"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "failed",
+              "interrupted"
+            ],
+            "title": "Outcome"
+          },
+          "sample_rate": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Sample Rate"
+          },
+          "reads": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Reads"
+          },
+          "late": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Late"
+          },
+          "underruns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underruns"
+          },
+          "underrun_ms": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underrun Ms"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action_id",
+          "player",
+          "outcome",
+          "sample_rate",
+          "reads",
+          "late"
+        ],
+        "title": "PlaybackReport",
+        "description": "How the page played one sentence; diagnosis only, nothing of what was said."
       },
       "PreparationResult": {
         "properties": {

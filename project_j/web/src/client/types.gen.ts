@@ -392,7 +392,7 @@ export type DeliveryFeedback = {
     /**
      * Modality
      */
-    modality: 'text' | 'simulated_audio' | 'audio';
+    modality: 'text' | 'simulated_audio' | 'audio' | 'image';
     /**
      * Status
      */
@@ -660,6 +660,50 @@ export type ParentRequest = {
      * Source Type
      */
     source_type?: 'simulated';
+};
+
+/**
+ * PlaybackReport
+ *
+ * How the page played one sentence; diagnosis only, nothing of what was said.
+ */
+export type PlaybackReport = {
+    /**
+     * Action Id
+     */
+    action_id: string;
+    /**
+     * Player
+     */
+    player: 'webaudio' | 'element';
+    /**
+     * Outcome
+     */
+    outcome: 'completed' | 'failed' | 'interrupted';
+    /**
+     * Sample Rate
+     */
+    sample_rate: number;
+    /**
+     * Reads
+     */
+    reads: number;
+    /**
+     * Late
+     */
+    late: number;
+    /**
+     * Underruns
+     */
+    underruns?: number | null;
+    /**
+     * Underrun Ms
+     */
+    underrun_ms?: number | null;
+    /**
+     * Latency Ms
+     */
+    latency_ms?: number | null;
 };
 
 /**
@@ -2034,6 +2078,37 @@ export type DeliveryApiStudentDeliveryPostResponses = {
 };
 
 export type DeliveryApiStudentDeliveryPostResponse = DeliveryApiStudentDeliveryPostResponses[keyof DeliveryApiStudentDeliveryPostResponses];
+
+export type PlaybackApiStudentPlaybackPostData = {
+    body: PlaybackReport;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/student/playback';
+};
+
+export type PlaybackApiStudentPlaybackPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PlaybackApiStudentPlaybackPostError = PlaybackApiStudentPlaybackPostErrors[keyof PlaybackApiStudentPlaybackPostErrors];
+
+export type PlaybackApiStudentPlaybackPostResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type PlaybackApiStudentPlaybackPostResponse = PlaybackApiStudentPlaybackPostResponses[keyof PlaybackApiStudentPlaybackPostResponses];
 
 export type SpeechApiStudentSpeechActionIdGetData = {
     body?: never;
