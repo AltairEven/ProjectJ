@@ -34,12 +34,13 @@ def speech(application, synthesizer, action_id=None, token=None):
     # Storage is closed during a class, so the app initializes first and the class starts after.
     with TestClient(create_app(Settings(), application)) as client:
         core = asyncio.run(start(application))
-        # The required demonstrations were synthesized before class; this one serves the class.
+        # Resources were synthesized before class; this one serves the class live.
         application.synthesizer = synthesizer
-        token = token or application.start_requests["start1"]["result"]["student_token"]
+        application.recorded = {}
+        token = token or application.token
         action = core.actions[core.pending]
         reply = client.get(
-            f"/api/student/speech/{action_id or action.action_id}",
+            f"/api/class/speech/{action_id or action.action_id}",
             headers={"Authorization": f"Bearer {token}"},
         )
     return reply, action
@@ -99,11 +100,11 @@ PLAYED = {
 def playback(application, *bodies, token=None):
     with TestClient(create_app(Settings(), application)) as client:
         core = asyncio.run(start(application))
-        token = token or application.start_requests["start1"]["result"]["student_token"]
+        token = token or application.token
         action = core.actions[core.pending]
         codes = [
             client.post(
-                "/api/student/playback",
+                "/api/class/playback",
                 json={"action_id": action.action_id} | body,
                 headers={"Authorization": f"Bearer {token}"},
             ).status_code

@@ -14,7 +14,7 @@ export function acknowledgePause(current: Cancellation | undefined, eventId: str
 
 export function presentationCancelled(current: Cancellation | undefined, snapshot?: View): boolean {
   if (!current) return false
-  // Only a running revision after this request's paused acknowledgement proves parent resume.
+  // Only a running revision after this request's paused acknowledgement proves a resume.
   return current.command === 'stop' || current.pausedRevision === undefined || !snapshot ||
     snapshot.core_revision <= current.pausedRevision || snapshot.mode === 'paused' || snapshot.mode === 'ended'
 }

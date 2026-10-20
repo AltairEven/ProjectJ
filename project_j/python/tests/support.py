@@ -10,17 +10,16 @@ LEARNER = "fictional-L1"
 CONDITIONS = {
     "materials": "reported_available",
     "time": "reported_30_minutes",
-    "accompaniment": "reported_present",
     "raw_report": "明确模拟：纸、书、小车、30分钟及陪伴均可用。",
     "explicit_start": True,
 }
 
 
 async def start(app, request_id="start1"):
-    prepared = await app.prepare("prepare1", LEARNER)
+    prepared = await app.prepare("prepare1", app.learner_id)
     await ready(app, prepared)
     result = app.start(
-        request_id, LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS
+        request_id, app.learner_id, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS
     )
     assert result["decision"] == f"allow_{app.store.realm}"
     return app.core
@@ -108,7 +107,9 @@ async def complete_story(app, helped=False, offscreen_report=True):
 async def teach(app, request_id, course_ref, answers):
     """Teach one prepared course with first-try answers and an offscreen report; seal the fact."""
     await ready(app, {"course_ref": course_ref})
-    result = app.start(request_id, LEARNER, RevisionRef.model_validate(course_ref), CONDITIONS)
+    result = app.start(
+        request_id, app.learner_id, RevisionRef.model_validate(course_ref), CONDITIONS
+    )
     assert result["decision"] == "allow_simulation"
     core = app.core
     deliver_all(core)
@@ -131,22 +132,83 @@ def judgments(app):
 
 
 async def ready(app, prepared):
-    """The parent confirms the prepared course version, then generates and adopts the
-    first version of every required resource; starting needs both."""
+    """The course version is confirmed and its required resources made and adopted; starting
+    needs both. Only required ones, to keep the suite fast: confirm-and-start makes all of
+    them and test_confirm_and_start covers that."""
     course_ref = prepared["course_ref"]
     if isinstance(course_ref, dict):
         course_ref = RevisionRef.model_validate(course_ref)
     key = f"{course_ref.object_id}:{course_ref.revision}"
-    result = app.confirm(f"confirm:{key}", LEARNER, course_ref)
-    preview = app.store.read(RevisionRef.model_validate(result["preview_ref"]), LEARNER)
+    learner = app.learner_id
+    result = app.confirm(f"confirm:{key}", learner, course_ref)
+    preview = app.store.read(RevisionRef.model_validate(result["preview_ref"]), learner)
     for item in preview.body["resources"]:
         if item["required"]:
             name = item["resource_id"]
-            made = await generate_resource(app, f"generate:{key}:{name}", LEARNER, course_ref, name)
-            adopt_resource(app, f"adopt:{key}:{name}", LEARNER, course_ref, name, made["version"])
+            made = await generate_resource(app, f"generate:{key}:{name}", learner, course_ref, name)
+            adopt_resource(app, f"adopt:{key}:{name}", learner, course_ref, name, made["version"])
     return result
 
 
 def confirmed(app, prepared):
     """ready() for synchronous tests."""
     return asyncio.run(ready(app, prepared))
+
+
+async def wait_jobs(app):
+    """Until no background job runs; a finishing job may start the next one."""
+    while app.jobs:
+        await asyncio.gather(*app.jobs.values(), return_exceptions=True)
+
+
+def prepare_course(app, request_id="prepare1"):
+    """A prepared course now comes from the background job; tests prepare directly."""
+    return asyncio.run(app.prepare(request_id, app.learner_id))
+
+
+async def next_course(app, request_id, learner_id, activity_id):
+    """What the background jobs do after a lesson, with the student's decisions in between:
+    evaluate, acknowledge, adopt and plan, accept a changed goal, prepare (ADR-0018)."""
+    from project_j.preparation.drafting import PreparationUnavailable
+
+    evaluation = await app.evaluate(
+        f"{request_id}:evaluate", learner_id, activity_id, "after_class"
+    )
+    app.acknowledge(f"{request_id}:ack", learner_id, activity_id, evaluation.ref)
+    adopted = await app.adopt(f"{request_id}:adopt", learner_id, evaluation)
+    demand = app.current(learner_id, "demand")
+    if demand.body.get("goal_confirmation") == "needed":  # The student accepts the new goal.
+        await app.decide_goal(f"{request_id}:goal", learner_id, demand.ref, "accept")
+    try:
+        package = await app.prepare(f"{request_id}:prepare", learner_id)
+    except PreparationUnavailable as gap:
+        package = {"status": "not_ready", "reason": str(gap)}
+    return {
+        "evaluation_ref": evaluation.ref.model_dump(),
+        "adoption": adopted,
+        "next_package": package,
+    }
+
+
+def onboarding_app(tmp_path):
+    """A simulation space that starts at onboarding, as a study space does."""
+    from conftest import ROOT
+
+    from project_j.application.coordinator import Coordinator
+    from project_j.platform.storage import SimulationStore
+
+    store = SimulationStore(tmp_path / "simulation", "run1")
+    verification = {"result": "pass", "method": "explicit_test_fixture", "scope": "simulation_only"}
+    return Coordinator(store, ROOT, verification=verification, onboarding=True)
+
+
+def settle(app):
+    """In TestClient tests: wait for the service thread's seal and background jobs, so the
+    test thread does not write the database at the same time."""
+    import time
+
+    for _ in range(500):
+        if not app.jobs and not app.pending_seals:
+            return
+        time.sleep(0.01)
+    raise AssertionError("background work did not settle")

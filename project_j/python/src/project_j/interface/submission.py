@@ -12,7 +12,7 @@ class InputAdapter:
         self.sequence = 0
 
     def provider(self, simulated: str) -> str:
-        return "adult_tester" if self.core.realm == "adult_check" else simulated
+        return "student" if self.core.realm == "study" else simulated
 
     def binding(self):
         state = self.core.snapshot()

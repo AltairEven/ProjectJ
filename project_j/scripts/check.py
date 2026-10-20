@@ -90,8 +90,8 @@ def main() -> int:
         json.dumps(evidence, ensure_ascii=False, indent=2) + "\n"
     )
     print(
-        "Simulation checks passed. Actual API/voice, adult durations, "
-        "child qualification and teaching effect: unverified."
+        "Simulation checks passed. Actual API/voice, real study use "
+        "and teaching effect: unverified."
     )
     return 0
 

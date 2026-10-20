@@ -39,8 +39,8 @@ def test_explicit_temporary_paths_reject_traversal_and_symlink_escape(tmp_path):
         check_path(tmp_path, "../family.sqlite3", "simulation")
     (tmp_path / "escape").symlink_to(tmp_path.parent, target_is_directory=True)
     with pytest.raises(ValueError, match="escapes"):
-        check_path(tmp_path, "escape/file", "adult_check")
-    with pytest.raises(ValueError, match="family"):
+        check_path(tmp_path, "escape/file", "study")
+    with pytest.raises(ValueError, match="unknown data space"):
         check_path(tmp_path, "family.sqlite3", "family")
 
 

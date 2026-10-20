@@ -3,13 +3,15 @@ import logging
 
 import pytest
 from fastapi.testclient import TestClient
-from support import CONDITIONS, LEARNER
+from support import CONDITIONS, LEARNER, next_course, wait_jobs
 from test_learning_planning import model_changes_goals, taught
 
 from project_j.application.configuration import Settings
+from project_j.application.progress import advance, next_step, retry
 from project_j.contracts import RevisionRef
 from project_j.interface.api import create_app
 from project_j.platform.storage import Conflict
+from project_j.preparation.drafting import PreparationUnavailable
 
 READING, REPORT = "english.reading.facts", "english.speaking.report"
 SCIENCE = "science.observation.report"
@@ -153,7 +155,7 @@ def test_new_story_is_saved_as_model_material(application, monkeypatch, caplog):
     model_changes_goals(application, monkeypatch)
     model_prepares(application, monkeypatch, science_draft)
     caplog.set_level(logging.INFO, logger="project_j")
-    result = asyncio.run(application.next_course("next1", LEARNER, activity))
+    result = asyncio.run(next_course(application, "next1", LEARNER, activity))
     package = result["next_package"]
     assert package["preparation"] == "drafted"
     course = application.store.read(ref(package["course_ref"]), LEARNER)
@@ -168,8 +170,6 @@ def test_new_story_is_saved_as_model_material(application, monkeypatch, caplog):
     assert preview.body["discussion"] == [] and preview.body["confirmation"] is None
     check = application.store.read(ref(package["check_ref"]), LEARNER)
     assert check.body["status"] == "checked"
-    report = application.store.read(ref(result["report_ref"]), LEARNER)
-    assert report.body["course"] == "drafted"
     assert "preparation drafted stage=prepare attempt=1 material=model tasks=3" in caplog.text
     assert "Sam" not in caplog.text  # No story or question text in the logs.
 
@@ -181,7 +181,7 @@ def test_one_repair_round_fixes_a_rejected_draft(application, monkeypatch, caplo
     model_prepares(application, monkeypatch, bad, science_draft)
     caplog.set_level(logging.INFO, logger="project_j")
     before = calls(application)
-    result = asyncio.run(application.next_course("next1", LEARNER, activity))
+    result = asyncio.run(next_course(application, "next1", LEARNER, activity))
     assert result["next_package"]["preparation"] == "drafted"
     assert calls(application) - before == 2
     assert "preparation refused stage=prepare attempt=1 checks=evidence" in caplog.text
@@ -192,35 +192,31 @@ def test_rejected_twice_saves_nothing_and_reports_not_ready(application, monkeyp
     model_changes_goals(application, monkeypatch)
     model_prepares(application, monkeypatch, lambda c: science_draft(c, evidence="Not there."))
     before = counts(application)
-    result = asyncio.run(application.next_course("next1", LEARNER, activity))
+    result = asyncio.run(next_course(application, "next1", LEARNER, activity))
     package = result["next_package"]
     assert package["status"] == "not_ready"
     assert package["reason"].startswith("课程未取得（规则核对未通过：cup-fact的依据不在故事原文中")
     assert counts(application) == before
-    with TestClient(create_app(Settings(), application)) as client:
-        parent = {"Authorization": f"Bearer {application.parent_token}"}
-        refused = client.post(
-            "/api/parent/prepare", headers=parent, json={"request_id": "p2", "learner_id": LEARNER}
-        )
-    assert refused.status_code == 503
-    assert refused.json()["message"].startswith("课程未取得（规则核对未通过")
+    with pytest.raises(PreparationUnavailable, match="^课程未取得（规则核对未通过"):
+        asyncio.run(application.prepare("p2", LEARNER))
 
 
 def test_preparation_failure_keeps_demand_and_retries(application, caplog):
     demand = application.current(LEARNER, "demand")
     application.models.adapters["simulated"].fail_next = True
     caplog.set_level(logging.INFO, logger="project_j")
-    with TestClient(create_app(Settings(), application)) as client:
-        parent = {"Authorization": f"Bearer {application.parent_token}"}
-        body = {"request_id": "p1", "learner_id": LEARNER}
-        failed = client.post("/api/parent/prepare", headers=parent, json=body)
-        assert failed.status_code == 503
-        assert failed.json() == {
-            "message": "课程未取得（模型暂不可用）。下节需求已保存，可以重试。",
-            "preparation": "failed",
-        }
+
+    async def scenario():
+        name = advance(application, LEARNER)
+        await wait_jobs(application)
+        reason = application.job_failures[name]
+        assert reason == "课程未取得（模型暂不可用）。下节需求已保存，可以重试。"
         assert application.current(LEARNER, "demand").ref == demand.ref
-        assert client.post("/api/parent/prepare", headers=parent, json=body).status_code == 200
+        retry(application, LEARNER, name)
+        await wait_jobs(application)
+        assert next_step(application, LEARNER)["kind"] == "course"
+
+    asyncio.run(scenario())
     assert "preparation failure stage=prepare failure=unavailable" in caplog.text
 
 
@@ -250,7 +246,7 @@ def science_lesson(application, monkeypatch, *drafts):
     activity = taught(application)
     model_changes_goals(application, monkeypatch)
     model_prepares(application, monkeypatch, *(drafts or (revised,)))
-    result = asyncio.run(application.next_course("next1", LEARNER, activity))
+    result = asyncio.run(next_course(application, "next1", LEARNER, activity))
     return ref(result["next_package"]["course_ref"])
 
 
@@ -261,29 +257,19 @@ def start(application, course_ref, request_id="start2"):
 def test_new_goals_are_prepared_confirmed_and_started(application, monkeypatch, caplog):
     course_ref = science_lesson(application, monkeypatch)
     caplog.set_level(logging.INFO, logger="project_j")
-    with TestClient(create_app(Settings(), application)) as client:
-        parent = {"Authorization": f"Bearer {application.parent_token}"}
-        body = {
-            "request_id": "s2",
-            "learner_id": LEARNER,
-            "course_ref": course_ref.model_dump(),
-            "conditions": CONDITIONS,
-        }
-        refused = client.post("/api/parent/start", headers=parent, json=body)
-        assert refused.status_code == 409 and refused.json()["message"].startswith("课程未确认")
-        confirmed = client.post(
-            "/api/parent/confirm",
-            headers=parent,
-            json={"request_id": "c1", "learner_id": LEARNER, "course_ref": course_ref.model_dump()},
-        )
-        assert confirmed.status_code == 200
-        assert confirmed.json()["resources"] == "awaiting_generation"
-        started = client.post("/api/parent/start", headers=parent, json=body | {"request_id": "s3"})
-        assert started.status_code == 200 and started.json()["decision"] == "allow_simulation"
+    with pytest.raises(Conflict, match="^课程未确认"):
+        start(application, course_ref, "s2")
+    started = asyncio.run(application.confirm_and_start("s3", LEARNER, course_ref, True))
+    assert started["decision"] == "allow_simulation"
     assert any("Sam has a red cup." in text for text in application.material_cache.values())
-    preview = application.store.read(ref(confirmed.json()["preview_ref"]), LEARNER)
+    application.core.control("stop-s3", "stop")
+    application.seal()
+    preview = next(
+        doc
+        for doc in application.store.list_current(LEARNER, "preview")
+        if doc.body["course_ref"] == course_ref.model_dump()
+    )
     assert preview.body["confirmation"]["course_ref"] == course_ref.model_dump()
-    assert preview.body["resources"][0]["state"] == "awaiting_generation"
     assert "start refused reason=unconfirmed" in caplog.text
     assert f"preparation confirmed course={course_ref.object_id} revision=1" in caplog.text
 
@@ -337,9 +323,9 @@ def test_failed_discussion_keeps_the_version(application, monkeypatch):
     application.confirm("c1", LEARNER, course_ref)
     application.models.adapters["simulated"].fail_next = True
     with TestClient(create_app(Settings(), application)) as client:
-        parent = {"Authorization": f"Bearer {application.parent_token}"}
+        parent = {"Authorization": f"Bearer {application.token}"}
         failed = client.post(
-            "/api/parent/discuss",
+            "/api/course/discuss",
             headers=parent,
             json={
                 "request_id": "d1",

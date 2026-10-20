@@ -228,7 +228,7 @@ def test_run_reference_counts_failures(monkeypatch):
     assert report["summary"]["all_passed"] is False
     failures = {r["failure"] for r in report["results"] if not r["passed"]}
     assert failures == {"timeout", "invalid_output"}
-    assert report["source_type"] == "adult" and report["qualification"] == "not_granted"
+    assert report["source_type"] == "technical" and report["qualification"] == "not_granted"
 
 
 def copy_courses(root):
@@ -236,7 +236,7 @@ def copy_courses(root):
 
 
 def report_path(root, run_id="ref1"):
-    return root / "project_j/private/adult_checks" / run_id / "judgment-reference.json"
+    return root / "project_j/private/study" / run_id / "judgment-reference.json"
 
 
 def test_cli_refuses_unready_models(tmp_path):

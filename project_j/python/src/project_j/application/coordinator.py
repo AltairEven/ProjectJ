@@ -4,6 +4,7 @@ import asyncio
 import logging
 import re
 import time
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from secrets import token_urlsafe
@@ -13,6 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from project_j.application.acceptance import simulation_evidence
 from project_j.application.documents import document, identity
 from project_j.application.ledger import Ledger, Request, Step
+from project_j.application.progress import advance, jobs, next_step
 from project_j.classroom.harness import Harness
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.content import check_content
@@ -28,7 +30,9 @@ from project_j.evaluation.assessment import (
 )
 from project_j.interface.submission import InputAdapter
 from project_j.learning.adoption import adopt_state, review_due
+from project_j.learning.catalog import Capability, define
 from project_j.learning.contracts import DemandBody, Goal, LearningState, PlanBody
+from project_j.learning.maintenance import LEVELS
 from project_j.learning.planning import (
     PlanningUnavailable,
     apply_demand_draft,
@@ -66,7 +70,7 @@ from project_j.preparation.packages import (
     next_material,
     template_draft,
 )
-from project_j.preparation.resources import GENERATED, adopted
+from project_j.preparation.resources import GENERATED, adopted, ready_resources
 from project_j.teacher.methods import JANE
 
 PRIMARY_GOAL = Goal(
@@ -123,8 +127,14 @@ class Coordinator:
         models: ModelService | None = None,
         scorer: PronunciationScorer | None = None,
         synthesizer: Synthesizer | None = None,
+        onboarding: bool | None = None,
     ):
         self.store, self.root = store, project_root
+        # A study space starts at onboarding; a simulation may (ADR-0018). Tests of a study
+        # space may pass False to use the fixture learner instead.
+        self.onboarding = store.realm == "study" if onboarding is None else onboarding
+        # One learner per data space.
+        self.learner_id = "learner" if store.realm == "study" else "fictional-L1"
         self.files, self.ledger = PrivateFiles(store), Ledger(store)
         self.models = models or ModelService.simulated()
         self.scorer = scorer or SimulatedScorer()
@@ -134,13 +144,16 @@ class Coordinator:
         )
         self.core: Harness | None = None
         self.adapter: InputAdapter | None = None
-        self.student_tokens: dict[str, str] = {}
-        self.parent_token = token_urlsafe(32)
+        self.token = token_urlsafe(32)  # The one operator's capability, management and class.
         self.start_requests: dict[str, dict] = {}
         self.material_cache: dict[str, str] = {}
         self.recorded: dict[str, bytes] = {}  # Adopted speech of the class, by exact text.
         self.visuals: dict[str, tuple[bytes, str]] = {}  # Adopted student visuals, by id.
         self.evaluation_jobs: dict[tuple, asyncio.Task] = {}
+        # Background AI work by name (application/progress.py); failures wait for a retry.
+        self.jobs: dict[str, asyncio.Task] = {}
+        self.job_failures: dict[str, str] = {}
+        self.job_progress: dict[str, str] = {}
         self.evaluation_calls: list[dict] = []
         self.pending_seals: dict[str, Document] = {}
 
@@ -310,9 +323,10 @@ class Coordinator:
             raise LookupError(f"missing effective {label}")
         return current
 
-    def initialize(self, learner_id="fictional-L1"):
+    def initialize(self, learner_id: str | None = None):
+        learner_id = learner_id or self.learner_id
         from project_j.learning.catalog import INITIAL, define
-        from project_j.learning.contracts import DimensionState, HouseholdBody, StateBody
+        from project_j.learning.contracts import DimensionState, ProfileBody, StateBody
 
         operation = self.request(
             f"initialize:{learner_id}", learner_id, "initialize", {"fixture_version": 1}
@@ -341,11 +355,21 @@ class Coordinator:
                         help="unknown",
                         material_condition="尚未观察",
                         observed_at=None,
-                        limitations=("明确模拟初始条件，没有真实儿童学习样本。",),
+                        limitations=("初始未知状态，尚无学习样本。",),
                     )
                     for goal in (
                         primary,
                         auxiliary,
+                        *(
+                            (
+                                Goal(
+                                    dimension_id="english.speaking.pronunciation",
+                                    description="英语朗读发音",
+                                ),
+                            )
+                            if self.onboarding
+                            else ()
+                        ),
                         Goal(
                             dimension_id="science.observation.report",
                             description="实际科学条件与结果报告",
@@ -369,30 +393,6 @@ class Coordinator:
                 publications=(Publication(ref=obj.ref, reason="模拟初始未知状态"),),
             )
         state = state[0]
-        household = self.saved_step(operation, learner_id, "household")
-        if household is None:
-            obj = document(
-                "household",
-                identity(learner_id, "household"),
-                operation,
-                None,
-                HouseholdBody(
-                    status="checked",
-                    raw_report="模拟：有30分钟、纸、书和小车，家长可陪伴。",
-                    provider="模拟家长",
-                    reported_at=datetime.now(UTC),
-                    applies_to=(learner_id,),
-                    limitations=("虚构条件；真实家庭与设备未验证。",),
-                ),
-            )
-            household = self.save_step(
-                operation,
-                learner_id,
-                "household",
-                [obj],
-                publications=(Publication(ref=obj.ref, reason="明确共享范围的模拟条件"),),
-            )
-        household = household[0]
         parent = None
         for level in ("long_term", "annual", "stage", "week"):
             result = self.saved_step(operation, learner_id, f"plan:{level}")
@@ -407,7 +407,7 @@ class Coordinator:
                     verification="首次、帮助后、延迟保持与新材料分别观察，不预填成绩。",
                     exit_conditions="疲惫或停止则结束，不自动加时或产生补课债务。",
                     review_at=None,
-                    limitations=("模拟方向与近期安排；不预排十年每日课程。",),
+                    limitations=("初始方向与近期安排，不预排每日课程。",),
                 )
                 obj = document(
                     "plan",
@@ -425,13 +425,46 @@ class Coordinator:
                     publications=(Publication(ref=obj.ref, reason="模拟计划检查与层次连接"),),
                 )
             parent = result[0]
+        if self.onboarding:  # Profile and first demand come from onboarding.
+            return self.ledger.finish(
+                operation, learner_id, {"realm": self.store.realm, "onboarding": True}
+            )
+        profile = self.saved_step(operation, learner_id, "profile")
+        if profile is None:
+            obj = document(
+                "profile",
+                identity(learner_id, "profile"),
+                operation,
+                learner_id,
+                ProfileBody(
+                    confirmed=True,
+                    lexile="500L",
+                    background="模拟学习者：用于开发与测试。",
+                    interests="故事、动手做小实验",
+                    weekly_time="每周三次，每次30分钟",
+                    focus="阅读找依据与短英语报告",
+                    materials="纸、书和小车",
+                    summarized=True,
+                    limitations=("模拟学习资料，不是学习记录。",)
+                    if self.store.realm == "simulation"
+                    else (),
+                ),
+            )
+            profile = self.save_step(
+                operation,
+                learner_id,
+                "profile",
+                [obj],
+                publications=(Publication(ref=obj.ref, reason="模拟学习资料"),),
+            )
+        profile = profile[0]
         demand = self.saved_step(operation, learner_id, "demand")
         if demand is None:
             body = DemandBody(
                 status="checked",
                 state_ref=state.ref,
                 plan_ref=parent.ref,
-                household_ref=household.ref,
+                profile_ref=profile.ref,
                 primary_goal=primary,
                 auxiliary_goal=auxiliary,
                 budget_minutes=30,
@@ -440,7 +473,7 @@ class Coordinator:
                 help_requirements=("两次求助用不同指导；未知外部帮助不填独立。",),
                 offscreen_requirements="离屏停止采集，返回取得实际条件/结果报告。",
                 fallback="已核实不依赖声音评价的任务可使用文字模拟。",
-                gaps=("真实API、声音与儿童用途未验证。",),
+                gaps=("尚无学习样本，用短观察取样。",),
             )
             obj = document(
                 "demand",
@@ -448,7 +481,7 @@ class Coordinator:
                 operation,
                 learner_id,
                 body,
-                refs=(state.ref, parent.ref, household.ref),
+                refs=(state.ref, parent.ref, profile.ref),
             )
             demand = self.save_step(
                 operation,
@@ -456,7 +489,7 @@ class Coordinator:
                 "demand",
                 [obj],
                 publications=(Publication(ref=obj.ref, reason="模拟需求已复核"),),
-                baselines=(state.ref, parent.ref, household.ref),
+                baselines=(state.ref, parent.ref, profile.ref),
             )
         return self.ledger.finish(
             operation,
@@ -502,23 +535,32 @@ class Coordinator:
             return completed
         self.models.require()
         demand = self.current(learner_id, "demand")
+        if demand.body.get("goal_confirmation") == "needed":
+            raise Conflict("新目标等你确认：确认后才备课。")
         body = DemandBody.model_validate(demand.body)
-        state, plan, household = [
-            self.store.read(ref, learner_id)
-            for ref in (body.state_ref, body.plan_ref, body.household_ref)
-        ]
-        for obj in (state, plan, household):
+        state, plan = [self.store.read(ref, learner_id) for ref in (body.state_ref, body.plan_ref)]
+        for obj in (state, plan):
             if self.store.current(obj.object_id, learner_id).ref != obj.ref:
                 raise Conflict("demand must be rechecked against current effective dependencies")
-        if active_restrictions(self, learner_id, (demand.ref, state.ref, plan.ref, household.ref)):
+        # The student may edit the profile any time; preparation reads its latest version.
+        profile = self.current(learner_id, "profile")
+        if active_restrictions(self, learner_id, (demand.ref, state.ref, plan.ref, profile.ref)):
             raise Conflict("preparation dependencies are restricted; owner recheck required")
+        existing = self.prepared(learner_id, demand)
+        if existing is not None:  # One course per demand revision, whoever asked first.
+            course = self.store.read(RevisionRef.model_validate(existing["course_ref"]), learner_id)
+            if active_restrictions(self, learner_id, (course.ref, *course.dependency_refs)):
+                raise Conflict(
+                    "saved preparation has restricted dependencies; owner recheck required"
+                )
+            return existing
         operation = self.request(
             request_id,
             learner_id,
             "prepare",
             {"demand_ref": demand.ref.model_dump()},
             sources=(demand.ref,),
-            baselines=(demand.ref, state.ref, plan.ref, household.ref),
+            baselines=(demand.ref, state.ref, plan.ref, profile.ref),
         )
         completed = self.ledger.result(operation, learner_id)
         if completed:
@@ -541,15 +583,21 @@ class Coordinator:
             read = self.read_sources(learner_id)
             library = self.library(read)
             goals = (body.primary_goal.dimension_id, body.auxiliary_goal.dimension_id)
+            # The fixed course fits the first goals; a placement lesson gets it only in a
+            # simulation, where it stands in for the model (a real one writes by Lexile).
+            fits = goals == (PRIMARY_GOAL.dimension_id, AUXILIARY_GOAL.dimension_id) or (
+                body.purpose == "placement" and self.store.realm == "simulation"
+            )
+            offscreen = bool(profile.body.get("materials"))  # checked_course rule
             template = (
-                template_draft(body, source, library[source]["story"], familiar)
-                if goals == (PRIMARY_GOAL.dimension_id, AUXILIARY_GOAL.dimension_id)
+                template_draft(body, source, library[source]["story"], familiar, offscreen)
+                if fits
                 else None
             )
             request = preparation_request(
                 body,
                 state.body,
-                household.body,
+                profile.body,
                 [doc.body for doc in self.store.list_current(learner_id, "capability")],
                 jane.body,
                 list(library.values()),
@@ -573,7 +621,7 @@ class Coordinator:
                 "package",
                 objects,
                 publications=publications(objects),
-                baselines=(demand.ref, state.ref, plan.ref, household.ref, jane.ref),
+                baselines=(demand.ref, state.ref, plan.ref, profile.ref, jane.ref),
             )
         course, _, _, checked, preview = package
         return self.ledger.finish(
@@ -588,6 +636,13 @@ class Coordinator:
                 "unverified": ["actual_api", "voice", "child_entry"],
             },
         )
+
+    def prepared(self, learner_id: str, demand: Document) -> dict | None:
+        """The finished preparation result of a course already made for this demand."""
+        for course in self.store.list_current(learner_id, "course"):
+            if course.body["demand_ref"] == demand.ref.model_dump():
+                return self.ledger.result(course.operation_id, learner_id)
+        return None
 
     def current_package(self, learner_id: str, course_ref: RevisionRef):
         """The current course version under the current demand, and its preview."""
@@ -636,17 +691,17 @@ class Coordinator:
         if saved is None:
             course, demand, preview = self.current_package(learner_id, course_ref)
             body = DemandBody.model_validate(demand.body)
-            state, plan, household = [
-                self.store.read(ref, learner_id)
-                for ref in (body.state_ref, body.plan_ref, body.household_ref)
+            state, plan = [
+                self.store.read(ref, learner_id) for ref in (body.state_ref, body.plan_ref)
             ]
+            profile = self.current(learner_id, "profile")
             jane = self.store.read(RevisionRef.model_validate(course.body["jane_ref"]), learner_id)
             read = self.read_sources(learner_id)
             library = self.library(read)
             base = preparation_request(
                 body,
                 state.body,
-                household.body,
+                profile.body,
                 [doc.body for doc in self.store.list_current(learner_id, "capability")],
                 jane.body,
                 list(library.values()),
@@ -768,7 +823,7 @@ class Coordinator:
                     Publication(
                         ref=obj.ref,
                         expected_revision=preview.revision,
-                        reason="家长确认这一课程版本；资源待生成",
+                        reason="学生确认这一课程版本；资源待生成",
                     ),
                 ),
                 baselines=(course.ref, preview.ref),
@@ -824,6 +879,7 @@ class Coordinator:
                     library,
                     read,
                     catalog,
+                    offscreen_allowed=bool(request.context["profile"].get("materials")),
                 )
             except DraftRejected as rejected:
                 codes = ",".join(dict.fromkeys(code for code, _ in rejected.problems))
@@ -994,13 +1050,13 @@ class Coordinator:
             raise SynthesizerNotReady(
                 "语音合成未就绪：" + "；".join(reasons) + "。请运行 project-j-tts-init probe。"
             )
-        required = {
-            "materials": "reported_available",
-            "time": "reported_30_minutes",
-            "accompaniment": "reported_present",
-        }
+        # Materials are asked for only when the course uses them; nobody is asked to accompany.
+        offscreen = any(task.purpose == "offscreen" for task in data.tasks)
+        required = {"time": "reported_30_minutes"} | (
+            {"materials": "reported_available"} if offscreen else {}
+        )
         if any(conditions.get(name) == "unavailable" for name in required):
-            return {"decision": "blocked", "reason": "required household condition failed"}
+            return {"decision": "blocked", "reason": "required condition failed"}
         missing = [name for name, expected in required.items() if conditions.get(name) != expected]
         if conditions.get("explicit_start") is not True:
             missing.append("explicit_start")
@@ -1011,14 +1067,8 @@ class Coordinator:
         demand = self.current(learner_id, "demand")
         if demand.ref != data.demand_ref:
             raise Conflict("course uses an old demand")
-        demand_body = DemandBody.model_validate(demand.body)
-        baseline_refs = (
-            demand.ref,
-            data.state_ref,
-            data.plan_ref,
-            demand_body.household_ref,
-            data.jane_ref,
-        )
+        # A profile edit after preparation does not void the course (it shapes the next one).
+        baseline_refs = (demand.ref, data.state_ref, data.plan_ref, data.jane_ref)
         for ref in baseline_refs:
             current = self.store.current(ref.object_id, learner_id)
             if current is None or current.ref != ref:
@@ -1163,7 +1213,7 @@ class Coordinator:
             "state": data.state_ref.model_dump(),
             "plan": data.plan_ref.model_dump(),
             "jane": data.jane_ref.model_dump(),
-            "household": demand_body.household_ref.model_dump(),
+            "profile": self.current(learner_id, "profile").ref.model_dump(),
             "config": config.ref.model_dump(),
             "input_policy": input_policy.ref.model_dump(),
             "validation": verification.ref.model_dump(),
@@ -1192,19 +1242,14 @@ class Coordinator:
         )
         self.adapter = InputAdapter(self.core)
         self.store.active_activity_id = activity_id
-        token = token_urlsafe(32)
-        self.student_tokens[token] = activity_id
-        result = {
-            "decision": f"allow_{self.store.realm}",
-            "student_token": token,
-            "snapshot": self.core.snapshot(),
-        }
+        result = {"decision": f"allow_{self.store.realm}", "snapshot": self.core.snapshot()}
         self.start_requests[request_id] = {"signature": signature, "result": result}
         return result
 
-    def student(self, token: str):
-        if self.core is None or self.student_tokens.get(token) != self.core.activity_id:
-            raise PermissionError("student capability does not cover the current activity")
+    def classroom(self, token: str):
+        """The class in memory, for the operator's token only."""
+        if token != self.token or self.core is None:
+            raise PermissionError("no class in memory for this capability")
         return self.core
 
     def student_view(self, core: Harness):
@@ -1392,11 +1437,11 @@ class Coordinator:
                     "activity_id": activity_id,
                     "fact_ref": fact.ref.model_dump(),
                     "text": text,
-                    "provider": "simulated_parent",
+                    "provider": "student" if self.store.realm == "study" else "simulated",
                     "occurred_at": None,
                     "reported_at": datetime.now(UTC).isoformat(),
                     "corrections": list(corrections),
-                    "limitations": ["无额外补充不等于独立；模拟来源不转为儿童证据。"],
+                    "limitations": ["无额外补充不等于独立。"],
                 },
                 refs=(fact.ref,),
                 sources=tuple(fb.ref for fb in old),
@@ -1412,6 +1457,11 @@ class Coordinator:
                     Publication(ref=obj.ref, reason="追加原活动来源，不制造新活动或尝试"),
                 ),
             )
+        log.info(
+            "feedback saved activity=%s objection=%s",
+            activity_id,
+            "true" if corrections else "false",
+        )
         evaluation = self.store.current(identity(activity_id, "evaluation"), learner_id)
         if corrections and evaluation:
             # Derived state/demand/course stay limited until the owners recheck the new source.
@@ -1461,11 +1511,11 @@ class Coordinator:
                     "requested_at": lost["requested_at"],
                     "course_ref": lost["course_ref"],
                     "text": text,
-                    "provider": "simulated_parent",
+                    "provider": "student" if self.store.realm == "study" else "simulated",
                     "reported_at": datetime.now(UTC).isoformat(),
                     "gap": lost["state"],
                     "limitations": [
-                        "家长有限报告是新的实际来源；不补造原话、不重复计样本，不自动进入评价。"
+                        "学生的补报是新的实际来源；不补造原话、不重复计样本，不自动进入评价。"
                     ],
                 },
                 refs=(start_ref,),
@@ -1475,7 +1525,7 @@ class Coordinator:
                 learner_id,
                 "parent-report",
                 [obj],
-                publications=(Publication(ref=obj.ref, reason="只保存家长补记，缺口保留"),),
+                publications=(Publication(ref=obj.ref, reason="只保存学生补报，缺口保留"),),
             )
         return self.ledger.finish(operation, learner_id, {"report_ref": report[0].ref.model_dump()})
 
@@ -1486,7 +1536,7 @@ class Coordinator:
             return doc.body.get("activity_id") == activity_id
         if doc.kind == "suggestion":
             return doc.body["evaluation_ref"]["object_id"] == identity(activity_id, "evaluation")
-        if doc.kind in {"state", "demand", "plan", "household"}:
+        if doc.kind in {"state", "demand", "plan", "profile"}:
             return self.store.current(doc.object_id, learner_id).ref == doc.ref
         if doc.kind == "start":
             return False
@@ -1497,42 +1547,64 @@ class Coordinator:
         package = {doc.object_id} | {ref.object_id for ref in doc.dependency_refs}
         return not package & taught
 
-    def later_feedback(self, request_id: str, learner_id: str, activity_id: str):
-        fact = self.activity_facts(activity_id, learner_id)
+    def acknowledged(self, learner_id: str, activity_id: str) -> Document | None:
+        """The acknowledgement of the activity's current evaluation, if the student gave one."""
+        evaluation = self.store.current(identity(activity_id, "evaluation"), learner_id)
+        mark = self.store.current(identity(activity_id, "acknowledgement"), learner_id)
+        if evaluation and mark and mark.body["acknowledged_ref"] == evaluation.ref.model_dump():
+            return mark
+        return None
+
+    def acknowledge(
+        self, request_id: str, learner_id: str, activity_id: str, evaluation_ref: RevisionRef
+    ) -> dict:
+        """The student accepts one exact evaluation version; adoption may then go on."""
+        signature = {"activity_id": activity_id, "evaluation_ref": evaluation_ref.model_dump()}
+        completed = self.ledger.completed_request(request_id, learner_id, "acknowledge", signature)
+        if completed:
+            return completed
+        current = self.store.current(identity(activity_id, "evaluation"), learner_id)
+        if current is None or current.ref != evaluation_ref:
+            raise Conflict("评价已更新，请查看新版本后再认可。", current.ref if current else None)
+        if current.source_revision != self.source_revision(activity_id, learner_id)[0]:
+            raise Conflict("评价已更新，请查看新版本后再认可。")
         operation = self.request(
-            request_id,
-            learner_id,
-            "later-feedback",
-            {"activity_id": activity_id},
-            sources=(fact.ref,),
+            request_id, learner_id, "acknowledge", signature, sources=(current.ref,)
         )
-        existing = self.ledger.result(operation, learner_id)
-        if existing:
-            return existing
-        obj = document(
-            "report",
-            identity(operation, "feedback-choice"),
-            operation,
-            learner_id,
-            {
-                "status": "checked",
-                "activity_id": activity_id,
-                "later_explicit": True,
-                "evaluation": "not_requested",
-            },
-            refs=(fact.ref,),
-        )
-        self.save_step(
-            operation,
-            learner_id,
-            "later-feedback",
-            [obj],
-            publications=(Publication(ref=obj.ref, reason="仅记录明确稍后，不请求模型"),),
-        )
+        saved = self.saved_step(operation, learner_id, "acknowledgement")
+        if saved is None:
+            prior = self.store.current(identity(activity_id, "acknowledgement"), learner_id)
+            obj = document(
+                "report",
+                identity(activity_id, "acknowledgement"),
+                operation,
+                learner_id,
+                {
+                    "status": "checked",
+                    "activity_id": activity_id,
+                    "acknowledged_ref": current.ref.model_dump(),
+                },
+                refs=(current.ref,),
+                revision=prior.revision + 1 if prior else 1,
+            )
+            saved = self.save_step(
+                operation,
+                learner_id,
+                "acknowledgement",
+                [obj],
+                publications=(
+                    Publication(
+                        ref=obj.ref,
+                        expected_revision=prior.revision if prior else None,
+                        reason="学生认可这一评价版本",
+                    ),
+                ),
+            )
+        log.info("evaluation acknowledged activity=%s revision=%d", activity_id, current.revision)
         return self.ledger.finish(
             operation,
             learner_id,
-            {"choice_ref": obj.ref.model_dump(), "evaluation": "not_requested"},
+            {"acknowledged_ref": current.ref.model_dump(), "ack_ref": saved[0].ref.model_dump()},
         )
 
     async def evaluate(self, request_id: str, learner_id: str, activity_id: str, purpose: str):
@@ -1549,15 +1621,9 @@ class Coordinator:
                 and active is not asyncio.current_task()
             ):
                 return await asyncio.shield(active)
-        if not feedbacks:
-            later = any(
-                doc.body.get("activity_id") == activity_id and doc.body.get("later_explicit")
-                for doc in self.store.list_current(learner_id, "report")
-            )
-            if not later or purpose not in {"next_course", "workbench_evaluation"}:
-                raise ValueError(
-                    "sealing, refresh or later choice alone must not trigger evaluation"
-                )
+        if not feedbacks and purpose != "after_class":
+            # The after-class job evaluates once on its own; a refresh never does.
+            raise ValueError("only the after-class evaluation runs without a note")
         job_key = (learner_id, activity_id, source_revision)
         if job_key in self.evaluation_jobs:
             return await asyncio.shield(self.evaluation_jobs[job_key])
@@ -1794,8 +1860,10 @@ class Coordinator:
                         break
         if demand is None:
             old = self.current(learner_id, "demand")
-            current = DemandBody.model_validate(old.body)
-            household = self.store.read(current.household_ref, learner_id)
+            profile = self.current(learner_id, "profile")  # Its latest version, edits included.
+            current = DemandBody.model_validate(old.body).model_copy(
+                update={"profile_ref": profile.ref}
+            )
             catalog = [doc.body for doc in self.store.list_current(learner_id, "capability")]
             known = {item["dimension_id"] for item in catalog}
             self.models.require()
@@ -1807,7 +1875,7 @@ class Coordinator:
                         level: self.current(learner_id, f"plan:{level}").body
                         for level in ("long_term", "annual", "stage", "week")
                     },
-                    household.body,
+                    profile.body,
                     catalog,
                     suggestion.body,
                     old.body,
@@ -1855,7 +1923,7 @@ class Coordinator:
             except PlanningUnavailable as error:
                 log.warning("planning activity=%s rejected: %s", activity_id, error)
                 raise
-            baselines = (old.ref, state.ref, week_before.ref, data.household_ref)
+            baselines = (old.ref, state.ref, week_before.ref, data.profile_ref)
             input_digest = digest(canonical([ref.model_dump() for ref in baselines]))
             previous = [
                 row["payload"]
@@ -1876,7 +1944,7 @@ class Coordinator:
                 data,
                 revision=old.revision + 1,
                 source_revision=current_revision,
-                refs=(state.ref, plan.ref, data.household_ref, suggestion.ref),
+                refs=(state.ref, plan.ref, data.profile_ref, suggestion.ref),
                 sources=(evaluation.ref,),
                 occurred_at=evaluation.occurred_at,
             )
@@ -1919,75 +1987,166 @@ class Coordinator:
             },
         )
 
-    async def next_course(self, request_id: str, learner_id: str, activity_id: str):
-        completed = self.ledger.completed_request(
-            request_id, learner_id, "next-package-report", {"activity_id": activity_id}
-        )
+    async def confirm_and_start(
+        self,
+        request_id: str,
+        learner_id: str,
+        course_ref: RevisionRef,
+        materials_ready: bool,
+        on_progress=None,
+    ) -> dict:
+        """The student's one click: confirm this version, make and adopt its resources, start."""
+        course = CourseBody.model_validate(self.store.read(course_ref, learner_id).body)
+        offscreen = any(task.purpose == "offscreen" for task in course.tasks)
+        if offscreen and not materials_ready:
+            raise Conflict("这节课用到实物：备好后勾选“实物已备好”再开始。")
+        if self.verification.get("result") != "pass":  # start() would refuse after resources
+            log.info("start refused reason=unchecked_build")
+            raise Conflict("当前版本还没有通过登记检查：运行统一检查后再开课。")
+        self.confirm(f"{request_id}:confirm", learner_id, course_ref)
+        failed = await ready_resources(self, learner_id, course_ref, on_progress)
+        if failed:
+            raise Conflict(f"资源未就绪：{'、'.join(failed)}。可以重试。")
+        conditions = {
+            "materials": "reported_available" if offscreen else "not_needed",
+            "time": "reported_30_minutes",
+            "raw_report": "学生确认开始上课" + ("；实物已备好" if offscreen else ""),
+            "explicit_start": True,
+        }
+        result = self.start(f"{request_id}:start", learner_id, course_ref, conditions)
+        if result["decision"] != f"allow_{self.store.realm}":
+            reason = result.get("reason") or "、".join(result.get("missing", ()))
+            raise Conflict(f"本次不能开课：{reason}")
+        return result
+
+    async def decide_goal(
+        self, request_id: str, learner_id: str, demand_ref: RevisionRef, choice: str
+    ) -> dict:
+        """The student accepts a changed goal (and its new capabilities) or keeps the old one."""
+        signature = {"demand_ref": demand_ref.model_dump(), "choice": choice}
+        completed = self.ledger.completed_request(request_id, learner_id, "goal", signature)
         if completed:
             return completed
-        evaluation = await self.evaluate(
-            f"{request_id}:evaluate", learner_id, activity_id, "next_course"
-        )
-        adopted = await self.adopt(f"{request_id}:adopt", learner_id, evaluation)
-        try:
-            package = await self.prepare(f"{request_id}:prepare", learner_id)
-        except PreparationUnavailable as gap:
-            package = {"status": "not_ready", "reason": str(gap)}
+        if choice not in {"accept", "reject"}:
+            raise ValueError("choice must be accept or reject")
+        demand = self.current(learner_id, "demand")
+        if demand.ref != demand_ref or demand.body.get("goal_confirmation") != "needed":
+            raise Conflict("这个目标已不是等你确认的版本。", demand.ref)
+        body = DemandBody.model_validate(demand.body)
         operation = self.request(
             request_id,
             learner_id,
-            "next-package-report",
-            {"activity_id": activity_id},
-            sources=(evaluation.ref,),
-            source_revision=evaluation.source_revision,
+            "goal",
+            signature,
+            sources=(demand.ref,),
+            baselines=(demand.ref,),
         )
-        existing = self.ledger.result(operation, learner_id)
-        if existing:
-            return existing
-        obj = document(
-            "report",
-            identity(operation, "report"),
-            operation,
-            learner_id,
-            {
-                "status": "checked",
-                "activity_id": activity_id,
-                "evaluation_ref": evaluation.ref.model_dump(),
-                "adoption": adopted,
-                "next_package": package,
-                "facts": "saved",
-                "feedback": "saved"
-                if self.feedbacks(activity_id, learner_id)
-                else "later_explicit",
-                "evaluation": "saved",
-                "state_demand": "effective",
-                "course": "drafted" if "course_ref" in package else "not_ready",
-                "unknown": ["独立条件、保持、迁移、真实声音、儿童与教学效果未验证。"],
-            },
-            refs=(
-                evaluation.ref,
-                RevisionRef.model_validate(adopted["demand_ref"]),
-                *(
-                    (RevisionRef.model_validate(package["course_ref"]),)
-                    if "course_ref" in package
-                    else ()
+        result = self.ledger.result(operation, learner_id)
+        if result:
+            return result
+        saved = self.saved_step(operation, learner_id, "demand")
+        if saved is None:
+            if choice == "accept":
+                for item in body.proposed_capabilities:
+                    define(
+                        self,
+                        f"{request_id}:capability:{item.dimension_id}",
+                        learner_id,
+                        Capability(
+                            dimension_id=item.dimension_id,
+                            subject=item.dimension_id.rsplit(".", 1)[0],
+                            name=item.name,
+                            definition=item.definition,
+                            limitations=("规划提出、学生确认；定义不构成学习观察或掌握。",),
+                        ),
+                    )
+                decided = body.model_copy(update={"goal_confirmation": "confirmed"})
+            else:
+                decided = await self.replan_keeping_goals(learner_id, demand, body)
+            obj = document(
+                "demand",
+                demand.object_id,
+                operation,
+                learner_id,
+                decided,
+                refs=demand.dependency_refs,
+                sources=demand.source_refs,  # Still planned from the same evaluation.
+                revision=demand.revision + 1,
+                occurred_at=demand.occurred_at,
+            )
+            saved = self.save_step(
+                operation,
+                learner_id,
+                "demand",
+                [obj],
+                publications=(
+                    Publication(
+                        ref=obj.ref,
+                        expected_revision=demand.revision,
+                        reason="学生确认新目标" if choice == "accept" else "学生不同意换目标",
+                    ),
                 ),
-            ),
-            source_revision=evaluation.source_revision,
-        )
-        self.save_step(
-            operation,
-            learner_id,
-            "report",
-            [obj],
-            source_revision=evaluation.source_revision,
-            publications=(Publication(ref=obj.ref, reason="汇总实际成果；报告不控制上游生效"),),
+                baselines=(demand.ref,),
+            )
+        log.info(
+            "goal decided choice=%s new=%d",
+            choice,
+            len(body.proposed_capabilities) if choice == "accept" else 0,
         )
         return self.ledger.finish(
-            operation,
-            learner_id,
-            {"report_ref": obj.ref.model_dump(), "next_package": package, "adoption": adopted},
+            operation, learner_id, {"demand_ref": saved[0].ref.model_dump(), "choice": choice}
         )
+
+    async def replan_keeping_goals(self, learner_id: str, demand: Document, body: DemandBody):
+        """Planning again from the same evaluation, told to keep the previous two goals."""
+        previous = DemandBody.model_validate(
+            self.store.read(
+                RevisionRef(object_id=demand.object_id, revision=demand.revision - 1), learner_id
+            ).body
+        )
+        evaluation = next(
+            self.store.read(ref, learner_id)
+            for ref in demand.source_refs
+            if self.store.read(ref, learner_id).kind == "evaluation"
+        )
+        choice = body.suggestion_choices[0]
+        catalog = [doc.body for doc in self.store.list_current(learner_id, "capability")]
+        keep = {
+            "primary_goal": previous.primary_goal.model_dump(mode="json"),
+            "auxiliary_goal": previous.auxiliary_goal.model_dump(mode="json"),
+        }
+        request = demand_request(
+            evaluation.body,
+            self.store.read(body.state_ref, learner_id).body,
+            {level: self.current(learner_id, f"plan:{level}").body for level in LEVELS},
+            self.store.read(body.profile_ref, learner_id).body,
+            catalog,
+            self.store.read(choice.suggestion_ref, learner_id).body,
+            previous.model_dump(mode="json"),
+        )
+        self.models.require()
+        result = await self.models.run(
+            replace(request, context=request.context | {"keep_goals": keep})
+        )
+        if not result.ok:
+            raise PlanningUnavailable(result.failure)
+        draft = result.output
+        if (draft.primary_goal.dimension_id, draft.auxiliary_goal.dimension_id) != (
+            previous.primary_goal.dimension_id,
+            previous.auxiliary_goal.dimension_id,
+        ):
+            raise PlanningUnavailable("没有沿用原目标")
+        known = {item["dimension_id"] for item in catalog}
+        kept = apply_demand_draft(
+            draft,
+            previous,
+            known,
+            body.state_ref,
+            body.plan_ref,
+            choice.suggestion_ref,
+            plan_adjusted=False,
+        )
+        return kept.model_copy(update={"goal_confirmation": "confirmed"})
 
     def restrict(self, operation_id: str, learner_id: str, target: Document, reason: str):
         label = f"restriction:{target.object_id}:{target.revision}"
@@ -2022,9 +2181,12 @@ class Coordinator:
         self.store.ensure_idle()
         self.initialize(learner_id)
         documents = self.store.list_current(learner_id)
+        advance(self, learner_id)
         return {
             "realm": self.store.realm,
             "learner_id": learner_id,
+            "next": next_step(self, learner_id),
+            "jobs": jobs(self),
             "qualification": "not_granted",
             "actual_api": "未验证",
             "actual_voice": "未验证",

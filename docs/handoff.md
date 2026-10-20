@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.28.0；更新：2026年10月20日。
+版本：1.31.0；更新：2026年10月20日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -646,3 +646,63 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 浏览器核对（无头Chrome）：把实际的speaker.ts与audio.ts编译后在页面里驱动，替身接口分别给出录音与现场两种语音：录音句经媒体播放3秒音频3.19秒完成并回报开始，现场句流式10段3.01秒完成、断档0次，录音句播到0.8秒停止记为打断，三条播放报回的方式、采样率与读取次数正确。隔离模拟中：工作台进行中提示逐项写出“生成全部待生成的资源：第1/9项 voice:goal”等，版本选择可选回第1版、试听与采用，采用后标“已采用”；以只在本机调试启动器给模拟课程加一张提问阶段图片，学生页显示该图，核心记录`delivery status=completed modality=image delivered_range=['debug-picture']`。
 - 未验证：录音句改为整段播放后课堂上电流音是否消失（须成人实际听；家长2026年10月20日选择留到下次成人检查）；学生页播放报回在真实扬声器下的数据；放行后出图的成功率；LOG-1记录的一次朗读评分8.6秒的原因（空闲与争用均未复现）。
 - 接续：下次成人检查用含朗读题与图片、动画的课程，留意播放日志、图片呈现回执与工作台显示；电流音再现时按日志的断档、迟到与读取次数定位；课堂判断延迟（中位约4.6秒）：家长2026年10月20日在过渡语、换更快模型、备课预生成与保持现状中选择保持现状，试教后看孩子是否在意再定；阶段4成人完整验收与阶段5试教由家长实际进行。
+
+## SELF-1 定位改为AI自学助理（文档）
+
+- 状态：文档改写完成（2026年10月20日），未提交。用户决定把定位改为AI自学助理、只保留一个主交互页面，头脑风暴后采用[设计说明](superpowers/specs/2026-10-20-self-study-assistant-design.md)与[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)，选择在本会话逐个任务实现、最终审查由主会话自做、不提交直至用户要求。决定见[ADR-0018](../decisions/ADR-0018.md)。
+- 负责人/集成：Claude Opus；起点8a9326b。
+- 文件边界：decisions/ADR-0018.md（新增）、AGENTS.md、README.md、design/shared/README.md、design/interface/parent-workbench.md改名为main-page.md及指向它的链接，以及计划Task 2、3列出的文档。
+- 改动：新增ADR-0018；AGENTS 1.30.0（定位、入口改为`--study`与`project-j-reset`、去掉儿童入口与成人检查条目，开发协作语境的“家长”改为“用户”）；README 1.18.0；docs/product 2.0.0、mvp 2.0.0、roadmap 1.14.0（阶段4、5由“自学助理改版与自用”取代）、acceptance 2.0.0（儿童试教门槛取消，“进入儿童试教的前提”只留标题供ADR-0011引用，新增正式学习空间一节）、technology 1.13.0（正式学习入口；课后评价、规划、备课各节的接口路径待SELF-2完成后改写）；design/shared/README 1.5.0（当前阶段、数据权威与术语规则）与business-contracts 1.5.0（数据空间simulation/study，来源simulated/student/technical）；interface README 2.0.0、main-page 2.0.0（由parent-workbench.md改名重写）、roles-devices 2.0.0、preview-start 2.0.0、feedback-reports 2.0.0、student-classroom 1.1.0；learning profile 2.0.0（学习资料与建档）、plan-review 1.2.0、updates 2.0.0、handoffs 1.7.2；preparation README 2.0.0、parent-preview 2.0.0（课程详情）、readiness 2.0.0；evaluation inputs-feedback 2.0.0、reports-revisions 2.0.0；platform configuration-permissions 2.0.0（数据外发范围、数据空间与清空）、realtime-voice 2.4.1。
+- 检查证据：`npm run --prefix project_j/web check:docs`通过（文档检查与本地链接）；代码未改。
+- 接续：SELF-2后端（计划Task 4–11）。
+
+
+## SELF-2 AI自学助理改版（后端）
+
+- 状态：实现与自测完成，未提交（2026年10月20日）。按[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)Task 4–11在本会话逐个任务实现；最终审查由主会话自做（SELF-4后）。
+- 负责人/集成：Claude Opus；起点8a9326b（与SELF-1同一工作区，未提交）。
+- 文件边界：project_j/python/src/project_j/{application/{coordinator,progress（新增）,ledger,configuration,reference}.py, learning/{contracts,planning,maintenance,adoption,catalog,onboarding（新增）}.py, preparation/{drafting,packages,resources,materials}.py, evaluation/assessment.py, classroom/{harness,judgment}.py, interface/{api,submission}.py, platform/{storage,files,reset（新增）}.py, platform/models/simulated.py, platform/migrations/versions/0001_simulation.py, contracts.py, paths.py}；project_j/python/pyproject.toml（`project-j-reset`）；project_j/scripts/check.py（结束语）；tests：新增test_{study（由test_adult_check改名）,reset,progress,roles,evaluation_flow,goal_confirmation,onboarding,confirm_and_start}.py，改support.py、fixtures/p1a_initial.json及调用旧接口的测试；project_j/web/src/{App.tsx,report.ts}（只为编译与路径，SELF-3重写）、web/tests/report.test.mjs、web/schema/openapi.json与web/src/client（生成）；docs/technology.md 1.13.0（后台推进、评价、规划、建档、备课各节改写）。
+- 实现要点：
+  1. 数据空间`study`取代`adult_check`（`project_j/private/study/<run_id>`，来源student）；`--study`取代`--adult-check`；`project-j-reset --run-id <id>`输入运行编号确认后删除该运行的全部记录。每个数据空间一名学习者（模拟`fictional-L1`、正式`learner`）。
+  2. 一个操作者令牌（`#token=`），管理与课堂共用；`/api/parent/*`、`/api/student/*`合并为`/api/dashboard`、`/api/course/*`、`/api/resource/*`、`/api/evaluation/*`、`/api/class/*`等；课堂控制合并为一条，`activity_id`可选、不符时409；无令牌401、错令牌403。
+  3. 推进器`application/progress.py`：`next_step`（建档各步、课堂、中断、待决定方案、评价等你认可、新目标等你确认、课程等你确认、资源准备、等待、无）与`next_job`（评价最近一课、采用已认可评价并规划、整理学习资料、备课、到期复盘）；主页读取与下课封存后`advance`，课堂中不发起，同时只跑一个自动任务，失败记中文原因、`/api/jobs/retry`重试；备课按需求修订去重。
+  4. 学习资料`ProfileBody`取代家庭条件（蓝思值、聊天原文、背景、兴趣、可用时间、想加强的方面、可用实物、`confirmed`、`summarized`）；规划、备课、开课读取最新资料；没有可用实物时规则拒绝离屏任务；开课不再问陪伴，实物只在课程用到时要求。所有模型指令与模板去掉孩子、家长、儿童、成人用语。
+  5. 下课自动评价（`after_class`）；补记/异议经`/api/evaluation/feedback`（异议即更正说明），认可经`/api/evaluation/acknowledge`绑定确切版本；`next_course`与稍后反馈删除。
+  6. 规划可提出目录外英语能力条目；换目标、新条目或建档后的首个目标保存为待确认，`/api/goal/decide`同意建立条目、不同意带keep_goals重规划；待确认的需求不备课。
+  7. 建档：`/api/onboarding/{lexile,questions,speech/{i},chat}`、`/api/profile`；聊天四问中英双语；规则生成建档小测需求（阅读事实+朗读发音）；小测评价后规划用途整理资料，学生确认即认可小测评价。
+  8. `/api/course/start`为后台任务：确认版本、逐项生成并采用资源（进度x/y）、开课；必需资源失败不开课，可选失败照常。
+- 执行中的裁定：见本机账本，主要有：自动评价/采用只处理最近一课；资料确认用单独的`confirmed`字段（存储不允许草稿生效）；规划、备课与开课读最新资料且资料修改不使已备课程失效；纸桥模板只在模拟中供建档小测使用；测试辅助`support.next_course`串联评价→认可→采用（换目标时代为同意）→备课，`support.ready`只生成必需资源以保持测试速度。
+- 检查证据：新增与改动的测试先失败后通过（少数先写实现的测试另以变异核对，见本机账本）；10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted），统一check含主工程515项、评分39项、合成15项共569项pytest，另有36项前端回归与1项文档检查自测，UTC 2026-10-20T03:17:48.954940+00:00，工程摘要9846096fcee57a5810d80dafda378e49bead86db79fd22ce9a7b4f7692b15ae9。
+- 未验证：前端（SELF-3）；真实模型下的建档整理、换目标与小测备课；参考题集重跑（课堂判断指令已改，SELF-4）；正式学习空间实际使用。
+- 接续：SELF-3前端重写（计划Task 12–15）。
+
+## SELF-3 主页面与全屏课堂（前端）
+
+- 状态：实现与自测完成，未提交（2026年10月20日）。按[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)Task 12–15在本会话逐个任务实现。
+- 负责人/集成：Claude Opus；与SELF-1、SELF-2同一工作区。
+- 文件边界：project_j/web/src/{App.tsx（只剩外壳）,Classroom.tsx（由旧学生页迁入）,api.ts,ui.tsx,next-step.ts,onboarding.ts,courses.ts,learning.ts,report.ts,request.ts,speaker.ts,recording.ts,cancellation.ts,style.css}、web/src/pages/{Home,Onboarding,State,Plan,Courses,Evaluations,Settings}.tsx（新增）、web/index.html、web/package.json（描述）；web/tests/{next-step,onboarding,courses,learning}.test.mjs（新增）、report.test.mjs、speaker.test.mjs；project_j/README.md、README.md 1.19.0（实施状态）；interface/api.py课中主页提示一句。
+- 实现要点：
+  1. 外壳：`#token=…&page=…&detail=…`保存位置，刷新回原处；主页数据每3秒读取一次，课堂中停止轮询（课堂有自己的事件流）；左侧六个栏目；没有已确认的学习资料时只显示建档、栏目不可用；有课堂时全屏显示课堂，下课后“回到主页”。
+  2. 主页：下一步（只有一件）、后台进行中与失败原因（失败可重试；开课失败从课程详情再试）、最近一课、本周计划。
+  3. 建档：蓝思值（前端提示与后端规则一致）、聊天四问（正式学习空间先播放Jane的问句，再显示文字）、开始小测、确认学习资料（同时认可小测评价）；AI处理期间显示进行中的任务。
+  4. 课程：列表与状态（备课中、等你确认、准备中、已上、已评价）；详情含课程说明、讨论记录、修改意见、实物勾选（只在课程有离屏任务时）、“确认并开始上课”及进度；确认后的资源可试听/查看、重新生成、选回旧版本。课堂控制：暂停/继续、重复、离屏返回、立即停止，“更多”里有跳过当前题与收尾。
+  5. 学习状态（各方面情况，没有依据写未知；学习资料可改；能力条目）、学习计划（新目标确认卡、待决定方案、下一课需求、各层计划、复盘）、课后评价（列表与状态；每题原答与帮助、评价、补记与异议、认可当前版本；认可后追加更正）。
+  6. 修正：课堂语音与播放报回改走`/api/class/speech`、`/api/class/playback`（SELF-2改名时漏改）；链接失效提示不再提家长工作台；删去旧家长工作台、开课结果说明与缺资源提示。
+- 执行中的裁定：见本机账本，主要有：旧家长工作台在Task 12即删除；首个目标与之后的目标一样在学习计划页确认；下课回主页（主页下一步指向评价）；开课失败不在主页重试而回课程详情；资源操作只在确认后出现（后端不许确认前生成）。
+- 检查证据：新增与改动的前端测试先失败后通过；10项登记命令全部通过（见SELF-4检查证据）。
+- 未验证：真实声音下的建档问句播放与课堂；手机宽度下的布局只做了CSS断点，未实测。
+- 接续：SELF-4核对。
+
+## SELF-4 模拟走查、参考题集与真实核对
+
+- 状态：完成，未提交（2026年10月20日）。
+- 负责人/集成：Claude Opus。
+- 文件边界（修复）：project_j/python/src/project_j/{platform/models/simulated.py,preparation/packages.py,application/coordinator.py}、tests/{test_onboarding,test_confirm_and_start}.py、project_j/web/src/{App.tsx,learning.ts,style.css}；本机不进Git的project_j/test/ui（走查脚本与playwright-core）、test/records/self4_study.py与记录。
+- 模拟UI走查（本机脚本project_j/test/ui/walkthrough.mjs，Chrome无头，截图与日志在project_j/test/output/self4-ui/）：`start.sh --run-id self4-ui --simulation-root project_j/test/simulation --onboarding`，从蓝思值、聊天、小测（含两段朗读）、确认资料、确认首个目标、课程确认并开始（含实物勾选、暂停/继续、“更多”里收尾）、评价补记后重新评价并认可，到下一课备好，每步主页下一步正确，页面无脚本错误（只有浏览器取favicon的404）。
+- 走查发现并修复：(1) 建档模拟里首个目标沿用小测目标（阅读+朗读发音），模拟课程只覆盖固定目标，第一课备课失败——模拟规划在不要求保留目标时改用固定课程的两个目标；(2) 学习资料没有可用实物时固定模板仍带离屏任务、被规则退回——模板改为只在屏幕上进行（同小测，离屏时间并入阅读），真实模型取得的模板也随之符合规则；(3) 下课“回到主页”留在原课程详情——改为回主页；(4) 学习状态依据的标点与输入框粗体。前两项先在test_onboarding扩展用例复现失败后修复。
+- 参考题集：`project-j-judge-reference --run-id self4-reference`（课堂判断codex:gpt-6.1-sol:low:fast）37/37通过，判断耗时中位4600毫秒、95分位7659毫秒；人工阅读全部37条回应：没有家长/孩子用语，错答、含糊与求助回应只给定位提示或句框，未泄露答案词。
+- 真实核对（`start.sh --study --run-id self4-check`，经API驱动、朗读用macOS say，细节记本机project_j/test/records/self-4-20261020.md）：真实模型备建档小测205秒；小测评价148秒、整理学习资料25.5秒、规划首个目标77.3秒（沿用阅读与朗读发音并说明不换目标）、备第一课202.6秒，四项都一次通过规则（无退回）；资料与目标说明都称“学生”。第一次开课被构建检查门禁拒绝（核对前改过前端），原先在生成全部资源之后才拒绝、原因是英文——改为开课前先核对并用中文说明，加测试。结束后`project-j-reset --run-id self4-check`清空（13个文件）；用户的正式学习空间未创建、不受影响。
+- 真实核对发现、本批未修（不是本批引入，需另定）：(1) 合成器一次超时（47.5秒，GPU争用下）后进程被结束，整个服务不再重启它，之后所有语音503、课堂退回文字，直到重启服务；(2) 第一段朗读的评分加判断超过10秒期限，返回澄清而不是判断；(3) 朗读判为读错后一直给帮助、没有次数上限，学生只能自己跳过。
+- 检查证据：走查与真实核对后的全部修改完成后，10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted），统一check含主工程516项、评分39项、合成15项共570项pytest，另有48项前端回归与1项文档检查自测，UTC 2026-10-20T04:45:13.014380+00:00，工程摘要281b5458570d296f3fb1300ac82bd4b1cd2efcca59db2850933bf7419f1b5680。
+- 未验证：教学效果与长期使用；真实声音下的建档问句与课堂听感；正式学习空间由用户实际使用。
+- 接续：用户开始正式学习（`start.sh --study --run-id <id>`），按使用反馈再定。

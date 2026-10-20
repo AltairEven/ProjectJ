@@ -3,15 +3,15 @@ import type { Document as Doc, RevisionRef as Ref } from './client'
 type Body = Record<string, any>
 
 const keyLabels: Record<string, string> = {
-  report_ref: '汇总报告', evaluation_ref: '课后评价', course_ref: '课程', preview_ref: '家长预览', check_ref: '内容核对', preparation: '备课',
+  report_ref: '汇总报告', evaluation_ref: '课后评价', course_ref: '课程', preview_ref: '课程详情', check_ref: '内容核对', preparation: '备课',
   start: '开始', unverified: '未验证', state_ref: '学习状态', plan_ref: '计划', plan_effect: '计划处理',
-  demand_ref: '下一课需求', suggestion_ref: '下节建议', review_ref: '复盘', decision_ref: '具体方案', choice: '家长选择',
+  demand_ref: '下一课需求', suggestion_ref: '下节建议', review_ref: '复盘', decision_ref: '具体方案', choice: '你的选择',
   effect: '结果', next_step: '下一步', run_id: '新运行目录', result: '结果', qualification: '使用资格',
   status: '课程状态', reason: '原因', plan_reason: '计划理由',
 }
 const valueLabels: Record<string, string> = {
   drafted: '已编写，待确认', pending: '待开始', actual_api: '实际API', voice: '声音',
-  child_entry: '儿童入口', reused: '沿用', reused_with_reason: '沿用并说明理由', plan_effective: '新计划已生效',
+  reused: '沿用', reused_with_reason: '沿用并说明理由', plan_effective: '新计划已生效',
   not_changed: '未改变', recheck_demand_and_course: '复核需求和课程', accept: '接受', reject: '拒绝',
   restored_to_new_simulation: '已恢复到新运行目录', not_granted: '未授予', not_ready: '课程未就绪', adjusted: '已调整',
   confirmed: '已确认', awaiting_generation: '待生成', planned: '已列入清单，确认后生成', generated: '待查看', adopted: '已采用', not_connected: '未接入',
@@ -21,7 +21,7 @@ const stageLabels: Record<string, string> = { question: '提问时', help: '求�
 const directionLabels: Record<string, string> = {
   consolidate: '巩固', review: '复查', extend: '拓展', advance: '小步进阶', observe: '短观察',
 }
-const judgmentLabels: Record<string, string> = {
+export const judgmentLabels: Record<string, string> = {
   unknown: '未知', needs_help: '需要帮助', single_independent: '单次独立',
   multiple_dates_independent: '多日独立', inconsistent: '表现不一致',
 }
@@ -98,17 +98,6 @@ export function evaluationLines(doc: Doc, docs: Doc[]): [string, string][] {
   return rows
 }
 
-const startItems: Record<string, string> = {
-  materials: '材料', time: '时间', accompaniment: '陪伴', explicit_start: '明确开始', raw_report: '条件报告',
-  'build-bound simulation verification': '与当前构建匹配的模拟检查依据',
-}
-const startReasons: Record<string, string> = {
-  'required household condition failed': '必要条件报告为没有（材料、时间或陪伴），本次不开课；条件具备后再开始。',
-  'content check unavailable or affected restriction active': '课程内容核对缺失或受影响的限制尚未解除，本包不能开始；请先复核或重新准备。',
-  'memory core is absent; do not reopen from the old request': '原开始请求对应的课堂已不在内存中，不能按旧请求重开；请重新开始。',
-}
-
-/** Explain a start that did not create a classroom, without turning a failed condition into a pass. */
 /** One line per teaching resource: kind, need, stage, purpose, Jane's words, fallback, state and versions. */
 export function resourceLines(preview: Body): string[] {
   return (preview.resources ?? []).map((item: Body) => {
@@ -118,23 +107,13 @@ export function resourceLines(preview: Body): string[] {
   })
 }
 
-/** Required resources that still have no adopted version; the class cannot start before them. */
-export function missingResources(preview: Body): string[] {
-  return (preview.resources ?? []).filter((item: Body) => item.required && !item.adopted_version).map((item: Body) => item.purpose)
-}
-
-/** Each discussion round as the parent's feedback and the model's note, then the confirmation. */
+/** Each discussion round as the student's feedback and the model's note, then the confirmation. */
 export function discussionLines(preview: Body): [string, string][] {
   const rounds = (preview.discussion ?? []).flatMap((item: Body, index: number): [string, string][] => [
     [`第${index + 1}轮意见`, item.feedback], [`第${index + 1}轮修改说明`, item.note],
   ])
   const confirmation = preview.confirmation
   return [...rounds, ['确认', confirmation ? `已确认（${confirmation.confirmed_at}）` : '待确认']]
-}
-
-export function startMessage(result: { decision: string; missing?: string[] | null; reason?: string | null }): string {
-  if (result.missing?.length) return `尚不能开始，待确认：${result.missing.map(item => startItems[item] ?? item).join('、')}。`
-  return (result.reason && startReasons[result.reason]) || `尚不能开始（${result.reason ?? result.decision}）。`
 }
 
 const purposeLabels: Record<string, string> = {

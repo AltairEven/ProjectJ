@@ -3,7 +3,16 @@
 import asyncio
 
 import pytest
-from support import CONDITIONS, LEARNER, answer, complete_story, confirmed, deliver_all, ready
+from support import (
+    CONDITIONS,
+    LEARNER,
+    answer,
+    complete_story,
+    confirmed,
+    deliver_all,
+    next_course,
+    ready,
+)
 
 from project_j.application.documents import document
 from project_j.contracts import RevisionRef
@@ -21,7 +30,7 @@ def test_corrected_sources_block_new_preparation_and_saved_preparation_replay(ap
     async def scenario():
         core, fact = await complete_story(app)
         app.feedback("feedback", LEARNER, core.activity_id, "明确模拟：无额外补充")
-        result = await app.next_course("next", LEARNER, core.activity_id)
+        result = await next_course(app, "next", LEARNER, core.activity_id)
         old_course = ref(result["next_package"]["course_ref"])
         app.feedback(
             "correction",
@@ -36,7 +45,7 @@ def test_corrected_sources_block_new_preparation_and_saved_preparation_replay(ap
                 (await app.prepare(request_id, LEARNER))
         assert len(app.store.list_current(LEARNER, "course")) == count
         assert app.start("blocked-old", LEARNER, old_course, CONDITIONS)["decision"] == "blocked"
-        rechecked = await app.next_course("recheck", LEARNER, core.activity_id)
+        rechecked = await next_course(app, "recheck", LEARNER, core.activity_id)
         new_course = ref(rechecked["next_package"]["course_ref"])
         await ready(app, {"course_ref": new_course})
         assert app.start("allowed-new", LEARNER, new_course, CONDITIONS)["decision"] == (

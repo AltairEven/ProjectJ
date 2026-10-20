@@ -44,7 +44,7 @@ def adopt_state(current: LearningState, evaluation: Document) -> StateBody:
         )
         names = "、".join(sorted({task["task_id"] for task in tasks}))
         # The stored state carries the partition; a just-made evaluation is not labelled yet.
-        source = "成人检查" if current.realm == "adult_check" else "模拟"
+        source = "" if current.realm == "study" else "模拟"
         dimensions[dimension_id] = DimensionState(
             dimension_id=dimension_id,
             task_scope=f"{source}任务{names}及当前材料条件",

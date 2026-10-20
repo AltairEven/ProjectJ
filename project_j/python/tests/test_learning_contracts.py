@@ -14,15 +14,15 @@ def initial_records():
 
 
 def test_initial_state_and_demand_keep_unknown_dimensions_and_exact_references():
-    household, state, plan, demand = initial_records()
-    assert household.body.applies_to == (state.learner_id,)
+    profile, state, plan, demand = initial_records()
+    assert profile.learner_id == state.learner_id and profile.body.lexile == "500L"
     assert all(
         item.judgment == "unknown" and item.help == "unknown" for item in state.body.dimensions
     )
     assert all(item.retention is None and item.transfer is None for item in state.body.dimensions)
     assert demand.body.state_ref == state.ref
     assert demand.body.plan_ref == plan.ref
-    assert demand.body.household_ref == household.ref
+    assert demand.body.profile_ref == profile.ref
     assert demand.body.budget_minutes == 30
 
 
@@ -30,7 +30,7 @@ def test_initial_state_and_demand_keep_unknown_dimensions_and_exact_references()
     "change",
     [
         {"realm": "family", "source_type": "child"},
-        {"realm": "adult_check", "source_type": "simulated"},
+        {"realm": "study", "source_type": "simulated"},
         {"source_type": "technical"},
         {"owner": "platform"},
         {"learner_id": None},
@@ -44,11 +44,10 @@ def test_learning_objects_reject_non_simulation_and_incomplete_identity(change):
         record_adapter.validate_python(state | change)
 
 
-def test_learning_objects_accept_the_adult_check_realm():
-    # The adult check keeps its fictional learner's state in its own partition (P2-V1).
+def test_learning_objects_accept_the_study_realm():
     state = initial_records()[1].model_dump(mode="json")
-    adult = record_adapter.validate_python(state | {"realm": "adult_check", "source_type": "adult"})
-    assert (adult.realm, adult.source_type) == ("adult_check", "adult")
+    study = record_adapter.validate_python(state | {"realm": "study", "source_type": "student"})
+    assert (study.realm, study.source_type) == ("study", "student")
 
 
 @pytest.mark.parametrize(

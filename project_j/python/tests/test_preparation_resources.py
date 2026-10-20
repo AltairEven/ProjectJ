@@ -217,11 +217,11 @@ def test_resource_endpoints(application, monkeypatch):
     course_ref = science_lesson(application, monkeypatch, visual_draft)
     body = {"learner_id": LEARNER, "course_ref": course_ref.model_dump()}
     with TestClient(create_app(Settings(), application)) as client:
-        parent = {"Authorization": f"Bearer {application.parent_token}"}
-        client.post("/api/parent/confirm", headers=parent, json=body | {"request_id": "c1"})
+        parent = {"Authorization": f"Bearer {application.token}"}
+        application.confirm("c1", LEARNER, course_ref)
         request = body | {"request_id": "g1", "resource_id": "cup-motion"}
-        assert client.post("/api/parent/generate-resource", json=request).status_code == 403
-        generated = client.post("/api/parent/generate-resource", headers=parent, json=request)
+        assert client.post("/api/resource/generate", json=request).status_code == 401
+        generated = client.post("/api/resource/generate", headers=parent, json=request)
         assert generated.status_code == 200 and generated.json()["version"] == 1
         query = {
             "learner_id": LEARNER,
@@ -230,16 +230,16 @@ def test_resource_endpoints(application, monkeypatch):
             "resource_id": "cup-motion",
             "version": 1,
         }
-        file = client.get("/api/parent/resource-file", headers=parent, params=query)
+        file = client.get("/api/resource/file", headers=parent, params=query)
         assert file.status_code == 200 and file.headers["content-type"] == "image/svg+xml"
         assert file.headers["cache-control"] == "no-store"
         assert file.headers["content-security-policy"] == "sandbox"
         adopt = body | {"request_id": "a1", "resource_id": "cup-motion", "version": 1}
-        adopted = client.post("/api/parent/adopt-resource", headers=parent, json=adopt)
+        adopted = client.post("/api/resource/adopt", headers=parent, json=adopt)
         assert adopted.status_code == 200 and adopted.json()["state"] == "adopted"
         application.models.adapters["simulated"].fail_next = True
         failed = client.post(
-            "/api/parent/generate-resource",
+            "/api/resource/generate",
             headers=parent,
             json=request | {"request_id": "g2", "resource_id": "cup-picture"},
         )

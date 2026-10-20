@@ -28,25 +28,26 @@ CONNECTED_KINDS: tuple[str, ...] = ("image", "animation")
 TASK_ID = r"^[a-z][a-z0-9-]{0,30}$"
 
 PREPARATION_INSTRUCTIONS = (
-    "你是备课助手。Jane是唯一的教师，不是学生；学习者不具名，一律称“孩子”。"
-    "按demand与requirements为下一课编写文字课程。只依据上下文里的需求、学习状态、家庭条件、"
-    "Jane的规则与策略、能力目录、课程库故事与模板；不补造未观察的表现。"
-    "材料：优先复用library里的故事，material_id填它的material_id，title与story为null；"
-    "确实需要新故事时material_id为null，自编英语短故事填title与story：每句以.!?结尾，全文30到250词，"
-    "难度贴近library，不称教材原文或已测分级，不把科学预测写成实验结论。"
-    "library里read为true的故事孩子读过，只能作复习。template不为null时它是已核对的固定课程，可以沿用或修改。"
+    "你是备课助手。Jane是唯一的AI教师，不是学生；学习者不具名，一律称“学生”。"
+    "按demand与requirements为下一课编写文字课程。只依据上下文里的需求、学习状态、学习资料（profile）、"
+    "Jane的规则与策略、能力目录、课程库故事与模板；不补造未观察的表现。不预设学生的年龄，"
+    "故事难度按profile.lexile，题材尽量贴近profile.interests。"
+    "材料：library里的故事合适时复用，material_id填它的material_id，title与story为null；"
+    "不合适或需要新故事时material_id为null，自编英语短故事填title与story：每句以.!?结尾，全文30到250词，"
+    "不称教材原文或已测分级，不把科学预测写成实验结论。"
+    "library里read为true的故事学生读过，只能作复习。template不为null时它是已核对的固定课程，可以沿用或修改。"
     "tasks只用三种题：answer是关于本课故事的问答，dimension_id为english.reading.facts或"
     "english.speaking.report，evidence必须逐字摘自故事中的一句或连续几句，acceptable_answers列可接受的回答"
     "与合理变式（可含中文），known_incorrect列常见错答；point与offscreen的dimension_id为"
-    "science.observation.report，只记录孩子实际报告的条件、改变与结果，acceptable_answers为空，"
-    "offscreen只用家庭条件里有的实物。不要写其他题型。"
+    "science.observation.report，只记录学生实际报告的条件、改变与结果，acceptable_answers为空，"
+    "offscreen只用profile.materials里有的实物；profile.materials为空时不写offscreen题。不要写其他题型。"
     "read_aloud为true时规则会把故事切段生成朗读题（发音评分），主要或辅助目标为"
     "english.speaking.pronunciation时必须为true。"
     "主要目标至少有一题；辅助目标要有题，或由某级帮助覆盖。先取未提示的初答，观察不前置答案，"
     "题目与帮助不泄露后续题的答案。每题至少两级帮助，后一级要换方法而不是只换措辞；"
     "help列这一级影响的维度与程度（light_prompt、scaffold、full_model），维度只能是本题维度或本课主辅目标。"
-    "prompt是Jane对孩子说的话：用孩子能懂的短句说清要做什么；给家长或Jane的条件、安全与记录说明"
-    "不写进prompt，写进preview或brief。supports的text也是Jane可以直接对孩子说的话。"
+    "prompt是Jane对学生说的话：用学生能懂的短句说清要做什么；给学生的条件、安全与记录说明"
+    "不写进prompt，写进preview或brief。supports的text也是Jane可以直接对学生说的话。"
     "task_id用小写字母、数字和连字符，不以read-aloud开头。"
     "budget从opening、reading、expression、help_practice、offscreen、closing中选，各为正整数分钟，合计30；"
     "必须有opening与closing；有offscreen题才有offscreen段且必须有。"
@@ -54,21 +55,20 @@ PREPARATION_INSTRUCTIONS = (
     "task_ids写落实它的题号，朗读题写read_aloud。"
     "lesson_type：observation短观察，practice练习；复习已读故事时由规则定为复习。"
     "resources只列需要的图片、动画、视频，写清用途、要画的内容与出现阶段"
-    "（stage为question时提问时显示，help时孩子求助后作为帮助显示），现在不生成；"
+    "（stage为question时提问时显示，help时学生求助后作为帮助显示），现在不生成；"
     "学生看的资源不能含本题或后续题的答案；图片与动画由多模态模型生成，"
     "kind不在connected_kinds里的资源required必须为false，课程在没有这些资源时也要能上，fallback写替代办法；"
     "Jane的题目语音与朗读示范由规则生成，不要列音频。"
-    "preview给家长：story本课故事，why为什么上，materials要准备的实物，help帮助方式，exit时长与退出。"
-    "brief给Jane：history相关历史（成人或模拟来源不能当孩子的历史，没有儿童历史就写无历史分支），"
+    "preview给学生：story本课故事，why为什么上，materials要准备的实物，help帮助方式，exit时长与退出。"
+    "brief给Jane：history相关历史（没有学习历史就写无历史分支），"
     "adjustments允许的挑战、降阶、跳过、暂停与停止，closing正常小结与停止时的简短结束。"
-    "note用一两句告诉家长本稿怎样安排。limitations写本课已知的限制。"
-    "评价或状态写明成人或模拟来源时，不能当作孩子的学习证据。"
+    "note用一两句告诉学生本稿怎样安排。limitations写本课已知的限制。"
 )
 
 DISCUSSION_INSTRUCTIONS = (
-    "家长对previous提出了feedback（discussion是此前各轮的意见与说明）。按意见修改，常规小调整直接落实；"
+    "学生对previous提出了feedback（discussion是此前各轮的意见与说明）。按意见修改，常规小调整直接落实；"
     "改变主要或辅助目标、30分钟预算、主要教学或评价方式的意见不在这里改，"
-    "在note里说明需要回到学习规划或由家长决定；没采纳的意见在note里说明原因；其余规则不变。"
+    "在note里说明需要回到学习规划或由学生决定；没采纳的意见在note里说明原因；其余规则不变。"
 )
 
 REPAIR_INSTRUCTIONS = "上一稿未通过规则核对：按problems逐项修正，其余尽量保留。"
@@ -153,7 +153,7 @@ class CourseDraft(Contract):
 def preparation_request(
     demand: DemandBody,
     state: dict,
-    household: dict,
+    profile: dict,
     catalog: list[dict],
     jane: dict,
     library: list[dict],
@@ -161,7 +161,7 @@ def preparation_request(
     template: dict | None,
 ) -> ModelRequest:
     """Learning data only: no learner, provider or object identity reaches the model."""
-    learning = learning_context(state, {}, household, catalog)
+    learning = learning_context(state, {}, profile, catalog)
     del learning["plans"]
     return ModelRequest(
         "preparation",
@@ -272,8 +272,11 @@ def checked_course(
     library: dict[str, dict],
     read: set[str],
     catalog_ids: set[str],
+    offscreen_allowed: bool = True,
 ) -> Checked:
     problems: list[tuple[str, str]] = []
+    if not offscreen_allowed and any(task.purpose == "offscreen" for task in draft.tasks):
+        problems.append(("offscreen", "学习资料里没有可用实物，不能安排离屏任务"))
     source, title, story = None, draft.title, draft.story
     if draft.material_id is not None:
         if draft.title is not None or draft.story is not None:

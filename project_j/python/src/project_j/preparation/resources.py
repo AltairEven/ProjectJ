@@ -170,7 +170,7 @@ async def generate_resource(app, request_id, learner_id, course_ref: RevisionRef
                 Publication(
                     ref=obj.ref,
                     expected_revision=preview.revision,
-                    reason="生成资源新版本；家长查看后才采用",
+                    reason="生成资源新版本",
                 ),
             ),
             baselines=(course.ref,),
@@ -244,7 +244,7 @@ def adopt_resource(app, request_id, learner_id, course_ref: RevisionRef, resourc
                 Publication(
                     ref=obj.ref,
                     expected_revision=preview.revision,
-                    reason="家长查看后采用这一版本",
+                    reason="采用这一版本",
                 ),
             ),
             baselines=(course.ref,),
@@ -308,3 +308,45 @@ def adopted(app, preview) -> tuple[dict[str, bytes], dict[str, tuple[bytes, str]
         elif item["audience"] == "student":
             visuals[item["resource_id"]] = (content, chosen["media_type"])
     return recorded, visuals, missing, skipped
+
+
+async def ready_resources(app, learner_id, course_ref: RevisionRef, on_progress=None) -> list[str]:
+    """Generate and adopt every generatable resource that has no adopted version yet
+    (ADR-0018: the AI adopts the latest good version). Returns the purposes of required
+    resources that failed; an optional failure is only logged."""
+    _, preview = confirmed_package(app, learner_id, course_ref)
+    todo = [
+        item
+        for item in preview.body["resources"]
+        if item["kind"] in GENERATED and not item.get("adopted_version")
+    ]
+    failed: list[str] = []
+    optional = 0
+    for done, item in enumerate(todo, 1):
+        key = f"{course_ref.object_id}:{course_ref.revision}:{item['resource_id']}"
+        try:
+            made = await generate_resource(
+                app, f"auto-generate:{key}", learner_id, course_ref, item["resource_id"]
+            )
+            adopt_resource(
+                app,
+                f"auto-adopt:{key}",
+                learner_id,
+                course_ref,
+                item["resource_id"],
+                made["version"],
+            )
+        except PreparationUnavailable:
+            if item["required"]:
+                failed.append(item["purpose"])
+            else:
+                optional += 1
+        if on_progress:
+            on_progress(done, len(todo))
+    log.info(
+        "course resources generated=%d failed=%d required_failed=%d",
+        len(todo) - len(failed) - optional,
+        len(failed) + optional,
+        len(failed),
+    )
+    return failed

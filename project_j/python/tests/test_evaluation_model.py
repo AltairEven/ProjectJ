@@ -3,11 +3,10 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from fastapi.testclient import TestClient
-from support import LEARNER, complete_story
+from support import LEARNER, complete_story, next_course, wait_jobs
 
-from project_j.application.configuration import Settings
 from project_j.application.documents import identity
+from project_j.application.progress import advance, next_step, retry
 from project_j.classroom.judgment import method_context
 from project_j.contracts import RevisionRef
 from project_j.evaluation.assessment import (
@@ -19,7 +18,6 @@ from project_j.evaluation.assessment import (
     evaluation_request,
     interpret,
 )
-from project_j.interface.api import create_app
 from project_j.platform.models.simulated import SimulatedAdapter
 from project_j.teacher.methods import JANE
 
@@ -44,7 +42,7 @@ def test_evaluation_request_carries_task_data_only(application):
     assert context["feedback"] == feedback
     assert context["jane_method"] == method_context(JANE)
     flat = json.dumps(context, ensure_ascii=False)
-    assert "fictional-L1" not in flat and "learner_id" not in flat and "household" not in flat
+    assert "fictional-L1" not in flat and "learner_id" not in flat and "profile" not in flat
 
 
 def test_simulated_evaluation_draft_mirrors_the_rules(application):
@@ -116,7 +114,7 @@ def test_unquoted_external_help_stays_unknown(application):
     assert merged["tasks"][0]["external_help"] == "unknown"
     assert merged["tasks"][0]["working_judgment"] == "unknown"
     assert [c["reason"] for c in merged["checks"]] == [
-        "家外帮助未逐字引用家长反馈，按未知处理",
+        "外部帮助未逐字引用学生补记，按未知处理",
         "单次独立的条件不足",
     ]
 
@@ -163,7 +161,7 @@ def test_corrected_task_is_unknown(application):
     )
     merged = apply_draft(base, draft, [feedback])
     assert merged["tasks"][0]["working_judgment"] == "unknown"
-    assert "受家长更正影响，待复核" in merged["tasks"][0]["limitations"]
+    assert "受学生更正影响，待复核" in merged["tasks"][0]["limitations"]
 
 
 def test_draft_with_missing_attempt_is_rejected(application):
@@ -180,7 +178,7 @@ def test_next_course_saves_a_checked_draft(application):
     core, fact = asyncio.run(complete_story(application))
     activity = fact.body["activity_id"]
     application.feedback("fb1", LEARNER, activity, "无额外补充", [])
-    result = asyncio.run(application.next_course("next1", LEARNER, activity))
+    result = asyncio.run(next_course(application, "next1", LEARNER, activity))
     evaluation = application.store.current(identity(activity, "evaluation"), LEARNER)
     assert evaluation.body["basis_version"] == "evaluation-draft-1"
     assert evaluation.body["report"]["summary"].startswith("模拟评价")
@@ -208,21 +206,20 @@ def test_draft_with_wrong_attempts_is_not_saved(application, monkeypatch):
 
 
 def test_evaluation_failure_is_reported_and_retryable(application):
-    core, fact = asyncio.run(complete_story(application))  # sealed before the client opens
-    activity = fact.body["activity_id"]
-    application.feedback("fb1", LEARNER, activity, "孩子说很好玩。", [])
-    body = {"request_id": "next1", "learner_id": LEARNER, "activity_id": activity}
-    with TestClient(create_app(Settings(), application)) as client:
-        parent = {"Authorization": f"Bearer {application.parent_token}"}
+    async def scenario():
+        _, fact = await complete_story(application)
         application.models.adapters["simulated"].fail_next = True
-        failed = client.post("/api/parent/next-course", headers=parent, json=body)
-        assert failed.status_code == 503
-        assert failed.json() == {
-            "message": "课后评价未取得（模型暂不可用）。事实与反馈已保存，可以重试。",
-            "evaluation": "failed",
-        }
-        retried = client.post("/api/parent/next-course", headers=parent, json=body)
-        assert retried.status_code == 200
+        name = advance(application, LEARNER)
+        assert name.startswith("evaluate:")
+        await wait_jobs(application)
+        assert application.job_failures[name] == (
+            "课后评价未取得（模型暂不可用）。事实与反馈已保存，可以重试。"
+        )
+        retry(application, LEARNER, name)
+        await wait_jobs(application)
+        assert next_step(application, LEARNER)["kind"] == "evaluation"
+
+    asyncio.run(scenario())
 
 
 def test_no_new_facts_reuses_the_prior_draft_without_a_call(application):

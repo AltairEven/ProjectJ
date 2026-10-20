@@ -1,4 +1,4 @@
-// A reading segment's recording: one take, pauses included, ended by the child or the maximum.
+// A reading segment's recording: one take, pauses included, ended by the student or the maximum.
 export type Recorder =
   | { state: 'idle' }
   | { state: 'recording' | 'paused'; startedAt: number; segmentStart: number; elapsed: number; pauses: number }

@@ -14,6 +14,8 @@ from support import (
     complete_story,
     confirmed,
     deliver_all,
+    next_course,
+    prepare_course,
     ready,
     start,
     teach,
@@ -39,7 +41,7 @@ def ref(value):
 async def first_lesson_with_next_course(app, helped=False):
     core, fact = await complete_story(app, helped=helped)
     app.feedback("feedback", LEARNER, core.activity_id, "无额外补充")
-    result = await app.next_course("next", LEARNER, core.activity_id)
+    result = await next_course(app, "next", LEARNER, core.activity_id)
     return core, fact, result
 
 
@@ -85,7 +87,7 @@ def test_two_fixed_courses_alternate_and_label_familiar_material(application):
             assert ("复习" in opening) == (course["lesson_type"] == "review")
             activity = fact.body["activity_id"]
             app.feedback(f"feedback{number}", LEARNER, activity, "无额外补充")
-            result = await app.next_course(f"next{number}", LEARNER, activity)
+            result = await next_course(app, f"next{number}", LEARNER, activity)
             course_ref = result["next_package"]["course_ref"]
             demand = app.store.read(ref(result["adoption"]["demand_ref"]), LEARNER).body
             sampling = demand["sampling_requirements"][0]
@@ -143,7 +145,7 @@ def test_feedback_correction_limits_derived_course_until_it_is_rechecked(applica
         old_course = ref(result["next_package"]["course_ref"])
         assert app.start("old-c2", LEARNER, old_course, CONDITIONS)["decision"] == "blocked"
         assert app.store.read(fact.ref, LEARNER).body == fact.body
-        rechecked = await app.next_course("recheck", LEARNER, core.activity_id)
+        rechecked = await next_course(app, "recheck", LEARNER, core.activity_id)
         new_course = ref(rechecked["next_package"]["course_ref"])
         await ready(app, {"course_ref": new_course})
         assert app.start("new-c3", LEARNER, new_course, CONDITIONS)["decision"] == (
@@ -197,8 +199,7 @@ def test_one_evaluation_object_per_activity_and_review_uses_only_the_latest(appl
 
     async def scenario():
         core, _ = await complete_story(app)
-        app.later_feedback("later", LEARNER, core.activity_id)
-        provisional = await app.evaluate("needed", LEARNER, core.activity_id, "next_course")
+        provisional = await app.evaluate("needed", LEARNER, core.activity_id, "after_class")
         app.feedback("feedback", LEARNER, core.activity_id, "模拟：家长提供过提示。")
         final = await app.evaluate("final", LEARNER, core.activity_id, "final_feedback")
         assert final.object_id == provisional.object_id and final.supersedes == provisional.ref
@@ -210,46 +211,31 @@ def test_one_evaluation_object_per_activity_and_review_uses_only_the_latest(appl
     asyncio.run(scenario())
 
 
-def test_student_capability_cannot_steer_the_teaching_flow(application):
+def test_class_control_takes_every_command_for_the_current_activity(application):
     app = application
     with TestClient(create_app(Settings(), app)) as client:
-        parent = {"Authorization": f"Bearer {app.parent_token}"}
-        prepared = client.post(
-            "/api/parent/prepare", headers=parent, json={"request_id": "p", "learner_id": LEARNER}
-        ).json()
+        auth = {"Authorization": f"Bearer {app.token}"}
+        prepared = prepare_course(app, "p")
         confirmed(app, prepared)
-        started = client.post(
-            "/api/parent/start",
-            headers=parent,
-            json={
-                "request_id": "s",
-                "learner_id": LEARNER,
-                "course_ref": prepared["course_ref"],
-                "conditions": CONDITIONS,
-            },
-        ).json()
-        student = {"Authorization": f"Bearer {started['student_token']}"}
-        for command in ("skip", "close", "end_unconfirmed", "resume"):
-            response = client.post(
-                "/api/student/control",
-                headers=student,
-                json={"event_id": f"student-{command}", "command": command},
-            )
-            assert response.status_code == 422
+        app.start("s", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS)
         paused = client.post(
-            "/api/student/control", headers=student, json={"event_id": "p1", "command": "pause"}
+            "/api/class/control", headers=auth, json={"event_id": "p1", "command": "pause"}
         )
         assert paused.json()["mode"] == "paused"
         activity = paused.json()["activity_id"]
+        other = client.post(
+            "/api/class/control",
+            headers=auth,
+            json={"event_id": "r0", "activity_id": "another", "command": "resume"},
+        )
+        assert other.status_code == 409
         resumed = client.post(
-            "/api/parent/control",
-            headers=parent,
+            "/api/class/control",
+            headers=auth,
             json={"event_id": "r1", "activity_id": activity, "command": "resume"},
         )
         assert resumed.status_code == 200 and resumed.json()["mode"] == "delivering"
-        client.post(
-            "/api/student/control", headers=student, json={"event_id": "s1", "command": "stop"}
-        )
+        client.post("/api/class/control", headers=auth, json={"event_id": "s1", "command": "stop"})
 
 
 def test_failed_save_records_next_step_and_deadline_then_resumes(application):
@@ -272,8 +258,7 @@ def test_failed_save_records_next_step_and_deadline_then_resumes(application):
         {"demand_ref": app.current(LEARNER, "demand").ref.model_dump()},
         sources=(app.current(LEARNER, "demand").ref,),
         baselines=tuple(
-            app.current(LEARNER, label).ref
-            for label in ("demand", "state", "plan:week", "household")
+            app.current(LEARNER, label).ref for label in ("demand", "state", "plan:week", "profile")
         ),
     )
     steps = {row["step_id"]: row["payload"] for row in app.ledger.steps(operation, LEARNER)}
@@ -312,30 +297,19 @@ def test_seal_progress_database_error_keeps_the_durable_fact(application, monkey
 def test_successful_seal_retry_clears_the_reported_error(application):
     app = application
     with TestClient(create_app(Settings(), app)) as client:
-        parent = {"Authorization": f"Bearer {app.parent_token}"}
-        prepared = client.post(
-            "/api/parent/prepare", headers=parent, json={"request_id": "p", "learner_id": LEARNER}
-        ).json()
+        parent = {"Authorization": f"Bearer {app.token}"}
+        prepared = prepare_course(app, "p")
         confirmed(app, prepared)
-        started = client.post(
-            "/api/parent/start",
-            headers=parent,
-            json={
-                "request_id": "s",
-                "learner_id": LEARNER,
-                "course_ref": prepared["course_ref"],
-                "conditions": CONDITIONS,
-            },
-        ).json()
+        app.start("s", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS)
         app.store.fail_at = "before_commit"
         client.post(
-            "/api/student/control",
-            headers={"Authorization": f"Bearer {started['student_token']}"},
+            "/api/class/control",
+            headers={"Authorization": f"Bearer {app.token}"},
             json={"event_id": "stop", "command": "stop"},
         )
-        assert client.get("/api/parent/dashboard", headers=parent).json()["seal_errors"]
-        assert client.post("/api/parent/retry-seal", headers=parent).status_code == 200
-        dashboard = client.get("/api/parent/dashboard", headers=parent).json()
+        assert client.get("/api/dashboard", headers=parent).json()["seal_errors"]
+        assert client.post("/api/retry-seal", headers=parent).status_code == 200
+        dashboard = client.get("/api/dashboard", headers=parent).json()
         assert dashboard["seal_errors"] == {} and dashboard["pending_seals"] == []
 
 
@@ -366,7 +340,7 @@ async def correct_first_lesson_after_a_second(app):
     )
     activity = second.body["activity_id"]
     app.feedback("feedback2", LEARNER, activity, "无额外补充")
-    third = await app.next_course("next2", LEARNER, activity)
+    third = await next_course(app, "next2", LEARNER, activity)
     app.feedback(
         "correction1",
         LEARNER,
@@ -405,7 +379,7 @@ def test_E2E06_rechecking_an_older_lesson_keeps_newer_evidence_and_the_lesson_or
 
     async def scenario():
         first, second, _ = await correct_first_lesson_after_a_second(app)
-        result = await app.next_course("recheck1", LEARNER, first.activity_id)
+        result = await next_course(app, "recheck1", LEARNER, first.activity_id)
         state = app.store.read(ref(result["adoption"]["state_ref"]), LEARNER)
         dims = {item["dimension_id"]: item for item in state.body["dimensions"]}
         later = app.store.current(identity(second.body["activity_id"], "evaluation"), LEARNER)

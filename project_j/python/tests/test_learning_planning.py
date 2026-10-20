@@ -3,13 +3,11 @@ import json
 import logging
 
 import pytest
-from fastapi.testclient import TestClient
-from support import LEARNER, complete_story
+from support import LEARNER, complete_story, next_course, wait_jobs
 
-from project_j.application.configuration import Settings
 from project_j.application.documents import identity
+from project_j.application.progress import advance, retry
 from project_j.contracts import RevisionRef
-from project_j.interface.api import create_app
 from project_j.learning.maintenance import review
 from project_j.learning.planning import (
     DemandDraft,
@@ -19,6 +17,7 @@ from project_j.learning.planning import (
     review_request,
 )
 from project_j.platform.models.simulated import SimulatedAdapter
+from project_j.preparation.drafting import PreparationUnavailable
 
 LEVELS = ("long_term", "annual", "stage", "week")
 
@@ -38,8 +37,8 @@ def bodies(application, activity):
         "evaluation": application.store.current(identity(activity, "evaluation"), LEARNER).body,
         "state": application.current(LEARNER, "state").body,
         "plans": {level: application.current(LEARNER, f"plan:{level}").body for level in LEVELS},
-        "household": application.store.read(
-            RevisionRef.model_validate(demand.body["household_ref"]), LEARNER
+        "profile": application.store.read(
+            RevisionRef.model_validate(demand.body["profile_ref"]), LEARNER
         ).body,
         "catalog": [doc.body for doc in application.store.list_current(LEARNER, "capability")],
         "suggestion": application.store.current(identity(activity, "suggestion"), LEARNER).body,
@@ -55,7 +54,7 @@ def requests(application, activity):
         data["plans"],
         data["state"],
         [data["evaluation"]],
-        data["household"],
+        data["profile"],
         data["catalog"],
     )
     return data, demand, review
@@ -82,7 +81,7 @@ def test_requests_carry_no_identity(application):
     _, demand, review = requests(application, taught(application))
     assert review.purpose == "planning" and review.output is ReviewDraft
     # The real model once read Jane as the learner; the role is stated in both instructions.
-    assert all("Jane是唯一的教师，不是学生" in r.instructions for r in (demand, review))
+    assert all("Jane是唯一的AI教师，不是学生" in r.instructions for r in (demand, review))
     for request in (demand, review):
         text = json.dumps(request.context, ensure_ascii=False)
         for word in (LEARNER, "learner_id", "provider", "object_id", "_ref"):
@@ -169,16 +168,22 @@ def test_unknown_goal_rejects_the_draft_and_retry_succeeds(application, monkeypa
 
 def test_planning_failure_keeps_state_and_retries(application):
     activity = taught(application)
-    body = {"request_id": "next1", "learner_id": LEARNER, "activity_id": activity}
-    with TestClient(create_app(Settings(), application)) as client:
-        parent = {"Authorization": f"Bearer {application.parent_token}"}
+
+    async def scenario():
+        evaluation = await application.evaluate("e1", LEARNER, activity, "after_class")
+        application.acknowledge("ack1", LEARNER, activity, evaluation.ref)
         application.models.adapters["simulated"].fail_next = True
-        failed = client.post("/api/parent/next-course", headers=parent, json=body)
-        assert failed.status_code == 503
-        assert failed.json()["message"].startswith("下节需求未取得（模型暂不可用）")
+        name = advance(application, LEARNER)
+        assert name.startswith("adopt:")
+        await wait_jobs(application)
+        assert application.job_failures[name].startswith("下节需求未取得（模型暂不可用）")
         state = application.current(LEARNER, "state")
-        assert client.post("/api/parent/next-course", headers=parent, json=body).status_code == 200
-    assert application.current(LEARNER, "state").ref == state.ref
+        retry(application, LEARNER, name)
+        await wait_jobs(application)
+        assert application.current(LEARNER, "state").ref == state.ref
+        assert evaluation.ref in application.current(LEARNER, "demand").source_refs
+
+    asyncio.run(scenario())
 
 
 def test_uncovered_goals_leave_the_course_not_ready(application, monkeypatch, caplog):
@@ -188,18 +193,14 @@ def test_uncovered_goals_leave_the_course_not_ready(application, monkeypatch, ca
     before = {kind: len(application.store.list_current(LEARNER, kind)) for kind in kinds}
     model_changes_goals(application, monkeypatch)
     caplog.set_level(logging.INFO, logger="project_j")
-    result = asyncio.run(application.next_course("next1", LEARNER, activity))
+    result = asyncio.run(next_course(application, "next1", LEARNER, activity))
     package = result["next_package"]
     assert package["status"] == "not_ready"
     assert package["reason"] == "课程未取得（模型暂不可用）。下节需求已保存，可以重试。"
     assert {kind: len(application.store.list_current(LEARNER, kind)) for kind in kinds} == before
     assert "preparation failure stage=prepare failure=unavailable" in caplog.text
-    with TestClient(create_app(Settings(), application)) as client:
-        parent = {"Authorization": f"Bearer {application.parent_token}"}
-        refused = client.post(
-            "/api/parent/prepare", headers=parent, json={"request_id": "p2", "learner_id": LEARNER}
-        )
-    assert refused.status_code == 503 and refused.json()["preparation"] == "failed"
+    with pytest.raises(PreparationUnavailable, match="^课程未取得"):
+        asyncio.run(application.prepare("p2", LEARNER))
 
 
 def model_reviews(application, monkeypatch, **reply):

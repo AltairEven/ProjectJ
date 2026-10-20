@@ -58,9 +58,7 @@ async def review(
     saved = app.saved_step(operation, learner_id, "review")
     if saved is None:
         demand = app.current(learner_id, "demand")
-        household = app.store.read(
-            RevisionRef.model_validate(demand.body["household_ref"]), learner_id
-        )
+        profile = app.store.read(RevisionRef.model_validate(demand.body["profile_ref"]), learner_id)
         catalog = [doc.body for doc in app.store.list_current(learner_id, "capability")]
         reply = await app.models.run(
             review_request(
@@ -68,7 +66,7 @@ async def review(
                 {lv: app.current(learner_id, f"plan:{lv}").body for lv in LEVELS},
                 state.body,
                 [e.body for e in evaluations],
-                household.body,
+                profile.body,
                 catalog,
             )
         )
@@ -232,7 +230,7 @@ def decide(app, request_id: str, learner_id: str, decision_ref: RevisionRef, cho
                 Publication(
                     ref=obj.ref,
                     expected_revision=proposal.revision,
-                    reason="保存绑定版本的模拟家长决定",
+                    reason="保存绑定版本的学生决定",
                 ),
             ),
         )
@@ -314,7 +312,7 @@ def revise_demand_after_plan(app, request_id: str, learner_id: str):
             operation,
             learner_id,
             body,
-            refs=(state.ref, plan.ref, body.household_ref),
+            refs=(state.ref, plan.ref, body.profile_ref),
             sources=(old.ref,),
             revision=old.revision + 1,
         )

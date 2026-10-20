@@ -230,8 +230,8 @@ async def run_reference(service: ModelService, root: Path, repeats: int = 1) -> 
     passed = sum(result["passed"] for result in results)
     return {
         "kind": "judgment_reference",
-        "source_type": "adult",
-        "realm": "adult_check",
+        "source_type": "technical",
+        "realm": "study",
         "qualification": "not_granted",
         "captured_at": datetime.now(UTC).isoformat(),
         "fingerprint": fingerprint(PROJECT_ROOT),
@@ -317,9 +317,9 @@ def main(argv: list[str] | None = None) -> int:
         check_run_id(args.run_id)
     except ValueError:
         parser.error("运行编号只能含字母、数字、-、_，最长64字符")
-    partition = args.root / "project_j/private/adult_checks"
+    partition = args.root / "project_j/private/study"
     partition.mkdir(mode=0o700, parents=True, exist_ok=True)
-    path = check_path(partition, f"{args.run_id}/judgment-reference.json", "adult_check")
+    path = check_path(partition, f"{args.run_id}/judgment-reference.json", "study")
     if path.exists():
         print("该运行编号已有参考题集报告，换一个运行编号。")
         return 2

@@ -125,8 +125,7 @@ def test_budget_boundaries_are_explicit_simulated_clock_events(application):
 def test_E2E18_explicit_no_addition_reuses_provisional_without_another_model_call(application):
     async def scenario():
         core, _ = await complete_story(application)
-        application.later_feedback("later", LEARNER, core.activity_id)
-        first = await application.evaluate("needed", LEARNER, core.activity_id, "next_course")
+        first = await application.evaluate("needed", LEARNER, core.activity_id, "after_class")
         application.feedback("no-addition", LEARNER, core.activity_id, "无额外补充")
         second = await application.evaluate("final", LEARNER, core.activity_id, "final_feedback")
         assert first.ref != second.ref and second.body["purpose"] == "final"

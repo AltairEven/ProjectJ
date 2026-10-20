@@ -247,9 +247,9 @@ BUDGET = {
     "offscreen": 7,
     "closing": 3,
 }
-PREVIEW_MATERIALS = "纸、同一本书和同一辆小车；陪伴与当前条件开始前另报。"
+PREVIEW_MATERIALS = "纸、同一本书和同一辆小车。"
 BRIEF = {
-    "history": "没有真实儿童历史，以明确模拟输入和初始未知状态开始。",
+    "history": "没有学习历史，以初始未知状态开始。",
     "adjustments": "挑战替换活动，降阶/跳过/暂停/停止遵守原目标与预算。",
     "closing": "只总结实际范围，取得收到确认；停止不强迫小结。",
 }
@@ -260,11 +260,25 @@ def library_entry(source: str, story: str, read: bool) -> dict:
     return {"material_id": source, "title": COURSES[source]["title"], "story": story, "read": read}
 
 
-def template_draft(demand: DemandBody, source: str, story: str, familiar: bool = False) -> dict:
-    """The fixed paper-bridge course written as a course draft the model may reuse or adapt."""
+def template_draft(
+    demand: DemandBody, source: str, story: str, familiar: bool = False, offscreen: bool = True
+) -> dict:
+    """The fixed paper-bridge course written as a course draft the model may reuse or adapt.
+
+    The onboarding test, or a student who listed no usable things, gets it on screen only:
+    reading and reading aloud, with the offscreen minutes given to reading."""
     reference = RevisionRef(object_id="template", revision=1)
     goals = (demand.primary_goal.dimension_id, demand.auxiliary_goal.dimension_id)
     tasks = course_tasks(source, story, reference, *goals)
+    screen_only = demand.purpose == "placement" or not offscreen
+    if screen_only:
+        tasks = tuple(task for task in tasks if task.purpose in {"answer", "read_aloud"})
+    budget = (
+        BUDGET
+        if not screen_only
+        else {k: v for k, v in BUDGET.items() if k != "offscreen"}
+        | {"reading": BUDGET["reading"] + BUDGET["offscreen"]}
+    )
     title = COURSES[source]["title"]
     practice = uses_new_material(demand)
     choice = f"选{title}复习模板，明示已读熟悉条件" if familiar else f"选{title}新材料短观察模板"
@@ -306,7 +320,7 @@ def template_draft(demand: DemandBody, source: str, story: str, familiar: bool =
             if task.purpose != "read_aloud"
         ],
         "read_aloud": True,
-        "budget": [{"part": part, "minutes": minutes} for part, minutes in BUDGET.items()],
+        "budget": [{"part": part, "minutes": minutes} for part, minutes in budget.items()],
         "demand_mapping": [
             {"index": index, "implementation": item.implementation, "task_ids": ids(item.task_ids)}
             for index, item in enumerate(mapping)
@@ -317,8 +331,8 @@ def template_draft(demand: DemandBody, source: str, story: str, familiar: bool =
             "why": "复习已读故事：熟悉条件下的回答不作首次新材料观察或迁移，科学只按实际报告解释。"
             if familiar
             else "按当前需求观察阅读事实与短表达，科学只按实际报告解释。",
-            "materials": PREVIEW_MATERIALS,
-            "help": "定位提示和不同句框分开；家长额外帮助随后补充。",
+            "materials": "不需要实物。" if screen_only else PREVIEW_MATERIALS,
+            "help": "定位提示和不同句框分开；外部帮助随后补记。",
             "exit": "30分钟内，挑战只替换；可跳过、暂停或停止。",
         },
         "brief": BRIEF,

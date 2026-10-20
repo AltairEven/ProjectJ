@@ -66,14 +66,30 @@ class SimulatedAdapter:
                 return context["previous"] | {"note": note}
             # The simulated model only reproduces the fixed library template.
             return context["template"]
+        if request.purpose == "planning" and "chat" in context:
+            return {
+                "background": "模拟整理：按建档聊天原话整理的学习目的与英语使用情况。",
+                "interests": context["chat"][1]["answer"],
+                "weekly_time": context["chat"][2]["answer"],
+                "focus": context["chat"][3]["answer"],
+                "note": "模拟：资料用于选故事难度与题材。",
+            }
         if request.purpose == "planning" and "demand" in context:
+            from project_j.application.coordinator import AUXILIARY_GOAL, PRIMARY_GOAL
+
             demand, suggestion = context["demand"], context["suggestion"]
+            # The simulated course covers only the fixed goals, so after a placement lesson
+            # (other goals) the simulated planner moves there unless told to keep the goals.
+            fixed = (PRIMARY_GOAL.model_dump(), AUXILIARY_GOAL.model_dump())
+            goals = (demand["primary_goal"], demand["auxiliary_goal"])
+            if "keep_goals" not in context:
+                goals = fixed
             return {
                 "suggestion_action": "adopt",
                 "suggestion_reason": "模拟规划：在既定目标与30分钟预算内采用候选建议。",
                 "direction": "consolidate",
-                "primary_goal": demand["primary_goal"],
-                "auxiliary_goal": demand["auxiliary_goal"],
+                "primary_goal": goals[0],
+                "auxiliary_goal": goals[1],
                 "prerequisites": demand["prerequisites"],
                 "sampling_requirements": suggestion["sampling"],
                 "help_requirements": suggestion["help"],
@@ -83,6 +99,7 @@ class SimulatedAdapter:
                 "plan_effect": "reused",
                 "plan_reason": "沿用当前周计划：既定目标与预算未发生必要变化。",
                 "plan_patch": None,
+                "goal_reason": "模拟规划：沿用当前两个目标。",
                 "note": {
                     "before": "当前需求与周计划。",
                     "after": "模拟规划：沿用目标并采纳候选建议。",
@@ -94,7 +111,7 @@ class SimulatedAdapter:
         if request.purpose == "planning":
             return {
                 "conclusion": "只汇总已有范围；日期和课时不产生完成或掌握。",
-                "unknown": ["保持、迁移及真实家庭负担仍未知。"],
+                "unknown": ["保持、迁移及学习负担仍未知。"],
                 "next_review_condition": "取得新日期、材料或重要家庭条件后再复核。",
                 "plan_effect": "reused",
                 "patch": None,

@@ -9,12 +9,12 @@ from project_j.platform.models.contracts import ImageNote, ModelRequest
 from project_j.preparation.contracts import CourseBody
 
 IMAGE_INSTRUCTIONS = (
-    "为孩子的课堂画一张教学插图。按purpose与content画，画面简洁清楚，"
+    "为学生的课堂画一张教学插图。按purpose与content画，画面简洁清楚，"
     "除非content要求不加文字；不画出questions的答案，不画真实人物或品牌；"
     "画完后在description里用一句中文说明画了什么。"
 )
 ANIMATION_INSTRUCTIONS = (
-    "为孩子的课堂写一段会动的SVG动画。按purpose与content画，"
+    "为学生的课堂写一段会动的SVG动画。按purpose与content画，"
     "只用SVG绘图元素与animate、animateTransform、animateMotion、set等SMIL动画元素，"
     "根元素为svg并带viewBox，循环播放；不用script、style元素、foreignObject、image、"
     "外部链接或事件属性；不演示questions的答案。description用一句中文说明动画内容。"

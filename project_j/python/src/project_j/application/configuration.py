@@ -12,8 +12,9 @@ class Settings(BaseSettings):
     # Relative to project_root; an absolute path replaces it. The store still requires a
     # directory named "simulation".
     simulation_root: Path = Path("project_j/private/simulation")
-    adult_check_root: Path = Path("project_j/private/adult_checks")
-    realm: Literal["simulation", "adult_check"] = "simulation"
+    study_root: Path = Path("project_j/private/study")
+    realm: Literal["simulation", "study"] = "simulation"
+    onboarding: bool = False  # Simulation only: start at onboarding, as study always does.
     provider: Literal["simulation"] = "simulation"
     host: Literal["127.0.0.1"] = "127.0.0.1"
     port: int = 8765

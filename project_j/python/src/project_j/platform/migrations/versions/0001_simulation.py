@@ -12,7 +12,7 @@ depends_on = None
 def upgrade():
     # Each database holds one data space; its rows can carry no other realm or source label.
     realm, source = op.get_context().config.attributes.get("realm", ("simulation", "simulated"))
-    if (realm, source) not in {("simulation", "simulated"), ("adult_check", "adult")}:
+    if (realm, source) not in {("simulation", "simulated"), ("study", "student")}:
         raise ValueError("unknown data space")
     op.create_table(
         "identities",

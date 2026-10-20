@@ -35,18 +35,22 @@ def test_http_requests_and_refusals_are_logged_without_the_token(application, ca
     _, fact = asyncio.run(complete_story(application))
     activity = fact.body["activity_id"]
     application.feedback("fb1", LEARNER, activity, "孩子说很好玩。", [])
-    body = {"request_id": "next1", "learner_id": LEARNER, "activity_id": activity}
     caplog.set_level(logging.INFO, logger="project_j")
+    asyncio.run(application.evaluate("e1", LEARNER, activity, "after_class"))
+    stale = {"object_id": "not-the-evaluation", "revision": 1}
+    body = {"request_id": "ack1", "learner_id": LEARNER, "activity_id": activity}
     with TestClient(create_app(Settings(), application)) as client:
-        parent = {"Authorization": f"Bearer {application.parent_token}"}
-        application.models.adapters["simulated"].fail_next = True
-        assert client.post("/api/parent/next-course", headers=parent, json=body).status_code == 503
-        client.get("/api/parent/dashboard", headers={"Authorization": "Bearer wrong"})
+        auth = {"Authorization": f"Bearer {application.token}"}
+        acknowledged = client.post(
+            "/api/evaluation/acknowledge", headers=auth, json=body | {"evaluation_ref": stale}
+        )
+        assert acknowledged.status_code == 409
+        client.get("/api/dashboard", headers={"Authorization": "Bearer wrong"})
     text = caplog.text
-    assert "POST /api/parent/next-course 503" in text
-    assert "refused POST /api/parent/next-course 503 EvaluationUnavailable" in text
-    assert "model evaluation" in text and "GET /api/parent/dashboard 403" in text
-    assert application.parent_token not in text and "孩子说很好玩" not in text
+    assert "POST /api/evaluation/acknowledge 409" in text
+    assert "refused POST /api/evaluation/acknowledge 409 Conflict" in text
+    assert "model evaluation" in text and "GET /api/dashboard 403" in text
+    assert application.token not in text and "孩子说很好玩" not in text
 
 
 def test_error_descriptions_never_echo_validated_or_stored_content():

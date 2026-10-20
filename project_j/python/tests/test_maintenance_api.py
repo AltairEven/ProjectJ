@@ -3,7 +3,7 @@ import sys
 
 import pytest
 from fastapi.testclient import TestClient
-from support import CONDITIONS, LEARNER, confirmed
+from support import CONDITIONS, LEARNER, confirmed, prepare_course, settle
 
 from project_j.application.configuration import Settings
 from project_j.application.documents import document, identity
@@ -182,51 +182,38 @@ def test_serve_uses_explicit_simulation_root_and_keeps_default(monkeypatch, tmp_
     )
 
 
-def test_API_role_separation_unknown_start_and_stop_do_not_expose_teacher_material(application):
+def test_API_needs_the_token_and_class_view_hides_teacher_material(application):
     app = application
     fastapi = create_app(Settings(), app)
     with TestClient(fastapi) as client:
-        parent = {"Authorization": f"Bearer {app.parent_token}"}
-        assert client.get("/api/parent/dashboard").status_code == 403
-        prepared = client.post(
-            "/api/parent/prepare",
-            headers=parent,
-            json={"request_id": "prepare-api", "learner_id": LEARNER},
-        ).json()
+        parent = {"Authorization": f"Bearer {app.token}"}
+        assert client.get("/api/dashboard").status_code == 401
+        prepared = prepare_course(app, "prepare-api")
         confirmed(app, prepared)
-        response = client.post(
-            "/api/parent/start",
-            headers=parent,
-            json={
-                "request_id": "start-api",
-                "learner_id": LEARNER,
-                "course_ref": prepared["course_ref"],
-                "conditions": CONDITIONS,
-            },
+        response = app.start(
+            "start-api", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS
         )
-        assert response.status_code == 200
-        result = response.json()
-        student = {"Authorization": f"Bearer {result['student_token']}"}
-        assert client.get("/api/parent/dashboard", headers=student).status_code == 403
-        snapshot = client.get("/api/student/snapshot", headers=student).json()
+        assert response["decision"] == "allow_simulation"
+        student = parent
+        snapshot = client.get("/api/class/snapshot", headers=student).json()
         assert not snapshot["materials"]
         assert "acceptable_simulated" not in str(snapshot) and "supports" not in str(snapshot)
-        parent_during_class = client.get("/api/parent/dashboard", headers=parent).json()
+        parent_during_class = client.get("/api/dashboard", headers=parent).json()
         assert parent_during_class["objects"] == [] and parent_during_class["active"]
         assert parent_during_class["verification"] == app.verification
         stopped = client.post(
-            "/api/student/control",
+            "/api/class/control",
             headers=student,
             json={"event_id": "stop-api", "command": "stop"},
         )
         assert stopped.status_code == 200 and stopped.json()["mode"] == "ended"
-        dashboard = client.get("/api/parent/dashboard", headers=parent).json()
+        dashboard = client.get("/api/dashboard", headers=parent).json()
         assert any(doc["kind"] == "fact" for doc in dashboard["objects"])
         assert (
             client.post(
-                "/api/parent/prepare",
+                "/api/review",
                 headers=parent,
-                json={"request_id": "family-attempt", "realm": "family"},
+                json={"request_id": "family-attempt", "level": "week", "realm": "family"},
             ).status_code
             == 422
         )
@@ -235,27 +222,18 @@ def test_API_role_separation_unknown_start_and_stop_do_not_expose_teacher_materi
 def test_API_websocket_reconnect_reads_the_same_memory_core(application):
     app = application
     with TestClient(create_app(Settings(), app)) as client:
-        parent = {"Authorization": f"Bearer {app.parent_token}"}
-        prepared = client.post(
-            "/api/parent/prepare", headers=parent, json={"request_id": "prep-ws"}
-        ).json()
+        prepared = prepare_course(app, "prep-ws")
         confirmed(app, prepared)
-        started = client.post(
-            "/api/parent/start",
-            headers=parent,
-            json={
-                "request_id": "start-ws",
-                "course_ref": prepared["course_ref"],
-                "conditions": CONDITIONS,
-            },
-        ).json()
-        protocol = f"project-j.{started['student_token']}"
-        with client.websocket_connect("/api/student/events", subprotocols=[protocol]) as socket:
+        started = app.start(
+            "start-ws", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS
+        )
+        protocol = f"project-j.{app.token}"
+        with client.websocket_connect("/api/class/events", subprotocols=[protocol]) as socket:
             assert (
                 socket.receive_json()["snapshot"]["activity_id"]
                 == started["snapshot"]["activity_id"]
             )
-        with client.websocket_connect("/api/student/events", subprotocols=[protocol]) as socket:
+        with client.websocket_connect("/api/class/events", subprotocols=[protocol]) as socket:
             assert (
                 socket.receive_json()["snapshot"]["activity_id"]
                 == started["snapshot"]["activity_id"]
@@ -316,48 +294,36 @@ def test_old_student_socket_and_parent_control_cannot_access_the_next_activity(a
 
     app = application
     with TestClient(create_app(Settings(), app)) as client:
-        parent = {"Authorization": f"Bearer {app.parent_token}"}
-        package = client.post(
-            "/api/parent/prepare", headers=parent, json={"request_id": "scope-prepare"}
-        ).json()
+        parent = {"Authorization": f"Bearer {app.token}"}
+        package = prepare_course(app, "scope-prepare")
         confirmed(app, package)
-        first = client.post(
-            "/api/parent/start",
-            headers=parent,
-            json={
-                "request_id": "scope-first",
-                "course_ref": package["course_ref"],
-                "conditions": CONDITIONS,
-            },
-        ).json()
-        student = {"Authorization": f"Bearer {first['student_token']}"}
+        first = app.start(
+            "scope-first", LEARNER, RevisionRef.model_validate(package["course_ref"]), CONDITIONS
+        )
+        student = {"Authorization": f"Bearer {app.token}"}
         with client.websocket_connect(
-            "/api/student/events", subprotocols=[f"project-j.{first['student_token']}"]
+            "/api/class/events", subprotocols=[f"project-j.{app.token}"]
         ) as socket:
             socket.receive_json()
             assert (
-                client.get(
-                    "/api/parent/dashboard?learner_id=fictional-L2", headers=parent
-                ).status_code
+                client.get("/api/dashboard?learner_id=fictional-L2", headers=parent).status_code
                 == 403
             )
             client.post(
-                "/api/student/control",
+                "/api/class/control",
                 headers=student,
                 json={"event_id": "scope-stop", "command": "stop"},
             )
-            second = client.post(
-                "/api/parent/start",
-                headers=parent,
-                json={
-                    "request_id": "scope-second",
-                    "course_ref": package["course_ref"],
-                    "conditions": CONDITIONS,
-                },
-            ).json()
+            settle(app)  # the class end seals and evaluates in the service thread
+            second = app.start(
+                "scope-second",
+                LEARNER,
+                RevisionRef.model_validate(package["course_ref"]),
+                CONDITIONS,
+            )
             assert second["decision"] == "allow_simulation"
             old = client.post(
-                "/api/parent/control",
+                "/api/class/control",
                 headers=parent,
                 json={
                     "event_id": "old-parent-stop",
@@ -374,3 +340,31 @@ def test_old_student_socket_and_parent_control_cannot_access_the_next_activity(a
             assert closed.value.code == 1008
             assert app.core.activity_id == second["snapshot"]["activity_id"]
             assert app.core.mode != "ended"
+
+
+def test_one_token_covers_management_and_the_class(application):
+    from starlette.websockets import WebSocketDisconnect
+
+    app = application
+    with TestClient(create_app(Settings(), app)) as client:
+        auth = {"Authorization": f"Bearer {app.token}"}
+        assert client.get("/api/dashboard", headers=auth).status_code == 200
+        assert client.get("/api/dashboard").status_code == 401
+        assert (
+            client.get("/api/dashboard", headers={"Authorization": "Bearer x"}).status_code == 403
+        )
+        assert client.get("/api/class/snapshot", headers=auth).status_code == 403  # no class yet
+        package = prepare_course(app, "one-prepare")
+        confirmed(app, package)
+        started = app.start(
+            "one-start", LEARNER, RevisionRef.model_validate(package["course_ref"]), CONDITIONS
+        )
+        assert "student_token" not in started
+        assert client.get("/api/class/snapshot", headers=auth).status_code == 200
+        with client.websocket_connect(
+            "/api/class/events", subprotocols=[f"project-j.{app.token}"]
+        ) as socket:
+            assert socket.receive_json()["snapshot"]["activity_id"] == app.core.activity_id
+        with pytest.raises(WebSocketDisconnect):
+            with client.websocket_connect("/api/class/events", subprotocols=["project-j.x"]):
+                pass

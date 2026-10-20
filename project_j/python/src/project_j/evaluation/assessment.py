@@ -60,9 +60,9 @@ def interpret(
             "tasks_materials": fact.body["course_ref"],
             "help_difficulty": "帮助与任务条件分维度，外部帮助未知。",
             "process": fact.body["end"],
-            "time_burden": "模拟流程；实际30分钟与家庭负担未验证。",
+            "time_burden": "按实际已发生范围；30分钟节奏与学习负担另评。",
         },
-        "limitations": ["成人/技术/模拟不能转为真实儿童学习证据。", "保持、迁移与独立条件未观察。"],
+        "limitations": ["技术或模拟来源不转为学习证据。", "保持、迁移与独立条件未观察。"],
         "actual_api": "未验证",
         "actual_voice": "未验证",
     }
@@ -94,20 +94,20 @@ def next_suggestion(evaluation: Document, material: dict) -> dict:
 
 
 EVALUATION_INSTRUCTIONS = (
-    "你是Jane的课后评价助手。只依据上下文里的封存事实、课程题目和家长反馈，为家长整理本课；"
+    "你是Jane的课后评价助手。只依据上下文里的封存事实、课程题目和学生补记，为学生整理本课；"
     "不补造未观察的表现、保持或迁移，不重评发音，不改课堂判断，不给总分或等级。"
     "tasks必须覆盖attempts里的每个attempt_id，每个只出现一次。"
     "working_judgment：single_independent只用于初答judgment为correct、help里没有任何帮助、"
-    "且家长反馈明确说没有额外帮助的尝试；needs_help用于课中有帮助、家长报告了帮助，或答错的尝试；"
+    "且学生补记明确说没有额外帮助的尝试；needs_help用于课中有帮助、学生补记了帮助，或答错的尝试；"
     "其余为unknown。“无额外补充”“没观察到”都不等于没有帮助。"
     "attempts的visuals是作答前学生页实际显示过的图片或动画：stage为question属于题目材料，"
-    "为help属于帮助、随help说明；没列出的不能当作孩子看到了。"
-    "external_help：家长反馈明确说没有帮忙为none，明确说帮了或代答为reported，否则unknown；"
+    "为help属于帮助、随help说明；没列出的不能当作学生看到了。"
+    "external_help：学生补记明确说没有别人帮忙为none，明确说有人帮了为reported，否则unknown；"
     "none或reported时help_quote必须逐字摘自feedback的text。"
-    "explanation用一两句给家长说明这次尝试的依据和限制。summary概括实际完成与结束情况；"
+    "explanation用一两句给学生说明这次尝试的依据和限制。summary概括实际完成与结束情况；"
     "strongest列最有依据的表现或帮助；uncertain列仍未确定的事项；"
     "alignment说明课程安排与实际课堂的关键差异及原因（如中途停止、未做的任务）。"
-    "limitations写明成人或模拟来源时，在summary中说明不能作为儿童学习证据。"
+    "补记里写明是异议的，按异议重新核对相关题目，在explanation里回应。"
 )
 
 
@@ -132,7 +132,7 @@ class EvaluationDraft(Contract):
 def evaluation_request(
     fact: dict, course: dict, feedbacks: list[dict], jane: dict | None
 ) -> ModelRequest:
-    # Task data only: no learner identity, household or full input signatures.
+    # Task data only: no learner identity, profile or full input signatures.
     end = fact["end"]
     return ModelRequest(
         purpose="evaluation",
@@ -198,12 +198,12 @@ def apply_draft(base: dict, draft: EvaluationDraft, feedbacks: list[dict]) -> di
         external, quote = reading.external_help, reading.help_quote.strip()
         if external != "unknown" and not (quote and any(quote in text for text in said)):
             external = "unknown"
-            reasons.append("家外帮助未逐字引用家长反馈，按未知处理")
+            reasons.append("外部帮助未逐字引用学生补记，按未知处理")
         helped = any(level not in {"none", "unknown"} for level in task["help"].values())
         judgment = reading.working_judgment
         if task["corrections"]:
             if judgment != "unknown":
-                reasons.append("受家长更正影响，待复核")
+                reasons.append("受学生更正影响，待复核")
             judgment = "unknown"
         elif judgment == "single_independent" and not (
             task["task_judgment"] == "correct"

@@ -1,4 +1,4 @@
-"""Loopback simulation API with separate parent and per-activity student capabilities."""
+"""Loopback API for the one operator: management and the class share one capability."""
 
 import argparse
 import asyncio
@@ -30,12 +30,20 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from project_j.application.configuration import Settings
 from project_j.application.coordinator import Coordinator
+from project_j.application.progress import advance, jobs, next_step, retry, run
 from project_j.classroom.harness import AllowedAction, DeliveryFeedback, Harness
 from project_j.contracts import Contract, Document, RevisionRef
 from project_j.curriculum.corrections import correct, release
 from project_j.evaluation.assessment import EvaluationUnavailable
 from project_j.learning.catalog import Capability, define, resolve
 from project_j.learning.maintenance import decide, review, revise_demand_after_plan
+from project_j.learning.onboarding import (
+    QUESTIONS,
+    ProfileEdit,
+    confirm_profile,
+    save_chat,
+    save_lexile,
+)
 from project_j.learning.planning import PlanningUnavailable
 from project_j.platform.files import PrivateFiles
 from project_j.platform.models.config import ModelFiles
@@ -48,25 +56,17 @@ from project_j.platform.tts.recorded import speak
 from project_j.preparation.drafting import PreparationUnavailable
 from project_j.preparation.resources import adopt_resource, generate_resource, resource_file
 
+LEARNER_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
+
 
 class ParentRequest(Contract):
     request_id: str = Field(min_length=1)
-    learner_id: str = Field(default="fictional-L1", pattern=r"^fictional-[A-Za-z0-9_-]+$")
-    realm: Literal["simulation"] = "simulation"
-    source_type: Literal["simulated"] = "simulated"
+    learner_id: str = Field(default="fictional-L1", pattern=LEARNER_PATTERN)
 
 
-class StartConditions(Contract):
-    materials: Literal["reported_available", "unavailable", "unknown"]
-    time: Literal["reported_30_minutes", "unavailable", "unknown"]
-    accompaniment: Literal["reported_present", "unavailable", "unknown"]
-    raw_report: str = Field(min_length=1)
-    explicit_start: bool
-
-
-class StartRequest(ParentRequest):
+class CourseStartRequest(ParentRequest):
     course_ref: RevisionRef
-    conditions: StartConditions
+    materials_ready: bool = False  # Only asked when the course uses things off screen.
 
 
 class CourseRequest(ParentRequest):
@@ -86,9 +86,11 @@ class AdoptRequest(ResourceRequest):
 
 
 class FeedbackRequest(ParentRequest):
+    """A note on a lesson; an objection is also a correction to recheck (ADR-0018)."""
+
     activity_id: str
     text: str = Field(min_length=1)
-    corrections: tuple[dict[str, JsonValue], ...] = ()
+    objection: bool = False
 
 
 class ActivityRequest(ParentRequest):
@@ -99,8 +101,25 @@ class LostReportRequest(ActivityRequest):
     text: str = Field(min_length=1)
 
 
-class EvaluationRequest(ActivityRequest):
-    purpose: Literal["next_course", "workbench_evaluation", "final_feedback"]
+class AcknowledgeRequest(ActivityRequest):
+    evaluation_ref: RevisionRef
+
+
+class LexileRequest(ParentRequest):
+    lexile: str = Field(min_length=1, max_length=20)
+
+
+class ChatRequest(ParentRequest):
+    answers: list[str] = Field(min_length=1, max_length=10)
+
+
+class ProfileRequest(ParentRequest, ProfileEdit):
+    pass
+
+
+class GoalDecision(ParentRequest):
+    demand_ref: RevisionRef
+    choice: Literal["accept", "reject"]
 
 
 class ReviewRequest(ParentRequest):
@@ -162,13 +181,6 @@ class Control(Contract):
     ]
 
 
-class StudentControl(Contract):
-    """Student role: stop/pause at once, ask to repeat, report return; flow control is parental."""
-
-    event_id: str
-    command: Literal["stop", "pause", "return", "repeat"]
-
-
 class PlaybackReport(Contract):
     """How the page played one sentence; diagnosis only, nothing of what was said."""
 
@@ -188,8 +200,8 @@ class PlaybackReport(Contract):
 class Snapshot(Contract):
     activity_id: str
     learner_id: str
-    realm: Literal["simulation", "adult_check"]
-    source_type: Literal["simulated", "adult"]
+    realm: Literal["simulation", "study"]
+    source_type: Literal["simulated", "student"]
     mode: str
     activity_state: Literal["running", "offscreen", "paused", "closing", "ended"]
     wait_kind: str
@@ -209,9 +221,43 @@ class Snapshot(Contract):
     materials: dict[str, str] = {}
 
 
+class NextStep(Contract):
+    kind: Literal[
+        "lexile",
+        "chat",
+        "placement",
+        "profile",
+        "class",
+        "interrupted",
+        "decision",
+        "evaluation",
+        "goal",
+        "course",
+        "resources",
+        "waiting",
+        "none",
+    ]
+    subject: dict[str, JsonValue] = {}
+
+
+class JobRow(Contract):
+    name: str
+    state: Literal["running", "failed"]
+    reason: str | None = None
+    progress: str | None = None
+
+
+class JobRetry(Contract):
+    learner_id: str = Field(default="fictional-L1", pattern=LEARNER_PATTERN)
+    name: str = Field(min_length=1, max_length=300)
+
+
 class Dashboard(Contract):
-    realm: Literal["simulation", "adult_check"] = "simulation"
+    realm: Literal["simulation", "study"] = "simulation"
     learner_id: str = "fictional-L1"
+    # The one thing for the student and the AI work under way (application/progress.py).
+    next: NextStep | None = None
+    jobs: list[JobRow] = []
     qualification: Literal["not_granted"] = "not_granted"
     actual_api: Literal["未验证"] = "未验证"
     actual_voice: Literal["未验证"] = "未验证"
@@ -242,17 +288,6 @@ class ResourceResult(Contract):
     resource_id: str
     version: int
     state: Literal["generated", "adopted"]
-
-
-class StartResult(Contract):
-    decision: Literal[
-        "allow_simulation", "allow_adult_check", "waiting", "blocked", "interrupted_unknown"
-    ]
-    student_token: str | None = None
-    snapshot: Snapshot | None = None
-    missing: tuple[str, ...] = ()
-    reason: str | None = None
-    unverified: tuple[str, ...] = ()
 
 
 class InputResult(Contract):
@@ -308,12 +343,16 @@ class AccessLog:
 
 
 def build_coordinator(settings: Settings) -> Coordinator:
-    """Simulation keeps its simulated providers; the adult check binds the real local ones."""
+    """Simulation keeps its simulated providers; study binds the real local ones."""
     root = settings.project_root
     if settings.realm == "simulation":
-        return Coordinator(SimulationStore(root / settings.simulation_root, settings.run_id), root)
+        return Coordinator(
+            SimulationStore(root / settings.simulation_root, settings.run_id),
+            root,
+            onboarding=settings.onboarding,
+        )
     return Coordinator(
-        SimulationStore(root / settings.adult_check_root, settings.run_id, realm="adult_check"),
+        SimulationStore(root / settings.study_root, settings.run_id, realm="study"),
         root,
         models=load_service(ModelFiles(root / "project_j/private/models")),
         scorer=LocalScorer(root),
@@ -437,17 +476,19 @@ def create_app(
     def controller():
         return app.state.coordinator
 
-    def parent(authorization: str | None = Header(default=None)):
-        if authorization != f"Bearer {controller().parent_token}":
-            raise HTTPException(403, "parent capability required")
+    def operator(authorization: str | None = Header(default=None)):
+        if authorization is None:
+            raise HTTPException(401, "operator capability required")
+        if authorization != f"Bearer {controller().token}":
+            raise HTTPException(403, "operator capability required")
         return controller()
 
-    def student(authorization: str | None = Header(default=None)):
-        if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(403, "student activity capability required")
-        return controller().student(authorization.removeprefix("Bearer "))
+    def in_class(authorization: str | None = Header(default=None)):
+        if authorization is None:
+            raise HTTPException(401, "operator capability required")
+        return controller().classroom(authorization.removeprefix("Bearer "))
 
-    StudentCore = Annotated[Harness, Depends(student)]
+    ClassCore = Annotated[Harness, Depends(in_class)]
 
     def refused(request, error, status_code: int, content: dict) -> JSONResponse:
         log.warning(
@@ -510,6 +551,7 @@ def create_app(
             try:
                 app_controller.seal()
                 seal_errors.pop(app_controller.core.activity_id, None)
+                advance(app_controller, app_controller.core.learner_id)  # Evaluate by itself.
             except (OSError, ValueError, SQLAlchemyError) as error:
                 seal_errors[app_controller.core.activity_id] = type(error).__name__
                 log.warning(
@@ -522,11 +564,12 @@ def create_app(
             # Response acknowledges stopping before the independent disk operation.
             background.add_task(save_after_end)
 
-    @app.get("/api/parent/dashboard", dependencies=[Depends(parent)], response_model=Dashboard)
+    @app.get("/api/dashboard", dependencies=[Depends(operator)], response_model=Dashboard)
     async def dashboard(
-        learner_id: Annotated[str, Query(pattern=r"^fictional-[A-Za-z0-9_-]+$")] = "fictional-L1",
+        learner_id: Annotated[str | None, Query(pattern=LEARNER_PATTERN)] = None,
     ):
         app_controller = controller()
+        learner_id = learner_id or app_controller.learner_id
         if app_controller.store.active_activity_id:
             if app_controller.core.learner_id != learner_id:
                 raise PermissionError(
@@ -536,34 +579,32 @@ def create_app(
                 "realm": app_controller.store.realm,
                 "learner_id": learner_id,
                 "active": app_controller.core.snapshot(),
+                "next": next_step(app_controller, learner_id),
+                "jobs": jobs(app_controller),
                 "verification": app_controller.verification,  # held in memory since startup
                 "models": app_controller.models.status(),
                 "objects": [],
-                "note": "课堂进行中，工作台只返回内存控制状态，不访问数据库。",
+                "note": "课堂进行中，主页只返回内存控制状态，不访问数据库。",
             }
         return app_controller.dashboard(learner_id) | {"seal_errors": seal_errors}
 
-    @app.post(
-        "/api/parent/prepare", dependencies=[Depends(parent)], response_model=PreparationResult
-    )
-    async def prepare(request: ParentRequest):
-        return await controller().prepare(request.request_id, request.learner_id)
+    @app.post("/api/jobs/retry", dependencies=[Depends(operator)])
+    async def retry_job(request: JobRetry):
+        started = retry(controller(), request.learner_id, request.name)
+        log.info("job retry name=%s started=%s", request.name, started is not None)
+        return {"started": started}
 
     @app.post(
-        "/api/parent/discuss", dependencies=[Depends(parent)], response_model=PreparationResult
+        "/api/course/discuss", dependencies=[Depends(operator)], response_model=PreparationResult
     )
     async def discuss(request: DiscussRequest):
         return await controller().discuss(
             request.request_id, request.learner_id, request.course_ref, request.feedback
         )
 
-    @app.post("/api/parent/confirm", dependencies=[Depends(parent)])
-    async def confirm(request: CourseRequest):
-        return controller().confirm(request.request_id, request.learner_id, request.course_ref)
-
     @app.post(
-        "/api/parent/generate-resource",
-        dependencies=[Depends(parent)],
+        "/api/resource/generate",
+        dependencies=[Depends(operator)],
         response_model=ResourceResult,
     )
     async def generate(request: ResourceRequest):
@@ -576,7 +617,7 @@ def create_app(
         )
 
     @app.post(
-        "/api/parent/adopt-resource", dependencies=[Depends(parent)], response_model=ResourceResult
+        "/api/resource/adopt", dependencies=[Depends(operator)], response_model=ResourceResult
     )
     async def adopt(request: AdoptRequest):
         return adopt_resource(
@@ -588,17 +629,17 @@ def create_app(
             request.version,
         )
 
-    @app.get("/api/parent/resource-file", dependencies=[Depends(parent)])
+    @app.get("/api/resource/file", dependencies=[Depends(operator)])
     async def resource_download(
         object_id: str,
         revision: int,
         resource_id: str,
         version: int,
-        learner_id: str = "fictional-L1",
+        learner_id: str | None = None,
     ):
         data, media_type = resource_file(
             controller(),
-            learner_id,
+            learner_id or controller().learner_id,
             RevisionRef(object_id=object_id, revision=revision),
             resource_id,
             version,
@@ -607,58 +648,77 @@ def create_app(
         headers = {"Cache-Control": "no-store", "Content-Security-Policy": "sandbox"}
         return Response(data, media_type=media_type, headers=headers)
 
-    @app.post("/api/parent/start", dependencies=[Depends(parent)], response_model=StartResult)
-    async def start(request: StartRequest):
-        result = controller().start(
-            request.request_id,
-            request.learner_id,
-            request.course_ref,
-            request.conditions.model_dump(),
-        )
-        log.info(
-            "start decision=%s missing=%s reason=%s",
-            result["decision"],
-            result.get("missing"),
-            result.get("reason"),
-        )
-        return result
+    @app.post("/api/course/start", dependencies=[Depends(operator)], status_code=202)
+    async def start(request: CourseStartRequest):
+        """Confirm, make and adopt resources, start: a background job the page follows."""
+        app_controller, course = controller(), request.course_ref
+        name = f"start:{course.object_id}:{course.revision}"
+        if name not in app_controller.jobs:
+            app_controller.job_failures.pop(name, None)
 
-    @app.post("/api/parent/feedback", dependencies=[Depends(parent)])
+            def progress(done: int, total: int):
+                app_controller.job_progress[name] = f"{done}/{total}"
+
+            run(
+                app_controller,
+                request.learner_id,
+                name,
+                lambda: app_controller.confirm_and_start(
+                    request.request_id,
+                    request.learner_id,
+                    course,
+                    request.materials_ready,
+                    progress,
+                ),
+            )
+        return {"job": name}
+
+    @app.post("/api/evaluation/feedback", dependencies=[Depends(operator)])
     async def feedback(request: FeedbackRequest):
         return controller().feedback(
             request.request_id,
             request.learner_id,
             request.activity_id,
             request.text,
-            request.corrections,
+            ({"note": request.text},) if request.objection else (),
         )
 
-    @app.post("/api/parent/later-feedback", dependencies=[Depends(parent)])
-    async def later(request: ActivityRequest):
-        return controller().later_feedback(
-            request.request_id, request.learner_id, request.activity_id
+    @app.post("/api/onboarding/lexile", dependencies=[Depends(operator)])
+    async def onboarding_lexile(request: LexileRequest):
+        return save_lexile(controller(), request.request_id, request.learner_id, request.lexile)
+
+    @app.get("/api/onboarding/questions", dependencies=[Depends(operator)])
+    async def onboarding_questions():
+        return list(QUESTIONS)
+
+    @app.post("/api/onboarding/chat", dependencies=[Depends(operator)])
+    async def onboarding_chat(request: ChatRequest):
+        return save_chat(controller(), request.request_id, request.learner_id, request.answers)
+
+    @app.post("/api/profile", dependencies=[Depends(operator)])
+    async def profile_confirmed(request: ProfileRequest):
+        edit = ProfileEdit.model_validate(request.model_dump(include=set(ProfileEdit.model_fields)))
+        return confirm_profile(controller(), request.request_id, request.learner_id, edit)
+
+    @app.post("/api/goal/decide", dependencies=[Depends(operator)])
+    async def decide_goal(request: GoalDecision):
+        return await controller().decide_goal(
+            request.request_id, request.learner_id, request.demand_ref, request.choice
         )
 
-    @app.post("/api/parent/lost-report", dependencies=[Depends(parent)])
+    @app.post("/api/evaluation/acknowledge", dependencies=[Depends(operator)])
+    async def acknowledge(request: AcknowledgeRequest):
+        return controller().acknowledge(
+            request.request_id, request.learner_id, request.activity_id, request.evaluation_ref
+        )
+
+    @app.post("/api/lost-report", dependencies=[Depends(operator)])
     async def lost_report(request: LostReportRequest):
         return controller().lost_report(
             request.request_id, request.learner_id, request.activity_id, request.text
         )
 
-    @app.post("/api/parent/evaluate", dependencies=[Depends(parent)])
-    async def evaluate(request: EvaluationRequest):
-        result = await controller().evaluate(
-            request.request_id, request.learner_id, request.activity_id, request.purpose
-        )
-        return {"evaluation_ref": result.ref.model_dump(), "body": result.body}
-
-    @app.post("/api/parent/next-course", dependencies=[Depends(parent)])
-    async def next_course(request: ActivityRequest):
-        return await controller().next_course(
-            request.request_id, request.learner_id, request.activity_id
-        )
-
-    @app.post("/api/parent/review", dependencies=[Depends(parent)])
+    @app.post("/api/review", dependencies=[Depends(operator)])
     async def review_plan(request: ReviewRequest):
         return await review(
             controller(),
@@ -668,7 +728,7 @@ def create_app(
             request.proposed_patch,
         )
 
-    @app.post("/api/parent/decision", dependencies=[Depends(parent)])
+    @app.post("/api/decision", dependencies=[Depends(operator)])
     async def decision(request: DecisionRequest):
         return decide(
             controller(),
@@ -678,11 +738,11 @@ def create_app(
             request.choice,
         )
 
-    @app.post("/api/parent/recheck-demand", dependencies=[Depends(parent)])
+    @app.post("/api/recheck-demand", dependencies=[Depends(operator)])
     async def recheck_demand(request: ParentRequest):
         return revise_demand_after_plan(controller(), request.request_id, request.learner_id)
 
-    @app.post("/api/parent/correction", dependencies=[Depends(parent)])
+    @app.post("/api/correction", dependencies=[Depends(operator)])
     async def correction(request: CorrectionRequest):
         return correct(
             controller(),
@@ -693,16 +753,16 @@ def create_app(
             request.owner,
         )
 
-    @app.post("/api/parent/capability", dependencies=[Depends(parent)])
+    @app.post("/api/capability", dependencies=[Depends(operator)])
     async def capability(request: CatalogRequest):
         return define(controller(), request.request_id, request.learner_id, request.capability)
 
-    @app.get("/api/parent/capability", dependencies=[Depends(parent)])
-    async def resolve_capability(subject: str, name: str, learner_id: str = "fictional-L1"):
-        result = resolve(controller(), learner_id, subject, name)
+    @app.get("/api/capability", dependencies=[Depends(operator)])
+    async def resolve_capability(subject: str, name: str, learner_id: str | None = None):
+        result = resolve(controller(), learner_id or controller().learner_id, subject, name)
         return {"capability_ref": result.ref.model_dump() if result else None}
 
-    @app.post("/api/parent/release", dependencies=[Depends(parent)])
+    @app.post("/api/release", dependencies=[Depends(operator)])
     async def release_restriction(request: ReleaseRequest):
         return release(
             controller(),
@@ -713,19 +773,20 @@ def create_app(
             request.evidence,
         )
 
-    @app.get("/api/parent/operation/{operation_id}", dependencies=[Depends(parent)])
-    async def operation(operation_id: str, learner_id: str = "fictional-L1"):
+    @app.get("/api/operation/{operation_id}", dependencies=[Depends(operator)])
+    async def operation(operation_id: str, learner_id: str | None = None):
+        learner_id = learner_id or controller().learner_id
         return controller().ledger.operation(operation_id, learner_id) | {
             "steps": controller().ledger.steps(operation_id, learner_id)
         }
 
-    @app.post("/api/parent/retry-seal", dependencies=[Depends(parent)])
+    @app.post("/api/retry-seal", dependencies=[Depends(operator)])
     async def retry_seal():
         result = controller().seal()
         seal_errors.pop(result.body["activity_id"], None)
         return {"fact_ref": result.ref.model_dump(), "save": "succeeded"}
 
-    @app.post("/api/parent/export", dependencies=[Depends(parent)])
+    @app.post("/api/export", dependencies=[Depends(operator)])
     async def export(request: ParentRequest):
         path = controller().files.export(request.learner_id)
         return {
@@ -733,7 +794,7 @@ def create_app(
             "qualification": "not_granted",
         }
 
-    @app.get("/api/parent/export-file", dependencies=[Depends(parent)])
+    @app.get("/api/export-file", dependencies=[Depends(operator)])
     async def export_file(path: str):
         from project_j.paths import check_path
 
@@ -751,7 +812,7 @@ def create_app(
             },
         )
 
-    @app.post("/api/parent/backup", dependencies=[Depends(parent)])
+    @app.post("/api/backup", dependencies=[Depends(operator)])
     async def backup():
         path = controller().files.backup()
         return {"backup_id": path.name, "scope": "simulation_database_and_fixed_assets"}
@@ -760,7 +821,7 @@ def create_app(
         backup_id: str = Field(pattern=r"^[0-9a-f-]{36}$")
         new_run_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")
 
-    @app.post("/api/parent/restore", dependencies=[Depends(parent)])
+    @app.post("/api/restore", dependencies=[Depends(operator)])
     async def restore(request: RestoreRequest):
         app_controller = controller()
         app_controller.store.ensure_idle()
@@ -776,12 +837,12 @@ def create_app(
             "qualification": "not_granted",
         }
 
-    @app.get("/api/student/snapshot", response_model=Snapshot)
-    async def snapshot(core: StudentCore):
+    @app.get("/api/class/snapshot", response_model=Snapshot)
+    async def snapshot(core: ClassCore):
         return controller().student_view(core)
 
-    @app.post("/api/student/input", response_model=InputResult)
-    async def submit(request: TextInput, background: BackgroundTasks, core: StudentCore):
+    @app.post("/api/class/input", response_model=InputResult)
+    async def submit(request: TextInput, background: BackgroundTasks, core: ClassCore):
         result = await controller().adapter.text(
             request.event_id,
             request.text,
@@ -792,8 +853,8 @@ def create_app(
         ended(core, background)
         return result | {"snapshot": controller().student_view(core)}
 
-    @app.post("/api/student/recording", response_model=InputResult)
-    async def recording(request: RecordingInput, background: BackgroundTasks, core: StudentCore):
+    @app.post("/api/class/recording", response_model=InputResult)
+    async def recording(request: RecordingInput, background: BackgroundTasks, core: ClassCore):
         try:
             audio = base64.b64decode(request.audio_base64, validate=True)
         except binascii.Error as error:
@@ -806,14 +867,14 @@ def create_app(
         ended(core, background)
         return result | {"snapshot": controller().student_view(core)}
 
-    @app.post("/api/student/delivery", response_model=Snapshot)
-    async def delivery(request: DeliveryFeedback, core: StudentCore):
+    @app.post("/api/class/delivery", response_model=Snapshot)
+    async def delivery(request: DeliveryFeedback, core: ClassCore):
         core.delivery(request)
         controller().late_delivery(request)
         return controller().student_view(core)
 
-    @app.post("/api/student/playback", status_code=204)
-    async def playback(report: PlaybackReport, core: StudentCore):
+    @app.post("/api/class/playback", status_code=204)
+    async def playback(report: PlaybackReport, core: ClassCore):
         if report.action_id not in core.actions:
             raise LookupError("unknown approved action")
         log.info(
@@ -830,13 +891,22 @@ def create_app(
             report.latency_ms,
         )
 
-    @app.get("/api/student/speech/{action_id}")
-    async def speech(action_id: str, core: StudentCore):
+    @app.get("/api/class/speech/{action_id}")
+    async def speech(action_id: str, core: ClassCore):
         action = core.actions.get(action_id)
         if action is None:
             raise LookupError("unknown approved action")
-        synthesizer, recorded = controller().synthesizer, controller().recorded
-        parts = action.speech or (action.text,)
+        return await spoken(action.speech or (action.text,), controller().recorded)
+
+    @app.get("/api/onboarding/speech/{index}", dependencies=[Depends(operator)])
+    async def onboarding_speech(index: int):
+        if not 0 <= index < len(QUESTIONS):
+            raise LookupError("no such onboarding question")
+        return await spoken((QUESTIONS[index],), {})
+
+    async def spoken(parts, recorded):
+        """Jane's sentence as a stream; whole recorded sentences arrive at once."""
+        synthesizer = controller().synthesizer
         stream = speak(parts, recorded, synthesizer)
         try:
             first = await anext(stream)
@@ -854,8 +924,8 @@ def create_app(
             headers={"X-Speech-Source": "recorded" if set(parts) <= recorded.keys() else "live"},
         )
 
-    @app.get("/api/student/visual/{action_id}/{resource_id}")
-    async def visual(action_id: str, resource_id: str, core: StudentCore):
+    @app.get("/api/class/visual/{action_id}/{resource_id}")
+    async def visual(action_id: str, resource_id: str, core: ClassCore):
         action = core.actions.get(action_id)
         if action is None or resource_id not in action.visuals:
             raise LookupError("unknown visual of an approved action")
@@ -866,40 +936,32 @@ def create_app(
             headers={"Cache-Control": "no-store", "Content-Security-Policy": "sandbox"},
         )
 
-    @app.post("/api/student/control", response_model=Snapshot)
-    async def control(request: StudentControl, background: BackgroundTasks, core: StudentCore):
+    @app.post("/api/class/control", response_model=Snapshot)
+    async def control(request: Control, background: BackgroundTasks, core: ClassCore):
+        if request.activity_id is not None and request.activity_id != core.activity_id:
+            raise Conflict("control names another activity than the current class")
         core.control(request.event_id, request.command)
         ended(core, background)
         return controller().student_view(core)
 
-    @app.post("/api/parent/control", dependencies=[Depends(parent)])
-    async def parent_control(request: Control, background: BackgroundTasks):
-        core = controller().core
-        if core is None:
-            raise LookupError("no active memory core")
-        if request.activity_id != core.activity_id:
-            raise Conflict("parent control must identify the intended current activity")
-        core.control(request.event_id, request.command)
-        ended(core, background)
-        return core.snapshot()
-
-    @app.websocket("/api/student/events")
+    @app.websocket("/api/class/events")
     async def events(socket: WebSocket):
         token = socket.headers.get("sec-websocket-protocol", "").removeprefix("project-j.")
         try:
-            core = controller().student(token)
+            core = controller().classroom(token)
         except PermissionError:
             await socket.close(code=1008)
             return
         await socket.accept(subprotocol=f"project-j.{token}")
         connections[socket] = core.activity_id
-        log.info("student socket opened activity=%s", core.activity_id)
+        log.info("class socket opened activity=%s", core.activity_id)
         send_lock = asyncio.Lock()
         jobs = set()
 
         async def handle(message):
             try:
-                controller().student(token)
+                if controller().classroom(token) is not core:
+                    raise PermissionError("the socket's class has ended")
                 if message["kind"] == "input":
                     request = TextInput.model_validate(message["payload"])
                     await controller().adapter.text(
@@ -910,7 +972,7 @@ def create_app(
                         request.related_event_id,
                     )
                 elif message["kind"] == "control":
-                    request = StudentControl.model_validate(message["payload"])
+                    request = Control.model_validate(message["payload"])
                     core.control(request.event_id, request.command)
                 elif message["kind"] == "delivery":
                     feedback = DeliveryFeedback.model_validate(message["payload"])
@@ -918,7 +980,8 @@ def create_app(
                     controller().late_delivery(feedback)
                 else:
                     raise ValueError("unknown event kind")
-                controller().student(token)
+                if controller().classroom(token) is not core:
+                    raise PermissionError("the socket's class has ended")
                 async with send_lock:
                     await socket.send_json(
                         {"reply_to": message.get("id"), "snapshot": controller().student_view(core)}
@@ -930,9 +993,7 @@ def create_app(
                 await socket.close(code=1008)
                 connections.pop(socket, None)
             except (ValueError, LookupError) as error:
-                log.warning(
-                    "student socket refused kind=%s %s", message.get("kind"), describe(error)
-                )
+                log.warning("class socket refused kind=%s %s", message.get("kind"), describe(error))
                 async with send_lock:
                     await socket.send_json({"reply_to": message.get("id"), "error": str(error)})
 
@@ -948,7 +1009,7 @@ def create_app(
             pass
         finally:
             connections.pop(socket, None)
-            log.info("student socket closed activity=%s", core.activity_id)
+            log.info("class socket closed activity=%s", core.activity_id)
             for job in jobs:
                 job.cancel()
 
@@ -965,16 +1026,21 @@ def create_app(
 
 def main(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(
-        description="Start Project J's loopback simulation, or the adult check with real providers."
+        description="Start Project J's loopback simulation, or study with real providers."
     )
     parser.add_argument("--run-id", default="local-simulation")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument(
-        "--adult-check",
+        "--study",
         action="store_true",
-        help="成人实际检查：真实模型、本机发音评分与本机合成，数据写project_j/private/adult_checks",
+        help="正式学习：真实模型、本机发音评分与本机合成，数据写project_j/private/study",
     )
     parser.add_argument("--simulation-root", type=Path, default=argparse.SUPPRESS)
+    parser.add_argument(
+        "--onboarding",
+        action="store_true",
+        help="调试用，只作用于模拟：从建档开始，不用固定的模拟学习资料与首个需求",
+    )
     debug = "调试用，只作用于模拟适配器和存储："
     parser.add_argument(
         "--model-delay",
@@ -988,17 +1054,20 @@ def main(argv: list[str] | None = None):
         help=f"{debug}注入一次失败，如fact:before_commit、after_commit、ledger或model",
     )
     args = vars(parser.parse_args(argv))
-    adult = args.pop("adult_check")
+    study = args.pop("study")
+    onboarding = args.pop("onboarding")
     simulation_only = {"simulation_root", "model_delay", "fail_once"} & set(args)
-    if adult and simulation_only:
-        parser.error("--adult-check 不能与模拟调试选项同用：" + "、".join(sorted(simulation_only)))
-    settings = Settings(**args, realm="adult_check" if adult else "simulation")
+    if onboarding:
+        simulation_only.add("onboarding")
+    if study and simulation_only:
+        parser.error("--study 不能与模拟调试选项同用：" + "、".join(sorted(simulation_only)))
+    settings = Settings(**args, realm="study" if study else "simulation", onboarding=onboarding)
     coordinator = build_coordinator(settings)
-    link = f"http://127.0.0.1:{settings.port}/#parent={coordinator.parent_token}"
-    if adult:
+    link = f"http://127.0.0.1:{settings.port}/#token={coordinator.token}"
+    if study:
         announce = [
-            f"成人实际检查工作台：{link}",
-            "真实模型、本机发音评分与本机合成；录音只在本机内存交评分，不落盘；儿童入口仍关闭。",
+            f"正式学习：{link}",
+            "真实模型、本机发音评分与本机合成；录音只在内存交评分，不落盘。",
         ]
     else:
         simulated = coordinator.models.adapters["simulated"]
@@ -1007,8 +1076,8 @@ def main(argv: list[str] | None = None):
         if settings.fail_once != "model":
             coordinator.store.fail_at = settings.fail_once
         announce = [
-            f"隔离模拟工作台：{link}",
-            "真实API/声音/儿童入口未验证且关闭；不加载.env、不调用麦克风。",
+            f"隔离模拟：{link}",
+            "模拟提供者；不加载.env、不调用麦克风，内容不是学习记录。",
         ]
         if settings.model_delay or settings.fail_once:
             announce.append(

@@ -55,12 +55,12 @@ LIMITATIONS = {
     "simulation": (
         "明确模拟；外部帮助、保持与迁移未知。",
         "明确模拟录音与模拟评分；不代表真实发音。",
-        "明确模拟活动，不能作为儿童学习证据。",
+        "明确模拟活动，不是学习记录。",
     ),
-    "adult_check": (
-        "成人实际检查；外部帮助、保持与迁移未知。",
-        "成人实际检查录音，交本机发音评分；评分门槛未校准。",
-        "成人实际检查活动，不能作为儿童学习证据。",
+    "study": (
+        "学生实际学习；外部帮助、保持与迁移未知。",
+        "学生朗读录音，交本机发音评分；评分门槛未校准。",
+        "学生实际学习活动；保持与迁移未知。",
     ),
 }
 HELP_ORDER = {"none": 0, "light_prompt": 1, "scaffold": 2, "full_model": 3, "unknown": 4}
@@ -117,7 +117,7 @@ class Harness:
         models: ModelService,
         scorer: PronunciationScorer | None = None,
         *,
-        realm: Literal["simulation", "adult_check"] = "simulation",
+        realm: Literal["simulation", "study"] = "simulation",
         jane: dict | None = None,
         voiced: frozenset[str] = frozenset(),
         visible: tuple[ResourceSpec, ...] = (),

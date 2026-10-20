@@ -12,6 +12,8 @@ from support import (
     confirmed,
     deliver_all,
     judgments,
+    next_course,
+    prepare_course,
     read_aloud_all,
     ready,
     start,
@@ -64,7 +66,7 @@ def test_all_template_sentence_frames_and_saved_c2_follow_the_corrected_flow(app
         assert core.mode == "ended"
         fact = app.seal()
         app.feedback("feedback", LEARNER, core.activity_id, "明确模拟：无额外补充")
-        result = await app.next_course("next", LEARNER, core.activity_id)
+        result = await next_course(app, "next", LEARNER, core.activity_id)
         course_ref = RevisionRef.model_validate(result["next_package"]["course_ref"])
         course = app.store.read(course_ref, LEARNER)
         assert course.body["demand_ref"] == app.current(LEARNER, "demand").ref.model_dump()
@@ -141,28 +143,14 @@ def test_legal_confirmation_replays_and_closes_without_learning_attempts(applica
 def test_api_rejects_confirmation_at_answer_wait_without_a_model_call(application):
     app = application
     with TestClient(create_app(Settings(), app)) as client:
-        parent = {"Authorization": f"Bearer {app.parent_token}"}
-        prepared = client.post(
-            "/api/parent/prepare",
-            headers=parent,
-            json={"request_id": "prepare", "learner_id": LEARNER},
-        ).json()
+        prepared = prepare_course(app, "prepare")
         confirmed(app, prepared)
-        started = client.post(
-            "/api/parent/start",
-            headers=parent,
-            json={
-                "request_id": "start",
-                "learner_id": LEARNER,
-                "course_ref": prepared["course_ref"],
-                "conditions": CONDITIONS,
-            },
-        ).json()
-        student = {"Authorization": f"Bearer {started['student_token']}"}
+        app.start("start", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS)
+        student = {"Authorization": f"Bearer {app.token}"}
         deliver_all(app.core)
         assert (
             client.post(
-                "/api/student/input",
+                "/api/class/input",
                 headers=student,
                 json={"event_id": "goal", "text": "收到", "intent": "confirmation"},
             ).status_code
@@ -170,7 +158,7 @@ def test_api_rejects_confirmation_at_answer_wait_without_a_model_call(applicatio
         )
         deliver_all(app.core)
         wrong = client.post(
-            "/api/student/input",
+            "/api/class/input",
             headers=student,
             json={"event_id": "wrong", "text": "收到", "intent": "confirmation"},
         )
@@ -179,7 +167,7 @@ def test_api_rejects_confirmation_at_answer_wait_without_a_model_call(applicatio
         assert not app.core.attempts and not judgments(app)
         assert (
             client.post(
-                "/api/student/input",
+                "/api/class/input",
                 headers=student,
                 json={"event_id": "answer", "text": "she wants a bridge"},
             ).status_code
@@ -187,36 +175,22 @@ def test_api_rejects_confirmation_at_answer_wait_without_a_model_call(applicatio
         )
         assert app.core.attempts[-1]["judgment"] == "correct"
         client.post(
-            "/api/student/control", headers=student, json={"event_id": "stop", "command": "stop"}
+            "/api/class/control", headers=student, json={"event_id": "stop", "command": "stop"}
         )
 
 
 def test_api_accepts_a_base64_recording_only_on_a_reading_segment(application):
     app = application
     with TestClient(create_app(Settings(), app)) as client:
-        parent = {"Authorization": f"Bearer {app.parent_token}"}
-        prepared = client.post(
-            "/api/parent/prepare",
-            headers=parent,
-            json={"request_id": "prepare", "learner_id": LEARNER},
-        ).json()
+        prepared = prepare_course(app, "prepare")
         confirmed(app, prepared)
-        started = client.post(
-            "/api/parent/start",
-            headers=parent,
-            json={
-                "request_id": "start",
-                "learner_id": LEARNER,
-                "course_ref": prepared["course_ref"],
-                "conditions": CONDITIONS,
-            },
-        ).json()
-        student = {"Authorization": f"Bearer {started['student_token']}"}
+        app.start("start", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS)
+        student = {"Authorization": f"Bearer {app.token}"}
         core = app.core
 
         def say(event_id, text, intent="unknown"):
             reply = client.post(
-                "/api/student/input",
+                "/api/class/input",
                 headers=student,
                 json={"event_id": event_id, "text": text, "intent": intent},
             )
@@ -225,7 +199,7 @@ def test_api_accepts_a_base64_recording_only_on_a_reading_segment(application):
 
         def recording(event_id, audio_base64):
             return client.post(
-                "/api/student/recording",
+                "/api/class/recording",
                 headers=student,
                 json={
                     "event_id": event_id,

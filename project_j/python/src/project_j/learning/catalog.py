@@ -17,7 +17,7 @@ class Capability(Contract):
     definition: str = Field(min_length=1)
     aliases: tuple[str, ...] = ()
     split_from: RevisionRef | None = None
-    limitations: tuple[str, ...] = ("模拟目录；定义不构成学习观察或掌握。",)
+    limitations: tuple[str, ...] = ("定义不构成学习观察或掌握。",)
 
     @model_validator(mode="after")
     def names(self):

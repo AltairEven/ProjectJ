@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { describe, discussionLines, evaluationLines, missingResources, modelLines, resourceLines, startMessage } from '../src/report.ts'
+import { describe, discussionLines, evaluationLines, modelLines, resourceLines } from '../src/report.ts'
 
 const doc = (object_id, revision, kind, body) => ({ object_id, revision, kind, body })
 const docs = [
@@ -21,12 +21,6 @@ test('next-course results read as labelled Chinese rows with what each saved obj
   assert.equal(rows.get('学习状态'), '修订2：阅读事实与顺序：需要帮助')
   assert.equal(rows.get('计划'), '修订1（当前已是修订2）')
   assert.equal(rows.get('计划处理'), '沿用并说明理由')
-})
-
-test('a start without a classroom says what is missing or failed in Chinese', () => {
-  assert.equal(startMessage({ decision: 'waiting', missing: ['materials', 'accompaniment'] }), '尚不能开始，待确认：材料、陪伴。')
-  assert.match(startMessage({ decision: 'blocked', missing: [], reason: 'required household condition failed' }), /本次不开课/)
-  assert.equal(startMessage({ decision: 'blocked', reason: 'new reason' }), '尚不能开始（new reason）。')
 })
 
 test('a fast tier binding and its probe item read as Fast', () => {
@@ -80,7 +74,7 @@ test('model status reads as Chinese lines without any credential field', () => {
 test('an evaluation reads as summary, evidence, unknowns, differences and per-task lines', () => {
   const evaluation = doc('e', 1, 'evaluation', {
     report: { summary: '完成两题。', strongest: ['首题初答对'], uncertain: [], alignment: '离屏未做。' },
-    tasks: [{ task_id: 'reading-fact', dimension_id: 'english.reading.facts', working_judgment: 'single_independent', explanation: '初答正确，家长说没有帮忙。' }],
+    tasks: [{ task_id: 'reading-fact', dimension_id: 'english.reading.facts', working_judgment: 'single_independent', explanation: '初答正确，学生说没有求助。' }],
     checks: [{ attempt_id: 'a2', task_id: 'reading-sequence', reason: '单次独立的条件不足' }],
   })
   const rows = evaluationLines(evaluation, docs)
@@ -88,7 +82,7 @@ test('an evaluation reads as summary, evidence, unknowns, differences and per-ta
   assert.deepEqual(rows[1], ['最有依据', '首题初答对'])
   assert.deepEqual(rows[2], ['尚未确定', '无'])
   assert.deepEqual(rows[3], ['课程与课堂差异', '离屏未做。'])
-  assert.deepEqual(rows[4], ['阅读事实与顺序·reading-fact', '单次独立：初答正确，家长说没有帮忙。'])
+  assert.deepEqual(rows[4], ['阅读事实与顺序·reading-fact', '单次独立：初答正确，学生说没有求助。'])
   assert.deepEqual(rows.at(-1), ['规则调整', 'reading-sequence：单次独立的条件不足'])
 })
 
@@ -109,7 +103,7 @@ test('a model-planned demand explains its change and an uncovered goal reads as 
       direction: 'observe', primary_goal: { dimension_id: 'science.observation.report', description: '说出纸桥的实际条件与结果' },
       note: { before: '阅读事实', after: '实际观察报告', why: '阅读两题都需要提示', uncertain: ['保持', '迁移'], expectation: '先报告实际条件' },
     }),
-    doc('r', 1, 'review', { conclusion: '先补实际报告', unknown: ['家庭负担'], checks: ['预算固定30分钟，改动不生效。'] }),
+    doc('r', 1, 'review', { conclusion: '先补实际报告', unknown: ['可用时间'], checks: ['预算固定30分钟，改动不生效。'] }),
   ]
   const rows = new Map(describe({
     next_package: { status: 'not_ready', reason: '课程未就绪：现有固定课程只覆盖英语阅读事实与英语短报告。' },
@@ -126,7 +120,7 @@ test('a model-planned demand explains its change and an uncovered goal reads as 
   assert.match(rows.get('原因'), /^课程未就绪：现有固定课程/)
   assert.equal(rows.get('计划处理'), '已调整')
   assert.equal(rows.get('计划理由'), '本周先补样本')
-  assert.equal(rows.get('仍未知'), '家庭负担')
+  assert.equal(rows.get('仍未知'), '可用时间')
   assert.equal(rows.get('规则调整'), '预算固定30分钟，改动不生效。')
 })
 
@@ -136,21 +130,20 @@ test('resource lines show stage, spoken words, versions and adoption', () => {
   const lines = resourceLines({ resources: [
     demo,
     { resource_id: 'cup', kind: 'image', purpose: '展示两个杯子', required: false, stage: 'help', fallback: '拿出实物杯子。', state: 'planned' },
-    { resource_id: 'clip', kind: 'video', purpose: '倒水', required: false, stage: 'question', fallback: '家长演示。', state: 'not_connected' },
+    { resource_id: 'clip', kind: 'video', purpose: '倒水', required: false, stage: 'question', fallback: '自己演示。', state: 'not_connected' },
     { resource_id: 'voice:goal', kind: 'audio', purpose: '开场说明', text: '我是Jane。', required: false, stage: 'question', fallback: '现场合成。',
       state: 'adopted', versions: [{ version: 1 }], adopted_version: 1 },
   ] })
   assert.deepEqual(lines, [
     '语音（必需，求助后）：朗读示范：read-aloud-1「Mia has paper.」；没有时：采用后才能开课。——待查看，采用第1版，共2版',
     '图片（可选，求助后）：展示两个杯子；没有时：拿出实物杯子。——已列入清单，确认后生成',
-    '视频（可选，提问时）：倒水；没有时：家长演示。——未接入',
+    '视频（可选，提问时）：倒水；没有时：自己演示。——未接入',
     '语音（可选，提问时）：开场说明「我是Jane。」；没有时：现场合成。——已采用，采用第1版，共1版',
   ])
   assert.deepEqual(resourceLines({ resources: [] }), [])
-  assert.deepEqual(missingResources({ resources: [demo, { ...demo, purpose: '朗读示范：read-aloud-2', adopted_version: null }] }), ['朗读示范：read-aloud-2'])
 })
 
-test('discussion rounds read as the parent feedback and what the model changed', () => {
+test('discussion rounds read as the student feedback and what the model changed', () => {
   assert.deepEqual(discussionLines({ discussion: [{ feedback: '第一题再简单一点。', note: '第一题改得更直接。' }], confirmation: null }), [
     ['第1轮意见', '第一题再简单一点。'],
     ['第1轮修改说明', '第一题改得更直接。'],

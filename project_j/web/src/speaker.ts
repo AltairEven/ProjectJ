@@ -1,4 +1,4 @@
-// Jane's voice for an approved action: audio first, the text only after it (parent's decision).
+// Jane's voice for an approved action: audio first, the text only after it.
 import { decodePcm16, encodeWav } from './audio.ts'
 import type { AllowedAction, DeliveryFeedback } from './client/types.gen'
 
@@ -36,7 +36,7 @@ export function startedReport(action: AllowedAction, deliveryId: string, occurre
   return audio(action, deliveryId, 1, 'started', ['audio'], occurredAt)
 }
 
-// What to report once a sentence's audio ends, in sending order. When the child cut in or the
+// What to report once a sentence's audio ends, in sending order. When the student cut in or the
 // audio failed, the full text is shown and reported first so the core waits for input; the audio
 // outcome then only adds to the record. Halted sentences (pause, stop, replaced) show no text.
 export function reportsFor(action: AllowedAction, outcome: Outcome, halted: boolean, deliveryId: string, now: Date): DeliveryFeedback[] {
@@ -59,6 +59,9 @@ export function visualReport(action: AllowedAction, shown: string[], now: Date):
     activity_id: action.activity_id, task_instance_id: action.task_instance_id, sequence: 1, output_device_id: 'browser-screen',
     modality: 'image', status, delivered_range: shown, occurred_at: now.toISOString() }
 }
+
+export const speechPath = (actionId: string) => `/api/class/speech/${encodeURIComponent(actionId)}`
+export const playbackPath = '/api/class/playback'
 
 export class Speaker {
   private context = new AudioContext()
@@ -130,14 +133,14 @@ export class Speaker {
   // Diagnosis only: a lost report changes nothing in class.
   private report(action: AllowedAction, outcome: Outcome['kind'], counts: Counts) {
     const body = { action_id: action.action_id, outcome, ...playbackOf(counts.rate ?? this.context.sampleRate, counts, statsOf(this.context)) }
-    void fetch('/api/student/playback', { method: 'POST', body: JSON.stringify(body),
+    void fetch(playbackPath, { method: 'POST', body: JSON.stringify(body),
       headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' } }).catch(() => undefined)
   }
 
   private async stream(action: AllowedAction, signal: AbortSignal, begin: () => void, settle: (kind: Outcome['kind']) => void, counts: Counts) {
     if (this.locked) await new Promise<void>(release => this.waiting.push(release))
     if (signal.aborted) return
-    const response = await fetch(`/api/student/speech/${encodeURIComponent(action.action_id)}`,
+    const response = await fetch(speechPath(action.action_id),
       { headers: { Authorization: `Bearer ${this.token}` }, signal })
     if (!response.ok || !response.body) return settle('failed')
     const rate = Number(/rate=(\d+)/.exec(response.headers.get('content-type') ?? '')?.[1] ?? 24000)

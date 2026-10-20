@@ -39,10 +39,10 @@ STORY = story_text((ROOT / FIRST).read_text())
 def initial(application):
     demand = application.current(LEARNER, "demand")
     body = DemandBody.model_validate(demand.body)
-    household = application.store.read(body.household_ref, LEARNER).body
+    profile = application.store.read(body.profile_ref, LEARNER).body
     return body, {
         "state": application.current(LEARNER, "state").body,
-        "household": household,
+        "profile": profile,
         "catalog": [doc.body for doc in application.store.list_current(LEARNER, "capability")],
     }
 
@@ -55,7 +55,7 @@ def build(application, template=True):
     return preparation_request(
         demand,
         data["state"],
-        data["household"],
+        data["profile"],
         data["catalog"],
         JANE,
         library,
@@ -370,8 +370,25 @@ def application_material(story):
     return Document.model_construct(body={"asset": {"sha256": "x"}})
 
 
-def test_instructions_keep_adult_notes_out_of_what_the_child_sees():
+def test_instructions_keep_notes_out_of_what_jane_says():
     from project_j.preparation.drafting import PREPARATION_INSTRUCTIONS
 
-    assert "prompt是Jane对孩子说的话" in PREPARATION_INSTRUCTIONS
+    assert "prompt是Jane对学生说的话" in PREPARATION_INSTRUCTIONS
     assert "写进preview或brief" in PREPARATION_INSTRUCTIONS
+
+
+def test_no_offscreen_task_without_materials(application):
+    demand, _ = initial(application)
+    draft = template_draft(demand, FIRST, STORY)
+    assert any(task["purpose"] == "offscreen" for task in draft["tasks"])
+    with pytest.raises(DraftRejected) as error:
+        checked_course(
+            CourseDraft.model_validate(draft),
+            demand,
+            **REFS,
+            library=library(),
+            read=set(),
+            catalog_ids=CATALOG,
+            offscreen_allowed=False,
+        )
+    assert ("offscreen", "学习资料里没有可用实物，不能安排离屏任务") in error.value.problems

@@ -1,5 +1,6 @@
 """P1a body mapping of the existing shared contract; no learning inference."""
 
+import re
 from typing import Annotated, Literal, Self
 
 from pydantic import AwareDatetime, Field, TypeAdapter, model_validator
@@ -15,8 +16,8 @@ class Goal(Contract):
     description: Text
 
 
-class ParentNote(Contract):
-    """What the parent reads about one revision: before, after, why, unknowns, next lesson."""
+class PlanNote(Contract):
+    """What the student reads about one revision: before, after, why, unknowns, next lesson."""
 
     before: Text
     after: Text
@@ -88,11 +89,19 @@ class SuggestionChoice(Contract):
     reason: Text
 
 
+class ProposedCapability(Contract):
+    """A capability outside the catalog that planning proposes with a goal (ADR-0018)."""
+
+    dimension_id: Text
+    name: Text
+    definition: Text
+
+
 class DemandBody(Contract):
     status: Literal["draft", "checked"]
     state_ref: RevisionRef
     plan_ref: RevisionRef
-    household_ref: RevisionRef
+    profile_ref: RevisionRef
     primary_goal: Goal
     auxiliary_goal: Goal
     budget_minutes: Literal[30]
@@ -107,7 +116,12 @@ class DemandBody(Contract):
     direction: Literal["consolidate", "review", "extend", "advance", "observe"] | None = None
     plan_effect: Literal["reused", "adjusted"] | None = None
     plan_reason: Text | None = None
-    note: ParentNote | None = None
+    note: PlanNote | None = None
+    # A placement lesson is the onboarding test; a goal change waits for the student.
+    purpose: Literal["lesson", "placement"] = "lesson"
+    goal_confirmation: Literal["needed", "confirmed"] | None = None
+    proposed_capabilities: tuple[ProposedCapability, ...] = ()
+    goal_reason: Text | None = None
 
     @model_validator(mode="after")
     def goals_and_choices(self) -> Self:
@@ -119,19 +133,45 @@ class DemandBody(Contract):
         return self
 
 
-class HouseholdBody(Contract):
-    status: Literal["draft", "checked"]
-    raw_report: Text
-    provider: Text
-    reported_at: AwareDatetime
-    applies_to: tuple[Text, ...] = Field(min_length=1)
-    limitations: tuple[Text, ...]
+def normalize_lexile(raw: str) -> str:
+    """A Lexile measure as "650L" or "BR100L"; anything else is refused, never guessed."""
+    value = re.sub(r"\s+", "", raw).upper()
+    if not re.fullmatch(r"(BR)?\d{1,4}L", value):
+        raise ValueError("蓝思值写成“数字+L”（如650L）或“BR+数字+L”（如BR100L）")
+    return value
+
+
+class ChatTurn(Contract):
+    question: Text
+    answer: Text
+
+
+class ProfileBody(Contract):
+    """The learner's own account, read by planning and preparation (ADR-0018)."""
+
+    status: Literal["checked"] = "checked"
+    confirmed: bool = False  # The student confirmed it (onboarding ends there).
+    lexile: Text | None = None
+    chat: tuple[ChatTurn, ...] = ()
+    background: Text | None = None
+    interests: Text | None = None
+    weekly_time: Text | None = None
+    focus: Text | None = None
+    materials: Text | None = None  # Usable things; none means no offscreen task.
+    summarized: bool = False
+    limitations: tuple[Text, ...] = ()
+
+    @model_validator(mode="after")
+    def lexile_form(self) -> Self:
+        if self.lexile is not None and normalize_lexile(self.lexile) != self.lexile:
+            raise ValueError("lexile must be stored in its normal form")
+        return self
 
 
 class SimulationRecord(ObjectEnvelope):
-    # Simulation or adult check; ObjectEnvelope keeps realm and source paired, family is excluded.
-    realm: Literal["simulation", "adult_check"] = "simulation"
-    source_type: Literal["simulated", "adult"] = "simulated"
+    # ObjectEnvelope keeps realm and source paired.
+    realm: Literal["simulation", "study"] = "simulation"
+    source_type: Literal["simulated", "student"] = "simulated"
     owner: Literal["learning"] = "learning"
     received_at: AwareDatetime
 
@@ -186,18 +226,17 @@ class LearningDemand(SimulationRecord):
     def references(self) -> tuple[RevisionRef, ...]:
         return (
             super().references
-            + (self.body.state_ref, self.body.plan_ref, self.body.household_ref)
+            + (self.body.state_ref, self.body.plan_ref, self.body.profile_ref)
             + tuple(choice.suggestion_ref for choice in self.body.suggestion_choices)
         )
 
 
-class HouseholdConditions(SimulationRecord):
-    kind: Literal["household"] = "household"
-    learner_id: None = None
-    body: HouseholdBody
+class LearnerProfile(SimulationRecord):
+    kind: Literal["profile"] = "profile"
+    body: ProfileBody
 
 
 StoredRecord = Annotated[
-    LearningState | LearningPlan | LearningDemand | HouseholdConditions, Field(discriminator="kind")
+    LearningState | LearningPlan | LearningDemand | LearnerProfile, Field(discriminator="kind")
 ]
 record_adapter = TypeAdapter(StoredRecord)

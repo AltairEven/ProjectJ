@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { playbackOf, reportsFor, startedReport, visualReport } from '../src/speaker.ts'
+import { playbackOf, playbackPath, reportsFor, speechPath, startedReport, visualReport } from '../src/speaker.ts'
 
 const action = { action_id: 'a1', activity_id: 'act', task_instance_id: 't1', text: '你好' }
 const now = new Date('2026-10-18T00:00:00Z')
@@ -22,7 +22,7 @@ test('a failure before any audio shows the text first, then records the failure'
     [['d1:text', 'text', 'completed', 1, ['text_content']], ['d1', 'audio', 'failed', 1, []]])
 })
 
-test('a child cutting in mid-sentence gets the full text before the interruption is recorded', () => {
+test('the student cutting in mid-sentence gets the full text before the interruption is recorded', () => {
   assert.deepEqual(shape(reportsFor(action, { kind: 'interrupted', started: true }, false, 'd1', now)),
     [['d1:text', 'text', 'completed', 1, ['text_content']], ['d1', 'audio', 'interrupted', 2, ['audio_partial']]])
 })
@@ -63,4 +63,9 @@ test('a picture report names the visuals that actually displayed', () => {
   assert.deepEqual(shape(visualReport(pictured, ['cup-picture', 'cup-motion'], now)), ['a1:visual', 'image', 'completed', 1, ['cup-picture', 'cup-motion']])
   assert.deepEqual(shape(visualReport(pictured, ['cup-motion'], now)), ['a1:visual', 'image', 'partial', 1, ['cup-motion']])
   assert.deepEqual(shape(visualReport(pictured, [], now)), ['a1:visual', 'image', 'failed', 1, []])
+})
+
+test('class speech and playback reports use the class routes', () => {
+  assert.equal(speechPath('a b'), '/api/class/speech/a%20b')
+  assert.equal(playbackPath, '/api/class/playback')
 })

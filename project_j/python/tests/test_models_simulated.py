@@ -98,7 +98,7 @@ def test_judgment_instructions_carry_the_reference_set_fixes():
     """Baseline judgment-ref-20261019: answer words leaked, retries invited, adult wording."""
     request = judgment_request(task(), "a car", 0, False, 10)
     assert "不说出evidence中能直接回答本题的词" in request.instructions
-    assert "不再要求孩子重说" in request.instructions
+    assert "不再要求学生重说" in request.instructions
     assert "不出现“依据”" in request.instructions
 
 

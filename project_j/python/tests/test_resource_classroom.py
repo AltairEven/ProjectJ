@@ -135,15 +135,15 @@ def test_visuals_follow_their_stage(application, monkeypatch):
 def test_student_speech_and_visual_endpoints(application, monkeypatch):
     with TestClient(create_app(Settings(), application)) as client:
         result, core = visual_class(application, monkeypatch)
-        student = {"Authorization": f"Bearer {result['student_token']}"}
+        student = {"Authorization": f"Bearer {application.token}"}
         question = core.actions[core.presented]
-        url = f"/api/student/visual/{question.action_id}"
+        url = f"/api/class/visual/{question.action_id}"
         picture = client.get(f"{url}/cup-picture", headers=student)
         assert picture.status_code == 200 and picture.content == solid_png()
         assert picture.headers["content-type"] == "image/png"
         assert picture.headers["content-security-policy"] == "sandbox"
         assert client.get(f"{url}/cup-motion", headers=student).status_code == 404
-        assert client.get(f"{url}/cup-picture").status_code == 403
+        assert client.get(f"{url}/cup-picture").status_code == 401
         core.control(str(uuid4()), "stop")
 
 
@@ -157,10 +157,10 @@ def test_speech_plays_the_recorded_demonstration(application):
             return core
 
         core = asyncio.run(scenario())
-        token = application.start_requests["start1"]["result"]["student_token"]
+        token = application.token
         demo = core.actions[core.presented]
         reply = client.get(
-            f"/api/student/speech/{demo.action_id}", headers={"Authorization": f"Bearer {token}"}
+            f"/api/class/speech/{demo.action_id}", headers={"Authorization": f"Bearer {token}"}
         )
         assert reply.status_code == 200
         assert reply.content.endswith(application.recorded[core.reading_task().reference_text])
@@ -171,11 +171,11 @@ def test_speech_plays_the_recorded_demonstration(application):
 def test_a_fully_recorded_sentence_says_so(application):
     with TestClient(create_app(Settings(), application)) as client:
         core = asyncio.run(to_reading(application))
-        token = application.start_requests["start1"]["result"]["student_token"]
+        token = application.token
         question = core.actions[core.pending or core.presented]
         application.recorded[question.speech[0]] = b"\x01\x00" * 8  # As if adopted.
         reply = client.get(
-            f"/api/student/speech/{question.action_id}",
+            f"/api/class/speech/{question.action_id}",
             headers={"Authorization": f"Bearer {token}"},
         )
         # The whole recording is there at once; the page plays it as one file.

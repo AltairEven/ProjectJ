@@ -13,8 +13,8 @@ from project_j.platform.storage import Conflict, SimulationStore, canonical, dig
 
 
 class Request(Contract):
-    realm: Literal["simulation", "adult_check"] = "simulation"
-    source_type: Literal["simulated", "adult"] = "simulated"
+    realm: Literal["simulation", "study"] = "simulation"
+    source_type: Literal["simulated", "student"] = "simulated"
     caller: str = Field(min_length=1)
     request_id: str = Field(min_length=1)
     learner_id: str = Field(min_length=1)
@@ -72,6 +72,18 @@ class Ledger:
         ):
             raise Conflict("same request identity has different content, purpose or learner")
         return json.loads(row["result"]) if row["result"] else None
+
+    def done(self, request_id: str) -> bool:
+        """Whether the operation of this request identity finished with a result."""
+        self.store.ensure_idle()
+        table = self.store.tables["operations"]
+        with self.store.engine.begin() as connection:
+            row = connection.execute(
+                select(table.c.result).where(
+                    table.c.caller == "simulation_parent", table.c.request_id == request_id
+                )
+            ).one_or_none()
+        return row is not None and row.result is not None
 
     def accept(self, request: Request, planned_operation_id: str | None = None) -> str:
         table = self.store.tables["operations"]

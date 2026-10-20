@@ -2,7 +2,7 @@
   "name": "project-j-p0-web-baseline",
   "version": "0.0.0",
   "private": true,
-  "description": "Project J parent workbench and isolated fictional classroom",
+  "description": "Project J self-study main page and classroom",
   "packageManager": "npm@11.20.0",
   "dependencies": {
     "react": "^19.3.0",

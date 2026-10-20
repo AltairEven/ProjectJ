@@ -5,8 +5,8 @@
     "owner": "learning",
     "realm": "simulation",
     "source_type": "simulated",
-    "learner_id": null,
-    "scope": "explicit shared fictional conditions",
+    "learner_id": "fictional-L1",
+    "scope": "explicit fictional learner profile",
     "occurred_at": null,
     "received_at": "2026-10-12T12:00:00Z",
     "created_at": "2026-10-12T12:00:00Z",
@@ -15,18 +15,16 @@
     "limitations": [
       "明确模拟的初始条件，没有真实学习观察。"
     ],
-    "object_id": "sim-household-1",
-    "kind": "household",
+    "object_id": "sim-profile-1",
+    "kind": "profile",
     "body": {
       "status": "checked",
-      "raw_report": "模拟：有30分钟、纸、同一本书和小车，家长可陪伴。",
-      "provider": "模拟家长",
-      "reported_at": "2026-10-12T12:00:00Z",
-      "applies_to": [
-        "fictional-L1"
-      ],
+      "confirmed": true,
+      "lexile": "500L",
+      "materials": "纸、同一本书和小车",
+      "summarized": true,
       "limitations": [
-        "只用于隔离模拟；不代表真实设备或家庭条件。"
+        "只用于隔离模拟；不是学习记录。"
       ]
     }
   },
@@ -145,10 +143,6 @@
         "object_id": "sim-plan-l1",
         "revision": 1
       },
-      "household_ref": {
-        "object_id": "sim-household-1",
-        "revision": 1
-      },
       "primary_goal": {
         "dimension_id": "english.reading.facts",
         "description": "观察故事事实和顺序的理解及文本依据"
@@ -171,7 +165,11 @@
       "fallback": "只有经核实不依赖声音判断的任务才可使用文字备用。",
       "gaps": [
         "材料、时间及陪伴只为明确模拟声明；本次开课尚未检查。"
-      ]
+      ],
+      "profile_ref": {
+        "object_id": "sim-profile-1",
+        "revision": 1
+      }
     }
   }
 ]

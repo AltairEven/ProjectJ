@@ -84,12 +84,7 @@ class PrivateFiles:
         with self.store.engine.begin() as connection:
             rows = connection.execute(self.store.tables["revisions"].select()).mappings()
             documents = [Document.model_validate_json(row["payload"]) for row in rows]
-        documents = [
-            doc
-            for doc in documents
-            if doc.learner_id in {None, learner_id}
-            and (doc.kind != "household" or learner_id in doc.body.get("applies_to", []))
-        ]
+        documents = [doc for doc in documents if doc.learner_id in {None, learner_id}]
         for doc in documents:
             self.store.boundary(doc, learner_id)
         target = check_path(self.store.run, f"exports/{uuid4()}.json", self.store.realm)

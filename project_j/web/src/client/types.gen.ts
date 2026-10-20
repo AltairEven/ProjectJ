@@ -5,9 +5,9 @@ export type ClientOptions = {
 };
 
 /**
- * ActivityRequest
+ * AcknowledgeRequest
  */
-export type ActivityRequest = {
+export type AcknowledgeRequest = {
     /**
      * Request Id
      */
@@ -17,17 +17,10 @@ export type ActivityRequest = {
      */
     learner_id?: string;
     /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
-    /**
      * Activity Id
      */
     activity_id: string;
+    evaluation_ref: RevisionRef;
 };
 
 /**
@@ -42,14 +35,6 @@ export type AdoptRequest = {
      * Learner Id
      */
     learner_id?: string;
-    /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
     course_ref: RevisionRef;
     /**
      * Resource Id
@@ -172,15 +157,25 @@ export type CatalogRequest = {
      * Learner Id
      */
     learner_id?: string;
-    /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
     capability: Capability;
+};
+
+/**
+ * ChatRequest
+ */
+export type ChatRequest = {
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    /**
+     * Answers
+     */
+    answers: Array<string>;
 };
 
 /**
@@ -213,14 +208,6 @@ export type CorrectionRequest = {
      * Learner Id
      */
     learner_id?: string;
-    /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
     target_ref: RevisionRef;
     /**
      * Owner
@@ -233,9 +220,9 @@ export type CorrectionRequest = {
 };
 
 /**
- * CourseRequest
+ * CourseStartRequest
  */
-export type CourseRequest = {
+export type CourseStartRequest = {
     /**
      * Request Id
      */
@@ -244,15 +231,11 @@ export type CourseRequest = {
      * Learner Id
      */
     learner_id?: string;
-    /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
     course_ref: RevisionRef;
+    /**
+     * Materials Ready
+     */
+    materials_ready?: boolean;
 };
 
 /**
@@ -262,11 +245,16 @@ export type Dashboard = {
     /**
      * Realm
      */
-    realm?: 'simulation' | 'adult_check';
+    realm?: 'simulation' | 'study';
     /**
      * Learner Id
      */
     learner_id?: string;
+    next?: NextStep | null;
+    /**
+     * Jobs
+     */
+    jobs?: Array<JobRow>;
     /**
      * Qualification
      */
@@ -342,14 +330,6 @@ export type DecisionRequest = {
      * Learner Id
      */
     learner_id?: string;
-    /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
     decision_ref: RevisionRef;
     /**
      * Choice
@@ -419,14 +399,6 @@ export type DiscussRequest = {
      * Learner Id
      */
     learner_id?: string;
-    /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
     course_ref: RevisionRef;
     /**
      * Feedback
@@ -463,11 +435,11 @@ export type Document = {
     /**
      * Realm
      */
-    realm?: 'simulation' | 'adult_check';
+    realm?: 'simulation' | 'study';
     /**
      * Source Type
      */
-    source_type?: 'simulated' | 'adult';
+    source_type?: 'simulated' | 'student';
     /**
      * Learner Id
      */
@@ -518,37 +490,9 @@ export type Document = {
 };
 
 /**
- * EvaluationRequest
- */
-export type EvaluationRequest = {
-    /**
-     * Request Id
-     */
-    request_id: string;
-    /**
-     * Learner Id
-     */
-    learner_id?: string;
-    /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
-    /**
-     * Activity Id
-     */
-    activity_id: string;
-    /**
-     * Purpose
-     */
-    purpose: 'next_course' | 'workbench_evaluation' | 'final_feedback';
-};
-
-/**
  * FeedbackRequest
+ *
+ * A note on a lesson; an objection is also a correction to recheck (ADR-0018).
  */
 export type FeedbackRequest = {
     /**
@@ -560,14 +504,6 @@ export type FeedbackRequest = {
      */
     learner_id?: string;
     /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
-    /**
      * Activity Id
      */
     activity_id: string;
@@ -576,11 +512,28 @@ export type FeedbackRequest = {
      */
     text: string;
     /**
-     * Corrections
+     * Objection
      */
-    corrections?: Array<{
-        [key: string]: JsonValue;
-    }>;
+    objection?: boolean;
+};
+
+/**
+ * GoalDecision
+ */
+export type GoalDecision = {
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    demand_ref: RevisionRef;
+    /**
+     * Choice
+     */
+    choice: 'accept' | 'reject';
 };
 
 /**
@@ -608,7 +561,61 @@ export type InputResult = {
     event_id?: string | null;
 };
 
+/**
+ * JobRetry
+ */
+export type JobRetry = {
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * JobRow
+ */
+export type JobRow = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * State
+     */
+    state: 'running' | 'failed';
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Progress
+     */
+    progress?: string | null;
+};
+
 export type JsonValue = unknown;
+
+/**
+ * LexileRequest
+ */
+export type LexileRequest = {
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    /**
+     * Lexile
+     */
+    lexile: string;
+};
 
 /**
  * LostReportRequest
@@ -623,14 +630,6 @@ export type LostReportRequest = {
      */
     learner_id?: string;
     /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
-    /**
      * Activity Id
      */
     activity_id: string;
@@ -638,6 +637,22 @@ export type LostReportRequest = {
      * Text
      */
     text: string;
+};
+
+/**
+ * NextStep
+ */
+export type NextStep = {
+    /**
+     * Kind
+     */
+    kind: 'lexile' | 'chat' | 'placement' | 'profile' | 'class' | 'interrupted' | 'decision' | 'evaluation' | 'goal' | 'course' | 'resources' | 'waiting' | 'none';
+    /**
+     * Subject
+     */
+    subject?: {
+        [key: string]: JsonValue;
+    };
 };
 
 /**
@@ -652,14 +667,6 @@ export type ParentRequest = {
      * Learner Id
      */
     learner_id?: string;
-    /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
 };
 
 /**
@@ -728,6 +735,44 @@ export type PreparationResult = {
 };
 
 /**
+ * ProfileRequest
+ */
+export type ProfileRequest = {
+    /**
+     * Background
+     */
+    background: string;
+    /**
+     * Interests
+     */
+    interests: string;
+    /**
+     * Weekly Time
+     */
+    weekly_time: string;
+    /**
+     * Focus
+     */
+    focus: string;
+    /**
+     * Materials
+     */
+    materials?: string | null;
+    /**
+     * Lexile
+     */
+    lexile?: string | null;
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+};
+
+/**
  * RecordingInput
  *
  * One reading segment's recording; it goes only to pronunciation scoring (ADR-0014).
@@ -775,14 +820,6 @@ export type ReleaseRequest = {
      * Learner Id
      */
     learner_id?: string;
-    /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
     restriction_ref: RevisionRef;
     /**
      * Owner
@@ -806,14 +843,6 @@ export type ResourceRequest = {
      * Learner Id
      */
     learner_id?: string;
-    /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
     course_ref: RevisionRef;
     /**
      * Resource Id
@@ -868,14 +897,6 @@ export type ReviewRequest = {
      */
     learner_id?: string;
     /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
-    /**
      * Level
      */
     level: 'week' | 'stage' | 'annual' | 'long_term';
@@ -916,11 +937,11 @@ export type Snapshot = {
     /**
      * Realm
      */
-    realm: 'simulation' | 'adult_check';
+    realm: 'simulation' | 'study';
     /**
      * Source Type
      */
-    source_type: 'simulated' | 'adult';
+    source_type: 'simulated' | 'student';
     /**
      * Mode
      */
@@ -989,99 +1010,6 @@ export type Snapshot = {
 };
 
 /**
- * StartConditions
- */
-export type StartConditions = {
-    /**
-     * Materials
-     */
-    materials: 'reported_available' | 'unavailable' | 'unknown';
-    /**
-     * Time
-     */
-    time: 'reported_30_minutes' | 'unavailable' | 'unknown';
-    /**
-     * Accompaniment
-     */
-    accompaniment: 'reported_present' | 'unavailable' | 'unknown';
-    /**
-     * Raw Report
-     */
-    raw_report: string;
-    /**
-     * Explicit Start
-     */
-    explicit_start: boolean;
-};
-
-/**
- * StartRequest
- */
-export type StartRequest = {
-    /**
-     * Request Id
-     */
-    request_id: string;
-    /**
-     * Learner Id
-     */
-    learner_id?: string;
-    /**
-     * Realm
-     */
-    realm?: 'simulation';
-    /**
-     * Source Type
-     */
-    source_type?: 'simulated';
-    course_ref: RevisionRef;
-    conditions: StartConditions;
-};
-
-/**
- * StartResult
- */
-export type StartResult = {
-    /**
-     * Decision
-     */
-    decision: 'allow_simulation' | 'allow_adult_check' | 'waiting' | 'blocked' | 'interrupted_unknown';
-    /**
-     * Student Token
-     */
-    student_token?: string | null;
-    snapshot?: Snapshot | null;
-    /**
-     * Missing
-     */
-    missing?: Array<string>;
-    /**
-     * Reason
-     */
-    reason?: string | null;
-    /**
-     * Unverified
-     */
-    unverified?: Array<string>;
-};
-
-/**
- * StudentControl
- *
- * Student role: stop/pause at once, ask to repeat, report return; flow control is parental.
- */
-export type StudentControl = {
-    /**
-     * Event Id
-     */
-    event_id: string;
-    /**
-     * Command
-     */
-    command: 'stop' | 'pause' | 'return' | 'repeat';
-};
-
-/**
  * TextInput
  */
 export type TextInput = {
@@ -1135,7 +1063,7 @@ export type ValidationError = {
     };
 };
 
-export type DashboardApiParentDashboardGetData = {
+export type DashboardApiDashboardGetData = {
     body?: never;
     headers?: {
         /**
@@ -1148,31 +1076,31 @@ export type DashboardApiParentDashboardGetData = {
         /**
          * Learner Id
          */
-        learner_id?: string;
+        learner_id?: string | null;
     };
-    url: '/api/parent/dashboard';
+    url: '/api/dashboard';
 };
 
-export type DashboardApiParentDashboardGetErrors = {
+export type DashboardApiDashboardGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DashboardApiParentDashboardGetError = DashboardApiParentDashboardGetErrors[keyof DashboardApiParentDashboardGetErrors];
+export type DashboardApiDashboardGetError = DashboardApiDashboardGetErrors[keyof DashboardApiDashboardGetErrors];
 
-export type DashboardApiParentDashboardGetResponses = {
+export type DashboardApiDashboardGetResponses = {
     /**
      * Successful Response
      */
     200: Dashboard;
 };
 
-export type DashboardApiParentDashboardGetResponse = DashboardApiParentDashboardGetResponses[keyof DashboardApiParentDashboardGetResponses];
+export type DashboardApiDashboardGetResponse = DashboardApiDashboardGetResponses[keyof DashboardApiDashboardGetResponses];
 
-export type PrepareApiParentPreparePostData = {
-    body: ParentRequest;
+export type RetryJobApiJobsRetryPostData = {
+    body: JobRetry;
     headers?: {
         /**
          * Authorization
@@ -1181,28 +1109,26 @@ export type PrepareApiParentPreparePostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/prepare';
+    url: '/api/jobs/retry';
 };
 
-export type PrepareApiParentPreparePostErrors = {
+export type RetryJobApiJobsRetryPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type PrepareApiParentPreparePostError = PrepareApiParentPreparePostErrors[keyof PrepareApiParentPreparePostErrors];
+export type RetryJobApiJobsRetryPostError = RetryJobApiJobsRetryPostErrors[keyof RetryJobApiJobsRetryPostErrors];
 
-export type PrepareApiParentPreparePostResponses = {
+export type RetryJobApiJobsRetryPostResponses = {
     /**
      * Successful Response
      */
-    200: PreparationResult;
+    200: unknown;
 };
 
-export type PrepareApiParentPreparePostResponse = PrepareApiParentPreparePostResponses[keyof PrepareApiParentPreparePostResponses];
-
-export type DiscussApiParentDiscussPostData = {
+export type DiscussApiCourseDiscussPostData = {
     body: DiscussRequest;
     headers?: {
         /**
@@ -1212,57 +1138,28 @@ export type DiscussApiParentDiscussPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/discuss';
+    url: '/api/course/discuss';
 };
 
-export type DiscussApiParentDiscussPostErrors = {
+export type DiscussApiCourseDiscussPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DiscussApiParentDiscussPostError = DiscussApiParentDiscussPostErrors[keyof DiscussApiParentDiscussPostErrors];
+export type DiscussApiCourseDiscussPostError = DiscussApiCourseDiscussPostErrors[keyof DiscussApiCourseDiscussPostErrors];
 
-export type DiscussApiParentDiscussPostResponses = {
+export type DiscussApiCourseDiscussPostResponses = {
     /**
      * Successful Response
      */
     200: PreparationResult;
 };
 
-export type DiscussApiParentDiscussPostResponse = DiscussApiParentDiscussPostResponses[keyof DiscussApiParentDiscussPostResponses];
+export type DiscussApiCourseDiscussPostResponse = DiscussApiCourseDiscussPostResponses[keyof DiscussApiCourseDiscussPostResponses];
 
-export type ConfirmApiParentConfirmPostData = {
-    body: CourseRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/parent/confirm';
-};
-
-export type ConfirmApiParentConfirmPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ConfirmApiParentConfirmPostError = ConfirmApiParentConfirmPostErrors[keyof ConfirmApiParentConfirmPostErrors];
-
-export type ConfirmApiParentConfirmPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type GenerateApiParentGenerateResourcePostData = {
+export type GenerateApiResourceGeneratePostData = {
     body: ResourceRequest;
     headers?: {
         /**
@@ -1272,28 +1169,28 @@ export type GenerateApiParentGenerateResourcePostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/generate-resource';
+    url: '/api/resource/generate';
 };
 
-export type GenerateApiParentGenerateResourcePostErrors = {
+export type GenerateApiResourceGeneratePostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GenerateApiParentGenerateResourcePostError = GenerateApiParentGenerateResourcePostErrors[keyof GenerateApiParentGenerateResourcePostErrors];
+export type GenerateApiResourceGeneratePostError = GenerateApiResourceGeneratePostErrors[keyof GenerateApiResourceGeneratePostErrors];
 
-export type GenerateApiParentGenerateResourcePostResponses = {
+export type GenerateApiResourceGeneratePostResponses = {
     /**
      * Successful Response
      */
     200: ResourceResult;
 };
 
-export type GenerateApiParentGenerateResourcePostResponse = GenerateApiParentGenerateResourcePostResponses[keyof GenerateApiParentGenerateResourcePostResponses];
+export type GenerateApiResourceGeneratePostResponse = GenerateApiResourceGeneratePostResponses[keyof GenerateApiResourceGeneratePostResponses];
 
-export type AdoptApiParentAdoptResourcePostData = {
+export type AdoptApiResourceAdoptPostData = {
     body: AdoptRequest;
     headers?: {
         /**
@@ -1303,28 +1200,28 @@ export type AdoptApiParentAdoptResourcePostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/adopt-resource';
+    url: '/api/resource/adopt';
 };
 
-export type AdoptApiParentAdoptResourcePostErrors = {
+export type AdoptApiResourceAdoptPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AdoptApiParentAdoptResourcePostError = AdoptApiParentAdoptResourcePostErrors[keyof AdoptApiParentAdoptResourcePostErrors];
+export type AdoptApiResourceAdoptPostError = AdoptApiResourceAdoptPostErrors[keyof AdoptApiResourceAdoptPostErrors];
 
-export type AdoptApiParentAdoptResourcePostResponses = {
+export type AdoptApiResourceAdoptPostResponses = {
     /**
      * Successful Response
      */
     200: ResourceResult;
 };
 
-export type AdoptApiParentAdoptResourcePostResponse = AdoptApiParentAdoptResourcePostResponses[keyof AdoptApiParentAdoptResourcePostResponses];
+export type AdoptApiResourceAdoptPostResponse = AdoptApiResourceAdoptPostResponses[keyof AdoptApiResourceAdoptPostResponses];
 
-export type ResourceDownloadApiParentResourceFileGetData = {
+export type ResourceDownloadApiResourceFileGetData = {
     body?: never;
     headers?: {
         /**
@@ -1353,29 +1250,29 @@ export type ResourceDownloadApiParentResourceFileGetData = {
         /**
          * Learner Id
          */
-        learner_id?: string;
+        learner_id?: string | null;
     };
-    url: '/api/parent/resource-file';
+    url: '/api/resource/file';
 };
 
-export type ResourceDownloadApiParentResourceFileGetErrors = {
+export type ResourceDownloadApiResourceFileGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ResourceDownloadApiParentResourceFileGetError = ResourceDownloadApiParentResourceFileGetErrors[keyof ResourceDownloadApiParentResourceFileGetErrors];
+export type ResourceDownloadApiResourceFileGetError = ResourceDownloadApiResourceFileGetErrors[keyof ResourceDownloadApiResourceFileGetErrors];
 
-export type ResourceDownloadApiParentResourceFileGetResponses = {
+export type ResourceDownloadApiResourceFileGetResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type StartApiParentStartPostData = {
-    body: StartRequest;
+export type StartApiCourseStartPostData = {
+    body: CourseStartRequest;
     headers?: {
         /**
          * Authorization
@@ -1384,28 +1281,26 @@ export type StartApiParentStartPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/start';
+    url: '/api/course/start';
 };
 
-export type StartApiParentStartPostErrors = {
+export type StartApiCourseStartPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type StartApiParentStartPostError = StartApiParentStartPostErrors[keyof StartApiParentStartPostErrors];
+export type StartApiCourseStartPostError = StartApiCourseStartPostErrors[keyof StartApiCourseStartPostErrors];
 
-export type StartApiParentStartPostResponses = {
+export type StartApiCourseStartPostResponses = {
     /**
      * Successful Response
      */
-    200: StartResult;
+    202: unknown;
 };
 
-export type StartApiParentStartPostResponse = StartApiParentStartPostResponses[keyof StartApiParentStartPostResponses];
-
-export type FeedbackApiParentFeedbackPostData = {
+export type FeedbackApiEvaluationFeedbackPostData = {
     body: FeedbackRequest;
     headers?: {
         /**
@@ -1415,27 +1310,27 @@ export type FeedbackApiParentFeedbackPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/feedback';
+    url: '/api/evaluation/feedback';
 };
 
-export type FeedbackApiParentFeedbackPostErrors = {
+export type FeedbackApiEvaluationFeedbackPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type FeedbackApiParentFeedbackPostError = FeedbackApiParentFeedbackPostErrors[keyof FeedbackApiParentFeedbackPostErrors];
+export type FeedbackApiEvaluationFeedbackPostError = FeedbackApiEvaluationFeedbackPostErrors[keyof FeedbackApiEvaluationFeedbackPostErrors];
 
-export type FeedbackApiParentFeedbackPostResponses = {
+export type FeedbackApiEvaluationFeedbackPostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type LaterApiParentLaterFeedbackPostData = {
-    body: ActivityRequest;
+export type OnboardingLexileApiOnboardingLexilePostData = {
+    body: LexileRequest;
     headers?: {
         /**
          * Authorization
@@ -1444,26 +1339,171 @@ export type LaterApiParentLaterFeedbackPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/later-feedback';
+    url: '/api/onboarding/lexile';
 };
 
-export type LaterApiParentLaterFeedbackPostErrors = {
+export type OnboardingLexileApiOnboardingLexilePostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type LaterApiParentLaterFeedbackPostError = LaterApiParentLaterFeedbackPostErrors[keyof LaterApiParentLaterFeedbackPostErrors];
+export type OnboardingLexileApiOnboardingLexilePostError = OnboardingLexileApiOnboardingLexilePostErrors[keyof OnboardingLexileApiOnboardingLexilePostErrors];
 
-export type LaterApiParentLaterFeedbackPostResponses = {
+export type OnboardingLexileApiOnboardingLexilePostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type LostReportApiParentLostReportPostData = {
+export type OnboardingQuestionsApiOnboardingQuestionsGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/onboarding/questions';
+};
+
+export type OnboardingQuestionsApiOnboardingQuestionsGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OnboardingQuestionsApiOnboardingQuestionsGetError = OnboardingQuestionsApiOnboardingQuestionsGetErrors[keyof OnboardingQuestionsApiOnboardingQuestionsGetErrors];
+
+export type OnboardingQuestionsApiOnboardingQuestionsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type OnboardingChatApiOnboardingChatPostData = {
+    body: ChatRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/onboarding/chat';
+};
+
+export type OnboardingChatApiOnboardingChatPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OnboardingChatApiOnboardingChatPostError = OnboardingChatApiOnboardingChatPostErrors[keyof OnboardingChatApiOnboardingChatPostErrors];
+
+export type OnboardingChatApiOnboardingChatPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ProfileConfirmedApiProfilePostData = {
+    body: ProfileRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/profile';
+};
+
+export type ProfileConfirmedApiProfilePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ProfileConfirmedApiProfilePostError = ProfileConfirmedApiProfilePostErrors[keyof ProfileConfirmedApiProfilePostErrors];
+
+export type ProfileConfirmedApiProfilePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type DecideGoalApiGoalDecidePostData = {
+    body: GoalDecision;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/goal/decide';
+};
+
+export type DecideGoalApiGoalDecidePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DecideGoalApiGoalDecidePostError = DecideGoalApiGoalDecidePostErrors[keyof DecideGoalApiGoalDecidePostErrors];
+
+export type DecideGoalApiGoalDecidePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type AcknowledgeApiEvaluationAcknowledgePostData = {
+    body: AcknowledgeRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/evaluation/acknowledge';
+};
+
+export type AcknowledgeApiEvaluationAcknowledgePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AcknowledgeApiEvaluationAcknowledgePostError = AcknowledgeApiEvaluationAcknowledgePostErrors[keyof AcknowledgeApiEvaluationAcknowledgePostErrors];
+
+export type AcknowledgeApiEvaluationAcknowledgePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type LostReportApiLostReportPostData = {
     body: LostReportRequest;
     headers?: {
         /**
@@ -1473,84 +1513,26 @@ export type LostReportApiParentLostReportPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/lost-report';
+    url: '/api/lost-report';
 };
 
-export type LostReportApiParentLostReportPostErrors = {
+export type LostReportApiLostReportPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type LostReportApiParentLostReportPostError = LostReportApiParentLostReportPostErrors[keyof LostReportApiParentLostReportPostErrors];
+export type LostReportApiLostReportPostError = LostReportApiLostReportPostErrors[keyof LostReportApiLostReportPostErrors];
 
-export type LostReportApiParentLostReportPostResponses = {
+export type LostReportApiLostReportPostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type EvaluateApiParentEvaluatePostData = {
-    body: EvaluationRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/parent/evaluate';
-};
-
-export type EvaluateApiParentEvaluatePostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type EvaluateApiParentEvaluatePostError = EvaluateApiParentEvaluatePostErrors[keyof EvaluateApiParentEvaluatePostErrors];
-
-export type EvaluateApiParentEvaluatePostResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type NextCourseApiParentNextCoursePostData = {
-    body: ActivityRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/parent/next-course';
-};
-
-export type NextCourseApiParentNextCoursePostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type NextCourseApiParentNextCoursePostError = NextCourseApiParentNextCoursePostErrors[keyof NextCourseApiParentNextCoursePostErrors];
-
-export type NextCourseApiParentNextCoursePostResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type ReviewPlanApiParentReviewPostData = {
+export type ReviewPlanApiReviewPostData = {
     body: ReviewRequest;
     headers?: {
         /**
@@ -1560,26 +1542,26 @@ export type ReviewPlanApiParentReviewPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/review';
+    url: '/api/review';
 };
 
-export type ReviewPlanApiParentReviewPostErrors = {
+export type ReviewPlanApiReviewPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ReviewPlanApiParentReviewPostError = ReviewPlanApiParentReviewPostErrors[keyof ReviewPlanApiParentReviewPostErrors];
+export type ReviewPlanApiReviewPostError = ReviewPlanApiReviewPostErrors[keyof ReviewPlanApiReviewPostErrors];
 
-export type ReviewPlanApiParentReviewPostResponses = {
+export type ReviewPlanApiReviewPostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type DecisionApiParentDecisionPostData = {
+export type DecisionApiDecisionPostData = {
     body: DecisionRequest;
     headers?: {
         /**
@@ -1589,26 +1571,26 @@ export type DecisionApiParentDecisionPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/decision';
+    url: '/api/decision';
 };
 
-export type DecisionApiParentDecisionPostErrors = {
+export type DecisionApiDecisionPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DecisionApiParentDecisionPostError = DecisionApiParentDecisionPostErrors[keyof DecisionApiParentDecisionPostErrors];
+export type DecisionApiDecisionPostError = DecisionApiDecisionPostErrors[keyof DecisionApiDecisionPostErrors];
 
-export type DecisionApiParentDecisionPostResponses = {
+export type DecisionApiDecisionPostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type RecheckDemandApiParentRecheckDemandPostData = {
+export type RecheckDemandApiRecheckDemandPostData = {
     body: ParentRequest;
     headers?: {
         /**
@@ -1618,26 +1600,26 @@ export type RecheckDemandApiParentRecheckDemandPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/recheck-demand';
+    url: '/api/recheck-demand';
 };
 
-export type RecheckDemandApiParentRecheckDemandPostErrors = {
+export type RecheckDemandApiRecheckDemandPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RecheckDemandApiParentRecheckDemandPostError = RecheckDemandApiParentRecheckDemandPostErrors[keyof RecheckDemandApiParentRecheckDemandPostErrors];
+export type RecheckDemandApiRecheckDemandPostError = RecheckDemandApiRecheckDemandPostErrors[keyof RecheckDemandApiRecheckDemandPostErrors];
 
-export type RecheckDemandApiParentRecheckDemandPostResponses = {
+export type RecheckDemandApiRecheckDemandPostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type CorrectionApiParentCorrectionPostData = {
+export type CorrectionApiCorrectionPostData = {
     body: CorrectionRequest;
     headers?: {
         /**
@@ -1647,26 +1629,26 @@ export type CorrectionApiParentCorrectionPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/correction';
+    url: '/api/correction';
 };
 
-export type CorrectionApiParentCorrectionPostErrors = {
+export type CorrectionApiCorrectionPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CorrectionApiParentCorrectionPostError = CorrectionApiParentCorrectionPostErrors[keyof CorrectionApiParentCorrectionPostErrors];
+export type CorrectionApiCorrectionPostError = CorrectionApiCorrectionPostErrors[keyof CorrectionApiCorrectionPostErrors];
 
-export type CorrectionApiParentCorrectionPostResponses = {
+export type CorrectionApiCorrectionPostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ResolveCapabilityApiParentCapabilityGetData = {
+export type ResolveCapabilityApiCapabilityGetData = {
     body?: never;
     headers?: {
         /**
@@ -1687,28 +1669,28 @@ export type ResolveCapabilityApiParentCapabilityGetData = {
         /**
          * Learner Id
          */
-        learner_id?: string;
+        learner_id?: string | null;
     };
-    url: '/api/parent/capability';
+    url: '/api/capability';
 };
 
-export type ResolveCapabilityApiParentCapabilityGetErrors = {
+export type ResolveCapabilityApiCapabilityGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ResolveCapabilityApiParentCapabilityGetError = ResolveCapabilityApiParentCapabilityGetErrors[keyof ResolveCapabilityApiParentCapabilityGetErrors];
+export type ResolveCapabilityApiCapabilityGetError = ResolveCapabilityApiCapabilityGetErrors[keyof ResolveCapabilityApiCapabilityGetErrors];
 
-export type ResolveCapabilityApiParentCapabilityGetResponses = {
+export type ResolveCapabilityApiCapabilityGetResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type CapabilityApiParentCapabilityPostData = {
+export type CapabilityApiCapabilityPostData = {
     body: CatalogRequest;
     headers?: {
         /**
@@ -1718,26 +1700,26 @@ export type CapabilityApiParentCapabilityPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/capability';
+    url: '/api/capability';
 };
 
-export type CapabilityApiParentCapabilityPostErrors = {
+export type CapabilityApiCapabilityPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CapabilityApiParentCapabilityPostError = CapabilityApiParentCapabilityPostErrors[keyof CapabilityApiParentCapabilityPostErrors];
+export type CapabilityApiCapabilityPostError = CapabilityApiCapabilityPostErrors[keyof CapabilityApiCapabilityPostErrors];
 
-export type CapabilityApiParentCapabilityPostResponses = {
+export type CapabilityApiCapabilityPostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ReleaseRestrictionApiParentReleasePostData = {
+export type ReleaseRestrictionApiReleasePostData = {
     body: ReleaseRequest;
     headers?: {
         /**
@@ -1747,26 +1729,26 @@ export type ReleaseRestrictionApiParentReleasePostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/release';
+    url: '/api/release';
 };
 
-export type ReleaseRestrictionApiParentReleasePostErrors = {
+export type ReleaseRestrictionApiReleasePostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ReleaseRestrictionApiParentReleasePostError = ReleaseRestrictionApiParentReleasePostErrors[keyof ReleaseRestrictionApiParentReleasePostErrors];
+export type ReleaseRestrictionApiReleasePostError = ReleaseRestrictionApiReleasePostErrors[keyof ReleaseRestrictionApiReleasePostErrors];
 
-export type ReleaseRestrictionApiParentReleasePostResponses = {
+export type ReleaseRestrictionApiReleasePostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type OperationApiParentOperationOperationIdGetData = {
+export type OperationApiOperationOperationIdGetData = {
     body?: never;
     headers?: {
         /**
@@ -1784,28 +1766,28 @@ export type OperationApiParentOperationOperationIdGetData = {
         /**
          * Learner Id
          */
-        learner_id?: string;
+        learner_id?: string | null;
     };
-    url: '/api/parent/operation/{operation_id}';
+    url: '/api/operation/{operation_id}';
 };
 
-export type OperationApiParentOperationOperationIdGetErrors = {
+export type OperationApiOperationOperationIdGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type OperationApiParentOperationOperationIdGetError = OperationApiParentOperationOperationIdGetErrors[keyof OperationApiParentOperationOperationIdGetErrors];
+export type OperationApiOperationOperationIdGetError = OperationApiOperationOperationIdGetErrors[keyof OperationApiOperationOperationIdGetErrors];
 
-export type OperationApiParentOperationOperationIdGetResponses = {
+export type OperationApiOperationOperationIdGetResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type RetrySealApiParentRetrySealPostData = {
+export type RetrySealApiRetrySealPostData = {
     body?: never;
     headers?: {
         /**
@@ -1815,26 +1797,26 @@ export type RetrySealApiParentRetrySealPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/retry-seal';
+    url: '/api/retry-seal';
 };
 
-export type RetrySealApiParentRetrySealPostErrors = {
+export type RetrySealApiRetrySealPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RetrySealApiParentRetrySealPostError = RetrySealApiParentRetrySealPostErrors[keyof RetrySealApiParentRetrySealPostErrors];
+export type RetrySealApiRetrySealPostError = RetrySealApiRetrySealPostErrors[keyof RetrySealApiRetrySealPostErrors];
 
-export type RetrySealApiParentRetrySealPostResponses = {
+export type RetrySealApiRetrySealPostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ExportApiParentExportPostData = {
+export type ExportApiExportPostData = {
     body: ParentRequest;
     headers?: {
         /**
@@ -1844,26 +1826,26 @@ export type ExportApiParentExportPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/export';
+    url: '/api/export';
 };
 
-export type ExportApiParentExportPostErrors = {
+export type ExportApiExportPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ExportApiParentExportPostError = ExportApiParentExportPostErrors[keyof ExportApiParentExportPostErrors];
+export type ExportApiExportPostError = ExportApiExportPostErrors[keyof ExportApiExportPostErrors];
 
-export type ExportApiParentExportPostResponses = {
+export type ExportApiExportPostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ExportFileApiParentExportFileGetData = {
+export type ExportFileApiExportFileGetData = {
     body?: never;
     headers?: {
         /**
@@ -1878,26 +1860,26 @@ export type ExportFileApiParentExportFileGetData = {
          */
         path: string;
     };
-    url: '/api/parent/export-file';
+    url: '/api/export-file';
 };
 
-export type ExportFileApiParentExportFileGetErrors = {
+export type ExportFileApiExportFileGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ExportFileApiParentExportFileGetError = ExportFileApiParentExportFileGetErrors[keyof ExportFileApiParentExportFileGetErrors];
+export type ExportFileApiExportFileGetError = ExportFileApiExportFileGetErrors[keyof ExportFileApiExportFileGetErrors];
 
-export type ExportFileApiParentExportFileGetResponses = {
+export type ExportFileApiExportFileGetResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type BackupApiParentBackupPostData = {
+export type BackupApiBackupPostData = {
     body?: never;
     headers?: {
         /**
@@ -1907,26 +1889,26 @@ export type BackupApiParentBackupPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/backup';
+    url: '/api/backup';
 };
 
-export type BackupApiParentBackupPostErrors = {
+export type BackupApiBackupPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type BackupApiParentBackupPostError = BackupApiParentBackupPostErrors[keyof BackupApiParentBackupPostErrors];
+export type BackupApiBackupPostError = BackupApiBackupPostErrors[keyof BackupApiBackupPostErrors];
 
-export type BackupApiParentBackupPostResponses = {
+export type BackupApiBackupPostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type RestoreApiParentRestorePostData = {
+export type RestoreApiRestorePostData = {
     body: RestoreRequest;
     headers?: {
         /**
@@ -1936,26 +1918,26 @@ export type RestoreApiParentRestorePostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/restore';
+    url: '/api/restore';
 };
 
-export type RestoreApiParentRestorePostErrors = {
+export type RestoreApiRestorePostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RestoreApiParentRestorePostError = RestoreApiParentRestorePostErrors[keyof RestoreApiParentRestorePostErrors];
+export type RestoreApiRestorePostError = RestoreApiRestorePostErrors[keyof RestoreApiRestorePostErrors];
 
-export type RestoreApiParentRestorePostResponses = {
+export type RestoreApiRestorePostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type SnapshotApiStudentSnapshotGetData = {
+export type SnapshotApiClassSnapshotGetData = {
     body?: never;
     headers?: {
         /**
@@ -1965,28 +1947,28 @@ export type SnapshotApiStudentSnapshotGetData = {
     };
     path?: never;
     query?: never;
-    url: '/api/student/snapshot';
+    url: '/api/class/snapshot';
 };
 
-export type SnapshotApiStudentSnapshotGetErrors = {
+export type SnapshotApiClassSnapshotGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SnapshotApiStudentSnapshotGetError = SnapshotApiStudentSnapshotGetErrors[keyof SnapshotApiStudentSnapshotGetErrors];
+export type SnapshotApiClassSnapshotGetError = SnapshotApiClassSnapshotGetErrors[keyof SnapshotApiClassSnapshotGetErrors];
 
-export type SnapshotApiStudentSnapshotGetResponses = {
+export type SnapshotApiClassSnapshotGetResponses = {
     /**
      * Successful Response
      */
     200: Snapshot;
 };
 
-export type SnapshotApiStudentSnapshotGetResponse = SnapshotApiStudentSnapshotGetResponses[keyof SnapshotApiStudentSnapshotGetResponses];
+export type SnapshotApiClassSnapshotGetResponse = SnapshotApiClassSnapshotGetResponses[keyof SnapshotApiClassSnapshotGetResponses];
 
-export type SubmitApiStudentInputPostData = {
+export type SubmitApiClassInputPostData = {
     body: TextInput;
     headers?: {
         /**
@@ -1996,28 +1978,28 @@ export type SubmitApiStudentInputPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/student/input';
+    url: '/api/class/input';
 };
 
-export type SubmitApiStudentInputPostErrors = {
+export type SubmitApiClassInputPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SubmitApiStudentInputPostError = SubmitApiStudentInputPostErrors[keyof SubmitApiStudentInputPostErrors];
+export type SubmitApiClassInputPostError = SubmitApiClassInputPostErrors[keyof SubmitApiClassInputPostErrors];
 
-export type SubmitApiStudentInputPostResponses = {
+export type SubmitApiClassInputPostResponses = {
     /**
      * Successful Response
      */
     200: InputResult;
 };
 
-export type SubmitApiStudentInputPostResponse = SubmitApiStudentInputPostResponses[keyof SubmitApiStudentInputPostResponses];
+export type SubmitApiClassInputPostResponse = SubmitApiClassInputPostResponses[keyof SubmitApiClassInputPostResponses];
 
-export type RecordingApiStudentRecordingPostData = {
+export type RecordingApiClassRecordingPostData = {
     body: RecordingInput;
     headers?: {
         /**
@@ -2027,28 +2009,28 @@ export type RecordingApiStudentRecordingPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/student/recording';
+    url: '/api/class/recording';
 };
 
-export type RecordingApiStudentRecordingPostErrors = {
+export type RecordingApiClassRecordingPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RecordingApiStudentRecordingPostError = RecordingApiStudentRecordingPostErrors[keyof RecordingApiStudentRecordingPostErrors];
+export type RecordingApiClassRecordingPostError = RecordingApiClassRecordingPostErrors[keyof RecordingApiClassRecordingPostErrors];
 
-export type RecordingApiStudentRecordingPostResponses = {
+export type RecordingApiClassRecordingPostResponses = {
     /**
      * Successful Response
      */
     200: InputResult;
 };
 
-export type RecordingApiStudentRecordingPostResponse = RecordingApiStudentRecordingPostResponses[keyof RecordingApiStudentRecordingPostResponses];
+export type RecordingApiClassRecordingPostResponse = RecordingApiClassRecordingPostResponses[keyof RecordingApiClassRecordingPostResponses];
 
-export type DeliveryApiStudentDeliveryPostData = {
+export type DeliveryApiClassDeliveryPostData = {
     body: DeliveryFeedback;
     headers?: {
         /**
@@ -2058,28 +2040,28 @@ export type DeliveryApiStudentDeliveryPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/student/delivery';
+    url: '/api/class/delivery';
 };
 
-export type DeliveryApiStudentDeliveryPostErrors = {
+export type DeliveryApiClassDeliveryPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DeliveryApiStudentDeliveryPostError = DeliveryApiStudentDeliveryPostErrors[keyof DeliveryApiStudentDeliveryPostErrors];
+export type DeliveryApiClassDeliveryPostError = DeliveryApiClassDeliveryPostErrors[keyof DeliveryApiClassDeliveryPostErrors];
 
-export type DeliveryApiStudentDeliveryPostResponses = {
+export type DeliveryApiClassDeliveryPostResponses = {
     /**
      * Successful Response
      */
     200: Snapshot;
 };
 
-export type DeliveryApiStudentDeliveryPostResponse = DeliveryApiStudentDeliveryPostResponses[keyof DeliveryApiStudentDeliveryPostResponses];
+export type DeliveryApiClassDeliveryPostResponse = DeliveryApiClassDeliveryPostResponses[keyof DeliveryApiClassDeliveryPostResponses];
 
-export type PlaybackApiStudentPlaybackPostData = {
+export type PlaybackApiClassPlaybackPostData = {
     body: PlaybackReport;
     headers?: {
         /**
@@ -2089,28 +2071,28 @@ export type PlaybackApiStudentPlaybackPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/student/playback';
+    url: '/api/class/playback';
 };
 
-export type PlaybackApiStudentPlaybackPostErrors = {
+export type PlaybackApiClassPlaybackPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type PlaybackApiStudentPlaybackPostError = PlaybackApiStudentPlaybackPostErrors[keyof PlaybackApiStudentPlaybackPostErrors];
+export type PlaybackApiClassPlaybackPostError = PlaybackApiClassPlaybackPostErrors[keyof PlaybackApiClassPlaybackPostErrors];
 
-export type PlaybackApiStudentPlaybackPostResponses = {
+export type PlaybackApiClassPlaybackPostResponses = {
     /**
      * Successful Response
      */
     204: void;
 };
 
-export type PlaybackApiStudentPlaybackPostResponse = PlaybackApiStudentPlaybackPostResponses[keyof PlaybackApiStudentPlaybackPostResponses];
+export type PlaybackApiClassPlaybackPostResponse = PlaybackApiClassPlaybackPostResponses[keyof PlaybackApiClassPlaybackPostResponses];
 
-export type SpeechApiStudentSpeechActionIdGetData = {
+export type SpeechApiClassSpeechActionIdGetData = {
     body?: never;
     headers?: {
         /**
@@ -2125,26 +2107,60 @@ export type SpeechApiStudentSpeechActionIdGetData = {
         action_id: string;
     };
     query?: never;
-    url: '/api/student/speech/{action_id}';
+    url: '/api/class/speech/{action_id}';
 };
 
-export type SpeechApiStudentSpeechActionIdGetErrors = {
+export type SpeechApiClassSpeechActionIdGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SpeechApiStudentSpeechActionIdGetError = SpeechApiStudentSpeechActionIdGetErrors[keyof SpeechApiStudentSpeechActionIdGetErrors];
+export type SpeechApiClassSpeechActionIdGetError = SpeechApiClassSpeechActionIdGetErrors[keyof SpeechApiClassSpeechActionIdGetErrors];
 
-export type SpeechApiStudentSpeechActionIdGetResponses = {
+export type SpeechApiClassSpeechActionIdGetResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type VisualApiStudentVisualActionIdResourceIdGetData = {
+export type OnboardingSpeechApiOnboardingSpeechIndexGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Index
+         */
+        index: number;
+    };
+    query?: never;
+    url: '/api/onboarding/speech/{index}';
+};
+
+export type OnboardingSpeechApiOnboardingSpeechIndexGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OnboardingSpeechApiOnboardingSpeechIndexGetError = OnboardingSpeechApiOnboardingSpeechIndexGetErrors[keyof OnboardingSpeechApiOnboardingSpeechIndexGetErrors];
+
+export type OnboardingSpeechApiOnboardingSpeechIndexGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type VisualApiClassVisualActionIdResourceIdGetData = {
     body?: never;
     headers?: {
         /**
@@ -2163,57 +2179,26 @@ export type VisualApiStudentVisualActionIdResourceIdGetData = {
         resource_id: string;
     };
     query?: never;
-    url: '/api/student/visual/{action_id}/{resource_id}';
+    url: '/api/class/visual/{action_id}/{resource_id}';
 };
 
-export type VisualApiStudentVisualActionIdResourceIdGetErrors = {
+export type VisualApiClassVisualActionIdResourceIdGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type VisualApiStudentVisualActionIdResourceIdGetError = VisualApiStudentVisualActionIdResourceIdGetErrors[keyof VisualApiStudentVisualActionIdResourceIdGetErrors];
+export type VisualApiClassVisualActionIdResourceIdGetError = VisualApiClassVisualActionIdResourceIdGetErrors[keyof VisualApiClassVisualActionIdResourceIdGetErrors];
 
-export type VisualApiStudentVisualActionIdResourceIdGetResponses = {
+export type VisualApiClassVisualActionIdResourceIdGetResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ControlApiStudentControlPostData = {
-    body: StudentControl;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/student/control';
-};
-
-export type ControlApiStudentControlPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ControlApiStudentControlPostError = ControlApiStudentControlPostErrors[keyof ControlApiStudentControlPostErrors];
-
-export type ControlApiStudentControlPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: Snapshot;
-};
-
-export type ControlApiStudentControlPostResponse = ControlApiStudentControlPostResponses[keyof ControlApiStudentControlPostResponses];
-
-export type ParentControlApiParentControlPostData = {
+export type ControlApiClassControlPostData = {
     body: Control;
     headers?: {
         /**
@@ -2223,24 +2208,26 @@ export type ParentControlApiParentControlPostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/parent/control';
+    url: '/api/class/control';
 };
 
-export type ParentControlApiParentControlPostErrors = {
+export type ControlApiClassControlPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ParentControlApiParentControlPostError = ParentControlApiParentControlPostErrors[keyof ParentControlApiParentControlPostErrors];
+export type ControlApiClassControlPostError = ControlApiClassControlPostErrors[keyof ControlApiClassControlPostErrors];
 
-export type ParentControlApiParentControlPostResponses = {
+export type ControlApiClassControlPostResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: Snapshot;
 };
+
+export type ControlApiClassControlPostResponse = ControlApiClassControlPostResponses[keyof ControlApiClassControlPostResponses];
 
 export type WebpagePathGetData = {
     body?: never;

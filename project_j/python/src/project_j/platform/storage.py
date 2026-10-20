@@ -1,4 +1,4 @@
-"""SQLite storage for one simulation or adult-check data space. No classroom persistence."""
+"""SQLite storage for one simulation or study data space. No classroom persistence."""
 
 import hashlib
 import json
@@ -31,7 +31,7 @@ def digest(value: str) -> str:
 
 
 # Data space -> (partition directory, source type of everything saved in it).
-REALMS = {"simulation": ("simulation", "simulated"), "adult_check": ("adult_checks", "adult")}
+REALMS = {"simulation": ("simulation", "simulated"), "study": ("study", "student")}
 
 
 class Conflict(ValueError):
@@ -74,7 +74,7 @@ def check_run_id(run_id: str) -> str:
 
 class SimulationStore:
     def __init__(
-        self, root: Path, run_id: str, realm: Literal["simulation", "adult_check"] = "simulation"
+        self, root: Path, run_id: str, realm: Literal["simulation", "study"] = "simulation"
     ):
         # Roots are explicit; neither an arbitrary database URL nor a family entry is exposed.
         partition, self.source_type = REALMS[realm]
@@ -82,7 +82,7 @@ class SimulationStore:
         if root.name != partition or root.is_symlink():
             raise ValueError(f"storage requires an explicit {partition} root")
         check_run_id(run_id)
-        others = {"family", "credentials"} | {p for p, _ in REALMS.values()} - {partition}
+        others = {"credentials"} | {p for p, _ in REALMS.values()} - {partition}
         if any(part in others for part in root.parts):
             raise ValueError(f"{realm} cannot access another private partition")
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -186,8 +186,6 @@ class SimulationStore:
     def boundary(document: Document, learner_id: str):
         if document.learner_id and document.learner_id != learner_id:
             raise ValueError("cross-learner reference")
-        if document.kind == "household" and learner_id not in document.body.get("applies_to", []):
-            raise ValueError("shared conditions do not cover this learner")
 
     def load(self, connection, ref: RevisionRef, learner_id: str | None) -> Document:
         table = self.tables["revisions"]
@@ -467,8 +465,6 @@ class SimulationStore:
                 doc = self.load(
                     connection, RevisionRef(object_id=identity, revision=revision), None
                 )
-                if doc.kind == "household" and learner_id not in doc.body.get("applies_to", []):
-                    continue
                 self.boundary(doc, learner_id)
                 result.append(doc)
             return result

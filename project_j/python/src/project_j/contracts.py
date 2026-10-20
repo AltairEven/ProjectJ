@@ -18,7 +18,7 @@ OWNERS = {
     "state": "learning",
     "plan": "learning",
     "demand": "learning",
-    "household": "learning",
+    "profile": "learning",
     "review": "learning",
     "decision": "learning",
     "capability": "learning",
@@ -43,6 +43,7 @@ OWNERS = {
     "report": "evaluation",
 }
 PERSONAL = {
+    "profile",
     "state",
     "plan",
     "demand",
@@ -71,8 +72,8 @@ class ObjectEnvelope(Contract):
     revision: int = Field(ge=1, strict=True)
     kind: str
     owner: str
-    realm: Literal["simulation", "adult_check", "family"]
-    source_type: Literal["simulated", "adult", "technical", "child", "external_real"]
+    realm: Literal["simulation", "study"]
+    source_type: Literal["simulated", "student", "technical"]
     learner_id: str | None
     scope: str = Field(min_length=1)
     occurred_at: AwareDatetime | None
@@ -93,10 +94,8 @@ class ObjectEnvelope(Contract):
             raise ValueError("personal object needs learner_id")
         if self.realm == "simulation" and self.source_type != "simulated":
             raise ValueError("simulation cannot relabel a real source")
-        if self.realm == "adult_check" and self.source_type not in {"adult", "technical"}:
-            raise ValueError("adult check cannot contain child sources")
-        if self.realm == "family" and self.source_type in {"adult", "technical", "simulated"}:
-            raise ValueError("development sources cannot enter family objects")
+        if self.realm == "study" and self.source_type not in {"student", "technical"}:
+            raise ValueError("study objects come from the student or a technical source")
         if self.occurred_at is None and not self.limitations:
             raise ValueError("unknown occurrence time needs a limitation")
         return self
@@ -109,8 +108,8 @@ class ObjectEnvelope(Contract):
 class Document(ObjectEnvelope):
     """Physical storage envelope; business modules validate their own body contracts."""
 
-    realm: Literal["simulation", "adult_check"] = "simulation"
-    source_type: Literal["simulated", "adult"] = "simulated"
+    realm: Literal["simulation", "study"] = "simulation"
+    source_type: Literal["simulated", "student"] = "simulated"
     body: dict[str, JsonValue]
 
     @model_validator(mode="after")
@@ -191,8 +190,8 @@ class SubmittedInput(Contract):
     cancellation_epoch: int = Field(ge=0, strict=True)
     client_sequence: int = Field(ge=1, strict=True)
     input_policy_ref: RevisionRef
-    realm: Literal["simulation", "adult_check"]  # P0 has no family input entry.
-    source_type: Literal["simulated", "adult", "technical"]
+    realm: Literal["simulation", "study"]
+    source_type: Literal["simulated", "student", "technical"]
     # Answers are typed or clicked; only an English reading segment is recorded (ADR-0014).
     modality: Literal["text", "audio", "action_report"]
     # Audio bytes never travel inside this contract; they reach the core in memory beside it.
@@ -211,8 +210,8 @@ class SubmittedInput(Contract):
     def check_submission(self) -> Self:
         if self.realm == "simulation" and self.source_type != "simulated":
             raise ValueError("simulation source mismatch")
-        if self.realm == "adult_check" and self.source_type == "simulated":
-            raise ValueError("adult check source mismatch")
+        if self.realm == "study" and self.source_type == "simulated":
+            raise ValueError("study source mismatch")
         if self.relation != "new" and not self.related_event_id:
             raise ValueError("a supplement needs its original event")
         if self.related_event_id == self.event_id:

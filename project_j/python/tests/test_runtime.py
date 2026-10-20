@@ -11,6 +11,7 @@ from support import (
     confirmed,
     deliver_all,
     judgments,
+    next_course,
     read,
     read_aloud_all,
     start,
@@ -30,7 +31,7 @@ def test_E2E01_complete_simulation_reaches_actual_C2_and_survives_reopen(applica
         core, fact = await complete_story(application)
         assert not any(call["purpose"] == "evaluation" for call in application.models.calls)
         feedback = application.feedback("feedback1", LEARNER, core.activity_id, "无额外补充")
-        result = await application.next_course("next1", LEARNER, core.activity_id)
+        result = await next_course(application, "next1", LEARNER, core.activity_id)
         assert feedback["evaluation"] == "not_requested"
         c2 = application.store.read(
             RevisionRef.model_validate(result["next_package"]["course_ref"]), LEARNER
@@ -93,7 +94,7 @@ def test_E2E02_state_records_english_expression_only_where_help_marked_it(applic
     async def scenario():
         core, _ = await complete_story(application, helped=helped)
         application.feedback("feedback", LEARNER, core.activity_id, "无额外补充")
-        result = await application.next_course("next", LEARNER, core.activity_id)
+        result = await next_course(application, "next", LEARNER, core.activity_id)
         state = application.store.read(
             RevisionRef.model_validate(result["adoption"]["state_ref"]), LEARNER
         )
@@ -265,7 +266,7 @@ def test_E2E06_feedback_correction_keeps_original_facts_and_changes_sources(appl
     async def scenario():
         core, fact = await complete_story(application)
         application.feedback("feedback1", LEARNER, core.activity_id, "无额外补充")
-        first = await application.next_course("next1", LEARNER, core.activity_id)
+        first = await next_course(application, "next1", LEARNER, core.activity_id)
         state = application.current(LEARNER, "state")
         application.feedback(
             "correction1",
@@ -276,7 +277,7 @@ def test_E2E06_feedback_correction_keeps_original_facts_and_changes_sources(appl
                 {"task_id": "reading-fact", "note": "家长代答，不能按儿童独立样本解释。"},
             ),
         )
-        second = await application.next_course("next2", LEARNER, core.activity_id)
+        second = await next_course(application, "next2", LEARNER, core.activity_id)
         assert application.store.read(fact.ref, LEARNER).body == fact.body
         assert len(application.store.list_current(LEARNER, "fact")) == 1
         assert application.current(LEARNER, "state").revision > state.revision
@@ -291,7 +292,7 @@ def test_E2E07_old_course_demand_does_not_start_after_next_demand(application):
         old = await application.prepare("prepare1", LEARNER)
         core, _ = await complete_story(application)
         application.feedback("feedback", LEARNER, core.activity_id, "无额外补充")
-        await application.next_course("next", LEARNER, core.activity_id)
+        await next_course(application, "next", LEARNER, core.activity_id)
         with pytest.raises(Conflict, match="old demand"):
             application.start(
                 "new-start", LEARNER, RevisionRef.model_validate(old["course_ref"]), CONDITIONS
@@ -300,17 +301,16 @@ def test_E2E07_old_course_demand_does_not_start_after_next_demand(application):
     asyncio.run(scenario())
 
 
-def test_E2E09_later_choice_and_dashboard_never_call_evaluation(application):
+def test_E2E09_refresh_never_evaluates_and_after_class_reuses(application):
     async def scenario():
         core, _ = await complete_story(application)
-        application.later_feedback("later", LEARNER, core.activity_id)
-        application.dashboard(LEARNER)
+        application.dashboard(LEARNER)  # Outside the service loop nothing starts by itself.
         assert not any(call["purpose"] == "evaluation" for call in application.models.calls)
         with pytest.raises(ValueError):
             await application.evaluate("refresh", LEARNER, core.activity_id, "refresh")
-        provisional = await application.evaluate("needed", LEARNER, core.activity_id, "next_course")
+        provisional = await application.evaluate("needed", LEARNER, core.activity_id, "after_class")
         reused = await application.evaluate(
-            "needed-again", LEARNER, core.activity_id, "workbench_evaluation"
+            "needed-again", LEARNER, core.activity_id, "after_class"
         )
         assert provisional.ref == reused.ref
         assert (
@@ -431,10 +431,9 @@ def test_E2E14_missing_failed_and_unverified_start_are_distinct(application):
 def test_E2E18_feedback_arriving_during_model_cannot_publish_old_source(application):
     async def scenario():
         core, _ = await complete_story(application)
-        application.later_feedback("later", LEARNER, core.activity_id)
         application.models.adapters["simulated"].delay_seconds = 0.03
         old_job = asyncio.create_task(
-            application.evaluate("needed", LEARNER, core.activity_id, "next_course")
+            application.evaluate("needed", LEARNER, core.activity_id, "after_class")
         )
         await asyncio.sleep(0.005)
         application.feedback("feedback", LEARNER, core.activity_id, "模拟：家长提供过提示。")
@@ -525,12 +524,12 @@ def test_completed_requests_replay_after_later_effective_versions_without_new_ca
         prepared = await application.prepare("first-prepare", LEARNER)
         core, _ = await complete_story(application)
         application.feedback("first-feedback", LEARNER, core.activity_id, "无额外补充")
-        result = await application.next_course("first-next", LEARNER, core.activity_id)
+        result = await next_course(application, "first-next", LEARNER, core.activity_id)
         state = application.current(LEARNER, "state").ref
         demand = application.current(LEARNER, "demand").ref
         calls = len(application.models.calls)
         assert (await application.prepare("first-prepare", LEARNER)) == prepared
-        assert await application.next_course("first-next", LEARNER, core.activity_id) == result
+        assert await next_course(application, "first-next", LEARNER, core.activity_id) == result
         assert application.current(LEARNER, "state").ref == state
         assert application.current(LEARNER, "demand").ref == demand
         assert len(application.models.calls) == calls
@@ -558,7 +557,7 @@ def test_recovered_successful_retry_preserves_original_attempt_count(application
                 sources=(app.current(LEARNER, "demand").ref,),
                 baselines=tuple(
                     app.current(LEARNER, label).ref
-                    for label in ("demand", "state", "plan:week", "household")
+                    for label in ("demand", "state", "plan:week", "profile")
                 ),
             ),
             LEARNER,
