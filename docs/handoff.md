@@ -649,7 +649,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## SELF-1 定位改为AI自学助理（文档）
 
-- 状态：文档改写完成（2026年10月20日），未提交。用户决定把定位改为AI自学助理、只保留一个主交互页面，头脑风暴后采用[设计说明](superpowers/specs/2026-10-20-self-study-assistant-design.md)与[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)，选择在本会话逐个任务实现、最终审查由主会话自做、不提交直至用户要求。决定见[ADR-0018](../decisions/ADR-0018.md)。
+- 状态：文档改写完成，用户说“提交”后与SELF-2至SELF-4一起本地提交为f1982b3（2026年10月20日）。用户决定把定位改为AI自学助理、只保留一个主交互页面，头脑风暴后采用[设计说明](superpowers/specs/2026-10-20-self-study-assistant-design.md)与[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)，选择在本会话逐个任务实现、最终审查由主会话自做、不提交直至用户要求。决定见[ADR-0018](../decisions/ADR-0018.md)。
 - 负责人/集成：Claude Opus；起点8a9326b。
 - 文件边界：decisions/ADR-0018.md（新增）、AGENTS.md、README.md、design/shared/README.md、design/interface/parent-workbench.md改名为main-page.md及指向它的链接，以及计划Task 2、3列出的文档。
 - 改动：新增ADR-0018；AGENTS 1.30.0（定位、入口改为`--study`与`project-j-reset`、去掉儿童入口与成人检查条目，开发协作语境的“家长”改为“用户”）；README 1.18.0；docs/product 2.0.0、mvp 2.0.0、roadmap 1.14.0（阶段4、5由“自学助理改版与自用”取代）、acceptance 2.0.0（儿童试教门槛取消，“进入儿童试教的前提”只留标题供ADR-0011引用，新增正式学习空间一节）、technology 1.13.0（正式学习入口；课后评价、规划、备课各节的接口路径待SELF-2完成后改写）；design/shared/README 1.5.0（当前阶段、数据权威与术语规则）与business-contracts 1.5.0（数据空间simulation/study，来源simulated/student/technical）；interface README 2.0.0、main-page 2.0.0（由parent-workbench.md改名重写）、roles-devices 2.0.0、preview-start 2.0.0、feedback-reports 2.0.0、student-classroom 1.1.0；learning profile 2.0.0（学习资料与建档）、plan-review 1.2.0、updates 2.0.0、handoffs 1.7.2；preparation README 2.0.0、parent-preview 2.0.0（课程详情）、readiness 2.0.0；evaluation inputs-feedback 2.0.0、reports-revisions 2.0.0；platform configuration-permissions 2.0.0（数据外发范围、数据空间与清空）、realtime-voice 2.4.1。
@@ -659,7 +659,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## SELF-2 AI自学助理改版（后端）
 
-- 状态：实现与自测完成，未提交（2026年10月20日）。按[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)Task 4–11在本会话逐个任务实现；最终审查由主会话自做（SELF-4后）。
+- 状态：实现与自测完成，已本地提交f1982b3（2026年10月20日）。按[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)Task 4–11在本会话逐个任务实现；最终审查由主会话自做（SELF-4后）。
 - 负责人/集成：Claude Opus；起点8a9326b（与SELF-1同一工作区，未提交）。
 - 文件边界：project_j/python/src/project_j/{application/{coordinator,progress（新增）,ledger,configuration,reference}.py, learning/{contracts,planning,maintenance,adoption,catalog,onboarding（新增）}.py, preparation/{drafting,packages,resources,materials}.py, evaluation/assessment.py, classroom/{harness,judgment}.py, interface/{api,submission}.py, platform/{storage,files,reset（新增）}.py, platform/models/simulated.py, platform/migrations/versions/0001_simulation.py, contracts.py, paths.py}；project_j/python/pyproject.toml（`project-j-reset`）；project_j/scripts/check.py（结束语）；tests：新增test_{study（由test_adult_check改名）,reset,progress,roles,evaluation_flow,goal_confirmation,onboarding,confirm_and_start}.py，改support.py、fixtures/p1a_initial.json及调用旧接口的测试；project_j/web/src/{App.tsx,report.ts}（只为编译与路径，SELF-3重写）、web/tests/report.test.mjs、web/schema/openapi.json与web/src/client（生成）；docs/technology.md 1.13.0（后台推进、评价、规划、建档、备课各节改写）。
 - 实现要点：
@@ -678,7 +678,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## SELF-3 主页面与全屏课堂（前端）
 
-- 状态：实现与自测完成，未提交（2026年10月20日）。按[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)Task 12–15在本会话逐个任务实现。
+- 状态：实现与自测完成，已本地提交f1982b3（2026年10月20日）。按[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)Task 12–15在本会话逐个任务实现。
 - 负责人/集成：Claude Opus；与SELF-1、SELF-2同一工作区。
 - 文件边界：project_j/web/src/{App.tsx（只剩外壳）,Classroom.tsx（由旧学生页迁入）,api.ts,ui.tsx,next-step.ts,onboarding.ts,courses.ts,learning.ts,report.ts,request.ts,speaker.ts,recording.ts,cancellation.ts,style.css}、web/src/pages/{Home,Onboarding,State,Plan,Courses,Evaluations,Settings}.tsx（新增）、web/index.html、web/package.json（描述）；web/tests/{next-step,onboarding,courses,learning}.test.mjs（新增）、report.test.mjs、speaker.test.mjs；project_j/README.md、README.md 1.19.0（实施状态）；interface/api.py课中主页提示一句。
 - 实现要点：
@@ -695,7 +695,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## SELF-4 模拟走查、参考题集与真实核对
 
-- 状态：完成，未提交（2026年10月20日）。
+- 状态：完成，已本地提交f1982b3（2026年10月20日）。
 - 负责人/集成：Claude Opus。
 - 文件边界（修复）：project_j/python/src/project_j/{platform/models/simulated.py,preparation/packages.py,application/coordinator.py}、tests/{test_onboarding,test_confirm_and_start}.py、project_j/web/src/{App.tsx,learning.ts,style.css}；本机不进Git的project_j/test/ui（走查脚本与playwright-core）、test/records/self4_study.py与记录。
 - 模拟UI走查（本机脚本project_j/test/ui/walkthrough.mjs，Chrome无头，截图与日志在project_j/test/output/self4-ui/）：`start.sh --run-id self4-ui --simulation-root project_j/test/simulation --onboarding`，从蓝思值、聊天、小测（含两段朗读）、确认资料、确认首个目标、课程确认并开始（含实物勾选、暂停/继续、“更多”里收尾）、评价补记后重新评价并认可，到下一课备好，每步主页下一步正确，页面无脚本错误（只有浏览器取favicon的404）。
@@ -709,7 +709,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## FIX-2 本机语音恢复、朗读评分预热与帮助用完退出
 
-- 状态：实现与自测完成，未提交（2026年10月20日）。处理SELF-4真实核对的三项发现。
+- 状态：实现与自测完成，已本地提交6760ca2（2026年10月20日）。处理SELF-4真实核对的三项发现。
 - 负责人/集成：Claude Opus。
 - 文件边界：project_j/python/src/project_j/{platform/tts/local.py,platform/speech/local.py,classroom/harness.py,preparation/packages.py}；tests/{test_tts_local,test_speech_local,test_runtime}.py、tests/fixtures/{fake_tts,fake_scorer}.py；文档design/platform/failures-performance.md 1.7.0、design/classroom/guidance-correction.md 1.2.0、docs/technology.md 1.14.0；本机不进Git的project_j/test/records/{fix_speech_contention,fix_scorer_variant,fix_real_check}.py与fix-2-20261020.md、test/output/fix-speech-real-check.log。
 - 根因：
@@ -723,5 +723,5 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 课堂判断请求（指令、字段及各状态下的取值）未改，参考题集无需重跑。
 - 检查证据：新增7项测试先失败后通过（合成器被结束后重启、退出后后台恢复、关闭时不重启；评分器退出后恢复、预热；朗读逐级帮助后退出、求助用完退出、朗读等待开始时预热），主工程pytest 523项通过。真实核对（本机真实评分器与合成器，不开课、不调模型API，细节在本机project_j/test/records/fix-2-20261020.md）：三轮“合成6句→预热→评分”，预热17–19秒，真实评分1.0–1.9秒；长句合成中途结束合成子进程，30秒块期限后判超时（34.9秒，杀进程后没有立即读到管道结束，原因未查），后台重启9.4秒，合成恢复（2.0秒）。10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted），统一check含主工程523项、评分39项、合成15项共577项pytest，另有48项前端回归与1项文档检查自测，UTC 2026-10-20T06:59:34.646137+00:00，工程摘要66fb407306c9d2a3ba6eb6e505ad1e078fb814ed5ce4a84ee950868f25ddd254。
 - 未验证：完整课堂中的实际体验；朗读很短、预热未完成时仍可能超时；评分之后首句合成的延迟本批未处理。
-- 待用户决定：根本缓解需要腾出内存（学习时关闭其他占内存的程序）或改用较小模型（合成0.6B备选，ADR-0016；评分改半精度须重新探针，ADR-0015）。
-- 接续：用户决定内存方案后，按需要再做一次完整课堂真实核对。
+- 用户决定（2026年10月20日）：学习时关闭其他占内存的程序，不改代码、不换模型；较小模型（合成0.6B备选，ADR-0016；评分半精度，ADR-0015）留作后备。
+- 接续：用户开始正式学习，按实际体验再定。
