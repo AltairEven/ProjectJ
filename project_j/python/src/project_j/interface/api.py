@@ -51,7 +51,7 @@ from project_j.platform.files import PrivateFiles
 from project_j.platform.models.config import ModelFiles
 from project_j.platform.models.registry import load_service
 from project_j.platform.speech.local import LocalScorer, ScorerUnavailable
-from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
+from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked, hold_run
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.local import LocalSynthesizer, SynthesizerUnavailable
 from project_j.platform.tts.recorded import speak
@@ -1092,6 +1092,10 @@ def main(argv: list[str] | None = None):
         parser.error("--study 不能与模拟调试选项同用：" + "、".join(sorted(simulation_only)))
     settings = Settings(**args, realm="study" if study else "simulation", onboarding=onboarding)
     coordinator = build_coordinator(settings)
+    try:
+        hold_run(coordinator.store.run)  # Kept open until the process ends, even on a crash.
+    except StorageBlocked as error:
+        parser.exit(1, f"{error}\n")
     link = f"http://127.0.0.1:{settings.port}/#token={coordinator.token}"
     if study:
         announce = [

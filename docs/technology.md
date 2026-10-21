@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.18.0；更新：2026年10月21日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
+版本：1.19.0；更新：2026年10月21日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -137,7 +137,7 @@ download按固定修订52f4770fd9726457eae3d3b6aa92047a25a10776只取运行所�
 
 ### 正式学习入口
 
-模型、评分与合成的初始化都显示就绪后，用`project_j/scripts/start.sh --study --run-id <id>`启动正式学习：同一回环后端，课堂判断等用途按project-j-init的真实绑定（课堂判断codex:gpt-6.1-sol:low:fast），朗读交本机评分器，Jane的声音由本机合成器流式生成；数据写`project_j/private/study/<run_id>/`，对象realm为study、来源student。首次打开先建档。该入口不能与`--simulation-root`、`--model-delay`、`--fail-once`、`--onboarding`同用。开发期间用`project-j-reset --run-id <id>`清空该运行编号的全部学习记录（需输入运行编号确认，服务运行时不要执行）。原`--adult-check`入口与`project_j/private/adult_checks`由它取代，旧数据不迁移、不再读取。
+模型、评分与合成的初始化都显示就绪后，用`project_j/scripts/start.sh --study --run-id <id>`启动正式学习：同一回环后端，课堂判断等用途按project-j-init的真实绑定（课堂判断codex:gpt-6.1-sol:low:fast），朗读交本机评分器，Jane的声音由本机合成器流式生成；数据写`project_j/private/study/<run_id>/`，对象realm为study、来源student。首次打开先建档。该入口不能与`--simulation-root`、`--model-delay`、`--fail-once`、`--onboarding`同用。开发期间用`project-j-reset --run-id <id>`清空该运行编号的全部学习记录（需输入运行编号确认；服务运行时拒绝）。换电脑时用`project-j-transfer export --run-id <id> <文件>`导出学习记录（数据库与全部素材及其SHA-256清单，单个只本人可读的.tar.gz），在新电脑用`project-j-transfer import --run-id <id> <文件>`导入为尚不存在的运行编号，规则见[数据存储](../design/platform/storage-lifecycle.md)；服务运行时导出拒绝，模型与Codex登录不随之迁移。原`--adult-check`入口与`project_j/private/adult_checks`由它取代，旧数据不迁移、不再读取。
 
 本机快捷启动：双击`project_j/scripts/study.command`（也可拖到程序坞右侧单击），以运行编号me启动正式学习。8765端口已被占用时只提示已在运行、不重复启动（链接在原来的终端窗口里）；它带`--open`，服务开始监听（评分与合成加载完）后用默认浏览器打开带令牌的页面，令牌每次启动重新生成，不写文件或日志。关闭终端窗口（SIGHUP）与Ctrl+C同样正常停止：进行中的课由核心按中断结束并封存；以nohup启动时保持忽略挂断。不打包成独立安装包：三套环境与约5.4GB本机模型只适用于Apple Silicon，模型登录状态是个人凭据，正式使用资格也尚未授予。
 

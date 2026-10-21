@@ -31,6 +31,7 @@ project-j-measure = "project_j.latency:main"
 project-j-judge-reference = "project_j.application.reference:main"
 project-j-serve = "project_j.interface.api:main"
 project-j-reset = "project_j.platform.reset:main"
+project-j-transfer = "project_j.platform.transfer:main"
 project-j-export-schema = "project_j.interface.api:export_schema"
 
 [tool.pytest.ini_options]

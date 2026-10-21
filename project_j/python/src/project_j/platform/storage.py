@@ -1,5 +1,6 @@
 """SQLite storage for one simulation or study data space. No classroom persistence."""
 
+import fcntl
 import hashlib
 import json
 import os
@@ -70,6 +71,36 @@ def check_run_id(run_id: str) -> str:
     if not run_id or len(run_id) > 64 or not all(c.isalnum() or c in "-_" for c in run_id):
         raise ValueError("invalid run identity")
     return run_id
+
+
+SERVING = "serving.lock"
+
+
+def hold_run(run: Path) -> int:
+    """The serving process holds this lock for its lifetime (the system frees it on any exit);
+    the database itself is opened per operation, so an open file does not show a service."""
+    fd = os.open(run / SERVING, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        raise StorageBlocked(f"另一个服务正在使用运行编号 {run.name}。") from None
+    return fd
+
+
+def serving(run: Path) -> bool:
+    """Whether a service holds the run; export and reset wait until it stops."""
+    try:
+        fd = os.open(run / SERVING, os.O_RDONLY)
+    except FileNotFoundError:
+        return False
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return True
+    finally:
+        os.close(fd)
+    return False
 
 
 class SimulationStore:

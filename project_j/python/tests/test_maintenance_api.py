@@ -14,7 +14,14 @@ from project_j.curriculum.corrections import correct, release
 from project_j.interface import api
 from project_j.interface.api import create_app
 from project_j.learning.maintenance import decide, review
-from project_j.platform.storage import Conflict, Publication, SaveKey
+from project_j.platform.storage import (
+    Conflict,
+    Publication,
+    SaveKey,
+    StorageBlocked,
+    hold_run,
+    serving,
+)
 
 
 def test_E2E08_12_method_candidate_and_dimension_catalog_do_not_change_effective_evidence(
@@ -180,6 +187,9 @@ def test_serve_uses_explicit_simulation_root_and_keeps_default(monkeypatch, tmp_
     api.main()
     assert started and (root / "r1" / "project_j.sqlite3").is_file()
     assert handlers == {signal.SIGHUP: api.hang_up}  # Closing the terminal window stops cleanly.
+    assert serving(root / "r1")  # Export and reset of this run wait until it stops.
+    with pytest.raises(StorageBlocked):
+        hold_run(root / "r1")  # Nor can a second service open the same run.
     default = Settings()
     assert (
         default.project_root / default.simulation_root

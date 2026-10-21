@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.44.1；更新：2026年10月21日。
+版本：1.46.0；更新：2026年10月21日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -884,3 +884,27 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 文件边界：project_j/python/src/project_j/{interface/api.py,platform/local_process.py}、tests/{test_maintenance_api,test_speech_local}.py；project_j/scripts/study.command；文档AGENTS.md 1.32.0、docs/technology.md 1.18.0。
 - 检查证据：新增与改写的测试先失败后通过（入口装上挂断处理；挂断转为正常停止并记日志；开始监听后才开页、停止时不开页、日志不含令牌）。子进程各自成组、由主服务关闭后正常退出（先失败后通过）。统一check通过（主工程526、评分39、合成15项pytest，前端61、文档1），UTC 2026-10-21T09:29:31.635957+00:00，工程摘要5afda57d4f9b31db629cb8b490d7276c0ae11688ea46883218a48cacc53a1569；离线probe通过；模拟measure p95 4500毫秒、not_granted；依赖未变。以模拟入口在8765端口带`--open`启动（浏览器换成无操作命令）：`browser opened`在`Uvicorn running`之后约0.1秒；运行中再执行study.command只提示已在运行、退出码1；向uv与服务进程发SIGHUP后走完`Application shutdown complete`，服务已停。用户正式学习的一次实际启停（运行编号me，终端日志经用户同意读取）：启动约74秒（评分21秒、合成41秒、Codex预热9秒，内存紧张时），开始监听后0.4秒开页，Ctrl+C后主服务正常停止，但子进程打印上述报错。修复后以单独运行编号launch-check真实启动（评分7.4秒、合成8.4秒、Codex 1.9秒），向整个进程组发SIGINT模拟终端Ctrl+C：两个子进程各自成组，主服务取消建档语音预生成、关闭子进程，约1秒停完，无报错、无遗留进程；该运行编号随后用project-j-reset清空。修复后用户从程序坞再启停一次（运行编号me）：启动约22秒（评分8.3秒、合成9.8秒、Codex 2.1秒），开始监听后1.3秒开页，Ctrl+C后约2.4秒停完，无报错、无遗留进程。
 - 未验证：关闭终端窗口的实际表现；进行中的课被关窗口或Ctrl+C时的中断封存（同一停止路径，本批未在课中实测）。
+
+## DOC-1 开发环境搭建文档与忽略规则
+
+- 状态：完成，未提交（等用户说“提交”）。用户问换电脑是否要重新配置，随后要求写开发环境搭建文档并链到README；此前同意把两条本机忽略规则写进仓库。
+- 负责人/集成：Claude Opus。
+- 范围：
+  1. 新增docs/setup.md：前提（Apple Silicon、约10 GB磁盘、只需自装Git/uv/Node与npm）、拷贝时可不带的本机目录、依赖安装与登记检查、三项真实初始化、`project_j/private/`分项迁移（学习记录要拷且须先停服务，Codex登录不拷、重新登录，模型可拷但仍重跑probe）、启动方式与不用迁移的目录。命令与AGENTS、technology一致，并写明以它们为准。
+  2. README 1.20.0在“开发检查”和目录表链到该文档；project_j/README.md的安装一节同样链接。
+  3. 根目录.gitignore加入`.superpowers/`与`.codegraph/`：原来只靠本机`.git/info/exclude`，换电脑克隆后`.codegraph`的pid等文件会显示为未跟踪。核对过已跟踪的358个文件与全部72个历史提交，没有私有数据、数据库、录音、登录文件或疑似密钥，作者均为`project-j-agent@users.invalid`。
+- 文件边界：docs/setup.md、README.md、project_j/README.md、.gitignore、docs/handoff.md。
+- 检查证据：文档本地链接检查通过，并临时改坏setup.md中的一个节链接确认检查器会报出后还原；未改工程代码，统一check无需重跑（工程摘要不含文档与.gitignore）。
+- 未验证：在另一台电脑上按文档实际走一遍。
+
+## MOVE-1 学习记录导出导入（换电脑）
+
+- 状态：实现与自测完成，未提交（等用户说“提交”）。用户：“再帮我把私有数据导出导入也做了”，同意只迁移学习记录的方案；界面入口先不做（服务启动即占用该运行编号，界面导入需要在运行中替换数据空间），只做命令。
+- 负责人/集成：Claude Opus。审查由主会话自做，未派审查子代理。
+- 范围：
+  1. 新命令`project-j-transfer export|import --run-id <id> <文件>`（platform/transfer.py）：导出复用已有备份（SQLite备份接口的一致快照、全部引用素材及SHA-256清单），打成只本人可读的单个.tar.gz，中间备份随即删除；导入安全解包后先恢复到新的暂存运行编号`import-<随机>`，走已有恢复的全部核对（摘要、外键、逐对象摘要），通过后改名为目标运行编号。目标已存在、导出文件已存在一律拒绝不覆盖；核对失败时目标不变，暂存目录按存储设计保留不删并在提示中给出位置。不迁移模型、Codex登录与模型配置。
+  2. 服务运行判定：存储按操作打开数据库（NullPool），不能据打开的文件判断服务在运行；改为服务启动时在运行目录持有`serving.lock`独占文件锁直到进程退出（崩溃也由系统释放）。导出与`project-j-reset`在锁被持有时拒绝（reset原来只提示“服务运行时不要执行”）；同一运行编号也不能再启动第二个服务。
+  3. 日志：`transfer export run=… assets=… bytes=…`、`transfer import run=… assets=…`、`transfer <动作> refused <错误类型>`，不记学习内容。
+- 文件边界：project_j/python/src/project_j/platform/{transfer,storage,reset}.py、interface/api.py、pyproject.toml（新命令入口，锁文件不变）；tests/{test_transfer,test_reset,test_maintenance_api}.py；文档AGENTS.md 1.33.0、design/platform/storage-lifecycle.md 1.8.0、docs/technology.md 1.19.0、docs/setup.md 1.1.0。
+- 检查证据：新增测试先失败后通过（往返搬运记录与素材、导出文件仅本人可读且不留中间备份；不覆盖已有运行编号与导出文件；导出包被改动时拒绝、目标不出现、暂存保留；服务持锁时导出与清空拒绝、停后可导出；服务入口持锁且拒绝第二个服务；日志只含数量）。统一check通过（主工程532、评分39、合成15项pytest，前端61、文档1），UTC 2026-10-21T10:34:08.762496+00:00，工程摘要a9bca2f17f6c4ae557fe0cf10dfa20ef35194f90521dcbe0ccf6b6b52a7e5f1b；离线probe通过；模拟measure p95 4500毫秒、not_granted。用me的副本实测：导出5.8 MB，导入后17个素材摘要与80条对象修订和原数据完全一致，再次导入拒绝；副本随后删除，me未动。以单独运行编号launch-check真实启动正式学习服务：运行中第二个服务、导出与清空均被拒绝且未写出导出文件，停止后清空正常。
+- 未验证：在另一台电脑上实际导入并继续学习。

@@ -5,7 +5,7 @@ import logging
 import shutil
 from pathlib import Path
 
-from project_j.platform.storage import check_run_id
+from project_j.platform.storage import check_run_id, serving
 
 log = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
@@ -18,6 +18,8 @@ def reset_study(project_root: Path, run_id: str) -> int:
     run = project_root / STUDY / run_id
     if run.is_symlink() or not run.is_dir():
         raise FileNotFoundError(f"没有这个正式学习运行编号：{run_id}")
+    if serving(run):
+        raise RuntimeError("服务正在使用这个运行编号：先在终端按 Ctrl+C 停止服务再清空。")
     files = sum(1 for item in run.rglob("*") if item.is_file())
     shutil.rmtree(run)
     log.info("reset run=%s files=%d", run_id, files)
@@ -40,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         removed = reset_study(args.root, args.run_id)
-    except (FileNotFoundError, ValueError) as error:
+    except (FileNotFoundError, RuntimeError, ValueError) as error:
         print(error)
         return 1
     print(f"已清空，删除 {removed} 个文件。下次打开会重新建档。")

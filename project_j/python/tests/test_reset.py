@@ -1,10 +1,11 @@
 import logging
+import os
 
 import pytest
 
 from project_j.application.documents import document
 from project_j.platform.reset import main, reset_study
-from project_j.platform.storage import SaveKey, SimulationStore
+from project_j.platform.storage import SaveKey, SimulationStore, hold_run
 
 KEY = SaveKey(operation_id="op1", step_id="s", source_revision=1)
 
@@ -37,6 +38,16 @@ def test_reset_refuses_an_unknown_or_invalid_run(spaces):
         reset_study(spaces, "missing")
     with pytest.raises(ValueError):
         reset_study(spaces, "../run2")
+
+
+def test_reset_refuses_while_the_service_runs(spaces):
+    service = hold_run(spaces / "project_j/private/study/run1")
+    try:
+        with pytest.raises(RuntimeError):
+            reset_study(spaces, "run1")
+    finally:
+        os.close(service)
+    assert (spaces / "project_j/private/study/run1").exists()
 
 
 def test_reset_cli_needs_the_run_id_typed_back(spaces, monkeypatch):
