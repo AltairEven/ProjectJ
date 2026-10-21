@@ -7,7 +7,7 @@ lesson is an ordinary prepared lesson; its evaluation is accepted with the profi
 import logging
 import time
 
-from project_j.application.documents import document, identity
+from project_j.application.documents import document, identity, publication
 from project_j.contracts import Contract, Document, RevisionRef
 from project_j.learning.contracts import (
     ChatTurn,
@@ -19,7 +19,7 @@ from project_j.learning.contracts import (
 )
 from project_j.learning.planning import PlanningUnavailable, evaluation_context
 from project_j.platform.models.contracts import ModelRequest
-from project_j.platform.storage import Conflict, Publication
+from project_j.platform.storage import Conflict
 
 log = logging.getLogger(__name__)
 
@@ -74,12 +74,6 @@ def revised(operation: str, learner_id: str, prior: Document | None, body: Profi
     )
 
 
-def publication(obj: Document, prior: Document | None, reason: str) -> Publication:
-    return Publication(
-        ref=obj.ref, expected_revision=prior.revision if prior else None, reason=reason
-    )
-
-
 def save_lexile(app, request_id: str, learner_id: str, raw: str) -> dict:
     lexile = normalize_lexile(raw)
     signature = {"lexile": lexile}
@@ -99,7 +93,7 @@ def save_lexile(app, request_id: str, learner_id: str, raw: str) -> dict:
             learner_id,
             "profile",
             [obj],
-            publications=(publication(obj, prior, "学生填写蓝思值"),),
+            publications=(publication(obj, "学生填写蓝思值"),),
         )
     log.info("onboarding lexile saved")
     return app.ledger.finish(operation, learner_id, {"profile_ref": saved[0].ref.model_dump()})
@@ -169,8 +163,8 @@ def save_chat(app, request_id: str, learner_id: str, answers: list[str]) -> dict
             "placement",
             [obj, demand],
             publications=(
-                publication(obj, prior, "学生回答建档问题"),
-                Publication(ref=demand.ref, reason="规则生成的建档小测需求"),
+                publication(obj, "学生回答建档问题"),
+                publication(demand, "规则生成的建档小测需求"),
             ),
             baselines=(prior.ref, state.ref, plan.ref),
         )
@@ -241,7 +235,7 @@ async def summarize_profile(app, request_id: str, learner_id: str, activity_id: 
             learner_id,
             "profile",
             [obj],
-            publications=(publication(obj, prior, "AI整理的学习资料，待学生确认"),),
+            publications=(publication(obj, "AI整理的学习资料，待学生确认"),),
         )
         log.info("profile summarized elapsed_ms=%.0f", (time.perf_counter() - started) * 1000)
     return app.ledger.finish(operation, learner_id, {"profile_ref": saved[0].ref.model_dump()})
@@ -270,7 +264,7 @@ def confirm_profile(app, request_id: str, learner_id: str, edit: ProfileEdit) ->
             learner_id,
             "profile",
             [obj],
-            publications=(publication(obj, prior, "学生确认学习资料"),),
+            publications=(publication(obj, "学生确认学习资料"),),
         )
     placed = placement_activity(app, learner_id)
     if placed and placed[1] is not None and app.acknowledged(learner_id, placed[0]) is None:

@@ -5,14 +5,14 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from support import CONDITIONS, LEARNER, answer, deliver_all, ready, start
+from support import LEARNER, answer, deliver_all, ready, start
 from test_preparation_model import ref, science_draft, science_lesson
 
 from project_j.application.configuration import Settings
 from project_j.classroom.harness import DeliveryFeedback
 from project_j.evaluation.assessment import evaluation_request
 from project_j.interface.api import create_app
-from project_j.platform.models.openai_api import solid_png
+from project_j.platform.models.contracts import solid_png
 from project_j.platform.storage import Conflict
 from project_j.preparation.resources import adopt_resource, generate_resource
 
@@ -36,10 +36,10 @@ def test_start_needs_adopted_required_resources(application, caplog):
     application.confirm("c1", LEARNER, course_ref)
     caplog.set_level(logging.INFO, logger="project_j")
     with pytest.raises(Conflict, match="资源未就绪：朗读示范"):
-        application.start("s1", LEARNER, course_ref, CONDITIONS)
+        application.start("s1", LEARNER, course_ref, materials_ready=True)
     assert "start refused reason=resources_missing" in caplog.text
     asyncio.run(ready(application, {"course_ref": course_ref}))
-    assert application.start("s2", LEARNER, course_ref, CONDITIONS)["decision"] == (
+    assert application.start("s2", LEARNER, course_ref, materials_ready=True)["decision"] == (
         "allow_simulation"
     )
     assert "start resources recorded=" in caplog.text
@@ -50,7 +50,7 @@ def test_changed_voice_counts_as_missing(application, monkeypatch):
     asyncio.run(ready(application, {"course_ref": course_ref}))
     monkeypatch.setattr(application.synthesizer, "voice", "another-voice")
     with pytest.raises(Conflict, match="资源未就绪"):
-        application.start("s1", LEARNER, course_ref, CONDITIONS)
+        application.start("s1", LEARNER, course_ref, materials_ready=True)
 
 
 def test_reading_question_does_not_read_the_passage(application):
@@ -114,7 +114,7 @@ def visual_class(application, monkeypatch, client=None):
     for name in ("cup-motion", "cup-note"):
         made = asyncio.run(generate_resource(application, f"g:{name}", LEARNER, course_ref, name))
         adopt_resource(application, f"a:{name}", LEARNER, course_ref, name, made["version"])
-    result = application.start("visual", LEARNER, course_ref, CONDITIONS)
+    result = application.start("visual", LEARNER, course_ref, materials_ready=True)
     core = application.core
     deliver_all(core)
     asyncio.run(answer(application, "听到了。", "confirmation"))

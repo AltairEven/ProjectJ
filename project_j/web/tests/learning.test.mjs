@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { dimensionLines, evaluationRows, goalCard } from '../src/learning.ts'
+import { dimensionLines, evaluationRows, goalCard, byNewest } from '../src/learning.ts'
 
 const ref = (object_id, revision) => ({ object_id, revision })
 const doc = (kind, object_id, revision, body, extra = {}) => ({ kind, object_id, revision, body, created_at: '', source_revision: 1, ...extra })
@@ -53,4 +53,9 @@ test('a goal card names the goals with their capability, the reason and new capa
     newCapabilities: ['听懂大意：听一段话说出主要意思'],
   })
   assert.equal(goalCard(doc('demand', 'd', 1, { primary_goal: { dimension_id: 'x', description: 'y' }, auxiliary_goal: { dimension_id: 'x', description: 'z' } }), catalog).reason, '无')
+})
+
+test('newest first, and a document without a time sorts last', () => {
+  const docs = [{ created_at: '2026-10-20T01:00:00Z' }, {}, { created_at: '2026-10-21T01:00:00Z' }]
+  assert.deepEqual([...docs].sort(byNewest), [docs[2], docs[0], docs[1]])
 })

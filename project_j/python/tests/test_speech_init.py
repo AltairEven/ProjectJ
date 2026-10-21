@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 from project_j.platform.speech.init import SAMPLES, main, probe
-from project_j.platform.speech.local import INIT, MODELS, LocalScorer, file_reasons
+from project_j.platform.speech.local import INIT, MODELS, LocalScorer
 
 FAKE = Path(__file__).parent / "fixtures/fake_scorer.py"
 
@@ -30,7 +30,7 @@ def test_passing_probe_writes_a_private_record_and_admits(tmp_path):
     assert record["samples"]["correct"]["flagged"] == [] and "long" in record["samples"]
     assert record["memory_peak_bytes"] == 200 and record["identity"]["revision"] == "r1"
     assert (tmp_path / INIT).stat().st_mode & 0o777 == 0o600
-    assert file_reasons(tmp_path) == []
+    assert LocalScorer.file_reasons(tmp_path) == []
 
 
 def test_a_missed_misread_fails_the_probe(tmp_path):
@@ -41,7 +41,7 @@ def test_a_missed_misread_fails_the_probe(tmp_path):
 
     record = asyncio.run(probe(tmp_path, fake(tmp_path), no_misread))
     assert not record["passed"] and "bridge未标出" in record["reasons"][0]
-    assert file_reasons(tmp_path)[0].startswith("评分探针未通过")
+    assert LocalScorer.file_reasons(tmp_path)[0].startswith("评分探针未通过")
 
 
 def test_missing_voice_or_unloadable_scorer_fails_with_a_reason(tmp_path):
@@ -58,7 +58,7 @@ def test_changed_models_need_a_new_probe(tmp_path):
     with_manifest(tmp_path)
     asyncio.run(probe(tmp_path, fake(tmp_path), text_synth))
     (tmp_path / MODELS / "manifest.json").write_text('{"revision": "other"}')
-    assert "评分模型已改动" in file_reasons(tmp_path)[0]
+    assert "评分模型已改动" in LocalScorer.file_reasons(tmp_path)[0]
 
 
 def test_status_and_adult_score_commands(tmp_path, monkeypatch, capsys):

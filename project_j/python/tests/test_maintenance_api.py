@@ -3,7 +3,7 @@ import sys
 
 import pytest
 from fastapi.testclient import TestClient
-from support import CONDITIONS, LEARNER, confirmed, prepare_course, settle
+from support import LEARNER, confirmed, prepare_course, settle
 
 from project_j.application.configuration import Settings
 from project_j.application.documents import document, identity
@@ -158,12 +158,8 @@ def test_E2E17_simulation_report_never_grants_real_interface_or_child_qualificat
     assert dashboard["qualification"] == "not_granted"
     assert dashboard["actual_api"] == "未验证"
     assert dashboard["actual_voice"] == "未验证"
-    settings = Settings()
-    with pytest.raises(ValueError):
-        Settings(provider="openai")
     with pytest.raises(ValueError):
         Settings(realm="family")
-    assert settings.classroom_effort == "low" and settings.evaluation_effort == "medium"
 
 
 def test_serve_uses_explicit_simulation_root_and_keeps_default(monkeypatch, tmp_path):
@@ -191,7 +187,10 @@ def test_API_needs_the_token_and_class_view_hides_teacher_material(application):
         prepared = prepare_course(app, "prepare-api")
         confirmed(app, prepared)
         response = app.start(
-            "start-api", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS
+            "start-api",
+            LEARNER,
+            RevisionRef.model_validate(prepared["course_ref"]),
+            materials_ready=True,
         )
         assert response["decision"] == "allow_simulation"
         student = parent
@@ -226,7 +225,10 @@ def test_API_websocket_reconnect_reads_the_same_memory_core(application):
         prepared = prepare_course(app, "prep-ws")
         confirmed(app, prepared)
         started = app.start(
-            "start-ws", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS
+            "start-ws",
+            LEARNER,
+            RevisionRef.model_validate(prepared["course_ref"]),
+            materials_ready=True,
         )
         protocol = f"project-j.{app.token}"
         with client.websocket_connect("/api/class/events", subprotocols=[protocol]) as socket:
@@ -299,7 +301,10 @@ def test_old_student_socket_and_parent_control_cannot_access_the_next_activity(a
         package = prepare_course(app, "scope-prepare")
         confirmed(app, package)
         first = app.start(
-            "scope-first", LEARNER, RevisionRef.model_validate(package["course_ref"]), CONDITIONS
+            "scope-first",
+            LEARNER,
+            RevisionRef.model_validate(package["course_ref"]),
+            materials_ready=True,
         )
         student = {"Authorization": f"Bearer {app.token}"}
         with client.websocket_connect(
@@ -320,7 +325,7 @@ def test_old_student_socket_and_parent_control_cannot_access_the_next_activity(a
                 "scope-second",
                 LEARNER,
                 RevisionRef.model_validate(package["course_ref"]),
-                CONDITIONS,
+                materials_ready=True,
             )
             assert second["decision"] == "allow_simulation"
             old = client.post(
@@ -358,7 +363,10 @@ def test_one_token_covers_management_and_the_class(application):
         package = prepare_course(app, "one-prepare")
         confirmed(app, package)
         started = app.start(
-            "one-start", LEARNER, RevisionRef.model_validate(package["course_ref"]), CONDITIONS
+            "one-start",
+            LEARNER,
+            RevisionRef.model_validate(package["course_ref"]),
+            materials_ready=True,
         )
         assert "student_token" not in started
         assert client.get("/api/class/snapshot", headers=auth).status_code == 200

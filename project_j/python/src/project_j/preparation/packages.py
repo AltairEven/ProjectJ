@@ -1,5 +1,7 @@
 """Fixed simulation template compiled from actual versioned source materials."""
 
+import re
+
 from project_j.contracts import RevisionRef
 from project_j.learning.contracts import DemandBody
 from project_j.preparation.contracts import (
@@ -343,3 +345,18 @@ def template_draft(
         "note": "沿用课程库的纸桥模板。",
         "limitations": [],
     }
+
+
+def student_text(source: str) -> str:
+    """Only the story reaches the student; the source's provenance line is adult metadata."""
+    # ponytail: assumes the fixed course format ("# title", one 素材版本 line); a structured
+    # student field on the material object is the upgrade path for other formats.
+    lines = [
+        line.removeprefix("# ") for line in source.splitlines() if not line.startswith("素材版本：")
+    ]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip() + "\n"
+
+
+def story_text(source: str) -> str:
+    """The story a course is compiled from: the student text without its title line."""
+    return student_text(source).split("\n", 1)[1]

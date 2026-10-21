@@ -4,7 +4,7 @@ import logging
 import pytest
 
 from project_j.platform.files import PrivateFiles
-from project_j.platform.models.openai_api import solid_png
+from project_j.platform.models.contracts import solid_png
 from project_j.platform.storage import SimulationStore
 from project_j.platform.tts.recorded import decode_wav, encode_wav, speak
 from project_j.platform.tts.simulated import SimulatedSynthesizer

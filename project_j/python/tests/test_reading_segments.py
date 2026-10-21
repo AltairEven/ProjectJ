@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from project_j.application.coordinator import student_text
+from project_j.preparation.packages import student_text
 from project_j.preparation.reading import MAX_SEGMENT_WORDS, segment_reading, words
 
 ROOT = Path(__file__).resolve().parents[3]

@@ -132,54 +132,6 @@ class Document(ObjectEnvelope):
         )
 
 
-def validate_e2e01_reference_fixture(objects: list[ObjectEnvelope]) -> None:
-    """Only identity/reference validation, not execution or business-body validation."""
-    index = {(x.object_id, x.revision): x for x in objects}
-    if len(index) != len(objects):
-        raise ValueError("duplicate immutable revision")
-    for obj in objects:
-        for ref in obj.dependency_refs + obj.source_refs:
-            target = index.get((ref.object_id, ref.revision))
-            if target is None:
-                raise ValueError(f"missing exact revision: {obj.object_id}->{ref.object_id}")
-            if target.learner_id and target.learner_id != obj.learner_id:
-                raise ValueError("cross-learner reference")
-            if target.learner_id and target.realm != obj.realm:
-                raise ValueError("cross-realm personal reference")
-    # E2E01 fixture must reach an actual course node, not stop at a suggestion.
-    by_id = {x.object_id: x for x in objects}
-    if len(by_id) != len(objects):
-        raise ValueError("fixture must select one exact revision for each identity")
-    required_kinds = {
-        "C1": "course",
-        "C2": "course",
-        "D1": "demand",
-        "D2": "demand",
-        "S2": "state",
-        "PL1": "plan",
-        "E1": "evaluation",
-        "N1": "suggestion",
-        "F1": "fact",
-        "FB1": "feedback",
-    }
-    for identity, kind in required_kinds.items():
-        if identity not in by_id or by_id[identity].kind != kind:
-            raise ValueError(f"E2E01 fixture missing or wrongly typed {identity}")
-    for child, parent in [
-        ("C1", "D1"),
-        ("E1", "F1"),
-        ("E1", "FB1"),
-        ("D2", "S2"),
-        ("D2", "PL1"),
-        ("D2", "N1"),
-        ("C2", "D2"),
-    ]:
-        if child not in by_id or parent not in by_id:
-            raise ValueError(f"E2E01 reference fixture missing {child}/{parent}")
-        if by_id[parent].ref not in by_id[child].dependency_refs + by_id[child].source_refs:
-            raise ValueError(f"missing required link {child}->{parent}")
-
-
 class SubmittedInput(Contract):
     event_id: str = Field(min_length=1)
     activity_id: str = Field(min_length=1)

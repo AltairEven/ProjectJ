@@ -3,10 +3,9 @@
 import asyncio
 
 import pytest
-from support import CONDITIONS, LEARNER
+from support import LEARNER
 
 from project_j.classroom import judgment
-from project_j.contracts import RevisionRef
 from project_j.evaluation import assessment
 from project_j.learning import planning
 from project_j.learning.contracts import normalize_lexile
@@ -51,15 +50,3 @@ def test_lexile_is_normalized_or_refused():
     for bad in ("650", "L", "abcL", "12345L", "", "BRL"):
         with pytest.raises(ValueError):
             normalize_lexile(bad)
-
-
-def test_start_no_longer_asks_for_accompaniment(application):
-    prepared = asyncio.run(application.prepare("p1", LEARNER))
-    from support import ready
-
-    asyncio.run(ready(application, prepared))
-    conditions = {key: value for key, value in CONDITIONS.items() if key != "accompaniment"}
-    result = application.start(
-        "s1", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), conditions
-    )
-    assert result["decision"] == "allow_simulation"

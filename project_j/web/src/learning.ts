@@ -7,6 +7,9 @@ export type EvaluationState = '评价中' | '等你认可' | '已认可' | '有�
 
 const helpLabels: Record<string, string> = { none: '无帮助', light_prompt: '轻提示', scaffold: '支架', full_model: '完整示范', unknown: '帮助未知' }
 const ref = (doc: Shape): Ref => ({ object_id: doc.object_id, revision: doc.revision })
+
+/** For sort(): the newest saved document first; one without a time last. */
+export const byNewest = (a: { created_at?: string }, b: { created_at?: string }) => (b.created_at ?? '').localeCompare(a.created_at ?? '')
 const nameOf = (catalog: Shape[], id: string) => catalog.find(doc => doc.kind === 'capability' && doc.body.dimension_id === id)?.body.name as string | undefined
 
 /** One line per dimension; without evidence the judgment is unknown, never a score (design/learning). */
@@ -27,7 +30,7 @@ export function dimensionLines(state: Shape, catalog: Shape[]) {
 /** An evaluation is current when it read the fact and every note added to it (server rule). */
 export function evaluationRows(objects: Shape[]) {
   return objects.filter(doc => doc.kind === 'fact')
-    .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+    .sort(byNewest)
     .map(fact => {
       const activity = String(fact.body.activity_id)
       const notes = objects.filter(doc => doc.kind === 'feedback' && doc.body.activity_id === activity)

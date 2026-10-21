@@ -3,7 +3,7 @@
 import logging
 from datetime import UTC, datetime
 
-from project_j.application.documents import document, identity
+from project_j.application.documents import document, identity, publication, successor
 from project_j.contracts import RevisionRef
 from project_j.learning.contracts import DemandBody, PlanBody
 from project_j.learning.planning import (
@@ -13,7 +13,7 @@ from project_j.learning.planning import (
     checked_plan,
     review_request,
 )
-from project_j.platform.storage import Conflict, Publication
+from project_j.platform.storage import Conflict
 
 log = logging.getLogger(__name__)
 LEVELS = ("long_term", "annual", "stage", "week")
@@ -103,26 +103,13 @@ async def review(
             sources=tuple(e.ref for e in evaluations),
         )
         objects = [obj]
-        publications = [Publication(ref=obj.ref, reason="复盘复用原证据，不新增活动")]
+        publications = [publication(obj, "复盘复用原证据，不新增活动")]
         if adjusted:
-            new_plan = document(
-                "plan",
-                plan.object_id,
-                operation,
-                learner_id,
-                adjusted,
-                refs=plan.dependency_refs,
-                sources=(obj.ref,),
-                revision=plan.revision + 1,
+            new_plan = successor(
+                plan, operation, adjusted, refs=plan.dependency_refs, sources=(obj.ref,)
             )
             objects.append(new_plan)
-            publications.append(
-                Publication(
-                    ref=new_plan.ref,
-                    expected_revision=plan.revision,
-                    reason=f"授权内周计划小调整：{draft.reason}",
-                )
-            )
+            publications.append(publication(new_plan, f"授权内周计划小调整：{draft.reason}"))
         saved = app.save_step(
             operation,
             learner_id,
@@ -171,7 +158,7 @@ async def review(
                 learner_id,
                 "decision",
                 [obj],
-                publications=(Publication(ref=obj.ref, reason="具体方案待决定，不改变原计划"),),
+                publications=(publication(obj, "具体方案待决定，不改变原计划"),),
             )
         result["decision_ref"] = decision[0].ref.model_dump()
     log.info(
@@ -211,28 +198,19 @@ def decide(app, request_id: str, learner_id: str, decision_ref: RevisionRef, cho
         applicable_plan(app, learner_id, plan.body | proposal.body["patch"])
     decided = app.saved_step(operation, learner_id, "decision")
     if decided is None:
-        obj = document(
-            "decision",
-            proposal.object_id,
+        obj = successor(
+            proposal,
             operation,
-            learner_id,
             proposal.body | {"decision_state": "accepted" if choice == "accept" else "rejected"},
             refs=proposal.dependency_refs,
             sources=(proposal.ref,),
-            revision=proposal.revision + 1,
         )
         decided = app.save_step(
             operation,
             learner_id,
             "decision",
             [obj],
-            publications=(
-                Publication(
-                    ref=obj.ref,
-                    expected_revision=proposal.revision,
-                    reason="保存绑定版本的学生决定",
-                ),
-            ),
+            publications=(publication(obj, "保存绑定版本的学生决定"),),
         )
     result = {
         "decision_ref": decided[0].ref.model_dump(),
@@ -247,28 +225,19 @@ def decide(app, request_id: str, learner_id: str, decision_ref: RevisionRef, cho
                 learner_id,
                 plan.body | proposal.body["patch"] | {"decision_ref": decided[0].ref.model_dump()},
             )
-            obj = document(
-                "plan",
-                plan.object_id,
+            obj = successor(
+                plan,
                 operation,
-                learner_id,
                 data,
                 refs=plan.dependency_refs + (decided[0].ref,),
                 sources=(proposal.ref,),
-                revision=plan.revision + 1,
             )
             changed = app.save_step(
                 operation,
                 learner_id,
                 "plan",
                 [obj],
-                publications=(
-                    Publication(
-                        ref=obj.ref,
-                        expected_revision=plan.revision,
-                        reason="接受不等于生效；此步保存后才生效",
-                    ),
-                ),
+                publications=(publication(obj, "接受不等于生效；此步保存后才生效"),),
                 baselines=(plan_ref, state_ref),
             )
         result.update(
@@ -306,26 +275,15 @@ def revise_demand_after_plan(app, request_id: str, learner_id: str):
                 "primary_goal": plan.body["main_goal"],
             }
         )
-        obj = document(
-            "demand",
-            old.object_id,
-            operation,
-            learner_id,
-            body,
-            refs=(state.ref, plan.ref, body.profile_ref),
-            sources=(old.ref,),
-            revision=old.revision + 1,
+        obj = successor(
+            old, operation, body, refs=(state.ref, plan.ref, body.profile_ref), sources=(old.ref,)
         )
         saved = app.save_step(
             operation,
             learner_id,
             "demand",
             [obj],
-            publications=(
-                Publication(
-                    ref=obj.ref, expected_revision=old.revision, reason="以已保存计划复核需求"
-                ),
-            ),
+            publications=(publication(obj, "以已保存计划复核需求"),),
             baselines=(state.ref, plan.ref, old.ref),
         )
     return app.ledger.finish(operation, learner_id, {"demand_ref": saved[0].ref.model_dump()})

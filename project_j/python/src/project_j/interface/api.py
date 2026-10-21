@@ -33,9 +33,9 @@ from project_j.application.coordinator import Coordinator
 from project_j.application.progress import advance, jobs, next_step, retry, run
 from project_j.classroom.harness import AllowedAction, DeliveryFeedback, Harness
 from project_j.contracts import Contract, Document, RevisionRef
-from project_j.curriculum.corrections import correct, release
+from project_j.curriculum.corrections import correct
 from project_j.evaluation.assessment import EvaluationUnavailable
-from project_j.learning.catalog import Capability, define, resolve
+from project_j.learning.fixtures import initialize
 from project_j.learning.maintenance import decide, review, revise_demand_after_plan
 from project_j.learning.onboarding import (
     QUESTIONS,
@@ -146,16 +146,6 @@ class CorrectionRequest(ParentRequest):
     target_ref: RevisionRef
     owner: str
     note: str = Field(min_length=1)
-
-
-class CatalogRequest(ParentRequest):
-    capability: Capability
-
-
-class ReleaseRequest(ParentRequest):
-    restriction_ref: RevisionRef
-    owner: str
-    evidence: str = Field(min_length=1)
 
 
 class TextInput(Contract):
@@ -416,7 +406,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app):
         app.state.coordinator = coordinator or build_coordinator(settings)
-        app.state.coordinator.initialize()
+        initialize(app.state.coordinator)
         # Local scorer and synthesizer load once here (seconds each), not at every class start.
         # A failed start keeps the server up; class admission then reports the reason.
         local = (app.state.coordinator.scorer, app.state.coordinator.synthesizer)
@@ -813,33 +803,6 @@ def create_app(
             request.note,
             request.owner,
         )
-
-    @app.post("/api/capability", dependencies=[Depends(operator)])
-    async def capability(request: CatalogRequest):
-        return define(controller(), request.request_id, request.learner_id, request.capability)
-
-    @app.get("/api/capability", dependencies=[Depends(operator)])
-    async def resolve_capability(subject: str, name: str, learner_id: str | None = None):
-        result = resolve(controller(), learner_id or controller().learner_id, subject, name)
-        return {"capability_ref": result.ref.model_dump() if result else None}
-
-    @app.post("/api/release", dependencies=[Depends(operator)])
-    async def release_restriction(request: ReleaseRequest):
-        return release(
-            controller(),
-            request.request_id,
-            request.learner_id,
-            request.restriction_ref,
-            request.owner,
-            request.evidence,
-        )
-
-    @app.get("/api/operation/{operation_id}", dependencies=[Depends(operator)])
-    async def operation(operation_id: str, learner_id: str | None = None):
-        learner_id = learner_id or controller().learner_id
-        return controller().ledger.operation(operation_id, learner_id) | {
-            "steps": controller().ledger.steps(operation_id, learner_id)
-        }
 
     @app.post("/api/retry-seal", dependencies=[Depends(operator)])
     async def retry_seal():

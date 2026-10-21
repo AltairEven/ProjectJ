@@ -82,7 +82,7 @@ class SimulationStore:
         if root.name != partition or root.is_symlink():
             raise ValueError(f"storage requires an explicit {partition} root")
         check_run_id(run_id)
-        others = {"credentials"} | {p for p, _ in REALMS.values()} - {partition}
+        others = {p for p, _ in REALMS.values()} - {partition}
         if any(part in others for part in root.parts):
             raise ValueError(f"{realm} cannot access another private partition")
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -412,11 +412,6 @@ class SimulationStore:
                         )
                     )
             self.fault("before_publish", key.step_id)
-            if self.fail_at == "temporary_save":
-                from project_j.platform.retries import UncommittedTransientSave
-
-                self.fail_at = None
-                raise UncommittedTransientSave("explicitly uncommitted temporary save failure")
             effective = self.tables["effective"]
             for publication in publications:
                 doc = pending[publication.ref]

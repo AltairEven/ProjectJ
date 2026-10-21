@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api, show, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
-import { goalCard } from '../learning'
+import { byNewest, goalCard } from '../learning'
 import { describe } from '../report'
 import { Rows, useRun, type PageProps } from '../ui'
 
@@ -30,7 +30,7 @@ export default function Plan({ token, dashboard, learner, refresh }: PageProps) 
   const catalog = objects.filter(doc => doc.kind === 'capability')
   const demand = objects.find(doc => doc.kind === 'demand')
   const plans = objects.filter(doc => doc.kind === 'plan')
-  const reviews = objects.filter(doc => doc.kind === 'review').sort((a, b) => b.created_at.localeCompare(a.created_at))
+  const reviews = objects.filter(doc => doc.kind === 'review').sort(byNewest)
   const decisions = objects.filter(doc => doc.kind === 'decision' && doc.body.decision_state === 'pending')
   return <>
     {demand?.body.goal_confirmation === 'needed' && <GoalConfirmation token={token} learner={learner} refresh={refresh} demand={demand} catalog={catalog} />}

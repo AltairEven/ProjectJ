@@ -15,13 +15,8 @@ class Settings(BaseSettings):
     study_root: Path = Path("project_j/private/study")
     realm: Literal["simulation", "study"] = "simulation"
     onboarding: bool = False  # Simulation only: start at onboarding, as study always does.
-    provider: Literal["simulation"] = "simulation"
     host: Literal["127.0.0.1"] = "127.0.0.1"
     port: int = 8765
-    classroom_model: Literal["gpt-6.1-sol"] = "gpt-6.1-sol"
-    classroom_effort: Literal["low"] = "low"
-    preparation_effort: Literal["medium"] = "medium"
-    evaluation_effort: Literal["medium"] = "medium"
     # Debug-only switches for the simulated provider and store; both default to off.
     model_delay: float = Field(default=0, ge=0)
     fail_once: str | None = Field(

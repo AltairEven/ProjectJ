@@ -4,9 +4,9 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from project_j.application.documents import document, identity
+from project_j.application.documents import document, identity, publication
 from project_j.contracts import Contract, RevisionRef
-from project_j.platform.storage import Conflict, Publication
+from project_j.platform.storage import Conflict
 
 
 class Capability(Contract):
@@ -111,7 +111,7 @@ def define(app, request_id: str, learner_id: str, body: Capability):
             learner_id,
             "capability",
             [obj],
-            publications=(Publication(ref=obj.ref, reason="明确范围的模拟目录定义"),),
+            publications=(publication(obj, "明确范围的模拟目录定义"),),
         )
     return app.ledger.finish(
         operation,

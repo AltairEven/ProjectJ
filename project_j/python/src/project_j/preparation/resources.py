@@ -10,9 +10,9 @@ import time
 from contextlib import aclosing
 from datetime import UTC, datetime
 
-from project_j.application.documents import document
+from project_j.application.documents import publication, successor
 from project_j.contracts import RevisionRef
-from project_j.platform.storage import Conflict, Publication
+from project_j.platform.storage import Conflict
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.recorded import decode_wav, encode_wav
 from project_j.platform.visuals import MEDIA_TYPES, checked_svg, image_type
@@ -152,27 +152,18 @@ async def generate_resource(app, request_id, learner_id, course_ref: RevisionRef
         index, _ = entry(preview, resource_id)
         resources = list(preview.body["resources"])
         resources[index] = item | {"state": "generated", "versions": [*item["versions"], version]}
-        obj = document(
-            "preview",
-            preview.object_id,
+        obj = successor(
+            preview,
             operation,
-            learner_id,
             preview.body | {"resources": resources},
             refs=preview.dependency_refs,
-            revision=preview.revision + 1,
         )
         saved = app.save_step(
             operation,
             learner_id,
             "resource",
             [obj],
-            publications=(
-                Publication(
-                    ref=obj.ref,
-                    expected_revision=preview.revision,
-                    reason="生成资源新版本",
-                ),
-            ),
+            publications=(publication(obj, "生成资源新版本"),),
             baselines=(course.ref,),
         )
         log.info(
@@ -226,27 +217,18 @@ def adopt_resource(app, request_id, learner_id, course_ref: RevisionRef, resourc
     if saved is None:
         resources = list(preview.body["resources"])
         resources[index] = item | {"state": "adopted", "adopted_version": version}
-        obj = document(
-            "preview",
-            preview.object_id,
+        obj = successor(
+            preview,
             operation,
-            learner_id,
             preview.body | {"resources": resources},
             refs=preview.dependency_refs,
-            revision=preview.revision + 1,
         )
         saved = app.save_step(
             operation,
             learner_id,
             "adoption",
             [obj],
-            publications=(
-                Publication(
-                    ref=obj.ref,
-                    expected_revision=preview.revision,
-                    reason="采用这一版本",
-                ),
-            ),
+            publications=(publication(obj, "采用这一版本"),),
             baselines=(course.ref,),
         )
         log.info(

@@ -1,11 +1,7 @@
 """project-j-scorer-init: download, probe and admit the local pronunciation scorer (ADR-0015)."""
 
-import argparse
-import asyncio
 import hashlib
 import io
-import json
-import os
 import subprocess
 import tempfile
 import wave
@@ -13,16 +9,11 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from project_j.platform.files import private_write
+from project_j.platform.local_process import init_main
 from project_j.platform.speech.local import (
-    BINARY,
-    INIT,
     MODELS,
     LocalScorer,
     ScorerUnavailable,
-    file_reasons,
-    identity,
-    read_init,
 )
 
 REFERENCE = "Mia has a toy car. She wants a bridge for her car."
@@ -103,9 +94,9 @@ async def probe(
         ready = await scorer.start()
     except ScorerUnavailable as error:
         record["reasons"] = [f"评分进程无法启动：{error}"]
-        save(root, record)
+        LocalScorer.save_init(root, record)
         return record
-    record |= {"identity": identity(ready), "device": ready.get("device")}
+    record |= {"identity": LocalScorer.identity(ready), "device": ready.get("device")}
     record["load_ms"] = ready.get("load_ms")
     memory = [ready.get("memory_bytes")]
     try:
@@ -131,12 +122,8 @@ async def probe(
     record["reasons"] = record["reasons"] or judge(record["samples"])
     record["memory_peak_bytes"] = max((m for m in memory if m is not None), default=None)
     record["passed"] = not record["reasons"]
-    save(root, record)
+    LocalScorer.save_init(root, record)
     return record
-
-
-def save(root: Path, record: dict):
-    private_write(root / INIT, (json.dumps(record, ensure_ascii=False, indent=2) + "\n").encode())
 
 
 def show(record: dict):
@@ -181,49 +168,24 @@ async def adult_score(root: Path, command: Sequence[str] | None, audio: bytes, t
 
 
 def main(argv: list[str] | None = None, command: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="本机发音评分初始化：下载模型、探针与准入（ADR-0015）。"
+    def arguments(parser):
+        parser.add_argument("file", type=Path)
+        parser.add_argument("--text", required=True)
+
+    return init_main(
+        LocalScorer,
+        "本机发音评分初始化：下载模型、探针与准入（ADR-0015）。",
+        "scorer",
+        probe,
+        show,
+        (
+            "score",
+            "成人自测：评一段16 kHz单声道16位WAV，不保存",
+            arguments,
+            lambda root, command, args: adult_score(
+                root, command, args.file.read_bytes(), args.text
+            ),
+        ),
+        argv,
+        command,
     )
-    commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("download").add_argument("--cache-dir", type=Path)
-    commands.add_parser("probe")
-    commands.add_parser("status")
-    adult = commands.add_parser("score", help="成人自测：评一段16 kHz单声道16位WAV，不保存")
-    adult.add_argument("file", type=Path)
-    adult.add_argument("--text", required=True)
-    args = parser.parse_args(argv)
-    if not Path("project_j").is_dir():
-        print("请在项目根目录运行（当前目录下没有 project_j）。")
-        return 1
-    root = Path.cwd()
-    if args.command == "download":
-        binary = root / BINARY
-        if not binary.exists():
-            print(
-                "评分子工程未安装，请先运行 "
-                "project_j/scripts/uv.sh sync --locked --project project_j/scorer"
-            )
-            return 1
-        call = [str(binary), "download", "--models", str(root / MODELS)]
-        if args.cache_dir:
-            call += ["--cache-dir", str(args.cache_dir.resolve())]
-        env = {key: value for key, value in os.environ.items() if key != "OPENAI_API_KEY"}
-        code = subprocess.run(call, cwd=root, env=env, check=False).returncode
-        if code == 0:
-            print("请运行 project-j-scorer-init probe。")
-        return code
-    if args.command == "probe":
-        record = asyncio.run(probe(root, LocalScorer(root, command, inherit_stderr=True)))
-        print("评分探针通过。" if record["passed"] else "评分探针未通过。")
-        show(record)
-        return 0 if record["passed"] else 1
-    if args.command == "status":
-        if reasons := file_reasons(root):
-            print("评分器未就绪。")
-            for reason in reasons:
-                print(f"- {reason}")
-            return 1
-        print("评分器已就绪。")
-        show(read_init(root))
-        return 0
-    return asyncio.run(adult_score(root, command, args.file.read_bytes(), args.text))

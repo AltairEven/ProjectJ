@@ -13,10 +13,10 @@ from typing import Literal
 from pydantic import Field
 
 from project_j.application.acceptance import fingerprint
-from project_j.application.coordinator import AUXILIARY_GOAL, PRIMARY_GOAL, story_text
 from project_j.classroom.harness import is_help_request
 from project_j.classroom.judgment import ClassroomJudgment, judgment_request, method_context
 from project_j.contracts import Contract, RevisionRef
+from project_j.learning.fixtures import AUXILIARY_GOAL, PRIMARY_GOAL
 from project_j.paths import check_path
 from project_j.platform.models.config import ModelFiles
 from project_j.platform.models.contracts import ModelRequest
@@ -26,7 +26,7 @@ from project_j.platform.speech.contracts import PronunciationResult, WordScore
 from project_j.platform.speech.local import LIMITATIONS
 from project_j.platform.storage import check_run_id
 from project_j.preparation.contracts import TaskDefinition
-from project_j.preparation.packages import COURSES, course_tasks
+from project_j.preparation.packages import COURSES, course_tasks, story_text
 from project_j.preparation.reading import words
 from project_j.teacher.methods import JANE
 

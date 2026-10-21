@@ -7,7 +7,6 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 from support import (
-    CONDITIONS,
     LEARNER,
     answer,
     deliver_all,
@@ -21,6 +20,7 @@ from project_j.application.configuration import Settings
 from project_j.application.progress import advance, next_step
 from project_j.contracts import RevisionRef
 from project_j.interface.api import create_app
+from project_j.learning.fixtures import initialize
 from project_j.learning.onboarding import (
     QUESTIONS,
     ProfileEdit,
@@ -46,8 +46,7 @@ async def placement_lesson(app):
     assert step["kind"] == "placement"
     course_ref = RevisionRef.model_validate(step["subject"]["course_ref"])
     await ready(app, {"course_ref": course_ref})
-    conditions = CONDITIONS | {"materials": "not_needed"}
-    assert app.start("placement", LEARNER, course_ref, conditions)["decision"] == "allow_simulation"
+    assert app.start("placement", LEARNER, course_ref)["decision"] == "allow_simulation"
     core = app.core
     deliver_all(core)
     await answer(app, "听到了，先读故事。", "confirmation")
@@ -65,7 +64,7 @@ def test_onboarding_walks_from_lexile_to_the_first_goal(tmp_path):
     app = onboarding_app(tmp_path)
 
     async def scenario():
-        app.initialize()
+        initialize(app)
         assert next_step(app, LEARNER)["kind"] == "lexile"
         save_lexile(app, "l1", LEARNER, " 650l ")
         assert app.current(LEARNER, "profile").body["lexile"] == "650L"
@@ -101,7 +100,7 @@ def test_onboarding_walks_from_lexile_to_the_first_goal(tmp_path):
 
 def test_chat_needs_every_answer(tmp_path):
     app = onboarding_app(tmp_path)
-    app.initialize()
+    initialize(app)
     with pytest.raises(LookupError):
         save_chat(app, "c0", LEARNER, ANSWERS)  # no Lexile yet
     save_lexile(app, "l1", LEARNER, "650L")
@@ -148,7 +147,7 @@ def test_onboarding_routes(tmp_path):
 def test_onboarding_logs_never_carry_answers_or_lexile(tmp_path, caplog):
     caplog.set_level(logging.INFO, logger="project_j")
     app = onboarding_app(tmp_path)
-    app.initialize()
+    initialize(app)
     save_lexile(app, "l1", LEARNER, "650L")
     save_chat(app, "c1", LEARNER, ANSWERS)
     assert "onboarding lexile saved" in caplog.text

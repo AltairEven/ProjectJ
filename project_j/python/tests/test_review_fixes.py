@@ -8,7 +8,6 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 from support import (
-    CONDITIONS,
     LEARNER,
     answer,
     complete_story,
@@ -143,12 +142,14 @@ def test_feedback_correction_limits_derived_course_until_it_is_rechecked(applica
         assert {"evaluation", "state", "demand", "course"} <= restricted
         assert "fact" not in restricted and "feedback" not in restricted
         old_course = ref(result["next_package"]["course_ref"])
-        assert app.start("old-c2", LEARNER, old_course, CONDITIONS)["decision"] == "blocked"
+        assert (
+            app.start("old-c2", LEARNER, old_course, materials_ready=True)["decision"] == "blocked"
+        )
         assert app.store.read(fact.ref, LEARNER).body == fact.body
         rechecked = await next_course(app, "recheck", LEARNER, core.activity_id)
         new_course = ref(rechecked["next_package"]["course_ref"])
         await ready(app, {"course_ref": new_course})
-        assert app.start("new-c3", LEARNER, new_course, CONDITIONS)["decision"] == (
+        assert app.start("new-c3", LEARNER, new_course, materials_ready=True)["decision"] == (
             "allow_simulation"
         )
 
@@ -217,7 +218,9 @@ def test_class_control_takes_every_command_for_the_current_activity(application)
         auth = {"Authorization": f"Bearer {app.token}"}
         prepared = prepare_course(app, "p")
         confirmed(app, prepared)
-        app.start("s", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS)
+        app.start(
+            "s", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), materials_ready=True
+        )
         paused = client.post(
             "/api/class/control", headers=auth, json={"event_id": "p1", "command": "pause"}
         )
@@ -300,7 +303,9 @@ def test_successful_seal_retry_clears_the_reported_error(application):
         parent = {"Authorization": f"Bearer {app.token}"}
         prepared = prepare_course(app, "p")
         confirmed(app, prepared)
-        app.start("s", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS)
+        app.start(
+            "s", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), materials_ready=True
+        )
         app.store.fail_at = "before_commit"
         client.post(
             "/api/class/control",
@@ -324,12 +329,12 @@ def test_replayed_start_of_an_ended_activity_never_returns_its_old_result(applic
     app = application
     course = ref(asyncio.run(app.prepare("prepare", LEARNER))["course_ref"])
     confirmed(app, {"course_ref": course})
-    app.start("start-A", LEARNER, course, CONDITIONS)
+    app.start("start-A", LEARNER, course, materials_ready=True)
     app.core.control(str(uuid4()), "stop")
     app.seal()
-    app.start("start-B", LEARNER, course, CONDITIONS)
+    app.start("start-B", LEARNER, course, materials_ready=True)
     with pytest.raises(Conflict, match="original start ended"):
-        app.start("start-A", LEARNER, course, CONDITIONS)
+        app.start("start-A", LEARNER, course, materials_ready=True)
 
 
 async def correct_first_lesson_after_a_second(app):

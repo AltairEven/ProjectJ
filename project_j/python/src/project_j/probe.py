@@ -2,7 +2,7 @@
 
 import json
 
-from project_j.platform.models.registry import ADAPTERS, NEEDS_KEY
+from project_j.platform.models.registry import ADAPTERS
 
 
 def preflight() -> dict:
@@ -13,7 +13,6 @@ def preflight() -> dict:
                 "adapter": adapter_id,
                 "version": adapter.version,
                 "efforts": list(adapter.efforts),
-                "needs_key": adapter_id in NEEDS_KEY,
                 "simulated": adapter.simulated,
             }
             for adapter_id, adapter in ADAPTERS.items()

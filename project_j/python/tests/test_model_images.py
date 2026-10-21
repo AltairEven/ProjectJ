@@ -21,8 +21,8 @@ from project_j.platform.models.contracts import (
     Binding,
     ImageNote,
     ModelRequest,
+    solid_png,
 )
-from project_j.platform.models.openai_api import OpenAIAdapter, solid_png
 from project_j.platform.models.service import ModelService
 from project_j.platform.visuals import image_type
 
@@ -142,11 +142,6 @@ def test_codex_text_request_still_refuses_drawing(tmp_path):
     reply = asyncio.run(adapter(fake, tmp_path).invoke(text, BINDING))
     assert reply.actual["tools"].status == "mismatch" and reply.media == ()
     assert fake.starts[0]["base_instructions"] == BASE_INSTRUCTIONS
-
-
-def test_openai_adapter_does_not_draw():
-    reply = asyncio.run(OpenAIAdapter("sk-test").invoke(DRAW, BINDING))
-    assert reply.failure == "unavailable"
 
 
 class Drawer:

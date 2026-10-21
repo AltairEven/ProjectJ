@@ -23,30 +23,26 @@ def mode(path):
     return stat.S_IMODE(path.stat().st_mode)
 
 
-def test_set_key_is_hidden_private_and_never_printed(root, monkeypatch, capsys):
-    monkeypatch.setattr(init.getpass, "getpass", lambda prompt: "sk-secret-123")
-    assert cli("set-key", "openai") == 0
-    key_file = root / "credentials/openai.json"
-    assert mode(key_file) == 0o600 and mode(root) == 0o700 and mode(root / "credentials") == 0o700
-    assert "sk-secret-123" not in capsys.readouterr().out
-    assert cli("set-key", "simulated") == 1  # no key for the simulated adapter
-    assert cli("set-key", "../escape") == 1
-
-
 def test_configure_validates_adapter_effort_and_purpose(root):
     assert cli("configure", "--default", "nope:m:low") == 1
-    assert cli("configure", "--default", "openai:gpt-6.1-sol:turbo") == 1
+    assert cli("configure", "--default", "simulated:simulated-jane:turbo") == 1
     assert (
-        cli("configure", "--default", "openai:gpt-6.1-sol:low", "--purpose", "chat=openai:x:low")
+        cli(
+            "configure",
+            "--default",
+            "simulated:simulated-jane:low",
+            "--purpose",
+            "chat=simulated:x:low",
+        )
         == 1
     )
     assert (
         cli(
             "configure",
             "--default",
-            "openai:gpt-6.1-sol:low",
+            "simulated:simulated-jane:low",
             "--purpose",
-            "evaluation=openai:gpt-6.1-sol:medium",
+            "evaluation=simulated:simulated-jane:medium",
         )
         == 0
     )
@@ -58,9 +54,9 @@ def test_configure_validates_adapter_effort_and_purpose(root):
         cli(
             "configure",
             "--default",
-            "openai:gpt-6.1-sol:medium",
+            "simulated:simulated-jane:medium",
             "--purpose",
-            "classroom_judgment=openai:gpt-6.1-sol:low",
+            "classroom_judgment=simulated:simulated-jane:low",
         )
         == 0
     )
@@ -75,7 +71,7 @@ def test_configure_validates_adapter_effort_and_purpose(root):
 
 
 def test_configure_accepts_a_fast_tier_only_where_the_adapter_offers_it(root):
-    assert cli("configure", "--default", "openai:gpt-6.1-sol:low:fast") == 1
+    assert cli("configure", "--default", "simulated:simulated-jane:low:fast") == 1
     assert cli("configure", "--default", "codex:gpt-6.1-sol:low:turbo") == 1
     assert cli("configure", "--default", "codex:gpt-6.1-sol:low:fast:x") == 1
     assert (
@@ -98,7 +94,7 @@ def test_configure_accepts_a_fast_tier_only_where_the_adapter_offers_it(root):
 
 
 def test_extra_high_effort_is_offered_by_codex_only(root):
-    assert cli("configure", "--default", "openai:gpt-6.1-sol:xhigh") == 1
+    assert cli("configure", "--default", "simulated:simulated-jane:xhigh") == 1
     assert (
         cli(
             "configure",
@@ -157,15 +153,6 @@ def test_probe_records_admission_without_secrets_and_changes_invalidate(root, ca
     assert cli("status") == 1
 
 
-def test_key_change_invalidates_and_record_keeps_only_digest(root):
-    files = ModelFiles(root)
-    files.set_key("openai", "sk-first")
-    first = files.digest({"openai": "1"})
-    files.set_key("openai", "sk-second")
-    assert files.digest({"openai": "1"}) != first
-    assert "sk-second" not in first and "sk-second" not in files.digest({"openai": "1"})
-
-
 def test_symlinked_paths_are_refused(root, tmp_path):
     root.parent.mkdir(parents=True)
     (tmp_path / "elsewhere").mkdir()
@@ -195,7 +182,6 @@ def test_codex_is_built_with_its_own_home_and_needs_no_key(root, capsys):
     adapter = build("codex", ModelFiles(root))
     assert isinstance(adapter, CodexAdapter) and adapter.home == root / "codex-home"
     assert not (root / "codex-home").exists()  # nothing launched just by building
-    assert cli("set-key", "codex") == 1
     assert cli("configure", "--default", "codex:gpt-6.1-sol:low") == 0
     cli("status")
     assert "codex 登录：未登录" in capsys.readouterr().out
@@ -219,7 +205,7 @@ def test_login_runs_only_for_codex(root, monkeypatch, capsys):
     assert cli("login", "codex") == 0
     assert seen == {"home": root / "codex-home", "closed": True}
     assert "https://auth.example/login" in capsys.readouterr().out
-    assert cli("login", "openai") == 1
+    assert cli("login", "simulated") == 1
 
 
 def test_probe_closes_each_adapter(root, monkeypatch):
@@ -233,3 +219,22 @@ def test_probe_closes_each_adapter(root, monkeypatch):
     monkeypatch.setattr(SimulatedAdapter, "aclose", aclose, raising=False)
     cli("configure", "--default", "simulated:simulated-jane:low")
     assert cli("probe") == 0 and closed == ["simulated"]
+
+
+def test_digest_of_an_existing_record_stays_valid(root):
+    """The study record of 2026-10-19 was made with this configuration; removing the API-key
+    adapter must not invalidate it."""
+    from project_j.platform.models.contracts import Binding
+
+    files = ModelFiles(root)
+    files.configure(
+        Binding(adapter="codex", model="gpt-6.1-sol", effort="xhigh"),
+        {
+            "classroom_judgment": Binding(
+                adapter="codex", model="gpt-6.1-sol", effort="low", tier="fast"
+            )
+        },
+    )
+    assert files.digest({"codex": "3"}) == (
+        "51a671b7bf0581790b819d71c69270370c3a81d4f8b918f352ecd4c203bf0063"
+    )

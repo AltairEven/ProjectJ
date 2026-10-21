@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
+import { byNewest } from '../learning'
 import { focusError, initialFocus, nextStepView } from '../next-step'
 import { endLabels } from '../report'
 import { JobLine, Rows, useRun, type PageProps } from '../ui'
@@ -47,14 +48,12 @@ function FocusPicker({ token, learner, refresh, subject }: Pick<PageProps, 'toke
   </>
 }
 
-const newest = (docs: Doc[]) => [...docs].sort((a, b) => b.created_at.localeCompare(a.created_at))[0] as Doc | undefined
-
 export default function Home({ token, dashboard, learner, go, refresh }: PageProps) {
   const { busy, run, status } = useRun(refresh)
   const view = nextStepView(dashboard.next ?? { kind: 'none' })
   const objects = dashboard.objects ?? []
   const jobs = dashboard.jobs ?? []
-  const fact = newest(objects.filter(doc => doc.kind === 'fact'))
+  const fact = objects.filter(doc => doc.kind === 'fact').sort(byNewest)[0] as Doc | undefined
   const activity = fact && String(fact.body.activity_id)
   const course = fact && objects.find(doc => doc.kind === 'course' && doc.object_id === (fact.body.course_ref as Doc).object_id)
   const evaluation = activity === undefined ? undefined : objects.find(doc => doc.kind === 'evaluation' && doc.body.activity_id === activity)

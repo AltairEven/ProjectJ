@@ -57,6 +57,12 @@ class ModelService:
         report = adapter.report(SIMULATED_MODEL, ("low", "medium"))
         return cls({"simulated": adapter}, bindings, [report])
 
+    def simulates(self, purpose: Purpose) -> bool:
+        """Whether this purpose is bound to a simulated adapter (no binding: not simulated)."""
+        binding = self.bindings.get(purpose)
+        adapter = self.adapters.get(binding.adapter) if binding else None
+        return bool(adapter and adapter.simulated)
+
     def report_for(self, binding: Binding) -> CapabilityReport | None:
         return next(
             (r for r in self.reports if r.adapter == binding.adapter and r.model == binding.model),

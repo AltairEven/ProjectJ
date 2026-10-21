@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from project_j.application.coordinator import Coordinator
+from project_j.learning.fixtures import initialize
 from project_j.platform.storage import SimulationStore
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -22,7 +23,7 @@ def application(tmp_path):
             "qualification": "not_granted",
         },
     )
-    app.initialize()
+    initialize(app)
     try:
         yield app
     finally:

@@ -7,7 +7,6 @@ import pytest
 from support import answer, deliver_all, start
 
 import project_j.application.reference as reference_module
-from project_j.application.coordinator import AUXILIARY_GOAL, PRIMARY_GOAL, story_text
 from project_j.application.reference import (
     REFERENCE,
     PronunciationFixture,
@@ -22,9 +21,10 @@ from project_j.application.reference import (
 )
 from project_j.classroom.harness import is_help_request
 from project_j.classroom.judgment import ClassroomJudgment
+from project_j.learning.fixtures import AUXILIARY_GOAL, PRIMARY_GOAL
 from project_j.platform.models.contracts import AdapterReply
 from project_j.platform.models.service import ModelService
-from project_j.preparation.packages import FIRST, course_tasks
+from project_j.preparation.packages import FIRST, course_tasks, story_text
 
 ROOT = Path(__file__).resolve().parents[3]
 

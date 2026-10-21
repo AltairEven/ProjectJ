@@ -38,16 +38,19 @@ from openai_codex.generated.v2_all import (
 from pydantic import BaseModel, ValidationError
 
 from project_j.platform.models.contracts import (
+    FAILURE_TEXT,
+    PROBE,
     AdapterReply,
     Binding,
     CapabilityReport,
+    ColorAnswer,
     ConfigCheck,
     Effort,
     ModelRequest,
     ProbeItem,
     Tier,
+    solid_png,
 )
-from project_j.platform.models.openai_api import FAILURE_TEXT, PROBE, ColorAnswer, solid_png
 
 log = logging.getLogger(__name__)
 ERRORS = {

@@ -6,7 +6,6 @@ import pytest
 from pydantic import ValidationError
 from support import LEARNER
 
-from project_j.application.coordinator import story_text
 from project_j.contracts import RevisionRef
 from project_j.curriculum.content import check_content
 from project_j.learning.contracts import DemandBody, Goal
@@ -27,6 +26,7 @@ from project_j.preparation.packages import (
     FIRST,
     course_tasks,
     library_entry,
+    story_text,
     template_draft,
 )
 from project_j.teacher.methods import JANE

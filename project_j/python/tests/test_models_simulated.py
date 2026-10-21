@@ -159,3 +159,12 @@ def test_reading_judgment_follows_the_score_and_names_words_to_reread():
     )
     assert good["judgment"] == "correct"
     assert reply({"status": "unknown", "words": []})["judgment"] == "unclear"
+
+
+def test_simulates_follows_the_purpose_binding():
+    from project_j.platform.models.service import ModelService
+
+    service = ModelService.simulated()
+    assert service.simulates("preparation") and service.simulates("evaluation")
+    del service.bindings["evaluation"]
+    assert not service.simulates("evaluation")  # no binding is never taken for a simulation

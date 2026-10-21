@@ -12,8 +12,8 @@ from project_j.platform.models.contracts import (
     ModelRequest,
     ProbeItem,
     Tier,
+    solid_png,
 )
-from project_j.platform.models.openai_api import solid_png
 
 SIMULATED_MODEL = "simulated-jane"
 SIMULATED_SVG = (
@@ -75,7 +75,7 @@ class SimulatedAdapter:
                 "note": "模拟：资料用于选故事难度与题材。",
             }
         if request.purpose == "planning" and "demand" in context:
-            from project_j.application.coordinator import AUXILIARY_GOAL, PRIMARY_GOAL
+            from project_j.learning.fixtures import AUXILIARY_GOAL, PRIMARY_GOAL
 
             demand, suggestion = context["demand"], context["suggestion"]
             # The simulated course covers only the fixed goals, so after a placement lesson

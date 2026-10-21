@@ -20,10 +20,10 @@ project_j/scripts/start.sh
 
 | 位置 | 用途 |
 | --- | --- |
-| python/src/project_j/application/ | 版本化用例、请求/步骤台账、后台推进（progress.py）、配置及模拟检查依据 |
-| python/src/project_j/learning/、teacher/、preparation/、curriculum/ | 状态/计划/需求及复盘、唯一Jane、固定模板编制、内容核验和影响限制 |
+| python/src/project_j/application/ | 协调对象及操作/保存机制（coordinator.py），按业务分开的用例：备课与确认（preparing.py）、开课与封存（teaching.py）、反馈与评价（evaluating.py）、规划与选择（adopting.py）；请求/步骤台账、后台推进（progress.py）、配置及模拟检查依据 |
+| python/src/project_j/learning/、teacher/、preparation/、curriculum/ | 状态/计划/需求及复盘、模拟固定学习者（learning/fixtures.py）、唯一Jane、固定模板编制、内容核验和影响限制 |
 | python/src/project_j/classroom/、interface/ | 单活动内存Harness、提交/识别修订、HTTP/WS及操作者令牌 |
-| python/src/project_j/evaluation/、platform/ | 有据模拟解释/建议、SQLite迁移/不可变保存/回执、固定资产与一致恢复、模拟能力 |
+| python/src/project_j/evaluation/、platform/ | 有据模拟解释/建议、SQLite迁移/不可变保存/回执、固定资产与一致恢复、模拟能力；本机评分与合成进程共用的进程管理（platform/local_process.py） |
 | python/tests/ | 明确模拟输入、临时目录、故障注入和SDK MockTransport |
 | web/src/ | React主页面（pages/）与全屏课堂（Classroom.tsx）；不拥有评分或转场规则 |
 | web/schema/、web/src/client/ | Python导出的OpenAPI及生成类型；通过命令再生成，不能手改另一份合同 |

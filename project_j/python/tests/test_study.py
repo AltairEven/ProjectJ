@@ -13,6 +13,7 @@ from project_j.application.documents import document
 from project_j.contracts import RevisionRef, SubmittedInput
 from project_j.interface.api import RecordingInput, build_coordinator, create_app, main
 from project_j.interface.submission import InputAdapter
+from project_j.learning.fixtures import initialize
 from project_j.platform.files import PrivateFiles
 from project_j.platform.models.service import ModelService
 from project_j.platform.speech.local import LocalScorer
@@ -60,7 +61,7 @@ def test_simulation_store_refuses_records_of_another_realm(tmp_path):
 def test_backup_restores_only_into_its_own_realm(tmp_path):
     store = SimulationStore(tmp_path / "private/study", "a1", realm="study")
     app = Coordinator(store, ROOT, verification=PASS, onboarding=False)
-    result = app.initialize("learner")
+    result = initialize(app, "learner")
     backup = PrivateFiles(store).backup()
     store.close()
     assert '"realm":"study"' in (backup / "manifest.json").read_text()
@@ -76,7 +77,7 @@ def test_backup_restores_only_into_its_own_realm(tmp_path):
 def study(tmp_path):
     store = SimulationStore(tmp_path / "private/study", "a1", realm="study")
     app = Coordinator(store, ROOT, verification=PASS, onboarding=False)
-    app.initialize()
+    initialize(app)
     try:
         yield app
     finally:
@@ -251,7 +252,7 @@ def test_study_starts_at_onboarding(tmp_path):
     store = SimulationStore(tmp_path / "private/study", "a1", realm="study")
     app = Coordinator(store, ROOT, verification=PASS)
     try:
-        app.initialize()
+        initialize(app)
         assert next_step(app, "learner")["kind"] == "lexile"
         assert store.current(identity("learner", "demand"), "learner") is None
     finally:

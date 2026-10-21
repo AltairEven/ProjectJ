@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.40.1；更新：2026年10月21日。
+版本：1.41.0；更新：2026年10月21日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -824,4 +824,25 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 检查证据：新增测试先失败后通过（题材字段与逐条要求、规划列题材含日志与过滤、超长标题被丢弃且输出结构不含长度限制、等待选择与提交含日志、旧需求重选、备课入口拒绝、接口拒绝空白与超长题材、备课请求带题材与指令、主页校验规则）。统一check通过（主工程544、评分39、合成15项pytest，前端58、文档1），UTC 2026-10-21T03:10:35.026331+00:00，工程摘要363f3fbba5b020cac041ebed08800629b9cb39f5c147f0d37a8b0833c14d822c；离线probe通过；模拟measure p95 4500毫秒、not_granted；依赖未变。沙盒整站预览以浏览器核对选择页（未选题材不能按、4项知识点不能按、空白自写题材不能按、提交内容正确、没列出题材时只有输入框）、品牌标题一行，原课堂烟测通过、页面无报错；脚本与截图在本机project_j/test/ui/sandbox/choose.mjs、test/output/design。审查由主会话自做（未派审查子代理）。
 - 未验证：真实规划模型列出的题材质量；真实备课是否按所选题材写短文；真实模型是否接受新的输出字段（已去掉长度约束）。
 - 接续：用户运行编号me当前停在“评价等你认可（可重上）”，当前课已备好，不出现选择；重启学习服务、重上并认可评价后，下一课前出现“下一课读什么、练什么？”。
+
+## LEAN-1 精简编码与按业务分层（ponytail审查）
+
+- 状态：实现与自测完成，未提交（2026年10月21日）。用户先要求“使用ponytail技能，参考主流的软件设计思想，重新review当前项目设计和实现”，看过审查报告后要求“按照你的建议全改了，改完之后完成review和自测，不要提交”。
+- 负责人/集成：Claude Opus。审查由主会话自做，未派审查子代理。
+- 范围（行为不变的精简，除第6、7、9项）：
+  1. 新版对象与发布：`application/documents.py`新增`successor()`（同一对象的下一版）与`publication()`（期望版本取自所替代的那一版），替换约30处手写组合；改前在保存处临时加断言跑全套测试，确认生产代码处处满足这一规则。
+  2. 本机评分与合成进程客户端共用`platform/local_process.py`的`LocalProcess`（启动握手、退出后后台重启、就绪原因、关闭），两个子工程与进程照旧分开；两个初始化命令共用`init_main`。提示文字与日志格式不变。
+  3. 删除只服务于测试注入故障的保存重试（`platform/retries.py`）及tenacity依赖；保存失败照旧先查回执。
+  4. 删除只校验一份手写测试样例的`validate_e2e01_reference_fixture`（真实保存已检查确切版本与跨学习者引用）。
+  5. 删除`Settings`里没人读的5个固定字段；`ModelService.simulates(purpose)`取代两份重复判断。
+  6. `start()`的开课条件字典改为`materials_ready`：缺实物仍为待补，内容核对缺失或受限仍为阻断，未核实仍为待补；“学生报告实物不可用→阻断”一支随条件字典去掉（学生只能说备好或没备好）。
+  7. 删除前端与测试都不调用的接口：`POST/GET /api/capability`、`/api/release`、`/api/operation/{id}`（底层函数保留）。
+  8. 前端“按时间取最新”统一为`byNewest`。
+  9. 按[ADR-0019](../decisions/ADR-0019.md)删除未用的OpenAI API直连适配器、密钥文件读写与`set-key`；共用的探针请求、失败说明与单色图片移到模型合同；`openai`包保留（Codex适配器用其严格结构转换）。配置摘要组成不变，用户本机的模型准入记录经只读核对仍然有效，不需重新探测。
+  10. 分层：Coordinator只留操作与保存机制、`restrict`、`dashboard`；用例按业务拆到`application/preparing.py`、`teaching.py`、`evaluating.py`、`adopting.py`（以多个父类组合，调用点不变）；固定学习者的初始数据移到`learning/fixtures.py`的`initialize(app)`，课程库文本函数移到`preparation/packages.py`。用语法树核对，42个方法搬家前后完全一致，只有`initialize`与`dashboard`按预期改动。
+- 文件边界：project_j/python/src/project_j/{application/*,learning/{fixtures,onboarding,maintenance,catalog,planning}.py,platform/{local_process,storage}.py,platform/{speech,tts}/{local,init}.py,platform/models/{contracts,codex_sdk,simulated,registry,config,init,service}.py,curriculum/corrections.py,preparation/{packages,resources}.py,interface/api.py,contracts.py,probe.py}（删除platform/retries.py、platform/models/openai_api.py），pyproject.toml与uv.lock（去掉tenacity）；tests相应更新（删除test_models_openai.py及只测已删功能的条目）；project_j/web/src/{learning,courses}.ts、pages/{Home,Plan}.tsx、tests/learning.test.mjs与重新导出的schema和client；文档ADR-0019（新）、design/platform/{models.md 2.8.0,configuration-permissions.md 2.0.1,storage-lifecycle.md 1.7.5}、docs/technology.md 1.15.0、project_j/README.md布局表。
+- 取舍：分层用多个父类组合而不是把用例改成模块函数，因为约300处测试直接调用Coordinator的方法；每个文件只管一块业务，运行时仍是一个对象。设计中“确认未提交的暂时保存失败可有限重试”的规则保留，技术文档写明目前没有这类故障、出现后再加。
+- 检查证据：新增或改写的测试先失败后通过（`simulates`、配置摘要回归、`byNewest`、E2E14按新开课参数）。统一check通过（主工程519、评分39、合成15项pytest，前端59、文档1），UTC 2026-10-21T04:38:03.659547+00:00，工程摘要dc6e90cd0aad0f7637d4b5c766b2d04f24766a84913e806b5590adc861909e1a；离线probe通过（只列模拟与Codex）；模拟measure p95 4500毫秒、not_granted。主工程环境离线同步去掉tenacity，其余依赖未变。沙盒四个本机烟测脚本（课堂、确认弹框、选择页、全页截图）无报错；以模拟入口真实启动服务，主页数据接口正常，被删接口返回404，服务已停。
+- 未验证：真实模型、真实声音与正式学习下的运行（未启动正式学习服务）。
+- 净变化：Python源码约−580行、测试约−240行，前端约−200行（主要是重新生成的接口类型），−1个依赖。
 

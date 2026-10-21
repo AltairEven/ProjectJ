@@ -1,5 +1,7 @@
 """Provider-neutral model requests and results; adapters absorb provider differences."""
 
+import struct
+import zlib
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
@@ -184,3 +186,55 @@ def admission(
             detail = f"（{item.detail}）" if item.detail else ""
             reasons.append(f"{item_label(name)}：{LABELS[item.status]}{detail}")
     return reasons
+
+
+FAILURE_TEXT = {
+    "auth": "密钥无效或未配置",
+    "quota": "额度不足或限流",
+    "timeout": "超时",
+    "unavailable": "模型或服务不可用",
+    "refused": "模型拒绝回答",
+    "incomplete": "返回不完整",
+    "invalid_output": "输出不合结构",
+}
+
+
+class ProbeAnswer(BaseModel):
+    verdict: Literal["correct", "incorrect", "unclear"]
+    evidence: str
+    response: str
+
+
+class ColorAnswer(BaseModel):
+    color: str
+
+
+PROBE = ModelRequest(
+    "classroom_judgment",
+    "This is a synthetic technical probe, not a child classroom. "
+    "Judge only the given source. Propose one short response; do not change state.",
+    {
+        "source": "Mia has a toy car. She wants a bridge for her car.",
+        "question": "What does Mia want to make?",
+        "answer": "a bridge.",
+    },
+    ProbeAnswer,
+    deadline_seconds=60,
+)
+
+
+def solid_png(rgb: tuple[int, int, int] = (255, 0, 0), size: int = 64) -> bytes:
+    """A one-colour PNG: the image-input probe and the simulated drawing."""
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        crc = struct.pack(">I", zlib.crc32(kind + data))
+        return struct.pack(">I", len(data)) + kind + data + crc
+
+    rows = (b"\x00" + bytes(rgb) * size) * size
+    header = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IEND", b"")
+    )

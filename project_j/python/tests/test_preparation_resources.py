@@ -9,8 +9,7 @@ from test_preparation_model import ref, science_draft, science_lesson
 from project_j.application.configuration import Settings
 from project_j.interface.api import create_app
 from project_j.platform.files import PrivateFiles
-from project_j.platform.models.contracts import AdapterReply
-from project_j.platform.models.openai_api import solid_png
+from project_j.platform.models.contracts import AdapterReply, solid_png
 from project_j.platform.storage import Conflict, StorageBlocked
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.recorded import decode_wav

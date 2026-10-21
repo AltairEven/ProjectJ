@@ -1,6 +1,6 @@
 # 数据存储与生命周期
 
-文档版本：1.7.4；更新：2026年10月19日；范围：存储设计及P1隔离实现。
+文档版本：1.7.5；更新：2026年10月21日；范围：存储设计及P1隔离实现。
 
 存储服务承载保存、读取、版本依赖、导出和恢复。业务模块定义数据含义及有效更新，平台维护物理可获取性、访问和保存结果；数据库事务或文件成功不能证明评价正确或所有下游已落实。
 
@@ -57,7 +57,7 @@
 | 模拟运行 | 默认`project_j/private/simulation/<run_id>/project_j.sqlite3`及`assets/`、`exports/`、`backups/`；启动参数`--simulation-root`可显式指定另一名为`simulation`的根目录，同样0700/0600并拒绝其他分区与符号链接 | 阶段1隔离入口；P0检查仅使用系统临时目录 |
 | 成人实际检查 | `project_j/private/adult_checks/<run_id>/project_j.sqlite3`及`assets/`、`exports/`、`backups/`，结构同模拟运行，参考题集报告`judgment-reference.json`（成人编写的虚构作答）也在这里，所有对象realm为adult_check、来源adult（数据库约束只收这一数据空间）；录音与合成音频只在内存，不落盘 | `project_j/scripts/start.sh --adult-check --run-id <id>`实际操作，模型、评分与合成初始化就绪；不能包含儿童状态 |
 | 未来家庭私有区 | `project_j/private/family/project_j.sqlite3`及`assets/`、`exports/`、`backups/` | 阶段5数据切换及真实入口验收后创建，P0—4入口不得访问/创建 |
-| 模型配置与密钥 | `project_j/private/models/`：config.json只含绑定，credentials/<适配器>.json各存一个适配器的密钥，init.json为初始化记录；目录0700、文件0600 | 密钥文件只供后端对应适配器读取；不进Git、导出或备份；家长页对密钥只写不读；模拟入口不读写 |
+| 模型配置 | `project_j/private/models/`：config.json只含绑定，init.json为初始化记录，codex-home/为订阅登录状态；目录0700、文件0600；目前没有密钥文件（[ADR-0019](../../decisions/ADR-0019.md)） | 不进Git、导出或备份；登录状态只由对应适配器读取；模拟入口不读写 |
 | 本机评分模型 | `project_j/private/scorer/`：`models/`为按固定修订下载的模型文件及摘要清单，`init.json`为探针与准入记录（不含任何录音）；目录0700、文件0600 | `project-j-scorer-init download`下载并核对摘要，`probe`写记录；只供评分进程只读；不进Git、导出或备份；模拟入口不读写 |
 | 本机合成模型 | `project_j/private/tts/`：`models/`为按固定修订下载的模型文件及摘要清单，`init.json`为探针与准入记录（不含音频）；目录0700、文件0600 | `project-j-tts-init download`下载并核对摘要，`probe`写记录；只供合成进程只读；不进Git、导出或备份；模拟入口不读写 |
 

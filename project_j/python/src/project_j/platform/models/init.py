@@ -1,8 +1,7 @@
-"""project-j-init: configure model bindings and keys, probe adapters, record admission."""
+"""project-j-init: configure model bindings, log in, probe adapters, record admission."""
 
 import argparse
 import asyncio
-import getpass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -17,7 +16,6 @@ from project_j.platform.models.contracts import (
 )
 from project_j.platform.models.registry import (
     ADAPTERS,
-    NEEDS_KEY,
     NEEDS_LOGIN,
     build,
     load_service,
@@ -100,8 +98,6 @@ def show(status: dict, files: ModelFiles):
         print(
             f"  能力报告 {report['adapter']}:{report['model']}（{report['captured_at']}）：{items}"
         )
-    for adapter in sorted(NEEDS_KEY):
-        print(f"  {adapter} 密钥：{'已配置' if files.has_key(adapter) else '未配置'}")
     for adapter in sorted(NEEDS_LOGIN):
         home = files.path(f"{adapter}-home")
         print(f"  {adapter} 登录：{'已登录' if ADAPTERS[adapter].logged_in(home) else '未登录'}")
@@ -116,12 +112,9 @@ async def login(files: ModelFiles, adapter_id: str) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="初始化模型适配层：配置、探测与准入；密钥只写不读。"
-    )
+    parser = argparse.ArgumentParser(description="初始化模型适配层：配置、登录、探测与准入。")
     parser.add_argument("--root", type=Path, default=Path("project_j/private/models"))
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("set-key").add_argument("adapter")
     commands.add_parser("login").add_argument("adapter")
     configure = commands.add_parser("configure")
     configure.add_argument("--default", required=True)
@@ -134,12 +127,6 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         files = ModelFiles(args.root)
-        if args.command == "set-key":
-            if args.adapter not in NEEDS_KEY:
-                raise ValueError(f"{args.adapter} 不需要或不接受密钥")
-            files.set_key(args.adapter, getpass.getpass(f"{args.adapter} API密钥（输入不显示）："))
-            print(f"{args.adapter} 密钥已保存（只写不读）；请重新运行 project-j-init probe。")
-            return 0
         if args.command == "login":
             if args.adapter not in NEEDS_LOGIN:
                 raise ValueError(f"{args.adapter} 不使用订阅登录")

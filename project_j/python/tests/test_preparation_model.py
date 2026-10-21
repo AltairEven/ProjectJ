@@ -3,13 +3,14 @@ import logging
 
 import pytest
 from fastapi.testclient import TestClient
-from support import CONDITIONS, LEARNER, next_course, wait_jobs
+from support import LEARNER, next_course, wait_jobs
 from test_learning_planning import model_changes_goals, taught
 
 from project_j.application.configuration import Settings
 from project_j.application.progress import advance, next_step, retry
 from project_j.contracts import RevisionRef
 from project_j.interface.api import create_app
+from project_j.learning.fixtures import initialize
 from project_j.platform.storage import Conflict
 from project_j.preparation.drafting import PreparationUnavailable
 
@@ -251,7 +252,7 @@ def science_lesson(application, monkeypatch, *drafts):
 
 
 def start(application, course_ref, request_id="start2"):
-    return application.start(request_id, LEARNER, course_ref, CONDITIONS)
+    return application.start(request_id, LEARNER, course_ref, materials_ready=True)
 
 
 def test_new_goals_are_prepared_confirmed_and_started(application, monkeypatch, caplog):
@@ -425,7 +426,7 @@ def test_study_preparation_writes_by_interests_and_maps_the_chosen_skill(
 
     store = SimulationStore(tmp_path / "private/study", "a1", realm="study")
     app = Coordinator(store, ROOT, verification={"result": "pass"}, onboarding=False)
-    app.initialize()
+    initialize(app)
     learner = app.learner_id
     demand = app.current(learner, "demand")
     chosen = document(

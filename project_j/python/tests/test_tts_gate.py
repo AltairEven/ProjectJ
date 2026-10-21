@@ -1,7 +1,7 @@
 import asyncio
 
 import pytest
-from support import CONDITIONS, LEARNER
+from support import LEARNER
 
 from project_j.contracts import RevisionRef
 from project_j.platform.tts.contracts import SynthesizerNotReady
@@ -18,6 +18,9 @@ def test_a_class_needs_a_ready_synthesizer(application):
     application.synthesizer = NotReady()
     with pytest.raises(SynthesizerNotReady, match="语音合成未就绪：合成进程未启动"):
         application.start(
-            "start1", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS
+            "start1",
+            LEARNER,
+            RevisionRef.model_validate(prepared["course_ref"]),
+            materials_ready=True,
         )
     assert application.core is None

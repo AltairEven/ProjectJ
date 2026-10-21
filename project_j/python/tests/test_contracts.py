@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from project_j.contracts import ObjectEnvelope, SubmittedInput, validate_e2e01_reference_fixture
+from project_j.contracts import ObjectEnvelope, SubmittedInput
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -89,10 +89,6 @@ def test_text_and_recordings_are_explicit_submissions():
     assert recording().text is None  # Audio bytes never travel inside the contract.
 
 
-def test_reference_skeleton_reaches_c2_with_exact_dependencies():
-    validate_e2e01_reference_fixture([ObjectEnvelope.model_validate(x) for x in objects()])
-
-
 @pytest.mark.parametrize(
     "change",
     [
@@ -110,28 +106,6 @@ def test_reject_identity_scope_revision_and_unknown_field(change):
         ObjectEnvelope.model_validate(objects()[0] | change)
 
 
-def test_references_do_not_replace_missing_old_revision_with_latest():
-    data = objects()
-    data[0]["revision"] = 2
-    with pytest.raises(ValueError, match="exact revision"):
-        validate_e2e01_reference_fixture([ObjectEnvelope.model_validate(x) for x in data])
-
-
-def test_cross_learner_reference_is_rejected():
-    data = objects()
-    data[0]["learner_id"] = "fictional-L2"
-    with pytest.raises(ValueError, match="cross-learner"):
-        validate_e2e01_reference_fixture([ObjectEnvelope.model_validate(x) for x in data])
-
-
-def test_duplicate_revision_and_missing_c2_are_rejected():
-    data = [ObjectEnvelope.model_validate(x) for x in objects()]
-    with pytest.raises(ValueError, match="duplicate"):
-        validate_e2e01_reference_fixture(data + [data[0]])
-    with pytest.raises(ValueError, match="C2"):
-        validate_e2e01_reference_fixture([x for x in data if x.object_id != "C2"])
-
-
 def test_reference_answers_are_fixed_simulated_data_and_have_independent_sources():
     samples = json.loads((FIXTURES / "reference_answers.json").read_text())
     assert len({s["id"] for s in samples}) == 10
@@ -141,12 +115,3 @@ def test_reference_answers_are_fixed_simulated_data_and_have_independent_sources
     for sample in samples:
         if sample["expected"] == "correct":
             assert sample["reference"] in text
-
-
-def test_next_course_cannot_be_replaced_by_a_suggestion_with_the_same_label():
-    data = objects()
-    for obj in data:
-        if obj["object_id"] == "C2":
-            obj.update(kind="suggestion", owner="evaluation")
-    with pytest.raises(ValueError, match="typed C2"):
-        validate_e2e01_reference_fixture([ObjectEnvelope.model_validate(x) for x in data])

@@ -1,8 +1,7 @@
 from sqlalchemy import select
 
-from project_j.application.documents import document, identity
+from project_j.application.documents import document, identity, publication, successor
 from project_j.contracts import RevisionRef
-from project_j.platform.storage import Publication
 
 # Facts and source reports stay historical truth; restriction records and issues are not uses.
 NOT_RESTRICTED = {"fact", "feedback", "parent_report", "restriction", "issue"}
@@ -91,7 +90,7 @@ def correct(app, request_id: str, learner_id: str, target: RevisionRef, note: st
             learner_id,
             "issue",
             [obj],
-            publications=(Publication(ref=obj.ref, reason="有版本和主责的更正问题"),),
+            publications=(publication(obj, "有版本和主责的更正问题"),),
         )
     impacted = affected(app, target, learner_id)
     restrictions = restrict_affected(app, operation, learner_id, [original], note)
@@ -126,26 +125,19 @@ def release(
         return result
     saved = app.saved_step(operation, learner_id, "release")
     if saved is None:
-        obj = document(
-            "restriction",
-            old.object_id,
+        obj = successor(
+            old,
             operation,
-            learner_id,
             old.body | {"restriction_state": "resolved", "recheck_evidence": evidence},
             refs=old.dependency_refs,
             sources=(old.ref,),
-            revision=old.revision + 1,
         )
         saved = app.save_step(
             operation,
             learner_id,
             "release",
             [obj],
-            publications=(
-                Publication(
-                    ref=obj.ref, expected_revision=old.revision, reason="主责针对确切版本复核解除"
-                ),
-            ),
+            publications=(publication(obj, "主责针对确切版本复核解除"),),
         )
     return app.ledger.finish(
         operation, learner_id, {"restriction_ref": saved[0].ref.model_dump(), "state": "resolved"}

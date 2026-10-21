@@ -7,19 +7,16 @@ from project_j.contracts import RevisionRef
 from project_j.preparation.resources import adopt_resource, generate_resource
 
 LEARNER = "fictional-L1"
-CONDITIONS = {
-    "materials": "reported_available",
-    "time": "reported_30_minutes",
-    "raw_report": "明确模拟：纸、书、小车、30分钟及陪伴均可用。",
-    "explicit_start": True,
-}
 
 
 async def start(app, request_id="start1"):
     prepared = await app.prepare("prepare1", app.learner_id)
     await ready(app, prepared)
     result = app.start(
-        request_id, app.learner_id, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS
+        request_id,
+        app.learner_id,
+        RevisionRef.model_validate(prepared["course_ref"]),
+        materials_ready=True,
     )
     assert result["decision"] == f"allow_{app.store.realm}"
     return app.core
@@ -108,7 +105,7 @@ async def teach(app, request_id, course_ref, answers):
     """Teach one prepared course with first-try answers and an offscreen report; seal the fact."""
     await ready(app, {"course_ref": course_ref})
     result = app.start(
-        request_id, app.learner_id, RevisionRef.model_validate(course_ref), CONDITIONS
+        request_id, app.learner_id, RevisionRef.model_validate(course_ref), materials_ready=True
     )
     assert result["decision"] == "allow_simulation"
     core = app.core

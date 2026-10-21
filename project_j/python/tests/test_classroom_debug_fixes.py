@@ -6,7 +6,6 @@ import base64
 import pytest
 from fastapi.testclient import TestClient
 from support import (
-    CONDITIONS,
     LEARNER,
     answer,
     confirmed,
@@ -72,7 +71,8 @@ def test_all_template_sentence_frames_and_saved_c2_follow_the_corrected_flow(app
         assert course.body["demand_ref"] == app.current(LEARNER, "demand").ref.model_dump()
         await ready(app, {"course_ref": course_ref})
         assert (
-            app.start("c2-start", LEARNER, course_ref, CONDITIONS)["decision"] == "allow_simulation"
+            app.start("c2-start", LEARNER, course_ref, materials_ready=True)["decision"]
+            == "allow_simulation"
         )
         next_core = app.core
         deliver_all(next_core)
@@ -145,7 +145,12 @@ def test_api_rejects_confirmation_at_answer_wait_without_a_model_call(applicatio
     with TestClient(create_app(Settings(), app)) as client:
         prepared = prepare_course(app, "prepare")
         confirmed(app, prepared)
-        app.start("start", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS)
+        app.start(
+            "start",
+            LEARNER,
+            RevisionRef.model_validate(prepared["course_ref"]),
+            materials_ready=True,
+        )
         student = {"Authorization": f"Bearer {app.token}"}
         deliver_all(app.core)
         assert (
@@ -184,7 +189,12 @@ def test_api_accepts_a_base64_recording_only_on_a_reading_segment(application):
     with TestClient(create_app(Settings(), app)) as client:
         prepared = prepare_course(app, "prepare")
         confirmed(app, prepared)
-        app.start("start", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS)
+        app.start(
+            "start",
+            LEARNER,
+            RevisionRef.model_validate(prepared["course_ref"]),
+            materials_ready=True,
+        )
         student = {"Authorization": f"Bearer {app.token}"}
         core = app.core
 

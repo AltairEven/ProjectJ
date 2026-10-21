@@ -1,4 +1,5 @@
 import type { Document as Doc, RevisionRef as Ref } from './client'
+import { byNewest } from './learning.ts'
 
 export type CourseState = '备课中' | '等你确认' | '待上课' | '已上' | '已评价'
 type Shape = Pick<Doc, 'object_id' | 'revision' | 'kind' | 'body'> & { created_at?: string }
@@ -27,11 +28,11 @@ export const retakeOffered = (next: { kind: string, subject?: Record<string, unk
 /** The course's latest class: a stopped class taken again keeps both, the newer one is shown. */
 export const latestFact = (course: Shape, objects: Shape[]) =>
   objects.filter(doc => doc.kind === 'fact' && (doc.body.course_ref as Ref | undefined)?.object_id === course.object_id)
-    .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0] as Shape | undefined
+    .sort(byNewest)[0] as Shape | undefined
 
 export function courseRows(objects: Shape[]) {
   return objects.filter(doc => doc.kind === 'course')
-    .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+    .sort(byNewest)
     .map(course => ({ object_id: course.object_id, revision: course.revision,
       title: String((course.body.parent_preview as Record<string, unknown> | undefined)?.story ?? '未命名的课'), state: state(course, objects) }))
 }

@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from project_j.application.documents import document, identity
 from project_j.application.ledger import Request, Step
 from project_j.contracts import RevisionRef
+from project_j.learning.fixtures import initialize
 from project_j.platform.files import PrivateFiles
 from project_j.platform.storage import (
     Conflict,
@@ -177,7 +178,7 @@ def test_reference_and_private_boundaries(application, tmp_path):
     old = app.current("fictional-L1", "state")
     with pytest.raises(ValueError, match="cross-learner"):
         app.store.read(old.ref, "fictional-L2")
-    app.initialize("fictional-L2")
+    initialize(app, "fictional-L2")
     l2 = app.current("fictional-L2", "state")
     obj = document(
         "report", "cross-report", "cross-op", "fictional-L1", {"status": "checked"}, refs=(l2.ref,)

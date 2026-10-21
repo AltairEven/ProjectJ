@@ -4,7 +4,6 @@ from uuid import uuid4
 
 import pytest
 from support import (
-    CONDITIONS,
     LEARNER,
     answer,
     complete_story,
@@ -22,6 +21,7 @@ from project_j.classroom.harness import PLEA
 from project_j.contracts import RevisionRef
 from project_j.evaluation.assessment import interpret
 from project_j.learning.contracts import DemandBody
+from project_j.learning.fixtures import initialize
 from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
 from project_j.preparation.contracts import demand_requirements
 
@@ -308,7 +308,10 @@ def test_E2E07_old_course_demand_does_not_start_after_next_demand(application):
         await next_course(application, "next", LEARNER, core.activity_id)
         with pytest.raises(Conflict, match="old demand"):
             application.start(
-                "new-start", LEARNER, RevisionRef.model_validate(old["course_ref"]), CONDITIONS
+                "new-start",
+                LEARNER,
+                RevisionRef.model_validate(old["course_ref"]),
+                materials_ready=True,
             )
 
     asyncio.run(scenario())
@@ -430,15 +433,14 @@ def test_pause_keeps_memory_and_prevents_seal_or_database_access(application):
     assert application.seal().body["end"]["reason"] == "stop"
 
 
-def test_E2E14_missing_failed_and_unverified_start_are_distinct(application):
+def test_E2E14_missing_materials_and_unverified_start_wait(application):
     prepared = asyncio.run(application.prepare("prepare", LEARNER))
     course = RevisionRef.model_validate(prepared["course_ref"])
-    result = application.start("missing", LEARNER, course, CONDITIONS | {"materials": "unknown"})
-    assert result["decision"] == "waiting"
-    result = application.start("failed", LEARNER, course, CONDITIONS | {"materials": "unavailable"})
-    assert result["decision"] == "blocked"
+    result = application.start("missing", LEARNER, course)  # the course uses things off screen
+    assert result == {"decision": "waiting", "missing": ["materials"]}
     application.verification = {"result": "unknown"}
-    assert application.start("unverified", LEARNER, course, CONDITIONS)["decision"] == "waiting"
+    result = application.start("unverified", LEARNER, course, materials_ready=True)
+    assert result["decision"] == "waiting"
 
 
 def test_E2E18_feedback_arriving_during_model_cannot_publish_old_source(application):
@@ -465,7 +467,7 @@ def test_E2E18_feedback_arriving_during_model_cannot_publish_old_source(applicat
 
 def test_E2E19_cross_learner_course_and_late_results_cannot_publish(application):
     package = asyncio.run(application.prepare("prepare", LEARNER))
-    application.initialize("fictional-L2")
+    initialize(application, "fictional-L2")
     with pytest.raises(ValueError, match="cross-learner"):
         application.store.read(RevisionRef.model_validate(package["course_ref"]), "fictional-L2")
     assert (
@@ -479,12 +481,12 @@ def test_persisted_start_does_not_reopen_an_activity_after_memory_loss(applicati
     package = asyncio.run(app.prepare("prepare1", LEARNER))
     course = RevisionRef.model_validate(package["course_ref"])
     confirmed(app, {"course_ref": course})
-    app.start("start1", LEARNER, course, CONDITIONS)
+    app.start("start1", LEARNER, course, materials_ready=True)
     app.store.active_activity_id = (
         None  # Explicitly simulate loss, not a recovery of classroom facts.
     )
     reopened = Coordinator(app.store, app.root, verification=app.verification)
-    result = reopened.start("start1", LEARNER, course, CONDITIONS)
+    result = reopened.start("start1", LEARNER, course, materials_ready=True)
     assert result["decision"] == "interrupted_unknown"
     assert reopened.core is None
     assert not app.store.list_current(LEARNER, "fact")
@@ -494,7 +496,7 @@ def test_dashboard_shows_the_gap_of_an_activity_lost_with_process_memory(applica
     app = application
     course = RevisionRef.model_validate(asyncio.run(app.prepare("prepare1", LEARNER))["course_ref"])
     confirmed(app, {"course_ref": course})
-    started = app.start("start1", LEARNER, course, CONDITIONS)
+    started = app.start("start1", LEARNER, course, materials_ready=True)
     app.store.active_activity_id = None  # Explicitly simulate process loss.
     reopened = Coordinator(app.store, app.root, verification=app.verification)
     [lost] = reopened.dashboard(LEARNER)["lost_activities"]
@@ -507,7 +509,7 @@ def test_parent_report_on_a_lost_activity_is_only_saved_as_a_new_source(applicat
     app = application
     course = RevisionRef.model_validate(asyncio.run(app.prepare("prepare1", LEARNER))["course_ref"])
     confirmed(app, {"course_ref": course})
-    activity = app.start("start1", LEARNER, course, CONDITIONS)["snapshot"]["activity_id"]
+    activity = app.start("start1", LEARNER, course, materials_ready=True)["snapshot"]["activity_id"]
     app.store.active_activity_id = None  # Explicitly simulate process loss.
     reopened = Coordinator(app.store, app.root, verification=app.verification)
     text = "家长补记：读完故事，第一题答了a bridge，之后断电。"
@@ -550,32 +552,6 @@ def test_completed_requests_replay_after_later_effective_versions_without_new_ca
             application.feedback("first-prepare", LEARNER, core.activity_id, "无额外补充")
 
     asyncio.run(scenario())
-
-
-def test_recovered_successful_retry_preserves_original_attempt_count(application):
-    app = application
-    app.store.fail_at = "temporary_save"
-    prepared = asyncio.run(app.prepare("temporary-save", LEARNER))
-    assert asyncio.run(app.prepare("temporary-save", LEARNER)) == prepared
-    assert any(
-        row["payload"]["attempts"] == 2
-        for row in app.ledger.steps(
-            app.request(
-                "temporary-save",
-                LEARNER,
-                "prepare",
-                {
-                    "demand_ref": app.current(LEARNER, "demand").ref.model_dump(),
-                },
-                sources=(app.current(LEARNER, "demand").ref,),
-                baselines=tuple(
-                    app.current(LEARNER, label).ref
-                    for label in ("demand", "state", "plan:week", "profile")
-                ),
-            ),
-            LEARNER,
-        )
-    )
 
 
 async def reach_reading(app):

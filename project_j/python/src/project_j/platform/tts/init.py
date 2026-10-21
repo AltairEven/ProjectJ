@@ -1,28 +1,18 @@
 """project-j-tts-init: download, probe and admit the local speech synthesizer (ADR-0016)."""
 
-import argparse
-import asyncio
 import hashlib
-import json
-import os
-import subprocess
 import wave
 from collections.abc import Sequence
 from contextlib import aclosing
 from datetime import UTC, datetime
 from pathlib import Path
 
-from project_j.platform.files import private_write
+from project_j.platform.local_process import init_main
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.local import (
-    BINARY,
-    INIT,
     MODELS,
     LocalSynthesizer,
     SynthesizerUnavailable,
-    file_reasons,
-    identity,
-    read_init,
 )
 
 SAMPLES = {
@@ -112,10 +102,10 @@ async def probe(root: Path, synthesizer: LocalSynthesizer | None = None) -> dict
         ready = await synthesizer.start()
     except SynthesizerUnavailable as error:
         record["reasons"] = [f"合成进程无法启动：{error}"]
-        save(root, record)
+        LocalSynthesizer.save_init(root, record)
         return record
     record |= {
-        "identity": identity(ready),
+        "identity": LocalSynthesizer.identity(ready),
         "device": ready.get("device"),
         "sample_rate": ready.get("sample_rate"),
         "load_ms": ready.get("load_ms"),
@@ -138,12 +128,8 @@ async def probe(root: Path, synthesizer: LocalSynthesizer | None = None) -> dict
     record["memory_peak_bytes"] = max((m for m in memory if m is not None), default=None)
     record["reasons"] = judge(record)
     record["passed"] = not record["reasons"]
-    save(root, record)
+    LocalSynthesizer.save_init(root, record)
     return record
-
-
-def save(root: Path, record: dict):
-    private_write(root / INIT, (json.dumps(record, ensure_ascii=False, indent=2) + "\n").encode())
 
 
 def show(record: dict):
@@ -204,49 +190,22 @@ async def speak(root: Path, command: Sequence[str] | None, text: str, out: Path)
 
 
 def main(argv: list[str] | None = None, command: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="本机语音合成初始化：下载模型、探针与准入（ADR-0016）。"
+    def arguments(parser):
+        parser.add_argument("--text", required=True)
+        parser.add_argument("--out", type=Path, required=True)
+
+    return init_main(
+        LocalSynthesizer,
+        "本机语音合成初始化：下载模型、探针与准入（ADR-0016）。",
+        "tts",
+        probe,
+        show,
+        (
+            "speak",
+            "成人试听：把一句话合成为新的WAV文件，不覆盖",
+            arguments,
+            lambda root, command, args: speak(root, command, args.text, args.out),
+        ),
+        argv,
+        command,
     )
-    commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("download").add_argument("--cache-dir", type=Path)
-    commands.add_parser("probe")
-    commands.add_parser("status")
-    listen = commands.add_parser("speak", help="成人试听：把一句话合成为新的WAV文件，不覆盖")
-    listen.add_argument("--text", required=True)
-    listen.add_argument("--out", type=Path, required=True)
-    args = parser.parse_args(argv)
-    if not Path("project_j").is_dir():
-        print("请在项目根目录运行（当前目录下没有 project_j）。")
-        return 1
-    root = Path.cwd()
-    if args.command == "download":
-        binary = root / BINARY
-        if not binary.exists():
-            print(
-                "合成子工程未安装，请先运行 "
-                "project_j/scripts/uv.sh sync --locked --project project_j/tts"
-            )
-            return 1
-        call = [str(binary), "download", "--models", str(root / MODELS)]
-        if args.cache_dir:
-            call += ["--cache-dir", str(args.cache_dir.resolve())]
-        env = {key: value for key, value in os.environ.items() if key != "OPENAI_API_KEY"}
-        code = subprocess.run(call, cwd=root, env=env, check=False).returncode
-        if code == 0:
-            print("请运行 project-j-tts-init probe。")
-        return code
-    if args.command == "probe":
-        record = asyncio.run(probe(root, LocalSynthesizer(root, command, inherit_stderr=True)))
-        print("合成探针通过。" if record["passed"] else "合成探针未通过。")
-        show(record)
-        return 0 if record["passed"] else 1
-    if args.command == "status":
-        if reasons := file_reasons(root):
-            print("合成器未就绪。")
-            for reason in reasons:
-                print(f"- {reason}")
-            return 1
-        print("合成器已就绪。")
-        show(read_init(root))
-        return 0
-    return asyncio.run(speak(root, command, args.text, args.out))

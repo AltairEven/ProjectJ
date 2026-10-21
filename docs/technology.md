@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.14.0；更新：2026年10月20日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
+版本：1.15.0；更新：2026年10月21日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -43,7 +43,7 @@ SQLite适合当前本机、低写并发的范围。以后出现多服务器或�
 | 合成 | 本机Qwen3-TTS 1.7B CustomVoice（MLX），预设音色Serena加老师语气指令，独立子工程与后端子进程 | 中英文、可懂度、流式首段与实际首播、打断与取消、GPU争用时的合成速度 |
 | 英语发音评分 | 本机评分器：wav2vec2-lv-60-espeak-cv-ft加GOP，独立子工程与后端子进程 | 读错、漏读、多读的标出与误报，评分耗时与内存，门槛未校准 |
 
-Sol官方模型说明列明low、medium及结构化输出支持；格式正确仍可能有语义错误。模型页另列fast与ultrafast服务层级，核对时价格分别为标准层的2倍和6倍；层级按[质量门槛](acceptance.md#最小版本质量门槛)作为延迟测量变量，不默认启用。2026年10月18日家长决定课堂判断先用Codex订阅的Fast层级跑通全流程，之后再考虑是否换模型；其他用途保持默认层级。Codex订阅列表中gpt-6.1-sol另列high、xhigh、max与ultra档；家长同日决定学习规划、备课与课后评价用xhigh（OpenAI适配器仍只接受low、medium、high）。[模型说明](https://developers.openai.com/api/docs/models/gpt-6.1-sol)、[结构化输出](https://developers.openai.com/api/docs/guides/structured-outputs)
+Sol官方模型说明列明low、medium及结构化输出支持；格式正确仍可能有语义错误。模型页另列fast与ultrafast服务层级，核对时价格分别为标准层的2倍和6倍；层级按[质量门槛](acceptance.md#最小版本质量门槛)作为延迟测量变量，不默认启用。2026年10月18日家长决定课堂判断先用Codex订阅的Fast层级跑通全流程，之后再考虑是否换模型；其他用途保持默认层级。Codex订阅列表中gpt-6.1-sol另列high、xhigh、max与ultra档；家长同日决定学习规划、备课与课后评价用xhigh（OpenAI API适配器已按[ADR-0019](../decisions/ADR-0019.md)删除）。[模型说明](https://developers.openai.com/api/docs/models/gpt-6.1-sol)、[结构化输出](https://developers.openai.com/api/docs/guides/structured-outputs)
 
 课堂路径为“文字/点选提交（英语朗读为按键录音 → 发音评分）→ 课堂判断模型据文字或评分结果判断 → 核心允许动作 → 合成已允许文本 → 实际播放反馈”，依据见[ADR-0014](../decisions/ADR-0014.md)。模型不听录音，不设语音识别，原首选的gpt-live-transcribe浏览器WebRTC转写路径不再采用；朗读由孩子按结束决定读完，不用客户端VAD或停顿窗口。合成在本机流式生成并播放已批准文本，未批准的模型片段不提前发声；固定教师语句与示范音在备课时预合成。
 
@@ -78,7 +78,7 @@ Skills用于开发、备课及维护工序；运行时依赖版本化策略、�
 | 项目 | 固定版本/路径 | P0实际证据与限制 |
 | --- | --- | --- |
 | Python | CPython3.14.4；project_j/python/.python-version；project_j/.python及python/.venv | 实际安装、锁定同步、Ruff/pytest通过；不用系统3.9，不改全局设置 |
-| Python库 | FastAPI0.143.0、Pydantic2.14.1、SQLAlchemy2.1.4、Alembic1.20.0、OpenAI3.29.0；开发测试依赖见uv.lock | uv.lock锁运行/开发依赖及hash；uv_build0.11.11在build-system精确固定，使用uv内置后端。Pydantic/FastAPI导出、SDK mock、临时SQLite事务验证；P1有隔离Alembic迁移及loopback服务 |
+| Python库 | FastAPI0.143.0、Pydantic2.14.1、SQLAlchemy2.1.4、Alembic1.20.0、OpenAI3.29.0（只用其严格JSON结构转换，供Codex适配器）；开发测试依赖见uv.lock | uv.lock锁运行/开发依赖及hash；uv_build0.11.11在build-system精确固定，使用uv内置后端。Pydantic/FastAPI导出、SDK mock、临时SQLite事务验证；P1有隔离Alembic迁移及loopback服务 |
 | SQLite | 本解释器3.50.4 | 临时库回滚验证；正式存储、备份恢复待阶段1 |
 | Node/npm | Node26.11.1、npm11.20.0；web/package.json的devEngines（onFail=error） | 实际读取版本；未更新本机全局工具 |
 | 页面基础库 | React/ReactDOM19.3.0、TypeScript7.0.2、Vite8.3.4、React类型19.3.0 | web/package-lock.json锁定；React/ReactDOM为dependencies，类型/TypeScript/Vite及remark为devDependencies。npm ci禁安装脚本、tsconfig独立React类型检查；没有应用页或浏览器行为验收 |
@@ -99,11 +99,11 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python projec
 project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-init status
 ```
 
-四个用途（planning学习规划、preparation备课、classroom_judgment课堂判断、evaluation课后评价）先取默认绑定，再按`--purpose 用途=适配器:模型:档位[:fast]`逐项覆盖，可各绑不同适配器。末尾`:fast`选Fast层级，目前只有Codex适配器提供，对应订阅列表中的priority层级（标称2倍速度、额度消耗增加）；SDK不回报每轮实际层级，记未核实。用API密钥时改为先`project-j-init set-key openai`，绑定写`openai:gpt-6.1-sol:medium`等，其余相同。
+四个用途（planning学习规划、preparation备课、classroom_judgment课堂判断、evaluation课后评价）先取默认绑定，再按`--purpose 用途=适配器:模型:档位[:fast]`逐项覆盖，可各绑不同适配器。末尾`:fast`选Fast层级，目前只有Codex适配器提供，对应订阅列表中的priority层级（标称2倍速度、额度消耗增加）；SDK不回报每轮实际层级，记未核实。OpenAI API直连适配器与`set-key`已删除（[ADR-0019](../decisions/ADR-0019.md)），只有Codex订阅与模拟两个适配器。
 
 Codex适配器使用官方Python SDK `openai-codex`（锁定0.163.0，随包附带codex运行时），在本机启动`codex app-server`；login打开ChatGPT浏览器登录，登录状态存于`project_j/private/models/codex-home/`，不读也不改家长全局的`~/.codex`。每次调用开一个不留存的新会话，空临时目录、只读沙箱、拒绝全部提权，以中性基础指令替换Codex自带的代理提示词，用途指令作开发者指令，按pydantic严格JSON结构输出，档位按绑定逐轮传入；配置覆盖关闭记忆、历史、项目说明文档、网页搜索、分析统计、shell工具、应用、插件、技能及环境/权限/应用/协作说明（后几项据真实运行实测：去掉插件与技能注入后输入不再逐次增长，剩余约1.1万token为运行时自带内容）。返回条目出现任何工具调用即记“工具”明确不符而失败。取消与超时会请求服务端中断该轮。SDK不回报每轮实际模型与档位，二者记未核实；探针以订阅模型列表核对模型与所声明的档位，记录鉴权、结构化输出、工具关闭、取消、图片输入与耗时。
 
-set-key以隐藏输入把密钥写入本地模型配置，不放命令正文、日志或Git。OpenAI适配器使用Responses API，请求指定模型、reasoning.effort、default层级、store=false与严格结构，SDK自动重试关闭；探针逐项记录实际模型、档位、层级（已核实、未核实或不支持）及结构化输出、取消、图片输入、request_id、可取得用量与耗时。明确不符判失败，未核实如实记录，不能靠提示词宣称Low。探测只用虚构技术样本，单请求耗时不是声音延迟；完整参考题集语义验证、课堂总期限/取消和Medium实际内容核验另做。OpenAI API实际调用样本数为0。Codex订阅2026年10月16日实测：probe准入通过，6个课堂判断样例6/6与预期一致，单次4.9–8.8秒、课堂判断中位约5.4秒，不能满足声音延迟目标，备课与课后评价等非实时用途可用。2026年10月18日同6个样例逐题交替比较：默认层级中位6.15秒（5.14–9.54），Fast层级中位5.25秒（4.19–7.64），约快15%，24次判断均与预期一致；每次输入约1.13万token（多为Codex运行时自带内容）、输出约37 token，Fast主要加速输出，对此帮助有限。按Fast配置重新probe通过，经正式入口6次调用服务端均回报priority，中位5.63秒；仍不满足声音延迟目标。改为xhigh后重新probe通过，xhigh探测7.1秒（推理122 token）；第一期课后评价占位调用（只带活动编号，结果不采用）两次11.4与12.2秒，在60秒期限内；完整评价内容接入后须按实际输入复测期限。
+探针逐项记录实际模型、档位、层级（已核实、未核实或不支持）及结构化输出、取消、图片输入、request_id、可取得用量与耗时。明确不符判失败，未核实如实记录，不能靠提示词宣称Low。探测只用虚构技术样本，单请求耗时不是声音延迟；完整参考题集语义验证、课堂总期限/取消和Medium实际内容核验另做。OpenAI API适配器实际调用样本数为0，2026年10月21日删除（[ADR-0019](../decisions/ADR-0019.md)）。Codex订阅2026年10月16日实测：probe准入通过，6个课堂判断样例6/6与预期一致，单次4.9–8.8秒、课堂判断中位约5.4秒，不能满足声音延迟目标，备课与课后评价等非实时用途可用。2026年10月18日同6个样例逐题交替比较：默认层级中位6.15秒（5.14–9.54），Fast层级中位5.25秒（4.19–7.64），约快15%，24次判断均与预期一致；每次输入约1.13万token（多为Codex运行时自带内容）、输出约37 token，Fast主要加速输出，对此帮助有限。按Fast配置重新probe通过，经正式入口6次调用服务端均回报priority，中位5.63秒；仍不满足声音延迟目标。改为xhigh后重新probe通过，xhigh探测7.1秒（推理122 token）；第一期课后评价占位调用（只带活动编号，结果不采用）两次11.4与12.2秒，在60秒期限内；完整评价内容接入后须按实际输入复测期限。
 
 ### 本机发音评分初始化与探针
 
@@ -178,7 +178,7 @@ ADR-0018起，应用协调层的推进器（project_j/python/src/project_j/appli
 | 项目 | 官方说明/实际状态 | 继续条件 |
 | --- | --- | --- |
 | Sol Low/Medium | 官方模型页支持两档及结构化输出；本机仅SDK mock/假运行时通过，实际API与订阅**未验证** | 订阅经project-j-init login codex登录，或API项目/密钥、模型权限、费用归属与测试预算具备后，经project-j-init probe探测；课堂参考题集与Medium内容另验 |
-| 服务层级 | 官方列fast=标准2倍、ultrafast=6倍；OpenAI适配器只发default，实际计费/可用性**未验证**；Codex订阅课堂判断按家长2026年10月18日决定用Fast层级，实测约快15%，额度消耗未计量 | 记录返回层级/用量；更高成本层级待家长按实际成本决定，不为延迟暗改 |
+| 服务层级 | 官方列fast=标准2倍、ultrafast=6倍，实际计费/可用性**未验证**；Codex订阅课堂判断按家长2026年10月18日决定用Fast层级，实测约快15%，额度消耗未计量 | 记录返回层级/用量；更高成本层级待家长按实际成本决定，不为延迟暗改 |
 | 转写WebRTC | 官方推荐gpt-live-transcribe，客户端commit且无server_vad/semantic_vad；本批未建音频连接 | 2026年10月16日按[ADR-0014](../decisions/ADR-0014.md)不再采用，作答改为文字/点选，只有英语朗读录音交发音评分；本行保留为当时核对记录 |
 | 凭据/数据条件 | 官方WebRTC示例有client_secrets及calls；数据控制保留表未单列这些或transcription_sessions。该页区域服务清单提到transcription_sessions，不能由此推断ZDR覆盖 | ADR-0013起不以ZDR为数据条件，记录实际发送范围与条款；儿童入口按验收关闭 |
 | Responses/合成/按轮转写保留 | 官方表列responses、audio/speech、audio/transcriptions与realtime有ZDR资格，带适用限制；本账户资格**未验证** | 记录所选路径的发送范围与保留条款，store=false不代账户批准 |
@@ -200,7 +200,7 @@ P0-R1按Opus工程审查采用安装后的project-j-probe/project-j-measure入�
 
 FastAPI单后端仅监听127.0.0.1，Vite产物和固定材料在课堂开始前读入内存；课堂中的数据库/固定文件/导出/备份访问禁止。家长临时访问能力和单活动学生访问能力分开，学生不获取简报/答案/帮助分支。配置由pydantic-settings载入PROJECT_J_前缀，默认不读.env，提供者和数据空间固定模拟；设置课堂low/课后medium只说明目标配置，不冒称真实请求参数已生效。
 
-Python新增pydantic-settings2.15.0、tenacity9.2.1、uvicorn0.54.0、websockets17.2，由uv.lock固定。保存使用SQLAlchemy/Alembic/SQLite约束；只有明确未提交的临时失败用tenacity限定次数与原期限，其他保存未知先查询。原P0 guards.py已删除，课堂判断与相关测试在真实调用的Harness边界。
+Python新增pydantic-settings2.15.0、uvicorn0.54.0、websockets17.2，由uv.lock固定。保存使用SQLAlchemy/Alembic/SQLite约束；保存失败一律先查询回执，查不到才记失败、可用同一请求重发。当前实现没有可确认“未提交的暂时保存失败”的故障类别（单进程单写入方），因此不自动重试保存；原来只服务于测试注入故障的tenacity重试于2026年10月21日删除，出现这类故障后再按[执行与接续](../design/shared/execution-recovery.md)的有限重试规则加入。原P0 guards.py已删除，课堂判断与相关测试在真实调用的Harness边界。
 
 前端采用官方Vite react-ts模板；应用保留TypeScript7.0.2。类型生成需要编译器API，因此web/codegen单独锁TypeScript6.0.3/Hey API0.99.0；解析器同系列固定1.4.1，避免1.4.4的js-yaml4已知告警，不使用force、legacy-peer-deps或跨主版替换。它只读取本地导出JSON并生成类型；两份锁、生成/编译/构建及审计均需检查，完整证据见[交接](handoff.md)。
 

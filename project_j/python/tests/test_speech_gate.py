@@ -1,7 +1,7 @@
 import asyncio
 
 import pytest
-from support import CONDITIONS, LEARNER
+from support import LEARNER
 
 from project_j.contracts import RevisionRef
 from project_j.platform.speech.contracts import ScorerNotReady
@@ -18,6 +18,9 @@ def test_a_course_with_reading_segments_needs_a_ready_scorer(application):
     application.scorer = NotReady()
     with pytest.raises(ScorerNotReady, match="发音评分未就绪：评分进程未启动"):
         application.start(
-            "start1", LEARNER, RevisionRef.model_validate(prepared["course_ref"]), CONDITIONS
+            "start1",
+            LEARNER,
+            RevisionRef.model_validate(prepared["course_ref"]),
+            materials_ready=True,
         )
     assert application.core is None
