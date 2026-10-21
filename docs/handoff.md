@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.40.0；更新：2026年10月21日。
+版本：1.40.1；更新：2026年10月21日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -812,7 +812,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## SELF-7 每次备课前选题材和知识点
 
-- 状态：实现与自测完成，未提交（2026年10月21日）。用户：“在所有备课前，都需要我自己来选择题材和知识点，选择完成后才能进入备课”；看过样子页后确认（docs/superpowers/specs/2026-10-21-choose-topic-and-skills-before-preparation-design.md），实施计划在docs/superpowers/plans/2026-10-21-choose-topic-and-skills-before-preparation.md。
+- 状态：实现与自测完成，已本地提交184eff9（2026年10月21日）。用户：“在所有备课前，都需要我自己来选择题材和知识点，选择完成后才能进入备课”；看过样子页后确认（docs/superpowers/specs/2026-10-21-choose-topic-and-skills-before-preparation-design.md），实施计划在docs/superpowers/plans/2026-10-21-choose-topic-and-skills-before-preparation.md。
 - 负责人/集成：Claude Opus。
 - 范围：
   1. 需求新增`topic`（学生定下的题材，1–100字）与`topic_suggestions`（最多4个，标题与理由）；规划随下节需求列3–4个题材（从兴趣出发、可延伸到相邻方面、避开最近三课、合蓝思值与本课目标），规划请求加最近三课标题；超长或多出的由规则丢掉，不让规划作废。
