@@ -37,7 +37,8 @@
     "test:docs": "node --test check_docs.test.mjs",
     "check:docs": "node check_docs.mjs",
     "build": "tsc -b && vite build",
-    "generate:api": "npm --prefix codegen run generate"
+    "generate:api": "npm --prefix codegen run generate",
+    "sandbox": "vite --config sandbox/vite.config.mjs"
   },
   "type": "module"
 }
