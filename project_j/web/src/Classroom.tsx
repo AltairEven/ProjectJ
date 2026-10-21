@@ -7,7 +7,8 @@ import { finishRecording, idle, pauseRecording, recordedMs, resumeRecording, sta
 import type { RequestFailure } from './request'
 import { Speaker, reportsFor, startedReport, visualReport } from './speaker'
 import { Microphone } from './microphone'
-import { classProgress } from './progress'
+import { passage } from './passage'
+import { classProgress, taskMarks } from './progress'
 import { Progress } from './ui'
 import { toBase64 } from './audio'
 import type { AllowedAction, Snapshot, Control, DeliveryFeedback, TextInput, InputResult as Ack } from './client/types.gen'
@@ -234,12 +235,14 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
   const confirm = () => void input('听到了，收到当前说明。', 'confirmation')
   const progress = snapshot && classProgress(snapshot)
   const shown = !voiced ? snapshot?.pending_action ?? snapshot?.presented_action : locked || voicing ? undefined : snapshot?.presented_action
-  // Jane left, the story in the middle, the student right (1:2:1), each scrolling on its own:
-  // no page scroll between her question, the story and the answer box.
+  // Jane's board left, the textbook page in the middle, the student's notebook right (1:2:1), each
+  // scrolling on its own: no page scroll between her question, the story and the answer box.
   return <main className="student classroom">
     <header className="class-bar">
-      <div><span className="eyebrow">{voiced ? 'JANE · 课堂' : 'JANE · 模拟课堂'}</span><h1>和 Jane 上课</h1></div>
-      {progress && <div className="class-progress"><span>{progress.label}</span><progress value={progress.value} max={progress.max} aria-label="课堂进度" /></div>}
+      <h1>和 Jane 上课{!voiced && <span className="tag">模拟</span>}</h1>
+      {progress && snapshot && <div className="class-progress"><span>{progress.label}</span>
+        <progress className="sr-only" value={progress.value} max={progress.max} aria-label="课堂进度" />
+        <span className="ticks" aria-hidden="true">{taskMarks(snapshot.task_index, snapshot.task_count).map((mark, index) => <i key={index} className={mark} />)}</span></div>}
       <div className="controls"><span>{snapshot ? stateLabels[snapshot.activity_state] : '正在连接原会话'}</span>
         {snapshot?.mode !== 'ended' && <div className="row">
           {snapshot?.mode === 'paused' ? <button onClick={() => void control('resume')}>继续</button>
@@ -250,29 +253,33 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
             <button className="quiet" disabled={halted} onClick={() => void control('close')}>收尾</button></div></details></div>}</div>
     </header>
     <div className="stage">
-      <div className="side">
+      <div className="side board">
         <section className="jane"><span className="avatar" aria-hidden="true">J</span><div><h2>Jane</h2>
           {localCancelled ? <p>呈现已取消。</p>
             : voiced && locked ? <p>请点“打开声音”，听 Jane 说话。</p>
             : voicing === 'preparing' ? <Progress label="Jane 正在准备要说的话……" />
             : voicing === 'speaking' ? <p aria-live="polite">Jane 正在说话……</p>
-            : <p aria-live="polite">{shown?.text ?? '等待同一核心的下一动作。'}</p>}
+            : <p aria-live="polite" className="said" key={shown?.action_id}>{shown?.text ?? '等待同一核心的下一动作。'}</p>}
           {!localCancelled && !voicing && (busy || snapshot?.mode === 'judging') && <Progress label="Jane 正在看你的回答……" />}
           {voiced && locked && <button onClick={() => void speaker.current?.resume().then(() => setLocked(false))}>打开声音</button>}
           {snapshot && snapshot.mode !== 'offscreen' && snapshot.mode !== 'ended' && <div className="row">
             <button className="quiet" disabled={busy || halted} onClick={() => void input('帮我一下', 'help')}>帮我一下</button>
             <button className="quiet" disabled={halted} onClick={() => void control('repeat')}>重复当前内容</button></div>}</div></section>
       </div>
-      <div className="side text">
+      <div className="side book">
         {!localCancelled && <Visuals token={token} action={shown ?? undefined} onShown={(action, shown) => {
           if (pictured.current.has(action.action_id)) return  // Once per action, though it may show again.
           pictured.current.add(action.action_id)
           void sendDelivery(visualReport(action, shown, new Date()))
         }} />}
-        {!localCancelled && Object.entries(snapshot?.materials ?? {}).map(([id, material]) => <section key={id} className="reading"><pre>{material}</pre></section>)}
+        {!localCancelled && Object.entries(snapshot?.materials ?? {}).map(([id, material]) => {
+          const { title, paragraphs } = passage(material)
+          return <section key={id} className="reading">{title && <h2>{title}</h2>}
+            <ol>{paragraphs.map((text, index) => <li key={index}>{text}</li>)}</ol></section>
+        })}
         {!Object.keys(snapshot?.materials ?? {}).length && <p className="hint">课文会在这里显示。</p>}
       </div>
-      <div className="side">
+      <div className="side notebook">
         {message && <div className="notice" role="alert">{message}</div>}
         {failedRequest && <button className="quiet" disabled={busy} onClick={() => void send(failedRequest.path, failedRequest.payload)}>接续原提交</button>}
         {failedDelivery && <button className="quiet" onClick={() => {

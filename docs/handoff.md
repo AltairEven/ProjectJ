@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.37.0；更新：2026年10月21日。
+版本：1.38.0；更新：2026年10月21日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -793,3 +793,13 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 文件边界：project_j/python/src/project_j/application/{progress.py,coordinator.py}；tests/test_confirm_and_start.py；project_j/web/src/{courses.ts,next-step.ts,pages/Home.tsx,pages/Courses.tsx}、tests/{courses,next-step}.test.mjs；文档design/interface/{main-page.md 2.4.0,preview-start.md 2.2.0}。
 - 检查证据：新增后端两项、前端三项测试先失败后通过。统一check通过（主工程538、评分39、合成15项pytest，前端55、文档1），UTC 2026-10-21T01:20:55.488317+00:00，工程摘要9a7bf95c67bc23cda33ec7e73f3f00cbddce99e882c69e80fa31a70242782256；依赖未变，未重跑sync、npm ci与audit。模拟服务（运行编号fix5-retake）走查：确认并开课→停止→主页显示“上节课中途停止了：可以认可这份评价，也可以重上这节课”→课程详情“重上这节课”→进入新课堂，日志attempt=1、attempt=2，页面无报错；脚本与截图在本机project_j/test/ui/fix5_retake.mjs、test/output/fix5-ui。只读核对用户运行编号me：停止的那课满足条件，启动后会出现重上入口。
 - 未验证：正式学习入口里实际重上（需真实合成与评分就绪）。
+
+## UI-1 视觉风格：回到学校
+
+- 状态：实现与自测完成，未提交（2026年10月21日）。用户以frontend-design技能提出“太朴素，要统一风格并有教学课堂的氛围”，看过两版示例后确认第二版（“童真一点，像回到学校，但不要像幼儿园”）。
+- 负责人/集成：Claude Opus。
+- 范围：样式表按“黑板、课本、练习本”重写（命名变量：黑板绿、粉笔色、纸、墨水蓝、批改红、荧光笔、横线；字体圆体/楷体/手札体/Iowan Old Style，均为本机字体）；Jane的话在黑板（主页下一步、课堂左栏、确认弹框，木框与粉笔槽）；课文按标题与段落编号显示（`passage`）；课堂进度一题一格、做完打勾（`taskMarks`，原生progress保留给读屏）；去掉大写小字标签，改为“Project J”加模拟/正式学习标签；作答框为练习本手写体。课堂逻辑、接口与数据不变。
+- 文件边界：project_j/web/src/{style.css,Classroom.tsx,App.tsx,passage.ts,progress.ts}、tests/{passage,progress}.test.mjs；文档design/interface/{README.md 2.1.0,student-classroom.md 1.4.0}。
+- 检查证据：`passage`、`taskMarks`测试先失败后通过。统一check通过（主工程538、评分39、合成15项pytest，前端58、文档1），UTC 2026-10-21T02:01:25.761779+00:00，工程摘要f8768e48cfce2ea0d301bb93ed79c99e22bbff70600018ded3eff874e2d191b2；依赖未变。课堂沙盒与整站预览（本机project_j/test/ui/sandbox，app.html用模拟运行fix5-retake的主页数据快照）截图核对课堂各场景、主页各下一步、建档、课程、评价、计划、状态、设置与手机宽度，页面无报错；截图在本机project_j/test/output/design。
+- 未验证：正式学习入口真实声音下的显示；未装这些字体的系统按回退字体显示。
+

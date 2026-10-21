@@ -12,3 +12,7 @@ export function jobProgress(progress?: string | null) {
   const match = /^(\d+)\/(\d+)$/.exec(progress ?? '')
   return match ? { value: Number(match[1]), max: Number(match[2]) } : undefined
 }
+
+/** One box a task, as in an exercise book: ticked when done, marked while current. */
+export const taskMarks = (index: number, count: number): ('done' | 'now' | 'todo')[] =>
+  Array.from({ length: count }, (_, task) => task < index ? 'done' : task === index ? 'now' : 'todo')

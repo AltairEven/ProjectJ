@@ -44,7 +44,7 @@ function Shell({ token, page, detail }: { token: string, page: Page, detail?: st
   const shown: Page | 'onboarding' = onboarding ? 'onboarding' : page
   const View = views[shown]
   return <div className="shell">
-    <nav aria-label="栏目"><span className="eyebrow">{dashboard.realm === 'study' ? 'PROJECT J · 正式学习' : 'PROJECT J · 模拟'}</span>
+    <nav aria-label="栏目"><span className="brand">Project J<span className="tag">{dashboard.realm === 'study' ? '正式学习' : '模拟'}</span></span>
       {pages.map(([key, label]) => <button key={key} className={key === shown ? '' : 'quiet'} disabled={onboarding}
         aria-current={key === shown ? 'page' : undefined} onClick={() => go(key)}>{label}</button>)}</nav>
     <main>{error && <div className="notice" role="alert">{error}</div>}

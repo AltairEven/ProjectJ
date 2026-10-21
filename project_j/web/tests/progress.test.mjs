@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { classProgress, jobProgress } from '../src/progress.ts'
+import { classProgress, jobProgress, taskMarks } from '../src/progress.ts'
 
 const at = (task_index, wait_kind = 'answer') => classProgress({ task_index, task_count: 4, wait_kind })
 
@@ -18,4 +18,11 @@ test('a job bar fills only when the job says how far it is', () => {
   assert.deepEqual(jobProgress('2/5'), { value: 2, max: 5 })
   assert.equal(jobProgress(null), undefined)
   assert.equal(jobProgress('soon'), undefined)
+})
+
+test('each task gets a box: ticked once done, marked while current', () => {
+  assert.deepEqual(taskMarks(-1, 3), ['todo', 'todo', 'todo'])  // the goal comes first
+  assert.deepEqual(taskMarks(1, 3), ['done', 'now', 'todo'])
+  assert.deepEqual(taskMarks(3, 3), ['done', 'done', 'done'])  // the closing
+  assert.deepEqual(taskMarks(0, 0), [])
 })
