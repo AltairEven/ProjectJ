@@ -6,10 +6,13 @@ import base64
 import binascii
 import json
 import logging
+import signal
+import threading
 import time
 import traceback
+import webbrowser
 from collections.abc import AsyncIterator, Sequence
-from contextlib import aclosing, asynccontextmanager
+from contextlib import aclosing, asynccontextmanager, suppress
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -1031,12 +1034,30 @@ def create_app(
     return app
 
 
+def hang_up(signum, frame):
+    """Closing the terminal window stops like Ctrl+C: the core ends the class, then it is sealed."""
+    log.info("stop signal=SIGHUP")
+    signal.raise_signal(signal.SIGTERM)
+
+
+def open_when_started(server, link: str):
+    """The token is new each start; open the page once the server listens (after speech loads)."""
+    while not server.started and not server.should_exit:
+        time.sleep(0.2)
+    if server.started:
+        webbrowser.open(link)
+        log.info("browser opened")
+
+
 def main(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(
         description="Start Project J's loopback simulation, or study with real providers."
     )
     parser.add_argument("--run-id", default="local-simulation")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument(
+        "--open", action="store_true", help="服务开始监听后用默认浏览器打开带令牌的页面"
+    )
     parser.add_argument(
         "--study",
         action="store_true",
@@ -1061,6 +1082,7 @@ def main(argv: list[str] | None = None):
         help=f"{debug}注入一次失败，如fact:before_commit、after_commit、ledger或model",
     )
     args = vars(parser.parse_args(argv))
+    opening = args.pop("open")
     study = args.pop("study")
     onboarding = args.pop("onboarding")
     simulation_only = {"simulation_root", "model_delay", "fail_once"} & set(args)
@@ -1098,13 +1120,23 @@ def main(argv: list[str] | None = None):
         datefmt="%Y-%m-%dT%H:%M:%S",
     )
     logging.Formatter.converter = time.gmtime  # UTC, the clock of the sealed facts.
-    uvicorn.run(
-        create_app(settings, coordinator, announce),
-        host=settings.host,
-        port=settings.port,
-        access_log=False,
-        log_config=None,
+    server = uvicorn.Server(
+        uvicorn.Config(
+            create_app(settings, coordinator, announce),
+            host=settings.host,
+            port=settings.port,
+            access_log=False,
+            log_config=None,
+        )
     )
+    if signal.getsignal(signal.SIGHUP) is not signal.SIG_IGN:  # nohup keeps running.
+        signal.signal(signal.SIGHUP, hang_up)
+    if opening:
+        threading.Thread(target=open_when_started, args=(server, link), daemon=True).start()
+    with suppress(KeyboardInterrupt):  # Uvicorn re-raises Ctrl+C after its graceful stop.
+        server.run()
+    if not server.started:
+        raise SystemExit(3)  # As uvicorn.run: the application failed to start.
 
 
 def export_schema():

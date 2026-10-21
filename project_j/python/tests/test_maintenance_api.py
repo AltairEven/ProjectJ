@@ -1,5 +1,7 @@
 import asyncio
+import signal
 import sys
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -163,19 +165,48 @@ def test_E2E17_simulation_report_never_grants_real_interface_or_child_qualificat
 
 
 def test_serve_uses_explicit_simulation_root_and_keeps_default(monkeypatch, tmp_path):
-    started = []
-    monkeypatch.setattr(api.uvicorn, "run", lambda app, **_: started.append(app))
+    started, handlers = [], {}
+
+    def run(server):
+        server.started = True
+        started.append(server.config.app)
+
+    monkeypatch.setattr(api.uvicorn.Server, "run", run)
+    monkeypatch.setattr(api.signal, "signal", lambda sig, handler: handlers.update({sig: handler}))
     root = tmp_path / "simulation"
     monkeypatch.setattr(
         sys, "argv", ["project-j-serve", "--run-id", "r1", "--simulation-root", str(root)]
     )
     api.main()
     assert started and (root / "r1" / "project_j.sqlite3").is_file()
+    assert handlers == {signal.SIGHUP: api.hang_up}  # Closing the terminal window stops cleanly.
     default = Settings()
     assert (
         default.project_root / default.simulation_root
         == default.project_root / "project_j/private/simulation"
     )
+
+
+def test_closing_the_terminal_window_stops_like_ctrl_c_and_logs_it(monkeypatch, caplog):
+    raised = []
+    monkeypatch.setattr(api.signal, "raise_signal", raised.append)
+    with caplog.at_level("INFO", logger=api.log.name):
+        api.hang_up(signal.SIGHUP, None)
+    assert raised == [signal.SIGTERM]  # Uvicorn's graceful stop; a repeated one does not force.
+    assert "stop signal=SIGHUP" in caplog.text
+
+
+def test_the_page_opens_once_the_service_listens_and_the_token_stays_out_of_logs(
+    monkeypatch, caplog
+):
+    opened, link = [], "http://127.0.0.1:8765/#token=secret-token"
+    monkeypatch.setattr(api.webbrowser, "open", opened.append)
+    with caplog.at_level("INFO", logger=api.log.name):
+        api.open_when_started(SimpleNamespace(started=False, should_exit=True), link)
+        assert not opened  # Stopped before listening: nothing to open.
+        api.open_when_started(SimpleNamespace(started=True, should_exit=False), link)
+    assert opened == [link]
+    assert "browser opened" in caplog.text and "secret-token" not in caplog.text
 
 
 def test_API_needs_the_token_and_class_view_hides_teacher_material(application):

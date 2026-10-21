@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -85,6 +86,19 @@ def test_a_cancelled_request_does_not_leak_its_late_reply(tmp_path):
         return result
 
     assert [w.word for w in asyncio.run(go()).words] == ["second"]
+
+
+def test_ctrl_c_in_the_terminal_reaches_the_server_only_which_closes_the_child(tmp_path):
+    async def go():
+        local = scorer(tmp_path)
+        await local.start()
+        group = os.getpgid(local.process.pid)
+        await local.aclose()
+        return local.process.pid, group, local.process.returncode
+
+    pid, group, returncode = asyncio.run(go())
+    assert group == pid != os.getpgid(0)  # Its own group: terminal signals pass it by.
+    assert returncode == 0  # Ended by the server closing its input, not by a signal.
 
 
 def test_child_environment_carries_no_api_key(tmp_path, monkeypatch):

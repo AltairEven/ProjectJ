@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.43.1；更新：2026年10月21日。
+版本：1.44.0；更新：2026年10月21日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -870,3 +870,17 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 文件边界：project_j/python/src/project_j/{application/coordinator.py,interface/api.py}、tests/test_review_fixes.py；project_j/web/src/{report.ts,pages/Evaluations.tsx}、tests/report.test.mjs、sandbox/dashboard.json与重新导出的schema和client；project_j/scripts/{uv.sh,python-downloads.json}、project_j/{python,scorer,tts}/.python-version；文档AGENTS.md 1.31.1、design/interface/feedback-reports.md 2.0.2、docs/technology.md 1.17.0、docs/roadmap.md 1.14.1。
 - 检查证据：新增测试先失败后通过（主页数据带被替代的上一版、首版时为空；对照逐题改变、没有变化、上一版无解读）。在3.14.8上统一check通过（主工程523、评分39、合成15项pytest，前端61、文档1），UTC 2026-10-21T07:49:11.787468+00:00，工程摘要f15c7c775eab259ba37c49a5dd6e9cf5419fafaf6afe5bcc36cd194db08d1a38；离线probe通过；模拟measure p95 4500毫秒、not_granted；沙盒五个烟测脚本无页面报错；临时给沙盒快照注入一份被替代的评价目测“与上一版相比”显示正常（截图在本机project_j/test/output/design/evaluation-before-after.png），快照已还原；以模拟入口在3.14.8上启动服务，主页数据含新字段，服务已停。
 - 未验证：正式学习服务在3.14.8上的实际运行（评分与合成子进程未在本批启动加载真实模型）；npm依赖未变，未重跑npm audit。
+
+## LAUNCH-1 正式学习快捷启动
+
+- 状态：实现与自测完成，未提交（等用户说“提交”）。用户问能否打包发布、要一个快捷启动；答复不打包成安装包（三套环境与约5.4GB本机模型只适用于Apple Silicon，模型登录状态是个人凭据，正式使用资格未授予），用户同意改做程序坞一键启动、保留终端窗口。
+- 负责人/集成：Claude Opus。审查由主会话自做，未派审查子代理。
+- 范围：
+  1. 新增`project_j/scripts/study.command`：双击或放在程序坞右侧单击，以运行编号me启动正式学习；8765端口已被占用时提示已在运行并退出，不重复加载模型。
+  2. `project-j-serve --open`：服务开始监听后用默认浏览器打开带令牌的页面（令牌每次启动重新生成，原来只能从终端复制）；启动失败时不开页。服务改用`uvicorn.Server`以便判断已开始监听，保留`uvicorn.run`原有的Ctrl+C与启动失败退出码3。
+  3. 关闭终端窗口：原来挂断信号直接终止服务，进行中的课来不及按中断封存；现在SIGHUP转为SIGTERM走正常停止（重复的SIGTERM不会强制退出），以nohup启动时保持忽略。
+  4. 日志：`stop signal=SIGHUP`、`browser opened`，不记链接或令牌。
+  5. 语音子进程退出（用户要求读运行日志后发现）：正式学习按Ctrl+C时，评分与合成子进程和主服务同在终端前台进程组，也直接收到Ctrl+C，各自打印KeyboardInterrupt，合成进程退出时还报`Fatal Python error`；主服务本身正常停止，数据不受影响，此前在终端按Ctrl+C即如此。现在两个子进程各自成组（`start_new_session`），只由主服务关闭输入后退出；主服务意外退出时它们读到输入结束也会退出。初始化探针在finally中关闭子进程，不受影响。
+- 文件边界：project_j/python/src/project_j/{interface/api.py,platform/local_process.py}、tests/{test_maintenance_api,test_speech_local}.py；project_j/scripts/study.command；文档AGENTS.md 1.32.0、docs/technology.md 1.18.0。
+- 检查证据：新增与改写的测试先失败后通过（入口装上挂断处理；挂断转为正常停止并记日志；开始监听后才开页、停止时不开页、日志不含令牌）。子进程各自成组、由主服务关闭后正常退出（先失败后通过）。统一check通过（主工程526、评分39、合成15项pytest，前端61、文档1），UTC 2026-10-21T09:29:31.635957+00:00，工程摘要5afda57d4f9b31db629cb8b490d7276c0ae11688ea46883218a48cacc53a1569；离线probe通过；模拟measure p95 4500毫秒、not_granted；依赖未变。以模拟入口在8765端口带`--open`启动（浏览器换成无操作命令）：`browser opened`在`Uvicorn running`之后约0.1秒；运行中再执行study.command只提示已在运行、退出码1；向uv与服务进程发SIGHUP后走完`Application shutdown complete`，服务已停。用户正式学习的一次实际启停（运行编号me，终端日志经用户同意读取）：启动约74秒（评分21秒、合成41秒、Codex预热9秒，内存紧张时），开始监听后0.4秒开页，Ctrl+C后主服务正常停止，但子进程打印上述报错。修复后以单独运行编号launch-check真实启动（评分7.4秒、合成8.4秒、Codex 1.9秒），向整个进程组发SIGINT模拟终端Ctrl+C：两个子进程各自成组，主服务取消建档语音预生成、关闭子进程，约1秒停完，无报错、无遗留进程；该运行编号随后用project-j-reset清空。修复后用户从程序坞再启停一次（运行编号me）：启动约22秒（评分8.3秒、合成9.8秒、Codex 2.1秒），开始监听后1.3秒开页，Ctrl+C后约2.4秒停完，无报错、无遗留进程。
+- 未验证：关闭终端窗口的实际表现；进行中的课被关窗口或Ctrl+C时的中断封存（同一停止路径，本批未在课中实测）。

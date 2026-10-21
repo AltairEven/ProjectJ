@@ -113,6 +113,9 @@ class LocalProcess:
                 stderr=None if self.inherit_stderr else asyncio.subprocess.DEVNULL,
                 env=env,
                 limit=self.stream_limit,
+                # Own group: Ctrl+C or closing the terminal reaches only the server, which then
+                # closes this child; if the server dies, the child exits on end of input.
+                start_new_session=True,
             )
         except OSError as error:
             raise self.Unavailable(f"{self.noun}进程无法启动：{type(error).__name__}") from error
