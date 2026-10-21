@@ -787,7 +787,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## FIX-5 重上中途停止的课
 
-- 状态：实现与自测完成，未提交（2026年10月21日）。
+- 状态：实现与自测完成，已本地提交f4d4d56（2026年10月21日）。
 - 负责人/集成：Claude Opus。
 - 范围：用户问被自动开课、54秒后停止的那节课能否回退。学习记录只增不改，不删除；改为可以重上：上一课由学生停止或服务中断而结束、评价未认可、需求未重新规划时，`next_step`的evaluation主题带`retake`（`progress.retake_course`），主页“评价等你认可”同时给出“重上这节课”，课程详情显示“重上这节课”并沿用原开课路径（新活动，照常开课核对，已采用资源沿用）。停止的那次事实与评价保留，可不认可；只按最新一次推进。开课日志加`attempt`（第几次上这门课）。用户问能否让重上的课覆盖原记录：记录不可改删，提出只在显示上合并后用户决定不覆盖，两次都照常显示；课程详情“查看课后评价”改为指向这门课最新的一次（`latestFact`）。
 - 文件边界：project_j/python/src/project_j/application/{progress.py,coordinator.py}；tests/test_confirm_and_start.py；project_j/web/src/{courses.ts,next-step.ts,pages/Home.tsx,pages/Courses.tsx}、tests/{courses,next-step}.test.mjs；文档design/interface/{main-page.md 2.4.0,preview-start.md 2.2.0}。
@@ -796,7 +796,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## UI-1 视觉风格：回到学校
 
-- 状态：实现与自测完成，未提交（2026年10月21日）。用户以frontend-design技能提出“太朴素，要统一风格并有教学课堂的氛围”，看过两版示例后确认第二版（“童真一点，像回到学校，但不要像幼儿园”）。
+- 状态：实现与自测完成，已本地提交a744618（2026年10月21日）。用户以frontend-design技能提出“太朴素，要统一风格并有教学课堂的氛围”，看过两版示例后确认第二版（“童真一点，像回到学校，但不要像幼儿园”）。
 - 负责人/集成：Claude Opus。
 - 范围：样式表按“黑板、课本、练习本”重写（命名变量：黑板绿、粉笔色、纸、墨水蓝、批改红、荧光笔、横线；字体圆体/楷体/手札体/Iowan Old Style，均为本机字体）；Jane的话在黑板（主页下一步、课堂左栏、确认弹框，木框与粉笔槽）；课文按标题与段落编号显示（`passage`）；课堂进度一题一格、做完打勾（`taskMarks`，原生progress保留给读屏）；去掉大写小字标签，改为“Project J”加模拟/正式学习标签；作答框为练习本手写体。课堂逻辑、接口与数据不变。
 - 文件边界：project_j/web/src/{style.css,Classroom.tsx,App.tsx,passage.ts,progress.ts}、tests/{passage,progress}.test.mjs；文档design/interface/{README.md 2.1.0,student-classroom.md 1.4.0}。
