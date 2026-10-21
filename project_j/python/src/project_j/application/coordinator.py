@@ -474,7 +474,9 @@ class Coordinator:
                 offscreen_requirements="离屏停止采集，返回取得实际条件/结果报告。",
                 fallback="已核实不依赖声音评价的任务可使用文字模拟。",
                 gaps=("尚无学习样本，用短观察取样。",),
-                skill_focus=(),  # The simulation's fixture lesson trains nothing in particular.
+                # The simulation's fixture lesson is the library's first story, nothing ticked.
+                topic=COURSES[FIRST]["title"],
+                skill_focus=(),
             )
             obj = document(
                 "demand",
@@ -560,6 +562,8 @@ class Coordinator:
         if demand.body.get("goal_confirmation") == "needed":
             raise Conflict("新目标等你确认：确认后才备课。")
         body = DemandBody.model_validate(demand.body)
+        if body.purpose != "placement" and body.topic is None:
+            raise Conflict("先选下一课的题材，选好才备课。")
         state, plan = [self.store.read(ref, learner_id) for ref in (body.state_ref, body.plan_ref)]
         for obj in (state, plan):
             if self.store.current(obj.object_id, learner_id).ref != obj.ref:
@@ -1910,6 +1914,7 @@ class Coordinator:
                     catalog,
                     suggestion.body,
                     old.body,
+                    self.recent_titles(learner_id),
                 )
             )
             activity_id = evaluation.body["activity_id"]
@@ -1997,12 +2002,13 @@ class Coordinator:
                 baselines=baselines,
             )
             log.info(
-                "planning activity=%s goals=%s/%s action=%s plan_effect=%s",
+                "planning activity=%s goals=%s/%s action=%s plan_effect=%s topics=%d",
                 activity_id,
                 data.primary_goal.dimension_id,
                 data.auxiliary_goal.dimension_id,
                 result.output.suggestion_action,
                 data.plan_effect,
+                len(data.topic_suggestions),
             )
         body = demand[0].body
         return self.ledger.finish(
@@ -2144,19 +2150,31 @@ class Coordinator:
         request_id: str,
         learner_id: str,
         demand_ref: RevisionRef,
+        topic: str,
         skills: list[str],
         note: str | None,
     ) -> dict:
-        """The student's ticks for the next lesson, a new demand revision; preparation waits."""
-        signature = {"demand_ref": demand_ref.model_dump(), "skills": list(skills), "note": note}
+        """The student's topic and ticks for the next lesson, a new demand revision; preparation
+        waits for it."""
+        signature = {
+            "demand_ref": demand_ref.model_dump(),
+            "topic": topic,
+            "skills": list(skills),
+            "note": note,
+        }
         completed = self.ledger.completed_request(request_id, learner_id, "focus", signature)
         if completed:
             return completed
         demand = self.current(learner_id, "demand")
-        if demand.ref != demand_ref or demand.body.get("skill_focus") is not None:
+        if demand.ref != demand_ref or demand.body.get("topic"):
             raise Conflict("这一版需求已不需要选择，请刷新。", demand.ref)
         chosen = DemandBody.model_validate(
-            demand.body | {"skill_focus": list(skills), "skill_note": (note or "").strip() or None}
+            demand.body
+            | {
+                "topic": topic.strip(),
+                "skill_focus": list(skills),
+                "skill_note": (note or "").strip() or None,
+            }
         )
         operation = self.request(
             request_id,
@@ -2191,12 +2209,18 @@ class Coordinator:
                     Publication(
                         ref=obj.ref,
                         expected_revision=demand.revision,
-                        reason="学生选择本课加强项目",
+                        reason="学生选择本课题材与加强项目",
                     ),
                 ),
                 baselines=(demand.ref,),
             )
-        log.info("focus chosen skills=%d note=%s", len(skills), chosen.skill_note is not None)
+        listed = chosen.topic in {item.title for item in chosen.topic_suggestions}
+        log.info(
+            "focus chosen topic=%s skills=%d note=%s",
+            "suggested" if listed else "own",
+            len(skills),
+            chosen.skill_note is not None,
+        )
         return self.ledger.finish(operation, learner_id, {"demand_ref": saved[0].ref.model_dump()})
 
     async def replan_keeping_goals(self, learner_id: str, demand: Document, body: DemandBody):
@@ -2225,6 +2249,7 @@ class Coordinator:
             catalog,
             self.store.read(choice.suggestion_ref, learner_id).body,
             previous.model_dump(mode="json"),
+            self.recent_titles(learner_id),
         )
         self.models.require()
         result = await self.models.run(

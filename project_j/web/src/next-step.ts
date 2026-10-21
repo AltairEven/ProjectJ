@@ -35,7 +35,7 @@ const views: Record<string, (subject: Subject) => { title: string, action?: stri
       also: { action: '重上这节课', page: 'courses', detail: subject.retake.object_id } }
     : { title: '课后评价已生成', action: '查看并认可', page: 'evaluations', detail: subject.activity_id },
   goal: () => ({ title: '新目标等你确认', action: '确认新目标', page: 'plan' }),
-  focus: () => ({ title: '下一课想加强什么？', page: 'home' }),  // Ticked right on the main page.
+  focus: () => ({ title: '下一课读什么、练什么？', page: 'home' }),  // Chosen right on the main page.
   course: subject => subject.confirmed
     ? { title: '课程已确认，准备好就开始上课', action: '去上课', page: 'courses', detail: subject.course_ref?.object_id }
     : { title: '下一课已备好', action: '查看并确认', page: 'courses', detail: subject.course_ref?.object_id },
@@ -60,8 +60,10 @@ export function inOnboarding(dashboard: { next?: { kind: string } | null, object
 /** Jane's suggested skills start ticked; the student may untick them. */
 export const initialFocus = (suggestions: { skill_id: string }[]): string[] => suggestions.map(item => item.skill_id)
 
-/** Mirrors the server: at most three skills a lesson and a short note. */
-export function focusError(count: number, note: string): string | null {
+/** Mirrors the server: a topic of 1–100 characters, at most three skills and a short note. */
+export function focusError(count: number, note: string, topic: string): string | null {
+  if (!topic.trim()) return '先选一个题材，或写下你想读的。'
+  if (topic.trim().length > 100) return '题材最多100字。'
   if (count > 3) return '每课最多选3项。'
   if (note.trim().length > 100) return '其他想练的最多100字。'
   return null

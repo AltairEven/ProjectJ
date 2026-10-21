@@ -25,6 +25,8 @@ def demand_requirements(demand: DemandBody) -> list[tuple[str, str]]:
         )
         for choice in demand.suggestion_choices
     ]
+    if demand.topic:  # The story is about what the student chose.
+        items.append(("topic", demand.topic))
     # What the student ticked must show in the story, the questions and the help.
     items += [
         ("skill_focus", f"{SKILLS[skill][1]}：{SKILLS[skill][2]}")

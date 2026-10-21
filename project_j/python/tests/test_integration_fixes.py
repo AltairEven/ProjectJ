@@ -114,6 +114,8 @@ def test_reused_state_retry_keeps_newer_evidence_and_rechecks_demand(application
         assert state_step["execution"] == "complete"
         assert state_step["effect_refs"] == [reused.model_dump()]
 
+        demand = app.current(LEARNER, "demand")
+        app.choose_focus("newer-focus", LEARNER, demand.ref, "桥", [], None)
         package = await app.prepare("newer-prepare", LEARNER)
         await ready(app, {"course_ref": ref(package["course_ref"])})
         assert (
@@ -150,7 +152,7 @@ def test_reused_state_retry_keeps_newer_evidence_and_rechecks_demand(application
         assert result["state_ref"] == newer.ref.model_dump()
         demand = app.store.read(ref(result["demand_ref"]), LEARNER)
         assert demand.body["state_ref"] == newer.ref.model_dump()
-        assert demand.revision == 4
+        assert demand.revision == 5  # one more for the topic chosen before the newer lesson
         if lose_completion:
             assert demand.ref == already_saved
         steps = app.ledger.steps(operation, LEARNER)

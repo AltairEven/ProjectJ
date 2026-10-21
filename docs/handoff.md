@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.39.0；更新：2026年10月21日。
+版本：1.40.0；更新：2026年10月21日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -809,4 +809,19 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 负责人/集成：Claude Opus。
 - 范围：课堂沙盒原在本机project_j/test/ui（不进Git、正式发布时删除），移到project_j/web/sandbox：index.html（真实Classroom配浏览器内假课堂mock.ts，十个场景、正式模式、等待秒数）与app.html（真实App配模拟运行的主页数据快照dashboard.json，可切下一步）；`npm run --prefix project_j/web sandbox`。纳入tsconfig.app类型检查（加resolveJsonModule），不进应用构建。AGENTS 1.31.0在本地维护段写明用途与同步要求；驱动截图的脚本仍在本机project_j/test/ui/sandbox。
 - 检查证据：类型检查覆盖沙盒4个文件；本机烟测脚本check.mjs、confirm.mjs在新位置全部通过、页面无报错（随UI-1更新了进度选择器，停止前先收起确认弹框）。统一check通过（主工程538、评分39、合成15项pytest，前端58、文档1），UTC 2026-10-21T02:20:14.968231+00:00，工程摘要656cd5ffc6560e8c28d0618c40fddf37158eee0401ab9ae873521d974e55dc94；依赖未变。
+
+## SELF-7 每次备课前选题材和知识点
+
+- 状态：实现与自测完成，未提交（2026年10月21日）。用户：“在所有备课前，都需要我自己来选择题材和知识点，选择完成后才能进入备课”；看过样子页后确认（docs/superpowers/specs/2026-10-21-choose-topic-and-skills-before-preparation-design.md），实施计划在docs/superpowers/plans/2026-10-21-choose-topic-and-skills-before-preparation.md。
+- 负责人/集成：Claude Opus。
+- 范围：
+  1. 需求新增`topic`（学生定下的题材，1–100字）与`topic_suggestions`（最多4个，标题与理由）；规划随下节需求列3–4个题材（从兴趣出发、可延伸到相邻方面、避开最近三课、合蓝思值与本课目标），规划请求加最近三课标题；超长或多出的由规则丢掉，不让规划作废。
+  2. 主页这一步改为“下一课读什么、练什么？”：题材单选各附理由加“我想读别的”输入框（没列出时只有输入框），知识点照旧，按钮“交给 Jane，开始备课”，题材没定时不能按；`POST /api/focus`增加必填`topic`。是否等待选择改按`topic`为空判断，旧规则只选过知识点、未备课的需求会请学生重选两样；备课入口也拒绝没有题材的正式课需求。建档小测不选；模拟初始需求预填课程库第一课题材。
+  3. 备课：题材取需求的`topic`（标明是数据不是指令），需求逐条要求加题材一条；修改意见明确要换题材时按意见换并写明。顺带修正左上角“Project J”被“正式学习”标签挤成两行。
+  4. 日志：`focus chosen topic=suggested|own skills=%d note=%s`，规划日志加`topics=%d`，不记题材、理由或说明文字。课堂判断未改，参考题集无需重跑。
+- 文件边界：project_j/python/src/project_j/{learning/contracts.py,learning/planning.py,preparation/contracts.py,preparation/drafting.py,preparation/packages.py,application/progress.py,application/coordinator.py,interface/api.py,platform/models/simulated.py}；tests/{support,test_learning_contracts,test_learning_planning,test_progress,test_maintenance_api,test_onboarding,test_goal_confirmation,test_evaluation_flow,test_integration_fixes,test_runtime,test_preparation_drafting,test_preparation_model}.py；project_j/web/src/{next-step.ts,pages/Home.tsx,style.css}、tests/next-step.test.mjs、重新导出的schema与client；沙盒sandbox/{app.tsx,dashboard.json}（样子页spike-choose已删除）；文档design/learning/README.md 1.7.0、design/preparation/README.md 2.2.0、design/interface/main-page.md 2.5.0、docs/product.md 2.1.0。
+- 取舍：单独的“这节课不特别加强”按钮去掉，知识点不勾直接提交即可（用户认可的样子只有一个按钮）。测试辅助next_course与几处直接备课的测试按新规则先选Jane列的第一个题材。
+- 检查证据：新增测试先失败后通过（题材字段与逐条要求、规划列题材含日志与过滤、超长标题被丢弃且输出结构不含长度限制、等待选择与提交含日志、旧需求重选、备课入口拒绝、接口拒绝空白与超长题材、备课请求带题材与指令、主页校验规则）。统一check通过（主工程544、评分39、合成15项pytest，前端58、文档1），UTC 2026-10-21T03:10:35.026331+00:00，工程摘要363f3fbba5b020cac041ebed08800629b9cb39f5c147f0d37a8b0833c14d822c；离线probe通过；模拟measure p95 4500毫秒、not_granted；依赖未变。沙盒整站预览以浏览器核对选择页（未选题材不能按、4项知识点不能按、空白自写题材不能按、提交内容正确、没列出题材时只有输入框）、品牌标题一行，原课堂烟测通过、页面无报错；脚本与截图在本机project_j/test/ui/sandbox/choose.mjs、test/output/design。审查由主会话自做（未派审查子代理）。
+- 未验证：真实规划模型列出的题材质量；真实备课是否按所选题材写短文；真实模型是否接受新的输出字段（已去掉长度约束）。
+- 接续：用户运行编号me当前停在“评价等你认可（可重上）”，当前课已备好，不出现选择；重启学习服务、重上并认可评价后，下一课前出现“下一课读什么、练什么？”。
 

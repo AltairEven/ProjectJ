@@ -168,7 +168,8 @@ def prepare_course(app, request_id="prepare1"):
 
 async def next_course(app, request_id, learner_id, activity_id):
     """What the background jobs do after a lesson, with the student's decisions in between:
-    evaluate, acknowledge, adopt and plan, accept a changed goal, prepare (ADR-0018)."""
+    evaluate, acknowledge, adopt and plan, accept a changed goal, pick Jane's first topic,
+    prepare (ADR-0018)."""
     from project_j.preparation.drafting import PreparationUnavailable
 
     evaluation = await app.evaluate(
@@ -179,6 +180,10 @@ async def next_course(app, request_id, learner_id, activity_id):
     demand = app.current(learner_id, "demand")
     if demand.body.get("goal_confirmation") == "needed":  # The student accepts the new goal.
         await app.decide_goal(f"{request_id}:goal", learner_id, demand.ref, "accept")
+    demand = app.current(learner_id, "demand")
+    if not demand.body.get("topic"):  # A replay finds it already chosen.
+        topic = demand.body["topic_suggestions"][0]["title"]
+        app.choose_focus(f"{request_id}:focus", learner_id, demand.ref, topic, [], None)
     try:
         package = await app.prepare(f"{request_id}:prepare", learner_id)
     except PreparationUnavailable as gap:

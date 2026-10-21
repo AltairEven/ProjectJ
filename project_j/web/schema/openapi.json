@@ -3164,6 +3164,10 @@
           "demand_ref": {
             "$ref": "#/components/schemas/RevisionRef"
           },
+          "topic": {
+            "type": "string",
+            "title": "Topic"
+          },
           "skills": {
             "items": {
               "type": "string"
@@ -3188,6 +3192,7 @@
         "required": [
           "request_id",
           "demand_ref",
+          "topic",
           "skills"
         ],
         "title": "FocusRequest"

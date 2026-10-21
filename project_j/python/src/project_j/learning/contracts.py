@@ -121,6 +121,16 @@ class FocusSuggestion(Contract):
     reason: Text
 
 
+Topic = Annotated[str, Field(min_length=1, max_length=100)]
+
+
+class TopicSuggestion(Contract):
+    """One story topic planning lists for the student to pick before preparation."""
+
+    title: Topic
+    reason: Text
+
+
 class DemandBody(Contract):
     status: Literal["draft", "checked"]
     state_ref: RevisionRef
@@ -150,6 +160,9 @@ class DemandBody(Contract):
     skill_focus: tuple[str, ...] | None = None
     skill_note: Annotated[str, Field(min_length=1, max_length=100)] | None = None
     focus_suggestions: tuple[FocusSuggestion, ...] = Field(default=(), max_length=2)
+    # The story topic the student picked or wrote for this lesson; None not chosen yet.
+    topic: Topic | None = None
+    topic_suggestions: tuple[TopicSuggestion, ...] = Field(default=(), max_length=4)
 
     @model_validator(mode="after")
     def goals_and_choices(self) -> Self:

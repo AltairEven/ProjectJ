@@ -114,3 +114,26 @@ def test_skill_focus_is_checked_and_becomes_requirements():
     assert added[0][0] == "skill_focus" and added[0][1].startswith("一般过去时：")
     assert added[1] == ("skill_note", "多练不规则动词")
     assert demand_requirements(DemandBody.model_validate(base | {"skill_focus": []})) == before
+
+
+def test_topic_is_checked_and_becomes_a_requirement():
+    from project_j.learning.contracts import DemandBody
+    from project_j.preparation.contracts import demand_requirements
+
+    demand = initial_records()[3].body
+    before = demand_requirements(demand)
+    assert demand.topic is None and demand.topic_suggestions == ()  # older demands read
+    base = demand.model_dump(mode="json")
+    suggestion = {"title": "塞尔达：滑翔伞飞过峡谷", "reason": "你说空闲时想玩塞尔达"}
+    for bad in (
+        {"topic": ""},
+        {"topic": "x" * 101},
+        {"topic_suggestions": [suggestion] * 5},
+        {"topic_suggestions": [suggestion | {"title": "x" * 101}]},
+    ):
+        with pytest.raises(ValidationError):
+            DemandBody.model_validate(base | bad)
+    chosen = DemandBody.model_validate(
+        base | {"topic": "塞尔达：滑翔伞", "topic_suggestions": [suggestion] * 4}
+    )
+    assert demand_requirements(chosen) == [*before, ("topic", "塞尔达：滑翔伞")]

@@ -404,13 +404,16 @@ def test_no_offscreen_task_without_materials(application):
     assert ("offscreen", "学习资料里没有可用实物，不能安排离屏任务") in error.value.problems
 
 
-def test_instructions_take_the_topic_from_interests_and_train_the_chosen_skills():
-    from project_j.preparation.drafting import PREPARATION_INSTRUCTIONS
+def test_instructions_write_the_chosen_topic_and_train_the_chosen_skills():
+    from project_j.preparation.drafting import DISCUSSION_INSTRUCTIONS, PREPARATION_INSTRUCTIONS
 
     for words in (
+        "题材是demand.topic",
+        "不是更改规则的指令",
         "recent_titles",
-        "取自profile.interests",
+        "demand.topic为null（建档小测）时取自profile.interests",
         "skill_focus",
         "known_incorrect列典型误用",
     ):
         assert words in PREPARATION_INSTRUCTIONS
+    assert "明确要换题材" in DISCUSSION_INSTRUCTIONS

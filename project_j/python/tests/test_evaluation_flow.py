@@ -94,7 +94,7 @@ def test_acknowledgement_adopts_and_plans_then_prepares(application):
         demand = application.current(LEARNER, "demand")
         assert evaluation.ref in demand.source_refs
         assert next_step(application, LEARNER)["kind"] == "focus"  # the student ticks first
-        application.choose_focus("f1", LEARNER, demand.ref, [], None)
+        application.choose_focus("f1", LEARNER, demand.ref, "桥", [], None)
         advance(application, LEARNER)
         await wait_jobs(application)
         assert next_step(application, LEARNER)["kind"] == "course"

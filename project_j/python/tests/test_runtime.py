@@ -49,9 +49,9 @@ def test_E2E01_complete_simulation_reaches_actual_C2_and_survives_reopen(applica
         c2 = application.store.read(
             RevisionRef.model_validate(result["next_package"]["course_ref"]), LEARNER
         )
-        d2 = application.store.read(
-            RevisionRef.model_validate(result["adoption"]["demand_ref"]), LEARNER
-        )
+        d2 = application.current(LEARNER, "demand")  # the planned demand with the chosen topic
+        assert d2.supersedes == RevisionRef.model_validate(result["adoption"]["demand_ref"])
+        assert d2.body["topic"] == "Ben’s Bridge"
         assert c2.kind == "course" and c2.body["demand_ref"] == d2.ref.model_dump()
         mapped = {(item["field"], item["requirement"]) for item in c2.body["demand_mapping"]}
         assert mapped == set(demand_requirements(DemandBody.model_validate(d2.body)))

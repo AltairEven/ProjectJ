@@ -73,11 +73,14 @@ test('onboarding lasts until the profile is confirmed, also while the AI works o
 
 test('the skills to train are ticked on the main page, Jane\'s suggestions already ticked', () => {
   const focus = nextStepView({ kind: 'focus', subject: {} })
-  assert.deepEqual([focus.title, focus.page, focus.action], ['下一课想加强什么？', 'home', undefined])
+  assert.deepEqual([focus.title, focus.page, focus.action], ['下一课读什么、练什么？', 'home', undefined])
   assert.deepEqual(initialFocus([{ skill_id: 'past_simple', reason: 'r' }]), ['past_simple'])
-  assert.equal(focusError(3, ''), null)
-  assert.equal(focusError(4, ''), '每课最多选3项。')
-  assert.equal(focusError(1, 'x'.repeat(101)), '其他想练的最多100字。')
+  assert.equal(focusError(3, '', '塞尔达'), null)
+  assert.equal(focusError(0, '', '塞尔达'), null)
+  assert.equal(focusError(1, '', '  '), '先选一个题材，或写下你想读的。')
+  assert.equal(focusError(1, '', 'x'.repeat(101)), '题材最多100字。')
+  assert.equal(focusError(4, '', '塞尔达'), '每课最多选3项。')
+  assert.equal(focusError(1, 'x'.repeat(101), '塞尔达'), '其他想练的最多100字。')
 })
 
 test('a stopped class can be acknowledged as it is or taken again', () => {

@@ -127,6 +127,7 @@ class GoalDecision(ParentRequest):
 
 class FocusRequest(ParentRequest):
     demand_ref: RevisionRef
+    topic: str
     skills: list[str]
     note: str | None = None
 
@@ -758,7 +759,12 @@ def create_app(
     @app.post("/api/focus", dependencies=[Depends(operator)])
     async def choose_focus(request: FocusRequest):
         return controller().choose_focus(
-            request.request_id, request.learner_id, request.demand_ref, request.skills, request.note
+            request.request_id,
+            request.learner_id,
+            request.demand_ref,
+            request.topic,
+            request.skills,
+            request.note,
         )
 
     @app.post("/api/evaluation/acknowledge", dependencies=[Depends(operator)])

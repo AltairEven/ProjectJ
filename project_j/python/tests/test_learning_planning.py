@@ -43,6 +43,7 @@ def bodies(application, activity):
         "catalog": [doc.body for doc in application.store.list_current(LEARNER, "capability")],
         "suggestion": application.store.current(identity(activity, "suggestion"), LEARNER).body,
         "demand": demand.body,
+        "recent_titles": ["The Paper Bridge"],
     }
 
 
@@ -327,3 +328,55 @@ def test_planning_suggests_at_most_two_known_skills(application, monkeypatch):
     kept = [item["skill_id"] for item in demand.body["focus_suggestions"]]
     assert kept == ["past_simple", "articles"] and demand.body["skill_focus"] is None
     assert len(seen[0].context["skills"]) == 13 and "0–2项" in seen[0].instructions
+
+
+def test_planning_lists_topics_for_the_student(application, monkeypatch, caplog):
+    activity = taught(application)
+    adapter = application.models.adapters["simulated"]
+    original, seen = adapter.respond, []
+    topics = [{"title": f"塞尔达第{n}个角度", "reason": f"兴趣原话{n}"} for n in range(5)]
+
+    def respond(request):
+        reply = original(request)
+        if request.purpose == "planning" and "demand" in request.context:
+            seen.append(request)
+            reply |= {"topic_suggestions": topics}
+        return reply
+
+    monkeypatch.setattr(adapter, "respond", respond)
+    caplog.set_level(logging.INFO, logger="project_j")
+    asyncio.run(application.adopt("adopt1", LEARNER, evaluation_of(application, activity)))
+    demand = application.current(LEARNER, "demand").body
+    assert demand["topic_suggestions"] == topics[:4] and demand["topic"] is None
+    assert seen[0].context["recent_titles"] == ["The Paper Bridge"]
+    assert "topic_suggestions" in seen[0].instructions and "3–4个" in seen[0].instructions
+    assert "topics=4" in caplog.text
+    assert not any(item["title"] in caplog.text or item["reason"] in caplog.text for item in topics)
+
+
+def test_simulated_planning_suggests_the_next_library_story(application):
+    activity = taught(application)
+    asyncio.run(application.adopt("adopt1", LEARNER, evaluation_of(application, activity)))
+    suggestions = application.current(LEARNER, "demand").body["topic_suggestions"]
+    assert [item["title"] for item in suggestions] == ["Ben’s Bridge"]
+
+
+def test_a_long_topic_is_dropped_without_voiding_the_plan(application, monkeypatch):
+    from project_j.learning.planning import DemandDraft
+
+    # Output schemas so far carry no length limits; a stray long title must not need one.
+    assert "maxLength" not in json.dumps(DemandDraft.model_json_schema())
+    activity = taught(application)
+    adapter = application.models.adapters["simulated"]
+    original = adapter.respond
+    topics = [{"title": "长" * 101, "reason": "太长"}, {"title": "火山", "reason": "兴趣"}]
+
+    def respond(request):
+        reply = original(request)
+        if request.purpose == "planning" and "demand" in request.context:
+            reply |= {"topic_suggestions": topics}
+        return reply
+
+    monkeypatch.setattr(adapter, "respond", respond)
+    asyncio.run(application.adopt("adopt1", LEARNER, evaluation_of(application, activity)))
+    assert application.current(LEARNER, "demand").body["topic_suggestions"] == topics[1:]

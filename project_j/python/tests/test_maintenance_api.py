@@ -378,8 +378,12 @@ def test_focus_route_refuses_more_than_three_skills(application):
     with TestClient(create_app(Settings(), application)) as client:
         auth = {"Authorization": f"Bearer {application.token}"}
         body = {"request_id": "f1", "learner_id": LEARNER, "demand_ref": demand.ref.model_dump()}
-        many = body | {"skills": ["verbs", "adjectives", "adverbs", "articles"], "note": None}
+        body |= {"topic": "塞尔达", "skills": [], "note": None}
+        many = body | {"skills": ["verbs", "adjectives", "adverbs", "articles"]}
         assert client.post("/api/focus", headers=auth, json=many).status_code == 400
+        for n, topic in enumerate(("   ", "x" * 101)):
+            blank = body | {"request_id": f"t{n}", "topic": topic}
+            assert client.post("/api/focus", headers=auth, json=blank).status_code == 400
         assert client.get("/api/dashboard", headers=auth).json()["next"]["kind"] == "focus"
-        none = body | {"request_id": "f2", "skills": [], "note": None}
+        none = body | {"request_id": "f2"}
         assert client.post("/api/focus", headers=auth, json=none).status_code == 200

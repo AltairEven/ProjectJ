@@ -167,7 +167,8 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
 /* The main page: chapters down the margin, the sheet on the right. */
 .shell { display: grid; grid-template-columns: 188px 1fr; min-height: 100vh; }
 .shell nav { display: flex; flex-direction: column; gap: 2px; padding: 28px 12px; border-right: 1px solid var(--rule); }
-.brand { display: flex; align-items: center; gap: 8px; padding: 0 12px 18px; font-size: 18px; font-weight: 700; }
+/* A long tag drops to the next line; the name itself never breaks. */
+.brand { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 0 12px 18px; font-size: 18px; font-weight: 700; white-space: nowrap; }
 .shell nav button { text-align: left; padding: 8px 12px; border: 0; border-radius: 0 6px 6px 0; background: none; box-shadow: none; color: var(--text); font-weight: 500; }
 .shell nav button[aria-current="page"] { background: var(--ink-wash); color: var(--ink); font-weight: 700; box-shadow: inset 3px 0 0 var(--ink); }
 .shell main { margin: 0; max-width: 860px; padding: 32px 40px 72px; }

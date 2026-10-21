@@ -90,7 +90,7 @@ def test_onboarding_walks_from_lexile_to_the_first_goal(tmp_path):
         assert app.current(LEARNER, "demand").body["purpose"] == "lesson"
         await app.decide_goal("g1", LEARNER, app.current(LEARNER, "demand").ref, "accept")
         assert next_step(app, LEARNER)["kind"] == "focus"  # the placement itself never asked
-        app.choose_focus("f1", LEARNER, app.current(LEARNER, "demand").ref, [], None)
+        app.choose_focus("f1", LEARNER, app.current(LEARNER, "demand").ref, "桥", [], None)
         advance(app, LEARNER)
         await wait_jobs(app)  # the first lesson is prepared, in a simulation from the template
         assert not app.job_failures

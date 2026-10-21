@@ -66,7 +66,7 @@ def test_unchanged_goals_go_straight_to_the_focus_choice(application):
         demand = await acknowledged_lesson(application)
         assert demand.body["goal_confirmation"] is None
         assert next_step(application, LEARNER)["kind"] == "focus"
-        application.choose_focus("f1", LEARNER, demand.ref, ["past_simple"], None)
+        application.choose_focus("f1", LEARNER, demand.ref, "桥", ["past_simple"], None)
         advance(application, LEARNER)
         await wait_jobs(application)
         assert next_step(application, LEARNER)["kind"] == "course"
@@ -113,7 +113,7 @@ def test_accepting_creates_the_new_capability_then_prepares(application, monkeyp
     assert confirmed.source_refs == demand.source_refs  # Still planned from that evaluation.
 
     assert next_step(application, LEARNER)["kind"] == "focus"
-    application.choose_focus("f1", LEARNER, confirmed.ref, [], None)
+    application.choose_focus("f1", LEARNER, confirmed.ref, "桥", [], None)
 
     async def scenario():
         assert advance(application, LEARNER).startswith("prepare:")

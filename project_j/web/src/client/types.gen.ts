@@ -546,6 +546,10 @@ export type FocusRequest = {
     learner_id?: string;
     demand_ref: RevisionRef;
     /**
+     * Topic
+     */
+    topic: string;
+    /**
      * Skills
      */
     skills: Array<string>;

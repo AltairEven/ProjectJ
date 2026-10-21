@@ -7,32 +7,43 @@ import { JobLine, Rows, useRun, type PageProps } from '../ui'
 
 type Skill = { skill_id: string, group: string, label: string }
 type Suggestion = { skill_id: string, reason: string }
+type Topic = { title: string, reason: string }
 
-// The skills to train next lesson, ticked before Jane prepares it (preparation waits for this).
+// The topic and skills of the next lesson, chosen before Jane prepares it (preparation waits for this).
 function FocusPicker({ token, learner, refresh, subject }: Pick<PageProps, 'token' | 'learner' | 'refresh'> & { subject: Record<string, any> }) {
   const { busy, run, status } = useRun(refresh)
   const options: Skill[] = subject.options ?? []
   const suggestions: Suggestion[] = subject.suggestions ?? []
+  const topics: Topic[] = subject.topics ?? []
+  const [choice, setChoice] = useState<number | 'own' | null>(topics.length ? null : 'own')
+  const [own, setOwn] = useState('')
   const [picked, setPicked] = useState(() => initialFocus(suggestions))
   const [note, setNote] = useState('')
-  const error = focusError(picked.length, note)
+  const topic = choice === 'own' ? own.trim() : choice === null ? '' : topics[choice].title
+  const error = focusError(picked.length, note, topic)
   const reasons = new Map(suggestions.map(item => [item.skill_id, item.reason]))
   const toggle = (id: string, on: boolean) => setPicked(current => on ? [...current, id] : current.filter(item => item !== id))
-  const send = (skills: string[], text: string | null) => {
-    const body = { request_id: uid(), learner_id: learner, demand_ref: subject.demand_ref, skills, note: text }
+  const send = () => {
+    const body = { request_id: uid(), learner_id: learner, demand_ref: subject.demand_ref, topic, skills: picked, note: note.trim() || null }
     void run(async () => { await api(token, 'focus', body) }, '保存选择')
   }
   return <>
-    <p>勾选这节课想重点练的项目（最多3项），Jane 会据此写短文、出题和准备帮助；也可以不特别加强。</p>
+    <p>{topics.length ? 'Jane 按你的兴趣想了几个题材，也列出了可以练的知识点。' : '写下这节课想读的题材，再勾选想练的知识点。'}选好交给 Jane，她才开始备课。</p>
+    <fieldset className="skills"><legend>{topics.length ? '题材（选一个）' : '题材'}</legend>
+      {topics.map((item, index) => <label key={index} className="check">
+        <input type="radio" name="topic" checked={choice === index} onChange={() => setChoice(index)} />
+        {item.title}<span className="tag">{item.reason}</span></label>)}
+      {topics.length > 0 && <label className="check"><input type="radio" name="topic" checked={choice === 'own'} onChange={() => setChoice('own')} />我想读别的：</label>}
+      <input aria-label="我想读的题材" placeholder="写一句你想读的内容" value={own} onFocus={() => setChoice('own')} onChange={event => setOwn(event.target.value)} /></fieldset>
+    <p className="hint">知识点（最多 3 项，可以不选）</p>
     {[...new Set(options.map(item => item.group))].map(group => <fieldset key={group} className="skills"><legend>{group}</legend>
       {options.filter(item => item.group === group).map(item => <label key={item.skill_id} className="check">
         <input type="checkbox" checked={picked.includes(item.skill_id)} onChange={event => toggle(item.skill_id, event.target.checked)} />
         {item.label}{reasons.has(item.skill_id) && <span className="tag">Jane建议：{reasons.get(item.skill_id)}</span>}</label>)}</fieldset>)}
     <label>其他想练的（可选）<input value={note} onChange={event => setNote(event.target.value)} /></label>
-    {error && <p className="notice">{error}</p>}
+    {error && <p className={topic ? 'notice' : 'hint'}>{error}</p>}
     {status}
-    <div className="row"><button disabled={busy || error !== null} onClick={() => send(picked, note.trim() || null)}>确定，开始备课</button>
-      <button className="quiet" disabled={busy} onClick={() => send([], null)}>这节课不特别加强</button></div>
+    <div className="row"><button disabled={busy || error !== null} onClick={send}>交给 Jane，开始备课</button></div>
   </>
 }
 

@@ -56,11 +56,13 @@ def lesson(app, learner_id: str):
 
 
 def focus_needed(demand) -> bool:
-    """A lesson's demand waits for the student's ticks (skills to train); a placement never asks."""
+    """A lesson's demand waits for the student's topic and ticks; a placement never asks.
+
+    Keyed on the topic, so a demand ticked before topics existed asks again for both."""
     return (
         demand is not None
         and demand.body.get("purpose") != "placement"
-        and demand.body.get("skill_focus") is None
+        and not demand.body.get("topic")
     )
 
 
@@ -292,6 +294,7 @@ def next_step(app, learner_id: str) -> dict:
                     for skill, (group, label, _) in SKILLS.items()
                 ],
                 "suggestions": list(demand.body.get("focus_suggestions", [])),
+                "topics": list(demand.body.get("topic_suggestions", [])),
             },
         }
     starting = [row for row in jobs(app) if row["name"].startswith(("confirm:", "start:"))]

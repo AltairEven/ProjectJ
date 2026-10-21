@@ -15,9 +15,17 @@ const skills: [string, string, string][] = [
 const course = dashboard.objects.find(doc => doc.kind === 'course')!
 const nexts: Record<string, { kind: string, subject: Record<string, unknown> }> = {
   '评价等你认可（可重上）': dashboard.next as { kind: string, subject: Record<string, unknown> },
-  '下一课想加强什么': { kind: 'focus', subject: { demand_ref: { object_id: 'demand', revision: 2 },
+  '下一课读什么、练什么': { kind: 'focus', subject: { demand_ref: { object_id: 'demand', revision: 2 },
     options: skills.map(([skill_id, group, label]) => ({ skill_id, group, label })),
-    suggestions: [{ skill_id: 'past_simple', reason: '上节课两处过去时用成了原形' }] } },
+    suggestions: [{ skill_id: 'past_simple', reason: '上节课两处过去时用成了原形' }],
+    topics: [
+      { title: '塞尔达：林克怎样用滑翔伞飞过峡谷', reason: '你说空闲时想玩《塞尔达传说》' },
+      { title: '塞尔达：海拉鲁的烹饪——什么食材能回血', reason: '同一个游戏，换个角度' },
+      { title: '一款冒险游戏是怎么做出来的', reason: '从游戏延伸到它背后的人' },
+      { title: '真实世界里的地图和指南针', reason: '游戏里的探索，换到现实' },
+    ] } },
+  'Jane 没列出题材': { kind: 'focus', subject: { demand_ref: { object_id: 'demand', revision: 2 },
+    options: skills.map(([skill_id, group, label]) => ({ skill_id, group, label })), suggestions: [], topics: [] } },
   '课程已确认，等你开始': { kind: 'course', subject: { course_ref: { object_id: course.object_id, revision: course.revision }, confirmed: true } },
   'AI 正在处理': { kind: 'waiting', subject: { failed: [] } },
   '建档：蓝思值': { kind: 'lexile', subject: {} },

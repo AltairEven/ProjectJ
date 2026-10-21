@@ -16,6 +16,7 @@ from project_j.learning.contracts import (
     ProposedCapability,
     SuggestionChoice,
     Text,
+    TopicSuggestion,
 )
 from project_j.platform.models.contracts import ModelRequest
 
@@ -38,6 +39,9 @@ PLANNING_INSTRUCTIONS = (
     "note给学生：before原安排，after新安排，why为什么，uncertain还不确定的事，expectation下节预期。"
     "focus_suggestions从skills里选0–2项建议下节加强的语言项目（学生会在备课前自己勾选），"
     "reason写评价里实际观察到的依据；没有依据就不建议。"
+    "topic_suggestions给3–4个下一课短文的题材供学生挑选（学生也可以自己写）：title一句短标题，"
+    "reason写为什么（如出自学生的哪项兴趣）；从profile.interests出发，可以延伸到相邻的方面，"
+    "彼此要有区别；避开recent_titles里最近几课的题材；难度适合profile.lexile与本课目标。"
 )
 
 REVIEW_INSTRUCTIONS = (
@@ -62,6 +66,13 @@ class PlanPatch(Contract):
     budget_minutes: int | None = None  # Visible only so the rules can refuse it.
 
 
+class TopicDraft(Contract):
+    """No length limit in the output schema; the rules drop a title that does not fit."""
+
+    title: Text
+    reason: Text
+
+
 class DemandDraft(Contract):
     suggestion_action: Literal["adopt", "modify", "defer", "reject"]
     suggestion_reason: Text
@@ -81,6 +92,7 @@ class DemandDraft(Contract):
     goal_reason: Text
     new_capabilities: tuple[ProposedCapability, ...] = ()
     focus_suggestions: tuple[FocusSuggestion, ...] = ()
+    topic_suggestions: tuple[TopicDraft, ...] = ()
 
 
 class ReviewDraft(Contract):
@@ -153,6 +165,7 @@ def demand_request(
     catalog: list[dict],
     suggestion: dict,
     demand: dict,
+    recent_titles: list[str],
 ) -> ModelRequest:
     material = suggestion["material"]
     return ModelRequest(
@@ -176,6 +189,7 @@ def demand_request(
                 "fallback",
                 "gaps",
             ),
+            "recent_titles": recent_titles,
             "skills": [
                 {"skill_id": skill, "group": group, "label": label, "hint": hint}
                 for skill, (group, label, hint) in SKILLS.items()
@@ -292,6 +306,12 @@ def apply_demand_draft(
         focus_suggestions=tuple(
             item for item in draft.focus_suggestions if item.skill_id in SKILLS
         )[:2],
+        # A title that does not fit is dropped, at most four; neither voids the plan.
+        topic_suggestions=tuple(
+            TopicSuggestion(title=item.title.strip(), reason=item.reason)
+            for item in draft.topic_suggestions
+            if 0 < len(item.title.strip()) <= 100
+        )[:4],
     )
     needed = needs_goal_confirmation(current, body)
     return body.model_copy(update={"goal_confirmation": "needed" if needed else None})

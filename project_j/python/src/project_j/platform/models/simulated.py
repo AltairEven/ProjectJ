@@ -100,6 +100,10 @@ class SimulatedAdapter:
                 "plan_reason": "沿用当前周计划：既定目标与预算未发生必要变化。",
                 "plan_patch": None,
                 "goal_reason": "模拟规划：沿用当前两个目标。",
+                # The simulated preparation only reproduces the library, so it offers that story.
+                "topic_suggestions": [
+                    {"title": suggestion["material"]["title"], "reason": "模拟：课程库的下一课。"}
+                ],
                 "note": {
                     "before": "当前需求与周计划。",
                     "after": "模拟规划：沿用目标并采纳候选建议。",

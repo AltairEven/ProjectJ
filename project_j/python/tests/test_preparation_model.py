@@ -458,6 +458,10 @@ def test_study_preparation_writes_by_interests_and_maps_the_chosen_skill(
     assert context["library"] == [] and context["candidate"] is None and context["template"] is None
     assert context["recent_titles"] == []
     assert context["demand"]["skill_focus"][0]["label"] == "一般过去时"
+    assert context["demand"]["topic"] == "The Paper Bridge"
+    assert ("topic", "The Paper Bridge") in [
+        (item["field"], item["requirement"]) for item in context["requirements"]
+    ]
     assert any(item["field"] == "skill_focus" for item in context["requirements"])
     assert calls(app) == 2  # the unmapped skill was sent back for repair
     assert "attempt=2 material=model tasks=2 read_aloud=0 resources=0 focus=1" in caplog.text
