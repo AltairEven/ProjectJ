@@ -11,6 +11,7 @@ export const pages: [Page, string][] = [
 
 const jobNames: Record<string, string> = {
   prepare: '备课', evaluate: '评价', adopt: '更新学习状态与计划', summarize: '整理学习资料', review: '复盘', start: '准备资源并开课', confirm: '确认课程并准备资源',
+  recheck: '按更正复核学习状态',
 }
 
 function jobLine({ name, state, reason, progress }: Job): string {
@@ -33,7 +34,7 @@ const views: Record<string, (subject: Subject) => { title: string, action?: stri
   evaluation: subject => subject.retake
     ? { title: '上节课中途停止了：可以认可这份评价，也可以重上这节课', action: '查看并认可', page: 'evaluations', detail: subject.activity_id,
       also: { action: '重上这节课', page: 'courses', detail: subject.retake.object_id } }
-    : { title: '课后评价已生成', action: '查看并认可', page: 'evaluations', detail: subject.activity_id },
+    : { title: subject.corrected ? '评价已按你的更正重写，请再认可一次' : '课后评价已生成', action: '查看并认可', page: 'evaluations', detail: subject.activity_id },
   goal: () => ({ title: '新目标等你确认', action: '确认新目标', page: 'plan' }),
   focus: () => ({ title: '下一课读什么、练什么？', page: 'home' }),  // Chosen right on the main page.
   course: subject => subject.confirmed

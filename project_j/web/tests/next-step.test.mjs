@@ -54,10 +54,11 @@ test('background jobs read as what the AI is doing, with the reason when one fai
     { name: 'review:week:3', state: 'running' },
     { name: 'start:c1:2', state: 'running', progress: '2/5' },
     { name: 'confirm:c1:2', state: 'running', progress: '1/3' },
+    { name: 'recheck:e:2', state: 'running' },
     { name: 'prepare:d:2', state: 'failed', reason: '备课未取得（超时）' },
   ]), [
     '正在备课', '正在评价', '正在更新学习状态与计划', '正在整理学习资料', '正在复盘',
-    '正在准备资源并开课：第2/5项', '正在确认课程并准备资源：第1/3项', '备课失败：备课未取得（超时）',
+    '正在准备资源并开课：第2/5项', '正在确认课程并准备资源：第1/3项', '正在按更正复核学习状态', '备课失败：备课未取得（超时）',
   ])
 })
 
@@ -88,4 +89,9 @@ test('a stopped class can be acknowledged as it is or taken again', () => {
   assert.deepEqual([view.title, view.action, view.page], ['上节课中途停止了：可以认可这份评价，也可以重上这节课', '查看并认可', 'evaluations'])
   assert.deepEqual(view.also, { action: '重上这节课', page: 'courses', detail: 'c1' })
   assert.equal(nextStepView({ kind: 'evaluation', subject: subjects.evaluation }).also, undefined)
+})
+
+test('an evaluation written again after the student\'s correction asks to be acknowledged again', () => {
+  const view = nextStepView({ kind: 'evaluation', subject: { ...subjects.evaluation, corrected: true } })
+  assert.deepEqual([view.title, view.action, view.detail], ['评价已按你的更正重写，请再认可一次', '查看并认可', 'a1'])
 })

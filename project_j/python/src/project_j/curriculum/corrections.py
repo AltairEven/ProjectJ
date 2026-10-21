@@ -1,7 +1,11 @@
+import logging
+
 from sqlalchemy import select
 
 from project_j.application.documents import document, identity, publication, successor
 from project_j.contracts import RevisionRef
+
+log = logging.getLogger(__name__)
 
 # Facts and source reports stay historical truth; restriction records and issues are not uses.
 NOT_RESTRICTED = {"fact", "feedback", "parent_report", "restriction", "issue"}
@@ -52,6 +56,62 @@ def restrict_affected(app, operation_id: str, learner_id: str, targets, reason: 
         for doc in docs.values()
         if doc.learner_id is not None and doc.kind not in NOT_RESTRICTED
     ]
+
+
+def resolved(old, operation_id: str, evidence: str, sources):
+    """The next version of a restriction, released by its owner with the recheck evidence."""
+    return successor(
+        old,
+        operation_id,
+        old.body | {"restriction_state": "resolved", "recheck_evidence": evidence},
+        refs=old.dependency_refs,
+        sources=sources,
+    )
+
+
+def correction_restrictions(app, learner_id: str, activity_id: str):
+    """Active restrictions a correction of this activity raised: on versions still in use, and
+    on versions a newer one already replaced (those stay restricted as history)."""
+    raised_by = {
+        doc.operation_id
+        for doc in app.feedbacks(activity_id, learner_id)
+        if doc.body["corrections"]
+    }
+    in_use, replaced = [], []
+    for doc in app.store.list_current(learner_id, "restriction"):
+        if doc.body["restriction_state"] != "active" or doc.operation_id not in raised_by:
+            continue
+        target = RevisionRef.model_validate(doc.body["target_ref"])
+        current = app.store.current(target.object_id, learner_id)
+        (in_use if current is not None and current.ref == target else replaced).append(doc)
+    return in_use, replaced
+
+
+def release_rechecked(app, operation_id: str, learner_id: str, evaluation) -> None:
+    """Evaluation and learning rechecked a corrected activity with its new evaluation; the
+    versions still in use are released with that evidence (the owner releases its own)."""
+    activity_id = evaluation.body["activity_id"]
+    in_use, replaced = correction_restrictions(app, learner_id, activity_id)
+    if not in_use and not replaced:
+        return
+    if in_use:
+        evidence = f"已按更正后的评价第{evaluation.revision}版复核，仍在使用的版本沿用。"
+        objects = [
+            resolved(doc, operation_id, evidence, (doc.ref, evaluation.ref)) for doc in in_use
+        ]
+        app.save_step(
+            operation_id,
+            learner_id,
+            "release",
+            objects,
+            publications=tuple(publication(obj, "按更正复核后解除") for obj in objects),
+        )
+    log.info(
+        "correction rechecked activity=%s released=%d kept=%d",
+        activity_id,
+        len(in_use),
+        len(replaced),
+    )
 
 
 def correct(app, request_id: str, learner_id: str, target: RevisionRef, note: str, owner: str):
@@ -125,13 +185,7 @@ def release(
         return result
     saved = app.saved_step(operation, learner_id, "release")
     if saved is None:
-        obj = successor(
-            old,
-            operation,
-            old.body | {"restriction_state": "resolved", "recheck_evidence": evidence},
-            refs=old.dependency_refs,
-            sources=(old.ref,),
-        )
+        obj = resolved(old, operation, evidence, (old.ref,))
         saved = app.save_step(
             operation,
             learner_id,

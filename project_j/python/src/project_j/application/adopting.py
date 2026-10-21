@@ -7,6 +7,7 @@ from dataclasses import replace
 from project_j.application.documents import identity, publication, successor
 from project_j.application.ledger import Step
 from project_j.contracts import Document, RevisionRef
+from project_j.curriculum.corrections import release_rechecked
 from project_j.learning.adoption import adopt_state
 from project_j.learning.catalog import Capability, define
 from project_j.learning.contracts import DemandBody, LearningState
@@ -47,51 +48,7 @@ class Adopting:
         result = self.ledger.result(operation, learner_id)
         if result:
             return result
-        state = self.saved_step(operation, learner_id, "state", current_revision)
-        if state is None:
-            old = self.current(learner_id, "state")
-            next_body = adopt_state(LearningState.model_validate(old.model_dump()), evaluation)
-            if canonical(next_body) == canonical(old.body):
-                state = [old]
-                self.ledger.checkpoint(
-                    operation,
-                    learner_id,
-                    Step(
-                        step_id="state",
-                        source_revision=current_revision,
-                        owner="learning",
-                        input_digest=digest(canonical([old.ref.model_dump()])),
-                        input_refs=(old.ref,),
-                        attempts=1,
-                        execution="complete",
-                        effect_refs=(old.ref,),
-                        required_input=("无变化：沿用当前有效状态。",),
-                    ),
-                    replace_unfinished=True,
-                )
-            else:
-                obj = successor(
-                    old,
-                    operation,
-                    next_body,
-                    source_revision=current_revision,
-                    refs=(old.ref,),
-                    sources=(evaluation.ref,),
-                    occurred_at=evaluation.occurred_at,
-                )
-                state = self.save_step(
-                    operation,
-                    learner_id,
-                    "state",
-                    [obj],
-                    source_revision=current_revision,
-                    publications=(publication(obj, "只采用评价支持维度，保持未知"),),
-                    baselines=(old.ref,),
-                )
-        state = state[0]
-        if self.current(learner_id, "state").ref != state.ref:
-            # Later evidence survives; retry continues against the currently valid state.
-            state = self.current(learner_id, "state")
+        state = self.adopted_state(operation, learner_id, evaluation, current_revision)
         plan = self.current(learner_id, "plan:week")
         suggestion = self.store.current(
             identity(evaluation.body["activity_id"], "suggestion"), learner_id
@@ -214,6 +171,7 @@ class Adopting:
                 len(data.topic_suggestions),
             )
         body = demand[0].body
+        release_rechecked(self, operation, learner_id, evaluation)
         return self.ledger.finish(
             operation,
             learner_id,
@@ -225,6 +183,121 @@ class Adopting:
                 "demand_ref": demand[0].ref.model_dump(),
                 "suggestion_ref": suggestion.ref.model_dump(),
             },
+        )
+
+    def adopted_state(
+        self, operation: str, learner_id: str, evaluation: Document, current_revision: int
+    ) -> Document:
+        """The current state with this evaluation taken in, or the same one when nothing changed."""
+        state = self.saved_step(operation, learner_id, "state", current_revision)
+        if state is None:
+            old = self.current(learner_id, "state")
+            next_body = adopt_state(LearningState.model_validate(old.model_dump()), evaluation)
+            if canonical(next_body) == canonical(old.body):
+                state = [old]
+                self.ledger.checkpoint(
+                    operation,
+                    learner_id,
+                    Step(
+                        step_id="state",
+                        source_revision=current_revision,
+                        owner="learning",
+                        input_digest=digest(canonical([old.ref.model_dump()])),
+                        input_refs=(old.ref,),
+                        attempts=1,
+                        execution="complete",
+                        effect_refs=(old.ref,),
+                        required_input=("无变化：沿用当前有效状态。",),
+                    ),
+                    replace_unfinished=True,
+                )
+            else:
+                obj = successor(
+                    old,
+                    operation,
+                    next_body,
+                    source_revision=current_revision,
+                    refs=(old.ref,),
+                    sources=(evaluation.ref,),
+                    occurred_at=evaluation.occurred_at,
+                )
+                state = self.save_step(
+                    operation,
+                    learner_id,
+                    "state",
+                    [obj],
+                    source_revision=current_revision,
+                    publications=(publication(obj, "只采用评价支持维度，保持未知"),),
+                    baselines=(old.ref,),
+                )
+        state = state[0]
+        if self.current(learner_id, "state").ref != state.ref:
+            # Later evidence survives; retry continues against the currently valid state.
+            state = self.current(learner_id, "state")
+        return state
+
+    async def recheck(self, request_id: str, learner_id: str, evaluation: Document) -> dict:
+        """An older lesson's correction, acknowledged: the current state takes the corrected
+        evaluation in (newer evidence stays) and the demand follows a changed state. The next
+        lesson is not planned again from an older lesson."""
+        signature = {"evaluation_ref": evaluation.ref.model_dump()}
+        completed = self.ledger.completed_request(request_id, learner_id, "recheck", signature)
+        if completed:
+            return completed
+        current_revision, _ = self.source_revision(evaluation.body["activity_id"], learner_id)
+        if evaluation.source_revision != current_revision:
+            raise Conflict("old evaluation source cannot recheck the learning baseline")
+        operation = self.request(
+            request_id,
+            learner_id,
+            "recheck",
+            signature,
+            sources=(evaluation.ref,),
+            source_revision=current_revision,
+        )
+        result = self.ledger.result(operation, learner_id)
+        if result:
+            return result
+        state = self.adopted_state(operation, learner_id, evaluation, current_revision)
+        demand = self.current(learner_id, "demand")
+        follows = demand.body["state_ref"] != state.ref.model_dump()
+        if follows:
+            saved = self.saved_step(operation, learner_id, "demand", current_revision)
+            if saved is None:
+                body = DemandBody.model_validate(
+                    demand.body | {"state_ref": state.ref.model_dump()}
+                )
+                obj = successor(
+                    demand,
+                    operation,
+                    body,
+                    source_revision=current_revision,
+                    refs=(state.ref,)
+                    + tuple(r for r in demand.dependency_refs if r.object_id != state.object_id),
+                    # Keeps the latest lesson's evaluation: it still planned this demand.
+                    sources=(*demand.source_refs, evaluation.ref),
+                )
+                saved = self.save_step(
+                    operation,
+                    learner_id,
+                    "demand",
+                    [obj],
+                    source_revision=current_revision,
+                    publications=(publication(obj, "按更正后的状态复核需求，不重新规划"),),
+                    baselines=(demand.ref, state.ref),
+                )
+            demand = saved[0]
+        log.info(
+            "learning recheck activity=%s state_revision=%d demand=%s",
+            evaluation.body["activity_id"],
+            state.revision,
+            "rechecked" if follows else "kept",
+        )
+        release_rechecked(self, operation, learner_id, evaluation)
+        return self.ledger.finish(
+            operation,
+            learner_id,
+            {"state_ref": state.ref.model_dump(), "demand_ref": demand.ref.model_dump()},
         )
 
     async def decide_goal(

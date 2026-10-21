@@ -1,6 +1,7 @@
 """Regressions for the P1 independent review findings (simulation and temporary stores only)."""
 
 import asyncio
+import logging
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -18,10 +19,12 @@ from support import (
     ready,
     start,
     teach,
+    wait_jobs,
 )
 
 from project_j.application.configuration import Settings
 from project_j.application.documents import identity
+from project_j.application.progress import advance, next_step
 from project_j.classroom.harness import DeliveryFeedback
 from project_j.contracts import RevisionRef
 from project_j.curriculum.content import check_content
@@ -152,6 +155,92 @@ def test_feedback_correction_limits_derived_course_until_it_is_rechecked(applica
         assert app.start("new-c3", LEARNER, new_course, materials_ready=True)["decision"] == (
             "allow_simulation"
         )
+
+    asyncio.run(scenario())
+
+
+def restricted_in_use(app):
+    """Active restrictions on a version that is still the current one of its object."""
+    return [
+        doc
+        for doc in app.store.list_current(LEARNER, "restriction")
+        if doc.body["restriction_state"] == "active"
+        and app.store.current(doc.body["target_ref"]["object_id"], LEARNER).ref
+        == ref(doc.body["target_ref"])
+    ]
+
+
+async def jobs_done(app):
+    """What the service does after each page load: start the next AI job, wait for all."""
+    advance(app, LEARNER)
+    await wait_jobs(app)
+
+
+def test_a_correction_after_acknowledgement_is_rechecked_and_released(application, caplog):
+    app = application
+
+    async def scenario():
+        core, _, _ = await first_lesson_with_next_course(app)
+        activity = core.activity_id
+        app.feedback(
+            "correction",
+            LEARNER,
+            activity,
+            "R1其实是看了答案才答的。",
+            corrections=({"note": "R1看了答案才答"},),
+        )
+        assert restricted_in_use(app)
+        # The course planned before the correction is not offered while it is rechecked.
+        assert next_step(app, LEARNER)["kind"] != "course"
+        await jobs_done(app)
+        step = next_step(app, LEARNER)
+        assert step["kind"] == "evaluation" and step["subject"]["activity_id"] == activity
+        assert step["subject"]["corrected"] is True
+        app.acknowledge("ack-again", LEARNER, activity, ref(step["subject"]["evaluation_ref"]))
+        with caplog.at_level(logging.INFO, logger="project_j"):
+            await jobs_done(app)
+        assert not restricted_in_use(app)
+        resolved = [
+            doc
+            for doc in app.store.list_current(LEARNER, "restriction")
+            if doc.body["restriction_state"] == "resolved"
+        ]
+        assert resolved and all(doc.body["recheck_evidence"] for doc in resolved)
+        assert f"correction rechecked activity={activity} released=" in caplog.text
+
+    asyncio.run(scenario())
+
+
+def test_a_correction_of_an_older_lesson_is_evaluated_again_and_rechecked(application, caplog):
+    app = application
+
+    async def scenario():
+        first, second, _ = await correct_first_lesson_after_a_second(app)
+        later = app.store.current(identity(second.body["activity_id"], "evaluation"), LEARNER)
+        await jobs_done(app)
+        step = next_step(app, LEARNER)
+        assert step["kind"] == "evaluation" and step["subject"]["activity_id"] == first.activity_id
+        assert step["subject"]["corrected"] is True
+        app.acknowledge(
+            "ack-c1", LEARNER, first.activity_id, ref(step["subject"]["evaluation_ref"])
+        )
+        with caplog.at_level(logging.INFO, logger="project_j"):
+            await jobs_done(app)
+        assert not restricted_in_use(app)
+        assert f"learning recheck activity={first.activity_id} state_revision=" in caplog.text
+        assert f"correction rechecked activity={first.activity_id} released=" in caplog.text
+        # The later lesson's own evaluation stays; the next lesson is not planned from C1.
+        current = app.store.current(identity(second.body["activity_id"], "evaluation"), LEARNER)
+        assert current.ref == later.ref
+        step = next_step(app, LEARNER)
+        assert step["kind"] == "course"
+        course = ref(step["subject"]["course_ref"])
+        await ready(app, {"course_ref": course})
+        assert app.start("after-recheck", LEARNER, course, materials_ready=True)["decision"] == (
+            "allow_simulation"
+        )
+        app.core.control("cleanup-stop", "stop")
+        app.seal()
 
     asyncio.run(scenario())
 

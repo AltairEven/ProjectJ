@@ -29,8 +29,8 @@ function Detail({ token, dashboard, learner, go, refresh, fact }: PageProps & { 
   const evaluation = objects.find(doc => doc.kind === 'evaluation' && doc.body.activity_id === activity)
   const notes = objects.filter(doc => doc.kind === 'feedback' && doc.body.activity_id === activity)
     .sort((a, b) => a.source_revision - b.source_revision)
-  const send = (objection: boolean) => { const body = { request_id: uid(), learner_id: learner, activity_id: activity, text: note.trim(), objection }
-    void run(async () => { await api(token, 'evaluation/feedback', body); setNote(''); setMessage('已保存，Jane 会据此重新评价。') }, objection ? '提出异议' : '补记') }
+  const send = (objection: boolean, label = objection ? '提出异议' : '补记') => { const body = { request_id: uid(), learner_id: learner, activity_id: activity, text: note.trim(), objection }
+    void run(async () => { await api(token, 'evaluation/feedback', body); setNote(''); setMessage('已保存，Jane 会据此重新评价。') }, label) }
   return <>
     <button className="quiet" onClick={() => go('evaluations')}>← 全部评价</button>
     <section><h2>{storyOf(fact, objects)}</h2>
@@ -47,11 +47,9 @@ function Detail({ token, dashboard, learner, go, refresh, fact }: PageProps & { 
         {row.evaluation_ref && <button disabled={busy} onClick={() => { const body = { request_id: uid(), learner_id: learner, activity_id: activity, evaluation_ref: row.evaluation_ref }
           void run(async () => { await api(token, 'evaluation/acknowledge', body) }, '认可评价') }}>认可这份评价</button>}</div></section>}
     {row?.state === '已认可' && evaluation && <section><h2>更正</h2>
-      <p>已认可的评价不再重写；发现记错的地方可以追加更正，原记录保留。</p>
+      <p>发现记错的地方可以追加更正：Jane 会按更正重新评价，评完请再认可一次；原评价和记录都保留。</p>
       <label>更正说明<textarea value={note} onChange={event => setNote(event.target.value)} /></label>
-      <button className="quiet" disabled={busy || !note.trim()} onClick={() => { const body = { request_id: uid(), learner_id: learner,
-        target_ref: { object_id: evaluation.object_id, revision: evaluation.revision }, owner: evaluation.owner, note: note.trim() }
-        void run(async () => { await api(token, 'correction', body); setNote(''); setMessage('更正已追加。') }, '追加更正') }}>追加更正</button></section>}
+      <button className="quiet" disabled={busy || !note.trim()} onClick={() => send(true, '追加更正')}>追加更正</button></section>}
   </>
 }
 

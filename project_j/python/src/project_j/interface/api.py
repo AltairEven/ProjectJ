@@ -33,7 +33,6 @@ from project_j.application.coordinator import Coordinator
 from project_j.application.progress import advance, jobs, next_step, retry, run
 from project_j.classroom.harness import AllowedAction, DeliveryFeedback, Harness
 from project_j.contracts import Contract, Document, RevisionRef
-from project_j.curriculum.corrections import correct
 from project_j.evaluation.assessment import EvaluationUnavailable
 from project_j.learning.fixtures import initialize
 from project_j.learning.maintenance import decide, review, revise_demand_after_plan
@@ -140,12 +139,6 @@ class ReviewRequest(ParentRequest):
 class DecisionRequest(ParentRequest):
     decision_ref: RevisionRef
     choice: Literal["accept", "reject"]
-
-
-class CorrectionRequest(ParentRequest):
-    target_ref: RevisionRef
-    owner: str
-    note: str = Field(min_length=1)
 
 
 class TextInput(Contract):
@@ -792,17 +785,6 @@ def create_app(
     @app.post("/api/recheck-demand", dependencies=[Depends(operator)])
     async def recheck_demand(request: ParentRequest):
         return revise_demand_after_plan(controller(), request.request_id, request.learner_id)
-
-    @app.post("/api/correction", dependencies=[Depends(operator)])
-    async def correction(request: CorrectionRequest):
-        return correct(
-            controller(),
-            request.request_id,
-            request.learner_id,
-            request.target_ref,
-            request.note,
-            request.owner,
-        )
 
     @app.post("/api/retry-seal", dependencies=[Depends(operator)])
     async def retry_seal():

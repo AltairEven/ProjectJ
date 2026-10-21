@@ -10,9 +10,11 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from functools import partial
 
 from project_j.application.documents import identity
 from project_j.contracts import RevisionRef
+from project_j.curriculum.corrections import active_restrictions, correction_restrictions
 from project_j.learning.adoption import review_due
 from project_j.learning.contracts import SKILLS
 from project_j.learning.maintenance import review
@@ -55,6 +57,10 @@ def lesson(app, learner_id: str):
     return course, confirmed, taught
 
 
+def restricted(app, learner_id: str, course) -> bool:
+    return bool(active_restrictions(app, learner_id, (course.ref, *course.dependency_refs)))
+
+
 def focus_needed(demand) -> bool:
     """A lesson's demand waits for the student's topic and ticks; a placement never asks.
 
@@ -79,24 +85,34 @@ def adopted(app, learner_id: str, evaluation) -> bool:
 
 
 def evaluation_job(app, learner_id: str) -> Job | None:
-    """Evaluate the latest lesson when its sources changed, or adopt its acknowledged evaluation.
+    """Evaluate a lesson when its sources changed, adopt the latest lesson's acknowledged
+    evaluation, or recheck what an older lesson's acknowledged correction touched.
 
-    Only the latest lesson moves on by itself; an older one was planned from before the
-    next lesson was prepared, and re-adopting it would plan backwards."""
-    facts = latest_facts(app, learner_id)
-    if not facts:
-        return None
-    activity = facts[0].body["activity_id"]
-    revision, _ = app.source_revision(activity, learner_id)
-    evaluation = app.store.current(identity(activity, "evaluation"), learner_id)
-    if evaluation is None or evaluation.source_revision != revision:
-        name = f"evaluate:{activity}:{revision}"
+    Only the latest lesson plans the next one; an older one was planned from before the next
+    lesson was prepared, and re-adopting it would plan backwards (design/evaluation)."""
+    for index, fact in enumerate(latest_facts(app, learner_id)):
+        activity = fact.body["activity_id"]
+        revision, _ = app.source_revision(activity, learner_id)
+        evaluation = app.store.current(identity(activity, "evaluation"), learner_id)
+        if evaluation is None and index:
+            continue  # An older class that was never evaluated planned nothing.
+        if evaluation is None or evaluation.source_revision != revision:
+            name = f"evaluate:{activity}:{revision}"
+            work = partial(app.evaluate, f"auto:{name}", learner_id, activity, "after_class")
+        elif not app.acknowledged(learner_id, activity):
+            continue
+        elif index == 0:
+            if adopted(app, learner_id, evaluation):
+                continue
+            name = f"adopt:{evaluation.object_id}:{evaluation.revision}"
+            work = partial(app.adopt, f"auto:{name}", learner_id, evaluation)
+        elif correction_restrictions(app, learner_id, activity)[0]:
+            name = f"recheck:{evaluation.object_id}:{evaluation.revision}"
+            work = partial(app.recheck, f"auto:{name}", learner_id, evaluation)
+        else:
+            continue
         if not app.ledger.done(f"auto:{name}"):
-            return name, lambda: app.evaluate(f"auto:{name}", learner_id, activity, "after_class")
-    elif app.acknowledged(learner_id, activity) and not adopted(app, learner_id, evaluation):
-        name = f"adopt:{evaluation.object_id}:{evaluation.revision}"
-        if not app.ledger.done(f"auto:{name}"):
-            return name, lambda: app.adopt(f"auto:{name}", learner_id, evaluation)
+            return name, work
     return None
 
 
@@ -258,20 +274,26 @@ def next_step(app, learner_id: str) -> dict:
     for doc in documents:
         if doc.kind == "decision" and doc.body.get("decision_state") == "pending":
             return {"kind": "decision", "subject": {"decision_ref": doc.ref.model_dump()}}
-    facts = latest_facts(app, learner_id)
-    if facts:
-        activity = facts[0].body["activity_id"]
+    placed = placement_activity(app, learner_id)
+    for index, fact in enumerate(latest_facts(app, learner_id)):
+        activity = fact.body["activity_id"]
         evaluation = app.store.current(identity(activity, "evaluation"), learner_id)
         current_source = evaluation is not None and (
             evaluation.source_revision == app.source_revision(activity, learner_id)[0]
         )
-        placed = placement_activity(app, learner_id)
         placement = placed is not None and placed[0] == activity  # accepted with the profile
-        if current_source and not placement and app.acknowledged(learner_id, activity) is None:
-            subject = {"activity_id": activity, "evaluation_ref": evaluation.ref.model_dump()}
-            if retake := retake_course(app, learner_id, facts[0]):
-                subject["retake"] = retake
-            return {"kind": "evaluation", "subject": subject}
+        if not current_source or placement or app.acknowledged(learner_id, activity):
+            continue
+        # Written again after the student corrected an acknowledged version.
+        corrected = app.store.current(identity(activity, "acknowledgement"), learner_id)
+        if index and corrected is None:
+            continue  # An older class the student never acknowledged waits on its page.
+        subject = {"activity_id": activity, "evaluation_ref": evaluation.ref.model_dump()}
+        if corrected is not None:
+            subject["corrected"] = True
+        if index == 0 and (retake := retake_course(app, learner_id, fact)):
+            subject["retake"] = retake
+        return {"kind": "evaluation", "subject": subject}
     demand = app.store.current(identity(learner_id, "demand"), learner_id)
     if demand is not None and demand.body.get("goal_confirmation") == "needed":
         return {
@@ -301,7 +323,8 @@ def next_step(app, learner_id: str) -> dict:
     if starting:  # Confirmed: resources are made and adopted; start: the class then opens.
         return {"kind": "resources", "subject": starting[0]}
     current = lesson(app, learner_id)
-    if current is not None and not current[2]:
+    # A course whose basis a correction restricted waits until it is rechecked.
+    if current is not None and not current[2] and not restricted(app, learner_id, current[0]):
         course, confirmed, _ = current
         return {
             "kind": "course",

@@ -177,11 +177,16 @@ class Teaching:
             None,
             {
                 "status": "checked",
-                "mode": "simulation_text_and_reading_recording",
+                "mode": "text_and_reading_recording",
                 "actual_voice": "未验证",
-                "real_recording": "disabled",
+                "real_recording": "disabled" if self.scorer.simulated else "enabled",
             },
         )
+        # The bindings and voice this class actually runs with, never declared defaults.
+        models = {
+            purpose: binding.model_dump() | {"simulated": self.models.simulates(purpose)}
+            for purpose, binding in self.models.bindings.items()
+        }
         config = document(
             "config",
             identity(operation, "config"),
@@ -189,14 +194,18 @@ class Teaching:
             None,
             {
                 "status": "checked",
-                "provider": "simulation",
-                "model": "gpt-6.1-sol",
-                "classroom_effort": "low",
-                "preparation_effort": "medium",
-                "evaluation_effort": "medium",
-                "real_api": "disabled",
-                "real_voice": "disabled",
+                "realm": self.store.realm,
+                "models": models,
+                "pronunciation": "simulated" if self.scorer.simulated else "local",
+                "synthesis": "simulated" if self.synthesizer.simulated else "local",
             },
+        )
+        log.info(
+            "start config realm=%s efforts=%s simulated=%d/%d",
+            self.store.realm,
+            ",".join(f"{purpose}={item['effort']}" for purpose, item in models.items()),
+            sum(item["simulated"] for item in models.values()),
+            len(models),
         )
         verification = document(
             "validation",

@@ -1,6 +1,7 @@
 """P1-R2 integration regressions: simulated providers and temporary stores only."""
 
 import asyncio
+import logging
 
 import pytest
 from support import (
@@ -16,11 +17,63 @@ from support import (
 from project_j.application.documents import document
 from project_j.contracts import RevisionRef
 from project_j.curriculum.corrections import release
+from project_j.platform.models.contracts import Binding
+from project_j.platform.models.service import ModelService
+from project_j.platform.models.simulated import SIMULATED_MODEL, SimulatedAdapter
 from project_j.platform.storage import Conflict, Publication, SaveKey
 
 
 def ref(value):
     return RevisionRef.model_validate(value)
+
+
+def test_the_start_record_keeps_the_bindings_and_voice_actually_in_use(application, caplog):
+    app = application
+    adapter = SimulatedAdapter()
+    high = Binding(adapter="simulated", model=SIMULATED_MODEL, effort="high")
+    app.models = ModelService(
+        {"simulated": adapter},
+        {
+            "planning": high,
+            "preparation": high,
+            "classroom_judgment": high.model_copy(update={"effort": "low"}),
+            "evaluation": high,
+        },
+        [adapter.report(SIMULATED_MODEL, ("low", "high"))],
+    )
+    app.scorer.simulated = False  # As a local scorer would report.
+
+    async def scenario():
+        prepared = await app.prepare("prepare", LEARNER)
+        await ready(app, prepared)
+        with caplog.at_level(logging.INFO, logger="project_j"):
+            course = ref(prepared["course_ref"])
+            assert app.start("start", LEARNER, course, materials_ready=True)["decision"] == (
+                "allow_simulation"
+            )
+        bindings = app.core.bindings
+        app.core.control("cleanup-stop", "stop")
+        app.seal()  # The store opens again at the end boundary.
+        return [
+            app.store.read(ref(bindings[name]), LEARNER).body for name in ("config", "input_policy")
+        ]
+
+    config, policy = asyncio.run(scenario())
+    assert config["realm"] == "simulation"
+    assert config["models"]["preparation"] == {
+        "adapter": "simulated",
+        "model": SIMULATED_MODEL,
+        "effort": "high",
+        "tier": "default",
+        "simulated": True,
+    }
+    assert config["models"]["classroom_judgment"]["effort"] == "low"
+    assert config["models"]["evaluation"]["effort"] == "high"
+    assert (config["pronunciation"], config["synthesis"]) == ("local", "simulated")
+    assert policy["real_recording"] == "enabled"
+    assert "preparation_effort" not in config and "provider" not in config
+    assert "start config realm=simulation" in caplog.text
+    assert "preparation=high" in caplog.text and "classroom_judgment=low" in caplog.text
 
 
 def test_corrected_sources_block_new_preparation_and_saved_preparation_replay(application):

@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.41.1；更新：2026年10月21日。
+版本：1.42.0；更新：2026年10月21日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -846,3 +846,15 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 未验证：真实模型、真实声音与正式学习下的运行（未启动正式学习服务）。
 - 净变化：Python源码约−580行、测试约−240行，前端约−200行（主要是重新生成的接口类型），−1个依赖。
 
+## FIX-6 更正后的限制解除与开课实际配置
+
+- 状态：实现与自测完成，未提交（2026年10月21日）。用户：“把那两项遗留问题也修了”，即[LEAN-1](#lean-1-精简编码与按业务分层ponytail审查)列为另行处理的两项。
+- 负责人/集成：Claude Opus。审查由主会话自做，未派审查子代理。
+- 范围：
+  1. 更正后的限制：原来认可后的“追加更正”走`/api/correction`，限制受影响的评价、状态、需求、课程等，只有已删的`/api/release`能解除，下一课从此无法备课或开课。现在追加更正与异议一样走补记接口（作为原活动的补充，删除`/api/correction`与其请求类型；`correct()`与`release()`函数保留）。推进器重评来源变了的课（较早的课也重评）；按更正重写的评价在主页提示“评价已按你的更正重写，请再认可一次”。最近一课认可后照常采用并规划；较早一课认可后由新任务`recheck`只把更正后的评价并入当前状态（较新证据为准），状态变了就按新状态复核需求（保留题材，随后重新备课），不从旧课重新规划。采用或复核完成时，由主责解除这次更正在仍在使用版本上的限制并写明依据，被新版本取代的旧版本保留限制。复核期间依据受限的课程不列为下一步。用户正式学习数据（me）经只读核对没有限制、问题或补记记录，无需迁移。
+  2. 开课配置记录：原来固定写“simulation、gpt-6.1-sol、课堂low、备课与评价medium、真实接口与声音关闭”。现在逐用途写实际绑定（适配器、模型、档位、层级、是否模拟）、数据空间，以及发音评分、合成是本机还是模拟；输入策略的真实录音按评分器是否本机写。
+  3. 日志：`start config realm=… efforts=… simulated=n/m`、`learning recheck activity=… state_revision=… demand=rechecked|kept`、`correction rechecked activity=… released=… kept=…`，只记身份、档位与数量。课堂判断的绑定、档位、指令与请求均未改，参考题集无需重跑。
+- 文件边界：project_j/python/src/project_j/{application/{adopting,progress,teaching}.py,curriculum/corrections.py,interface/api.py}；tests/{test_review_fixes,test_integration_fixes}.py；project_j/web/src/{next-step.ts,pages/Evaluations.tsx}、tests/next-step.test.mjs与重新导出的schema和client；文档design/evaluation/README.md 1.10.0、design/interface/feedback-reports.md 2.0.1、design/platform/configuration-permissions.md 2.0.2、docs/technology.md 1.16.0。
+- 取舍：较早一课的更正只复核状态与需求，周计划不重新规划，留给到期复盘；状态有变时需求换新版本，已确认的下一课要重新备课。主页对较早一课只在它曾被认可、又按更正重写时提示再认可。
+- 检查证据：新增测试先失败后通过（开课记录写实际绑定与日志；最近一课认可后更正：受限课程不列为下一步、重写后提示再认可、采用后仍在使用的版本解除且有依据、日志；较早一课更正：重评、再认可、复核与日志、较新一课的评价不变、下一课可开课；主页文案与任务名）。统一check通过（主工程522、评分39、合成15项pytest，前端60、文档1），UTC 2026-10-21T06:39:28.187919+00:00，工程摘要4c66451550a12407fefefb405f7d14f42a8ad697c98735d2976de0a752972c4c；离线probe通过；模拟measure p95 4500毫秒、not_granted；依赖未变。沙盒五个烟测脚本无页面报错；以模拟入口启动服务，主页数据接口200，`POST /api/correction`与LEAN-1删除的`/api/release`同为405（无处理函数），服务已停。
+- 未验证：真实评价模型按更正重写的质量；正式学习下更正、再认可与复核的整条流程；评价详情页未单独呈现旧版解释（设计要求的“旧新解释对照”仍缺，现有页面只显示当前评价与补记）。

@@ -1134,60 +1134,6 @@
         }
       }
     },
-    "/api/correction": {
-      "post": {
-        "summary": "Correction",
-        "operationId": "correction_api_correction_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CorrectionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/retry-seal": {
       "post": {
         "summary": "Retry Seal",
@@ -2213,42 +2159,6 @@
           "command"
         ],
         "title": "Control"
-      },
-      "CorrectionRequest": {
-        "properties": {
-          "request_id": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Request Id"
-          },
-          "learner_id": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{1,64}$",
-            "title": "Learner Id",
-            "default": "fictional-L1"
-          },
-          "target_ref": {
-            "$ref": "#/components/schemas/RevisionRef"
-          },
-          "owner": {
-            "type": "string",
-            "title": "Owner"
-          },
-          "note": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Note"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "request_id",
-          "target_ref",
-          "owner",
-          "note"
-        ],
-        "title": "CorrectionRequest"
       },
       "CourseConfirmRequest": {
         "properties": {

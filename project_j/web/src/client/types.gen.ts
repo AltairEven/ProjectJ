@@ -147,29 +147,6 @@ export type Control = {
 };
 
 /**
- * CorrectionRequest
- */
-export type CorrectionRequest = {
-    /**
-     * Request Id
-     */
-    request_id: string;
-    /**
-     * Learner Id
-     */
-    learner_id?: string;
-    target_ref: RevisionRef;
-    /**
-     * Owner
-     */
-    owner: string;
-    /**
-     * Note
-     */
-    note: string;
-};
-
-/**
  * CourseConfirmRequest
  */
 export type CourseConfirmRequest = {
@@ -1648,35 +1625,6 @@ export type RecheckDemandApiRecheckDemandPostErrors = {
 export type RecheckDemandApiRecheckDemandPostError = RecheckDemandApiRecheckDemandPostErrors[keyof RecheckDemandApiRecheckDemandPostErrors];
 
 export type RecheckDemandApiRecheckDemandPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type CorrectionApiCorrectionPostData = {
-    body: CorrectionRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/correction';
-};
-
-export type CorrectionApiCorrectionPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type CorrectionApiCorrectionPostError = CorrectionApiCorrectionPostErrors[keyof CorrectionApiCorrectionPostErrors];
-
-export type CorrectionApiCorrectionPostResponses = {
     /**
      * Successful Response
      */
