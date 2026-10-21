@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "course": "L-C2026-01-001",
-  "authored": "成人编写的虚构作答；预期逐句核对reading-main.md与reading-transfer.md 1.1.0；不依赖模型自评。",
+  "authored": "成人编写的虚构作答；预期逐句核对reading-main.md与reading-transfer.md 1.1.0；不依赖模型自评。1.1.0补开放问答（复述与谈看法）13题，同为成人编写的虚构作答，预期按要点与原文核对。",
   "cases": [
     {
       "case_id": "F1-correct",
@@ -467,6 +467,128 @@
         "等级"
       ],
       "basis": "评分为unknown（too_short），不判对错。"
+    },
+    {
+      "case_id": "O1-correct",
+      "category": "correct",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "retell-bridge",
+      "answer": "First the paper bends and the car falls. Then Mia folds a new paper. The car stays on the bridge.",
+      "expected": "correct",
+      "basis": "要点：第一次纸弯了、车掉了；Mia把一张新纸折起来；第二次车留在桥上。三点都说到。"
+    },
+    {
+      "case_id": "O1-variant",
+      "category": "variant",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "retell-bridge",
+      "answer": "Mia's first bridge did not work. She folded the paper, and the second bridge held the car.",
+      "expected": "correct",
+      "basis": "要点：第一次纸弯了、车掉了；Mia把一张新纸折起来；第二次车留在桥上。换了说法，先后、改变与结果都对。"
+    },
+    {
+      "case_id": "O1-chinese",
+      "category": "chinese",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "retell-bridge",
+      "answer": "第一次纸弯了车掉下去，后来她把新纸折起来，车就没掉。",
+      "expected": "correct",
+      "basis": "要点：第一次纸弯了、车掉了；Mia把一张新纸折起来；第二次车留在桥上。中文复述，三点都对。"
+    },
+    {
+      "case_id": "O1-mixed",
+      "category": "mixed",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "retell-bridge",
+      "answer": "第一次 the car falls，然后她 fold 了一张新纸，车 stays on the bridge。",
+      "expected": "correct",
+      "basis": "要点：第一次纸弯了、车掉了；Mia把一张新纸折起来；第二次车留在桥上。中英混合，三点都对。"
+    },
+    {
+      "case_id": "O1-incorrect",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "retell-bridge",
+      "answer": "The car stays on the first bridge. Mia is sad.",
+      "expected": "incorrect",
+      "basis": "要点：第一次纸弯了、车掉了；Mia把一张新纸折起来；第二次车留在桥上。与原文矛盾：第一次车掉了，Mia最后在笑。"
+    },
+    {
+      "case_id": "O1-short",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "retell-bridge",
+      "answer": "The car falls.",
+      "expected": "incorrect",
+      "basis": "要点：第一次纸弯了、车掉了；Mia把一张新纸折起来；第二次车留在桥上。只说了第一次的结果，缺改变与第二次结果。"
+    },
+    {
+      "case_id": "O1-unclear",
+      "category": "unclear",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "retell-bridge",
+      "answer": "嗯……那个……",
+      "expected": "unclear",
+      "basis": "没有可判断的内容。"
+    },
+    {
+      "case_id": "O1-help",
+      "category": "help",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "retell-bridge",
+      "answer": "帮我一下",
+      "intent": "help",
+      "required_any": [
+        "第一次"
+      ],
+      "expected": "help",
+      "basis": "第一级支持：先说第一次发生了什么，再说Mia改了什么。"
+    },
+    {
+      "case_id": "O1-after-help",
+      "category": "after_help",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "retell-bridge",
+      "answer": "First the car falls. Then she folds the paper and the car stays.",
+      "help_count": 1,
+      "expected": "correct",
+      "basis": "要点：第一次纸弯了、车掉了；Mia把一张新纸折起来；第二次车留在桥上。帮助后复述，三点都对。"
+    },
+    {
+      "case_id": "O2-correct",
+      "category": "correct",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "opinion-bus",
+      "answer": "The big bus is too heavy for the paper. I would fold the paper to make it strong.",
+      "expected": "correct",
+      "basis": "要点：原因与故事相符（大巴士更重、纸撑不住）；改法说得通。原因与改法都说得通。"
+    },
+    {
+      "case_id": "O2-chinese",
+      "category": "chinese",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "opinion-bus",
+      "answer": "大车太重了，纸撑不住。我会多放几张纸。",
+      "expected": "correct",
+      "basis": "要点：原因与故事相符（大巴士更重、纸撑不住）；改法说得通。中文作答，原因与改法都说得通。"
+    },
+    {
+      "case_id": "O2-incorrect",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "opinion-bus",
+      "answer": "The big bus fell because it is red.",
+      "expected": "incorrect",
+      "basis": "要点：原因与故事相符（大巴士更重、纸撑不住）；改法说得通。原因与故事不符：故事没有说颜色，而是纸弯了。"
+    },
+    {
+      "case_id": "O2-offtopic",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "opinion-bus",
+      "answer": "I like buses.",
+      "expected": "incorrect",
+      "basis": "要点：原因与故事相符（大巴士更重、纸撑不住）；改法说得通。离题，没有说原因和改法。"
     }
   ]
 }

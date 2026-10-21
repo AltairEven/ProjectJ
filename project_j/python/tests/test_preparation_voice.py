@@ -38,8 +38,31 @@ def test_audio_resources_follow_the_course_text(course):
             assert f"demo:{task.task_id}" not in resources
     offscreen = next(task for task in course.tasks if task.purpose == "offscreen")
     assert question_text(offscreen, course.budget).endswith(
-        f"这一段约{course.budget['offscreen']}分钟；做完点“返回”，再说实际结果。"
+        f"这一段约{offscreen.minutes}分钟；做完点“返回”，再说实际结果。"
     )
+    # A course saved before ADR-0020 keeps its minutes in the budget.
+    old = offscreen.model_copy(update={"minutes": None})
+    assert "这一段约9分钟" in question_text(old, {"offscreen": 9})
+
+
+def test_clicked_tasks_prepare_every_line_jane_may_say(course):
+    from project_j.preparation.voice import WRONG_TEXT
+
+    resources = {item.resource_id: item for item in course.resources}
+    choice = next(task for task in course.tasks if task.purpose == "choice")
+    expected = {
+        "correct": choice.correct_text,
+        "wrong-1": WRONG_TEXT + choice.supports[0].text,
+        "wrong-2": WRONG_TEXT + choice.supports[1].text,
+        "hint-1": choice.supports[0].text,
+        "hint-2": choice.supports[1].text,
+        "exit": choice.exit_text,
+    }
+    for name, text in expected.items():
+        item = resources[f"voice:{choice.task_id}:{name}"]
+        assert (item.text, item.kind, item.required) == (text, "audio", False)
+    answer = next(task for task in course.tasks if task.purpose == "answer")
+    assert not any(key.startswith(f"voice:{answer.task_id}:") for key in resources)
 
 
 def test_goal_mentions_observation_only_with_an_offscreen_task(course):

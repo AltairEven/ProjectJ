@@ -11,6 +11,8 @@ import { passage } from './passage'
 import { classProgress, taskMarks } from './progress'
 import { Progress } from './ui'
 import { toBase64 } from './audio'
+import { answerMode, type TaskView } from './tasks'
+import { TaskInput } from './TaskInput'
 import type { AllowedAction, Snapshot, Control, DeliveryFeedback, TextInput, InputResult as Ack } from './client/types.gen'
 
 const stateLabels: Record<string, string> = { running: '进行中', offscreen: '离屏活动中', paused: '已暂停', closing: '收尾', ended: '已结束' }
@@ -233,6 +235,12 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     if (!asking && box?.open) box.close()
   }, [asking])
   const confirm = () => void input('听到了，收到当前说明。', 'confirmation')
+  // A clicked task is answered on the task itself: no text box, and a hint instead of a plea.
+  const mode = answerMode(snapshot)
+  const respond = async (payload: { intent: 'answer' | 'help', response?: Record<string, unknown> }) => {
+    await interrupt()
+    await send('class/response', { event_id: uid(), ...payload })
+  }
   const progress = snapshot && classProgress(snapshot)
   const shown = !voiced ? snapshot?.pending_action ?? snapshot?.presented_action : locked || voicing ? undefined : snapshot?.presented_action
   // Jane's board left, the textbook page in the middle, the student's notebook right (1:2:1), each
@@ -263,7 +271,7 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
           {!localCancelled && !voicing && (busy || snapshot?.mode === 'judging') && <Progress label="Jane 正在看你的回答……" />}
           {voiced && locked && <button onClick={() => void speaker.current?.resume().then(() => setLocked(false))}>打开声音</button>}
           {snapshot && snapshot.mode !== 'offscreen' && snapshot.mode !== 'ended' && <div className="row">
-            <button className="quiet" disabled={busy || halted} onClick={() => void input('帮我一下', 'help')}>帮我一下</button>
+            {mode !== 'task' && <button className="quiet" disabled={busy || halted} onClick={() => void input('帮我一下', 'help')}>帮我一下</button>}
             <button className="quiet" disabled={halted} onClick={() => void control('repeat')}>重复当前内容</button></div>}</div></section>
       </div>
       <div className="side book">
@@ -304,7 +312,9 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
             {recorder.state !== 'idle' && <><button disabled={busy} onClick={() => void finishReading(performance.now())}>结束并提交</button>
               <button className="quiet" onClick={() => { microphone.current?.discard(); setRecorder(idle) }}>重录</button></>}
           </div></section>}
-        {snapshot?.mode === 'offscreen' ? <section><p>离屏期间没有采集。回来后需要报告实际条件与结果，返回本身不算完成。</p><button onClick={() => void control('return')}>返回，报告结果</button></section> :
+        {mode === 'task' && snapshot ? <TaskInput key={snapshot.task_instance_id} task={snapshot.task as TaskView} disabled={busy || halted}
+          onSubmit={response => void respond({ intent: 'answer', response })} onHint={() => void respond({ intent: 'help' })} /> :
+          snapshot?.mode === 'offscreen' ? <section><p>离屏期间没有采集。回来后需要报告实际条件与结果，返回本身不算完成。</p><button onClick={() => void control('return')}>返回，报告结果</button></section> :
           snapshot?.mode !== 'ended' && <section><label>{voiced ? '你的回答或报告' : '你的回答或报告（模拟）'}<textarea value={text} onChange={event => setText(event.target.value)} disabled={localCancelled} /></label>
             <div className="row"><button disabled={busy || !text.trim() || halted || Boolean(reading)} onClick={() => void input(text)}>提交</button>
               {canConfirm(snapshot) && setAside === confirming && <button className="quiet" disabled={busy || halted} onClick={confirm}>确认收到说明</button>}

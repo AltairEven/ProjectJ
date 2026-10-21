@@ -2,7 +2,8 @@ import asyncio
 import logging
 
 from fastapi.testclient import TestClient
-from support import LEARNER, complete_story
+from support import LEARNER, complete_story, correct_response, deliver_all
+from test_program_tasks import to_clicked, wrong_choice
 
 from project_j.application.configuration import Settings
 from project_j.interface.api import create_app
@@ -69,3 +70,49 @@ def test_error_descriptions_never_echo_validated_or_stored_content():
     stored = IntegrityError("INSERT INTO documents VALUES (?)", ("孩子的回答",), Exception("x"))
     assert describe(stored) == "IntegrityError"
     assert describe(LookupError("no active memory core")) == "LookupError: no active memory core"
+
+
+def test_rule_judging_logs_the_kind_not_the_answer(application, caplog):
+    async def scenario():
+        core = await to_clicked(application)
+        task = core.current_task()
+        caplog.set_level(logging.INFO, logger="project_j")
+        await application.adapter.response("hint", None, "help")
+        deliver_all(core)
+        await application.adapter.response("wrong", wrong_choice(task))
+        deliver_all(core)
+        await application.adapter.response("right", correct_response(task))
+        deliver_all(core)
+        return task
+
+    task = asyncio.run(scenario())
+    text = caplog.text
+    for words in (
+        "event hint",
+        "purpose=choice",
+        "level=1",
+        "event rule_judged",
+        "judgment=incorrect wrong_count=1 rule_ms=",
+        "judgment=correct wrong_count=1 rule_ms=",
+        "event task_started",
+        "type_version=1",
+    ):
+        assert words in text
+    for words in (*task.choice.options, task.correct_text, *[s.text for s in task.supports]):
+        assert words not in text
+
+
+def test_scoring_and_estimates_log_counts_only(application, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    _, fact = asyncio.run(complete_story(application))
+    activity = fact.body["activity_id"]
+    application.feedback("fb1", LEARNER, activity, "孩子说很好玩。", [])
+    evaluation = asyncio.run(application.evaluate("e1", LEARNER, activity, "after_class"))
+    text = caplog.text
+    assert f"evaluation scores activity={activity} rule=4 model=3 pronunciation=" in text
+    assert "unknown=" in text
+    assert all(entry["reason"] not in text for entry in evaluation.body["scores"])
+    assert "minutes=" in text and "types=" in text  # preparation drafted, from start()
+    # A first lesson: no scores and no sealed times yet; counts only.
+    assert "preparation scores lessons=0 types=0" in text
+    assert "preparation calibration types=0 samples=0" in text

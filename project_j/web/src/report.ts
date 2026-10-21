@@ -96,8 +96,16 @@ export function evaluationLines(doc: Doc, docs: Doc[]): [string, string][] {
     ['尚未确定', joined(body.report.uncertain)], ['课程与课堂差异', body.report.alignment],
     ...(body.tasks ?? []).map((task: Body): [string, string] => [taskName(task, docs), `${judgment(task)}：${task.explanation ?? ''}`]),
   ]
+  // Out of 10 per question (ADR-0020); evaluations saved before scoring have none.
+  rows.push(...(body.scores ?? []).map((score: Body): [string, string] => [`得分·${taskName(score, docs)}`, scoreText(score)]))
   if (body.checks?.length) rows.push(['规则调整', body.checks.map((check: Body) => `${check.task_id}：${check.reason}`).join('；')])
   return rows
+}
+
+/** "7 分（错1次后答对，用了1次提示）" or "未知（停课时这题还没完成）"; reading scores are uncalibrated. */
+export function scoreText(score: Body): string {
+  const known = typeof score.score === 'number'
+  return `${known ? `${score.score} 分` : '未知'}（${score.reason}${score.basis === 'pronunciation' ? '，评分门槛未校准' : ''}）`
 }
 
 /** A rewritten evaluation against the version it replaced: the old summary, then each judgment that changed (design/interface). */

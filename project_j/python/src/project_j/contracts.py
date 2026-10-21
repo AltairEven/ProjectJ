@@ -145,9 +145,11 @@ class SubmittedInput(Contract):
     realm: Literal["simulation", "study"]
     source_type: Literal["simulated", "student", "technical"]
     # Answers are typed or clicked; only an English reading segment is recorded (ADR-0014).
-    modality: Literal["text", "audio", "action_report"]
+    # response: a clicked task's structured answer by display position (ADR-0020).
+    modality: Literal["text", "audio", "action_report", "response"]
     # Audio bytes never travel inside this contract; they reach the core in memory beside it.
     text: str | None = Field(default=None, min_length=1)
+    response: dict[str, JsonValue] | None = None
     provider: str = Field(min_length=1)  # "unknown" is explicit, never inferred child.
     intent: Literal["answer", "help", "confirmation", "report", "unknown"]
     completion_trigger: Literal["explicit", "max_duration"]
@@ -169,7 +171,16 @@ class SubmittedInput(Contract):
         if self.related_event_id == self.event_id:
             raise ValueError("a supplement must have a new event identity")
         timing = (self.input_started_ms, self.input_ended_ms, self.recording_ms)
-        if self.modality == "audio":
+        if (self.response is not None) != (self.modality == "response" and self.intent == "answer"):
+            raise ValueError("only a clicked answer carries a structured response")
+        if self.modality == "response":
+            if self.text is not None or any(x is not None for x in timing):
+                raise ValueError("a clicked answer carries no text or timing")
+            if self.relation != "new" or self.intent not in {"answer", "help"}:
+                raise ValueError("a clicked input is a new answer or a plea for a hint")
+            if self.completion_trigger != "explicit":
+                raise ValueError("a clicked input ends explicitly")
+        elif self.modality == "audio":
             if self.text is not None or None in timing:
                 raise ValueError("a reading recording carries its timing and no text")
             if self.input_ended_ms < self.input_started_ms:

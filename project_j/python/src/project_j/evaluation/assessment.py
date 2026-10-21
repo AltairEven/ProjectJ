@@ -4,7 +4,9 @@ from pydantic import Field
 
 from project_j.classroom.judgment import method_context
 from project_j.contracts import Contract, Document
+from project_j.evaluation.scoring import AWAITING, model_score, score_entries
 from project_j.platform.models.contracts import ModelRequest
+from project_j.preparation.task_types import CONTENT_TYPES
 
 
 def interpret(
@@ -55,6 +57,8 @@ def interpret(
         "basis_version": "fixed-simulation-1",
         "purpose": purpose,
         "tasks": tasks,
+        # Out of 10 per question (ADR-0020); model-scored ones are filled by apply_draft.
+        "scores": score_entries(fact.body, corrections),
         "alignment": {
             "goals_scope": "按实际已发生范围，未做任务不补造。",
             "tasks_materials": fact.body["course_ref"],
@@ -95,7 +99,11 @@ def next_suggestion(evaluation: Document, material: dict) -> dict:
 
 EVALUATION_INSTRUCTIONS = (
     "你是Jane的课后评价助手。只依据上下文里的封存事实、课程题目和学生补记，为学生整理本课；"
-    "不补造未观察的表现、保持或迁移，不重评发音，不改课堂判断，不给总分或等级。"
+    "不补造未观察的表现、保持或迁移，不重评发音，不改课堂判断，不给总分或等级；"
+    "scores只给tasks里purpose为answer或open的题各一项（task_id）：看这题全部attempts的作答、judgment"
+    "与帮助综合给0到10的整数分，有judgment为incorrect的不能给10分，reason用一句话说明。"
+    "tasks里有content的choice、order、match、fill题由程序判定对错，open题没有唯一答案；"
+    "attempts的answers是学生实际点选、填写或写下的内容。"
     "tasks必须覆盖attempts里的每个attempt_id，每个只出现一次。"
     "working_judgment：single_independent只用于初答judgment为correct、help里没有任何帮助、"
     "且学生补记明确说没有额外帮助的尝试；needs_help用于课中有帮助、学生补记了帮助，或答错的尝试；"
@@ -121,10 +129,18 @@ class TaskReading(Contract):
     explanation: str = Field(min_length=1)
 
 
+class ScoreReading(Contract):
+    task_id: str
+    score: int
+    reason: str = Field(min_length=1)
+
+
 class EvaluationDraft(Contract):
     """A proposal only: apply_draft checks every judgment against the sealed facts."""
 
     tasks: tuple[TaskReading, ...]
+    # Drafts saved before scoring have none; apply_draft tells them apart (ADR-0020).
+    scores: tuple[ScoreReading, ...] = ()
     summary: str = Field(min_length=1)
     strongest: tuple[str, ...]
     uncertain: tuple[str, ...]
@@ -155,6 +171,7 @@ def evaluation_request(
                     "reference_answers": task["acceptable_simulated"],
                     "supports": [support["text"] for support in task["supports"]],
                 }
+                | ({"content": task[task["purpose"]]} if task["purpose"] in CONTENT_TYPES else {})
                 for task in course["tasks"]
             ],
             "attempts": [
@@ -162,7 +179,10 @@ def evaluation_request(
                     "attempt_id": attempt["attempt_id"],
                     "task_id": attempt["task_id"],
                     "dimension_id": attempt["dimension_id"],
-                    "answers": [item.get("text") for item in attempt["inputs"]],
+                    # A clicked answer reads as what was picked or filled in.
+                    "answers": [attempt["answer_text"]]
+                    if "answer_text" in attempt
+                    else [item.get("text") for item in attempt["inputs"]],
                     "judgment": attempt["judgment"],
                     "help": attempt["help"],
                     "visuals": attempt.get("visuals", []),
@@ -249,9 +269,11 @@ def apply_draft(base: dict, draft: EvaluationDraft, feedbacks: list[dict]) -> di
             }
             for reason in reasons
         ]
+    scores, score_checks = applied_scores(base, draft)
     return base | {
         "tasks": tasks,
-        "checks": checks,
+        "scores": scores,
+        "checks": checks + score_checks,
         "report": {
             "summary": draft.summary,
             "strongest": list(draft.strongest),
@@ -261,6 +283,52 @@ def apply_draft(base: dict, draft: EvaluationDraft, feedbacks: list[dict]) -> di
         "draft": draft.model_dump(mode="json"),
         "basis_version": "evaluation-draft-1",
     }
+
+
+def applied_scores(base: dict, draft: EvaluationDraft) -> tuple[list[dict], list[dict]]:
+    """The model's scores where the rules accept them; anything else stays unknown."""
+    given: dict[str, ScoreReading] = {}
+    for reading in draft.scores:
+        given.setdefault(reading.task_id, reading)
+    waiting = {
+        entry["task_id"]
+        for entry in base.get("scores", [])
+        if entry["basis"] == "model" and entry["reason"] == AWAITING
+    }
+    drafted = "scores" in draft.model_fields_set
+    scores, checks = [], []
+    for entry in base.get("scores", []):
+        if entry["task_id"] not in waiting:
+            scores.append(entry)
+            continue
+        wrong = any(
+            task["task_judgment"] == "incorrect"
+            for task in base["tasks"]
+            if task["task_instance_id"] == entry["task_instance_id"]
+        )
+        reading = given.get(entry["task_id"])
+        score, reason, check = model_score(reading, wrong, drafted)
+        scores.append(entry | {"score": score, "reason": reason})
+        if check:
+            checks.append(
+                {
+                    "task_id": entry["task_id"],
+                    "proposed": reading.score if reading else None,
+                    "applied": score,
+                    "reason": check,
+                }
+            )
+    checks += [
+        {
+            "task_id": task_id,
+            "proposed": reading.score,
+            "applied": None,
+            "reason": "不是需要打分的题",
+        }
+        for task_id, reading in given.items()
+        if task_id not in waiting
+    ]
+    return scores, checks
 
 
 FAILURE_TEXT = {

@@ -11,12 +11,14 @@ from uuid import uuid4
 from pydantic import AwareDatetime, Field
 
 from project_j.classroom.judgment import ModelProposal, judgment_request, method_context
+from project_j.classroom.responses import describe, judge, presentation
 from project_j.contracts import Contract, RevisionRef, SubmittedInput
 from project_j.platform.models.service import ModelService
 from project_j.platform.speech.contracts import PronunciationResult, PronunciationScorer
 from project_j.platform.storage import REALMS, Conflict, canonical, digest
 from project_j.preparation.contracts import CourseBody, ResourceSpec, TaskDefinition
-from project_j.preparation.voice import goal_text, question_speech, question_text
+from project_j.preparation.task_types import PROGRAM_JUDGED
+from project_j.preparation.voice import WRONG_TEXT, goal_text, question_speech, question_text
 
 log = logging.getLogger(__name__)
 # Diagnostic logs carry identities, kinds and outcomes only, never what was said or shown.
@@ -24,7 +26,8 @@ LOGGED_FIELDS = (
     "event_id", "action_id", "task_id", "task_instance_id", "dimension_id", "purpose", "kind",
     "after_delivery", "status", "modality", "intent", "relation", "completion_trigger",
     "recording_ms", "delivered_range", "failure", "deadline_seconds", "judgment", "call_id",
-    "command", "reason", "unconfirmed", "unfinished_tasks", "elapsed_seconds",
+    "command", "reason", "unconfirmed", "unfinished_tasks", "elapsed_seconds", "type_version",
+    "wrong_count", "rule_ms", "level",
 )  # fmt: skip
 TRANSITIONS = {
     "delivering": {"waiting_input", "delivering", "offscreen", "paused", "ended"},
@@ -175,7 +178,7 @@ class Harness:
         self.end: dict | None = None
         self.last_response_event: str | None = None
         self.closing_clock: float | None = None
-        self.budget_exhausted = False
+        self.task_started_ms: float | None = None
         # A review lesson must not present an already-read story as a first reading.
         self.action("goal", goal_text(self.course), "input", visuals=self.shown((), "question"))
 
@@ -248,14 +251,25 @@ class Harness:
         self.record("allowed_action", action.model_dump(mode="json"))
         return action
 
-    def reading_task(self) -> TaskDefinition | None:
+    def current_task(self) -> TaskDefinition | None:
         if self.mode == "ended" or not 0 <= self.task_index < len(self.course.tasks):
             return None
-        task = self.course.tasks[self.task_index]
-        return task if task.purpose == "read_aloud" else None
+        return self.course.tasks[self.task_index]
+
+    def reading_task(self) -> TaskDefinition | None:
+        task = self.current_task()
+        return task if task and task.purpose == "read_aloud" else None
+
+    def clicked_task(self) -> TaskDefinition | None:
+        """The current task when it is answered on the page by clicking or filling."""
+        task = self.current_task()
+        return task if task and task.purpose in PROGRAM_JUDGED else None
+
+    def class_ms(self) -> float:
+        """Milliseconds since the class started, for the attempt record's time points."""
+        return round((time.monotonic() - self.started_clock) * 1000, 1)
 
     def snapshot(self):
-        self.tick()
         action = self.actions.get(self.pending) if self.pending else None
         activity_state = (
             "closing"
@@ -292,6 +306,8 @@ class Harness:
             }
             if (reading := self.reading_task()) and self.scorer
             else None,
+            # A clicked task as the page shows it; never its answer.
+            "task": presentation(clicked) if (clicked := self.clicked_task()) else None,
             "end": self.end,
             "actual_api": "未验证",
             "actual_voice": "未验证",
@@ -373,10 +389,8 @@ class Harness:
     def next_task(self):
         self.task_index += 1
         self.wait_id, self.task_instance_id = str(uuid4()), str(uuid4())
-        if (
-            self.task_index >= len(self.course.tasks)
-            or time.monotonic() - self.started_clock >= 30 * 60
-        ):
+        # Thirty minutes estimate the lesson; the class still finishes its tasks (ADR-0020).
+        if self.task_index >= len(self.course.tasks):
             self.wait_kind = "closing_confirmation"
             return self.action(
                 "closing",
@@ -385,6 +399,7 @@ class Harness:
             )
         task, budget = self.course.tasks[self.task_index], self.course.budget
         self.wait_kind = "answer"
+        self.task_started_ms = self.class_ms()
         self.record(
             "task_started",
             {
@@ -392,6 +407,7 @@ class Harness:
                 "task_instance_id": self.task_instance_id,
                 "dimension_id": task.dimension_id,
                 "purpose": task.purpose,
+                "type_version": task.type_version,
             },
         )
         text, spoken = question_text(task, budget), question_speech(task, budget)
@@ -502,28 +518,6 @@ class Harness:
         }
         self.record("end", self.end)
 
-    def tick(self):
-        if self.mode in {"ended", "paused"}:
-            return
-        elapsed = time.monotonic() - self.started_clock
-        closing_seconds = self.course.budget["closing"] * 60
-        if elapsed >= 30 * 60:
-            self.finish("unconfirmed")
-        elif elapsed >= 30 * 60 - closing_seconds and not self.budget_exhausted:
-            self.budget_exhausted = True
-            self.invalidate()
-            self.record(
-                "budget_boundary", {"elapsed_seconds": elapsed, "remaining_scope": "closing"}
-            )
-            if self.mode == "offscreen":
-                self.move("delivering")
-            self.wait_kind = "closing_confirmation"
-            self.action(
-                "closing",
-                "时间接近约定边界，我们只收尾已发生范围。请确认收到小结；未做项目保持未知。",
-                "end_confirmation",
-            )
-
     async def submit(
         self,
         submitted: SubmittedInput,
@@ -573,6 +567,13 @@ class Harness:
             raise ValueError("core is not waiting for a completed input")
         reading = self.reading_task()
         answering = self.wait_kind in {"answer", "retry", "clarification"}
+        clicked = self.clicked_task() if answering else None
+        if submitted.modality == "response":
+            if clicked is None:
+                raise ValueError("这道题不用按钮作答。")
+            return self.submit_response(clicked, submitted, signature)
+        if clicked is not None:
+            raise ValueError("这道题请在题目上作答，或点“给我提示”。")
         if submitted.modality == "audio":
             if reading is None or audio is None or not answering or self.scorer is None:
                 raise ValueError("录音只用于当前朗读段。")
@@ -623,22 +624,7 @@ class Harness:
                 original_id = self.inputs[submitted.related_event_id]["attempt_id"]
                 attempt = next((a for a in self.attempts if a["attempt_id"] == original_id), None)
             if attempt is None:
-                attempt = {
-                    "attempt_id": str(uuid4()),
-                    "task_instance_id": self.task_instance_id,
-                    "task_id": task.task_id,
-                    "dimension_id": task.dimension_id,
-                    "purpose": task.purpose,
-                    "inputs": [],
-                    "help": dict(self.help_by_task.get(self.task_instance_id, {})),
-                    "visuals": [
-                        {"resource_id": resource, "stage": stage}
-                        for resource, stage in self.seen.get(self.task_instance_id, {}).items()
-                    ],
-                    "external_help": "unknown",
-                    "judgment": "unclear",
-                    "limitations": [LIMITATIONS[self.realm][submitted.modality == "audio"]],
-                }
+                attempt = self.new_attempt(task, submitted.modality == "audio")
                 self.attempts.append(attempt)
             attempt["inputs"].append(signature)
             self.inputs[submitted.event_id]["attempt_id"] = attempt["attempt_id"]
@@ -751,10 +737,78 @@ class Harness:
             task, submitted.event_id, attempt, proposal.judgment, proposal.evidence, proposal.text
         )
 
+    def new_attempt(self, task: TaskDefinition, recorded: bool) -> dict:
+        """A new try at the current task, with the help and pictures it had and when it came
+        (class milliseconds; judged_ms is set when it is judged)."""
+        return {
+            "attempt_id": str(uuid4()),
+            "task_instance_id": self.task_instance_id,
+            "task_id": task.task_id,
+            "dimension_id": task.dimension_id,
+            "purpose": task.purpose,
+            "inputs": [],
+            "help": dict(self.help_by_task.get(self.task_instance_id, {})),
+            "visuals": [
+                {"resource_id": resource, "stage": stage}
+                for resource, stage in self.seen.get(self.task_instance_id, {}).items()
+            ],
+            "external_help": "unknown",
+            "judgment": "unclear",
+            "limitations": [LIMITATIONS[self.realm][recorded]],
+            "type_version": task.type_version,
+            "task_started_ms": self.task_started_ms,
+            "answered_ms": self.class_ms(),
+            "judged_ms": None,
+        }
+
+    def submit_response(self, task: TaskDefinition, submitted: SubmittedInput, signature: dict):
+        """A clicked task: judged here by its own rule, no model; a hint takes the next help."""
+        event_id = submitted.event_id
+        if submitted.intent == "help":
+            self.record("input", signature)
+            self.inputs[event_id] = {"signature": signature, "attempt_id": None}
+            level = self.help_count.get(self.task_instance_id, 0) + 1
+            self.record(
+                "hint",
+                {
+                    "task_instance_id": self.task_instance_id,
+                    "purpose": task.purpose,
+                    "level": level,
+                },
+            )
+            return self.respond(task, event_id, None, "help", task.evidence, "", by_rule=True)
+        started = time.perf_counter()
+        correct = judge(task, submitted.response)  # A malformed answer is refused, not counted.
+        rule_ms = round((time.perf_counter() - started) * 1000, 2)
+        self.record("input", signature)
+        self.inputs[event_id] = {"signature": signature, "attempt_id": None}
+        attempt = self.new_attempt(task, recorded=False) | {
+            "inputs": [signature],
+            "response": submitted.response,
+            "answer_text": describe(task, submitted.response),
+        }
+        self.attempts.append(attempt)
+        self.inputs[event_id]["attempt_id"] = attempt["attempt_id"]
+        judgment = "correct" if correct else "incorrect"
+        self.record(
+            "rule_judged",
+            {
+                "event_id": event_id,
+                "task_instance_id": self.task_instance_id,
+                "purpose": task.purpose,
+                "judgment": judgment,
+                "wrong_count": self.wrong_count.get(self.task_instance_id, 0) + (not correct),
+                "rule_ms": rule_ms,
+            },
+        )
+        text = task.correct_text if correct else WRONG_TEXT
+        return self.respond(task, event_id, attempt, judgment, task.evidence, text, by_rule=True)
+
     def respond(self, task, event_id, attempt, judgment, evidence, text, by_rule=False):
         if attempt:
             attempt["judgment"] = judgment
             attempt["evidence"] = evidence
+            attempt["judged_ms"] = self.class_ms()
         # Each wrong answer and each plea gets the next support of its own ladder; past the last
         # one the task exits instead of asking for yet another try.
         help_map, ladder = {}, None

@@ -3,8 +3,10 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from project_j.classroom.harness import DeliveryFeedback
+from project_j.classroom.responses import presentation
 from project_j.contracts import RevisionRef
 from project_j.preparation.resources import adopt_resource, generate_resource
+from project_j.preparation.task_types import PROGRAM_JUDGED
 
 LEARNER = "fictional-L1"
 
@@ -64,15 +66,45 @@ async def read(app, event_id, text, recording_ms=4000.0, trigger="explicit"):
     )
 
 
-async def read_aloud_all(app):
-    """Read every remaining segment faithfully; a no-op when no reading task is current."""
+OPEN_ANSWER = (
+    "First the paper bends and the car falls. Then she folds a new paper and the car stays."
+)
+
+
+def correct_response(task) -> dict:
+    """A clicked task's right answer by the display positions the page sees."""
+    view = presentation(task)
+    if task.purpose == "choice":
+        return {"choice": view["options"].index(task.choice.options[task.choice.correct])}
+    if task.purpose == "order":
+        return {"order": [view["items"].index(item) for item in task.order.items]}
+    if task.purpose == "match":
+        return {"pairs": [view["right"].index(item) for item in task.match.right]}
+    return {"blanks": [spellings[0] for spellings in task.fill.answers]}
+
+
+async def answer_clicked(app):
+    """Answer the current clicked tasks right, up to the next task of another type."""
     core = app.core
-    while core.reading_task() is not None and core.wait_kind in {
-        "answer",
-        "retry",
-        "clarification",
-    }:
-        await read(app, str(uuid4()), core.reading_task().reference_text)
+    while (task := core.current_task()) and task.purpose in PROGRAM_JUDGED:
+        await app.adapter.response(str(uuid4()), correct_response(task))
+        deliver_all(core)
+
+
+async def read_aloud_all(app):
+    """After the reports: answer the clicked tasks right, read every segment faithfully and
+    answer the open question; a no-op when none of them is current."""
+    core = app.core
+    while core.wait_kind in {"answer", "retry", "clarification"} and core.current_task():
+        task = core.current_task()
+        if task.purpose in PROGRAM_JUDGED:
+            await app.adapter.response(str(uuid4()), correct_response(task))
+        elif task.purpose == "read_aloud":
+            await read(app, str(uuid4()), task.reference_text)
+        elif task.purpose == "open":
+            await app.adapter.text(str(uuid4()), OPEN_ANSWER)
+        else:
+            return
         deliver_all(core)
 
 

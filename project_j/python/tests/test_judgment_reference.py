@@ -69,7 +69,21 @@ def test_is_help_request(application, text, intent, purpose, expected):
 def test_reference_set_is_valid_against_the_course():
     reference, digest = load_reference(ROOT)
     assert validate(reference, reference_tasks(ROOT)) == []
-    assert len(digest) == 64 and len(reference.cases) == 37
+    assert len(digest) == 64 and len(reference.cases) == 50
+    assert reference.version == "1.1.0"
+
+
+def test_the_open_cases_were_added_without_changing_the_first_37():
+    reference, _ = load_reference(ROOT)
+    tasks = reference_tasks(ROOT)
+    added = reference.cases[37:]
+    assert {case.case_id for case in added} == {
+        *(f"O1-{n}" for n in ("correct", "variant", "chinese", "mixed", "incorrect", "short")),
+        *(f"O1-{n}" for n in ("unclear", "help", "after-help")),
+        *(f"O2-{n}" for n in ("correct", "chinese", "incorrect", "offtopic")),
+    }
+    assert all(tasks[case.source, case.task_id].purpose == "open" for case in added)
+    assert all(tasks[case.source, case.task_id].purpose != "open" for case in reference.cases[:37])
 
 
 def test_reference_set_covers_the_required_classes():
@@ -202,7 +216,7 @@ def scripted_service(slow=(), invalid=()):
     cases = {
         key(reference_request(c, tasks[c.source, c.task_id]).context): c for c in reference.cases
     }
-    assert len(cases) == 37
+    assert len(cases) == 50
     service = ModelService.simulated()
 
     async def invoke(request, binding):
@@ -223,7 +237,7 @@ def test_run_reference_counts_failures(monkeypatch):
     monkeypatch.setattr(reference_module, "DEADLINE_SECONDS", 0.2)
     service = scripted_service(slow={"F1-variant-1"}, invalid={"B2-variant"})
     report = asyncio.run(run_reference(service, ROOT, repeats=2))
-    assert report["summary"]["total"] == 74 and report["summary"]["failed"] == 4
+    assert report["summary"]["total"] == 100 and report["summary"]["failed"] == 4
     assert report["summary"]["failed_cases"] == ["B2-variant", "F1-variant-1"]
     assert report["summary"]["all_passed"] is False
     failures = {r["failure"] for r in report["results"] if not r["passed"]}
@@ -250,7 +264,7 @@ def test_cli_writes_the_report(tmp_path, monkeypatch):
     monkeypatch.setattr(reference_module, "load_service", lambda files: scripted_service())
     assert main(["--run-id", "ref1", "--root", str(tmp_path)]) == 0
     saved = json.loads(report_path(tmp_path).read_text())
-    assert saved["summary"]["all_passed"] and saved["reference"]["cases"] == 37
+    assert saved["summary"]["all_passed"] and saved["reference"]["cases"] == 50
 
 
 def test_cli_refuses_existing_report(tmp_path, monkeypatch):

@@ -15,6 +15,7 @@ from functools import partial
 from project_j.application.documents import identity
 from project_j.contracts import RevisionRef
 from project_j.curriculum.corrections import active_restrictions, correction_restrictions
+from project_j.evaluation.scoring import recent_scores
 from project_j.learning.adoption import review_due
 from project_j.learning.contracts import SKILLS
 from project_j.learning.maintenance import review
@@ -76,6 +77,22 @@ def latest_facts(app, learner_id: str):
     return sorted(
         app.store.list_current(learner_id, "fact"), key=lambda fact: fact.occurred_at, reverse=True
     )
+
+
+def lesson_evaluations(app, learner_id: str):
+    """Current lesson evaluations, oldest lesson first (scores read in this order, ADR-0020)."""
+    return sorted(
+        app.store.list_current(learner_id, "evaluation"),
+        key=lambda doc: doc.occurred_at or doc.created_at,
+    )
+
+
+def lesson_score_summary(app, learner_id: str, use: str) -> dict:
+    """The last five lessons' averages by task type and ability, for planning or preparing the
+    next lesson; the log keeps counts only."""
+    scores = recent_scores([doc.body for doc in lesson_evaluations(app, learner_id)])
+    log.info("%s scores lessons=%d types=%d", use, scores["lessons"], len(scores["by_type"]))
+    return scores
 
 
 def adopted(app, learner_id: str, evaluation) -> bool:

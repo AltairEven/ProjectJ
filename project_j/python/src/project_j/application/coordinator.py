@@ -16,10 +16,11 @@ from project_j.application.documents import document, identity, publication
 from project_j.application.evaluating import Evaluating
 from project_j.application.ledger import Ledger, Request, Step
 from project_j.application.preparing import Preparing
-from project_j.application.progress import advance, jobs, next_step
+from project_j.application.progress import advance, jobs, lesson_evaluations, next_step
 from project_j.application.teaching import Teaching
 from project_j.classroom.harness import Harness
 from project_j.contracts import Document, RevisionRef
+from project_j.evaluation.scoring import lesson_scores
 from project_j.interface.submission import InputAdapter
 from project_j.learning.adoption import review_due
 from project_j.learning.fixtures import initialize
@@ -293,6 +294,12 @@ class Coordinator(Preparing, Teaching, Evaluating, Adopting):
             "models": self.models.status(),
             "pending_seals": list(self.pending_seals),
             "lost_activities": self.lost_activities(learner_id, documents),
+            # Each lesson's averages by task type and ability, oldest lesson first (ADR-0020).
+            "scores": [
+                lesson_scores(doc.body) | {"occurred_at": doc.occurred_at.isoformat()}
+                for doc in lesson_evaluations(self, learner_id)
+                if doc.occurred_at
+            ],
         }
 
     def lost_activities(self, learner_id: str, documents: list[Document]) -> list[dict]:

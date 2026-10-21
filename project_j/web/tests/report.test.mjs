@@ -169,3 +169,25 @@ test('discussion rounds read as the student feedback and what the model changed'
 test('a drafted course in the next-course report reads as waiting for confirmation', () => {
   assert.equal(new Map(describe({ next_package: { preparation: 'drafted' } }, docs)).get('备课'), '已编写，待确认')
 })
+
+test("an evaluation lists each question's score and reason", async () => {
+  const { evaluationLines, scoreText } = await import('../src/report.ts')
+  const evaluation = { object_id: 'e', revision: 1, kind: 'evaluation', body: {
+    report: { summary: '概括', strongest: [], uncertain: [], alignment: '无' },
+    tasks: [{ task_id: 'q1', dimension_id: 'english.reading.facts', working_judgment: 'unknown', explanation: '说明' }],
+    scores: [
+      { task_id: 'q1', dimension_id: 'english.reading.facts', score: 7, basis: 'rule', reason: '错1次后答对，用了1次提示' },
+      { task_id: 'r1', dimension_id: 'english.speaking.pronunciation', score: 8.5, basis: 'pronunciation', reason: '按最后一次有分的朗读' },
+      { task_id: 'q2', dimension_id: 'english.reading.facts', score: null, basis: 'model', reason: '停课时这题还没完成' },
+    ],
+  } }
+  const rows = evaluationLines(evaluation, docs)
+  assert.deepEqual(rows.slice(-3), [
+    ['得分·阅读事实与顺序·q1', '7 分（错1次后答对，用了1次提示）'],
+    ['得分·english.speaking.pronunciation·r1', '8.5 分（按最后一次有分的朗读，评分门槛未校准）'],
+    ['得分·阅读事实与顺序·q2', '未知（停课时这题还没完成）'],
+  ])
+  assert.equal(scoreText({ score: 0, basis: 'rule', reason: '帮助用完仍没答对' }), '0 分（帮助用完仍没答对）')
+  const old = { ...evaluation, body: { ...evaluation.body, scores: undefined } }
+  assert.ok(!evaluationLines(old, docs).some(([label]) => label.startsWith('得分')))
+})

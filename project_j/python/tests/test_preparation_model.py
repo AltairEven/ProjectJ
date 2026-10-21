@@ -28,9 +28,16 @@ def support(text, *levels):
     return {"text": text, "help": [{"dimension_id": d, "level": lv} for d, lv in levels]}
 
 
+def typed(task: dict) -> dict:
+    """A draft task with the per-type fields a task without typed content leaves empty."""
+    content = dict.fromkeys(("choice", "order", "match", "fill", "open"))
+    minutes = 10 if task["purpose"] == "offscreen" else None
+    return {"minutes": minutes, "correct_text": None} | content | task
+
+
 def science_draft(context, evidence="He fills it with water."):
     """A science lesson on a model-written story: one English report, a point and an offscreen."""
-    return {
+    draft = {
         "material_id": None,
         "title": "Sam's Cup",
         "story": NEW_STORY,
@@ -83,13 +90,6 @@ def science_draft(context, evidence="He fills it with water."):
             },
         ],
         "read_aloud": False,
-        "budget": [
-            {"part": "opening", "minutes": 3},
-            {"part": "reading", "minutes": 5},
-            {"part": "expression", "minutes": 4},
-            {"part": "offscreen", "minutes": 15},
-            {"part": "closing", "minutes": 3},
-        ],
         "demand_mapping": [
             {"index": item["index"], "implementation": "本课按离屏观察落实。", "task_ids": []}
             for item in context["requirements"]
@@ -122,6 +122,8 @@ def science_draft(context, evidence="He fills it with water."):
         "note": "这节先用杯子做实际观察。",
         "limitations": [],
     }
+    draft["tasks"] = [typed(task) for task in draft["tasks"]]
+    return draft
 
 
 def model_prepares(application, monkeypatch, *drafts):
@@ -161,7 +163,7 @@ def test_new_story_is_saved_as_model_material(application, monkeypatch, caplog):
     assert package["preparation"] == "drafted"
     course = application.store.read(ref(package["course_ref"]), LEARNER)
     assert course.body["primary_goal"]["dimension_id"] == SCIENCE
-    assert course.body["budget"]["offscreen"] == 15
+    assert course.body["budget"]["offscreen"] == 10  # The offscreen task's own minutes.
     material = application.store.read(ref(course.body["material_refs"][0]), LEARNER)
     assert material.body["origin"] == "model" and material.body["source"].startswith("model:")
     assert application.files.read_asset(material.body["asset"]).startswith("# Sam's Cup\n")
@@ -396,15 +398,10 @@ def reading_draft(context, skip=()):
             support("用过去式说：He ___ the water into a bowl.", (REPORT, "scaffold")),
         ],
     }
+    # A short observation: a practice lesson would need three task types and 20 minutes.
     draft = science_draft(context) | {
-        "lesson_type": "practice",
-        "tasks": [answer, report],
-        "budget": [
-            {"part": "opening", "minutes": 3},
-            {"part": "reading", "minutes": 12},
-            {"part": "expression", "minutes": 12},
-            {"part": "closing", "minutes": 3},
-        ],
+        "lesson_type": "observation",
+        "tasks": [typed(answer), typed(report)],
         "resources": [],
     }
     draft["demand_mapping"] = [
@@ -413,6 +410,18 @@ def reading_draft(context, skip=()):
         if item["field"] not in skip
     ]
     return draft
+
+
+def test_study_preparation_allows_open_after_the_reference_set_passed(tmp_path):
+    """Real classroom judgment passed reference set 1.1.0 (QT-3, run qt3-reference-b)."""
+    from conftest import ROOT
+
+    from project_j.application.coordinator import Coordinator
+    from project_j.platform.storage import SimulationStore
+
+    store = SimulationStore(tmp_path / "private/study", "a1", realm="study")
+    app = Coordinator(store, ROOT, verification={"result": "pass"}, onboarding=False)
+    assert app.open_allowed()
 
 
 def test_study_preparation_writes_by_interests_and_maps_the_chosen_skill(

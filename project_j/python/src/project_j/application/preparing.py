@@ -5,7 +5,7 @@ import logging
 from datetime import UTC, datetime
 
 from project_j.application.documents import document, identity, publication, successor
-from project_j.application.progress import latest_facts
+from project_j.application.progress import latest_facts, lesson_score_summary
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.content import check_content
 from project_j.curriculum.corrections import active_restrictions
@@ -15,7 +15,9 @@ from project_j.platform.storage import (
     Conflict,
     digest,
 )
+from project_j.preparation.contracts import CourseBody
 from project_j.preparation.drafting import (
+    OPEN_IN_STUDY,
     DraftRejected,
     PreparationUnavailable,
     checked_course,
@@ -32,6 +34,7 @@ from project_j.preparation.packages import (
     template_draft,
 )
 from project_j.preparation.resources import GENERATED, ready_resources
+from project_j.preparation.task_types import calibration, timing_samples
 from project_j.teacher.methods import JANE
 
 log = logging.getLogger(__name__)
@@ -79,6 +82,22 @@ class Preparing:
             if material.body.get("title"):
                 titles.append(material.body["title"])
         return titles
+
+    def open_allowed(self) -> bool:
+        """Open questions only after real judgment passed the reference set (QT-3)."""
+        return self.store.realm == "simulation" or OPEN_IN_STUDY
+
+    def calibration(self, learner_id: str) -> dict[str, float]:
+        """Per task type, how long sealed classes actually took against the estimate."""
+        samples = []
+        for fact in reversed(latest_facts(self, learner_id)):  # Oldest first.
+            course = self.store.read(
+                RevisionRef.model_validate(fact.body["course_ref"]), learner_id
+            )
+            samples += timing_samples(fact.body, CourseBody.model_validate(course.body))
+        factors = calibration(samples)
+        log.info("preparation calibration types=%d samples=%d", len(factors), len(samples))
+        return factors
 
     def read_sources(self, learner_id: str) -> set[str]:
         # ponytail: any sealed fact counts its story as read, even a class stopped before
@@ -163,7 +182,14 @@ class Preparing:
             )
             offscreen = bool(profile.body.get("materials"))  # checked_course rule
             template = (
-                template_draft(body, source, library[source]["story"], familiar, offscreen)
+                template_draft(
+                    body,
+                    source,
+                    library[source]["story"],
+                    familiar,
+                    offscreen,
+                    self.open_allowed(),
+                )
                 if fits
                 else None
             )
@@ -177,6 +203,8 @@ class Preparing:
                 source if simulated else None,
                 template,
                 self.recent_titles(learner_id),
+                lesson_score_summary(self, learner_id, "preparation"),
+                self.open_allowed(),
             )
             refs = {
                 "course": RevisionRef(object_id=identity(operation, "course"), revision=1),
@@ -284,6 +312,8 @@ class Preparing:
                 else None,
                 None,
                 self.recent_titles(learner_id),
+                lesson_score_summary(self, learner_id, "preparation"),
+                self.open_allowed(),
             )
             request = discussion_request(
                 base, preview.body["draft"], feedback, preview.body["discussion"]
@@ -427,6 +457,7 @@ class Preparing:
             doc.body["dimension_id"]
             for doc in self.store.list_current(demand.learner_id, "capability")
         }
+        factors = self.calibration(demand.learner_id)
         for attempt in (1, 2):
             reply = await self.models.run(request)
             if not reply.ok:
@@ -445,6 +476,8 @@ class Preparing:
                     read,
                     catalog,
                     offscreen_allowed=bool(request.context["profile"].get("materials")),
+                    open_allowed=request.context["open_allowed"],
+                    factors=factors,
                 )
             except DraftRejected as rejected:
                 codes = ",".join(dict.fromkeys(code for code, _ in rejected.problems))
@@ -460,7 +493,7 @@ class Preparing:
                 continue
             log.info(
                 "preparation drafted stage=%s attempt=%d material=%s tasks=%d read_aloud=%d "
-                "resources=%d focus=%d",
+                "resources=%d focus=%d minutes=%d types=%d",
                 stage,
                 attempt,
                 "library" if checked.source else "model",
@@ -468,6 +501,8 @@ class Preparing:
                 len(checked.course.tasks) - len(draft.tasks),
                 len(draft.resources),
                 len(body.skill_focus or ()),
+                sum(checked.course.budget.values()),
+                len({task.purpose for task in checked.course.tasks}),
             )
             return checked, draft
         raise AssertionError("unreachable")

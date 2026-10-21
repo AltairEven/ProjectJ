@@ -78,6 +78,23 @@ def test_demand_request_carries_learning_data(application):
     assert context["evaluation"]["report"] == data["evaluation"]["report"]
 
 
+def test_planning_reads_the_recent_scores(application, caplog):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="project_j")
+    data, request, _ = requests(application, taught(application))
+    assert request.context["scores"] == {}  # None given: the request still stands.
+    from project_j.application.progress import lesson_score_summary
+
+    scores = lesson_score_summary(application, LEARNER, "planning")
+    assert scores["lessons"] == 1 and scores["by_type"]["choice"]["average"] == 10.0
+    with_scores = demand_request(**data, scores=scores)
+    text = json.dumps(with_scores.context["scores"], ensure_ascii=False)
+    assert "Mia" not in text and "reason" not in text and "模拟评分" not in text
+    assert "scores是最近几节课按题型与能力的平均分" in with_scores.instructions
+    assert "planning scores lessons=1 types=" in caplog.text
+
+
 def test_requests_carry_no_identity(application):
     _, demand, review = requests(application, taught(application))
     assert review.purpose == "planning" and review.output is ReviewDraft

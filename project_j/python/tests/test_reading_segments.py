@@ -63,7 +63,7 @@ def test_a_read_aloud_task_needs_a_short_punctuated_reference():
         TaskDefinition(**base | {"purpose": "answer", "reference_text": "Mia has a car."})
 
 
-def test_prepared_course_ends_with_read_aloud_segments(application):
+def test_prepared_course_reads_aloud_before_the_open_question(application):
     prepared = asyncio.run(application.prepare("prepare-reading", "fictional-L1"))
     from project_j.contracts import RevisionRef
 
@@ -73,5 +73,7 @@ def test_prepared_course_ends_with_read_aloud_segments(application):
     tasks = course.body["tasks"]
     reading = [task for task in tasks if task["purpose"] == "read_aloud"]
     assert [task["task_id"] for task in reading] == ["read-aloud-1", "read-aloud-2"]
-    assert tasks[-len(reading) - 1]["task_id"] == "paper-experiment"
+    # After understanding, before the first open question (ADR-0020).
+    assert tasks[-len(reading) - 2]["task_id"] == "fill-puts"
+    assert tasks[-1]["task_id"] == "retell-bridge"
     assert all(task["dimension_id"] == "english.speaking.pronunciation" for task in reading)

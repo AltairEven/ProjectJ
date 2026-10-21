@@ -29,6 +29,7 @@ from project_j.preparation.packages import (
     story_text,
     template_draft,
 )
+from project_j.preparation.task_types import course_budget
 from project_j.teacher.methods import JANE
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -109,7 +110,10 @@ def test_course_tasks_unchanged():
     tasks = course_tasks(FIRST, STORY, MATERIAL, "english.reading.facts", "english.speaking.report")
     ids = [task.task_id for task in tasks]
     assert ids[:4] == ["reading-fact", "reading-sequence", "point-paper", "paper-experiment"]
-    assert ids[4:] and all(task_id.startswith("read-aloud-") for task_id in ids[4:])
+    # One sample of each new type, then reading aloud, then the open question (ADR-0020).
+    assert ids[4:8] == ["choice-first-try", "order-bridge", "match-words", "fill-puts"]
+    assert ids[-1] == "retell-bridge"
+    assert ids[8:-1] and all(task_id.startswith("read-aloud-") for task_id in ids[8:-1])
 
 
 def test_simulated_preparation_replies(application):
@@ -188,14 +192,8 @@ def draft(demand):
 def test_template_draft_checks_into_the_fixed_course(demand, draft):
     checked = check(demand, draft)
     assert checked.course.tasks == course_tasks(FIRST, STORY, MATERIAL, READING, REPORT)
-    assert checked.course.budget == {
-        "opening": 3,
-        "reading": 7,
-        "expression": 4,
-        "help_practice": 6,
-        "offscreen": 7,
-        "closing": 3,
-    }
+    assert checked.course.budget == course_budget(checked.course.tasks, STORY)
+    assert 20 <= sum(checked.course.budget.values()) <= 40
     assert checked.course.lesson_type == "observation"
     assert checked.source == FIRST and checked.story == STORY
     assert checked.course.limitations[-1].startswith("课程由备课模型编写")
@@ -221,7 +219,6 @@ def test_task_types_stay_within_the_reference_set(demand, draft):
 def test_goals_must_be_covered(demand, draft):
     science = with_goals(demand, SCIENCE, REPORT)
     draft["tasks"] = draft["tasks"][:2]
-    draft["budget"] = [{"part": "opening", "minutes": 10}, {"part": "closing", "minutes": 20}]
     for item in draft["demand_mapping"]:
         item["task_ids"] = [
             i for i in item["task_ids"] if i in {"reading-fact", "reading-sequence"}
@@ -233,26 +230,41 @@ def test_goals_must_be_covered(demand, draft):
     assert "goal" in rejected(with_goals(demand, PRONUNCIATION, READING), draft)
 
 
-def test_budget_rules(demand, draft):
-    parts = {part["part"]: part for part in draft["budget"]}
-    parts["opening"]["minutes"] = 2
-    assert rejected(demand, draft) == {"budget"}
-    parts["opening"]["minutes"] = 3
-    draft["budget"] = [part for part in draft["budget"] if part["part"] != "closing"]
-    draft["budget"][0]["minutes"] += 3
-    assert rejected(demand, draft) == {"budget"}
-    no_offscreen = template_draft(demand, FIRST, STORY)
-    no_offscreen["tasks"] = no_offscreen["tasks"][:3]
-    for item in no_offscreen["demand_mapping"]:
-        item["task_ids"] = [i for i in item["task_ids"] if i != "paper-experiment"]
-    assert rejected(demand, no_offscreen) == {"budget"}
-    offscreen_only = template_draft(demand, FIRST, STORY)
-    offscreen_only["budget"] = [
-        {"part": part["part"], "minutes": part["minutes"] + 7 * (part["part"] == "opening")}
-        for part in offscreen_only["budget"]
-        if part["part"] != "offscreen"
+def test_time_estimates_bound_the_course(demand, draft):
+    long = template_draft(demand, FIRST, STORY)
+    long["tasks"] += [
+        task | {"task_id": f"{task['task_id']}-{n}"} for n in range(8) for task in long["tasks"][:2]
     ]
-    assert rejected(demand, offscreen_only) == {"budget"}
+    assert rejected(demand, long) == {"time"}  # Over 40 minutes: delete questions.
+    short = template_draft(demand, FIRST, STORY)
+    short["lesson_type"], short["read_aloud"] = "practice", False
+    short["tasks"] = short["tasks"][:1]
+    unmap(short, keep={"reading-fact"})
+    assert "time" in rejected(demand, short)  # A practice lesson under 20 minutes.
+    short["lesson_type"] = "observation"
+    assert "time" not in rejected_or_none(demand, short)
+    offscreen = next(task for task in draft["tasks"] if task["purpose"] == "offscreen")
+    for minutes in (1, 11, None):
+        offscreen["minutes"] = minutes
+        assert rejected(demand, draft) == {"offscreen"}
+    offscreen["minutes"] = 7
+    draft["tasks"][0]["minutes"] = 3
+    assert rejected(demand, draft) == {"offscreen"}
+
+
+def unmap(draft, keep):
+    for item in draft["demand_mapping"]:
+        item["task_ids"] = [i for i in item["task_ids"] if i in keep or i == "read_aloud"]
+        if not draft["read_aloud"]:
+            item["task_ids"] = [i for i in item["task_ids"] if i != "read_aloud"]
+
+
+def rejected_or_none(demand, draft):
+    try:
+        check(demand, draft)
+    except DraftRejected as error:
+        return {code for code, _ in error.problems}
+    return set()
 
 
 def test_every_requirement_is_mapped_once(demand, draft):
@@ -313,6 +325,9 @@ def test_new_story_rules(demand, draft):
     new["story"] = "Sam has a cup. It is red."
     assert "story" in rejected(demand, new)
     new["story"] = NEW_STORY
+    # The template's samples quote the paper-bridge story; a new story keeps its own questions.
+    new["tasks"] = [t for t in new["tasks"] if t["purpose"] in {"answer", "point", "offscreen"}]
+    unmap(new, keep={t["task_id"] for t in new["tasks"]})
     for task, evidence in zip(
         new["tasks"][:2], ("He fills it with water.", "The cup is heavy now."), strict=True
     ):
@@ -417,3 +432,225 @@ def test_instructions_write_the_chosen_topic_and_train_the_chosen_skills():
     ):
         assert words in PREPARATION_INSTRUCTIONS
     assert "明确要换题材" in DISCUSSION_INSTRUCTIONS
+
+
+NULL_CONTENT = {code: None for code in ("choice", "order", "match", "fill", "open")}
+
+
+def sample(draft, task_id):
+    return next(task for task in draft["tasks"] if task["task_id"] == task_id)
+
+
+def new_task(task_id, purpose, content, **fields):
+    """A draft task of a new type on the paper-bridge story."""
+    return (
+        {
+            "task_id": task_id,
+            "dimension_id": READING,
+            "purpose": purpose,
+            "prompt": "Answer from the story.",
+            "evidence": "The paper bends. The car falls.",
+            "acceptable_answers": [],
+            "known_incorrect": [],
+            "supports": [
+                {
+                    "text": "回到原文。",
+                    "help": [{"dimension_id": READING, "level": "light_prompt"}],
+                },
+                {"text": "看第二段。", "help": [{"dimension_id": READING, "level": "scaffold"}]},
+            ],
+            "exit_text": "先到这里。",
+            "optional": False,
+            "minutes": None,
+            "correct_text": None if purpose == "open" else "对了。",
+        }
+        | NULL_CONTENT
+        | {purpose: content}
+        | fields
+    )
+
+
+@pytest.mark.parametrize(
+    ("task_id", "change"),
+    [
+        ("choice-first-try", {"variant": "true_false"}),  # Options are not 对、错.
+        ("choice-first-try", {"correct": 3}),
+        ("order-bridge", {"items": ["The paper bends.", "Mia smiles."]}),
+        ("order-bridge", {"variant": "words"}),  # The cards do not join into a story sentence.
+        ("match-words", {"right": ["弯了", "折"]}),
+        ("fill-puts", {"answers": [["puts"], ["car"]]}),
+        ("fill-puts", {"answers": [["drives"]]}),  # Filled back it is not in the story.
+        ("fill-puts", {"distractors": []}),  # A word bank needs distractors.
+    ],
+)
+def test_each_new_type_checks_its_content(demand, draft, task_id, change):
+    task = sample(draft, task_id)
+    task[task["purpose"]] |= change
+    assert rejected(demand, draft) == {"content"}
+
+
+def test_words_order_and_free_fill_that_quote_the_story_pass(demand, draft):
+    order = sample(draft, "order-bridge")
+    order["order"] = {"variant": "words", "items": ["She puts her car", "on the paper."]}
+    assert rejected(demand, draft) == {"content"}  # Two cards are too few.
+    order["order"]["items"] = ["She puts", "her car", "on the paper."]
+    sample(draft, "fill-puts")["fill"] |= {"variant": "free", "distractors": []}
+    assert check(demand, draft).course
+
+
+def test_new_types_need_their_content_and_correct_line(demand, draft):
+    choice = sample(draft, "choice-first-try")
+    for change in (
+        {"choice": None},
+        {"correct_text": None},
+        {"order": sample(draft, "order-bridge")["order"]},
+        {"acceptable_answers": ["b"]},
+    ):
+        broken = template_draft(demand, FIRST, STORY)
+        sample(broken, "choice-first-try").update(change)
+        assert rejected(demand, broken) == {"content"}, change
+    answer = draft["tasks"][0]
+    answer["choice"] = choice["choice"]
+    assert rejected(demand, draft) == {"content"}
+
+
+def test_new_types_measure_reading_facts_only(demand, draft):
+    sample(draft, "choice-first-try")["dimension_id"] = REPORT
+    assert "purpose" in rejected(demand, draft)
+
+
+def test_placement_uses_no_new_types(demand):
+    placement = demand.model_copy(update={"purpose": "placement"})
+    draft = template_draft(placement, FIRST, STORY)
+    assert all(task["purpose"] == "answer" for task in draft["tasks"])
+    draft["tasks"].append(
+        new_task(
+            "choice-extra",
+            "choice",
+            {"variant": "true_false", "options": ["对", "错"], "correct": 0},
+        )
+    )
+    assert "placement" in rejected(placement, draft)
+
+
+def test_evidence_of_new_types_quotes_the_story(demand, draft):
+    sample(draft, "fill-puts")["evidence"] = "She drives her car."
+    assert rejected(demand, draft) == {"evidence"}
+
+
+def test_not_given_answers_say_they_cannot_be_quoted(demand, draft):
+    sample(draft, "choice-first-try")["choice"] = {
+        "variant": "true_false_not_given",
+        "options": ["对", "错", "文中没提"],
+        "correct": 2,
+    }
+    limitations = check(demand, draft).course.limitations
+    assert "choice-first-try的“文中没提”无法逐字核对原文。" in limitations
+
+
+def test_the_primary_goal_is_not_proved_by_clicking_alone(demand, draft):
+    draft["tasks"] = [task for task in draft["tasks"] if task["purpose"] != "answer"]
+    draft["read_aloud"] = False
+    unmap(draft, keep={task["task_id"] for task in draft["tasks"]})
+    assert "guess" in rejected(demand, draft)
+
+
+def practice(draft, purposes):
+    """Keep only these task purposes in a practice lesson without reading aloud."""
+    draft["lesson_type"], draft["read_aloud"] = "practice", False
+    draft["tasks"] = [task for task in draft["tasks"] if task["purpose"] in purposes]
+    unmap(draft, keep={task["task_id"] for task in draft["tasks"]})
+    return draft
+
+
+def test_practice_lessons_use_three_types_and_no_type_over_half(demand, draft):
+    two = practice(draft, {"answer", "choice"})
+    assert "variety" in rejected(demand, two)
+    many = practice(template_draft(demand, FIRST, STORY), {"answer", "choice", "order"})
+    many["tasks"] += [
+        sample(many, "choice-first-try") | {"task_id": f"choice-{n}"} for n in range(3)
+    ]
+    assert "variety" in rejected(demand, many)  # Four of seven are choices.
+    many["lesson_type"] = "observation"
+    assert "variety" not in rejected_or_none(demand, many)
+
+
+def test_a_clicked_task_must_not_show_a_later_answer(demand, draft):
+    leak = new_task(
+        "choice-leak",
+        "choice",
+        {"variant": "single", "options": ["A bridge for her car.", "A boat."], "correct": 0},
+    )
+    draft["tasks"].insert(0, leak)  # Before reading-fact, whose first answer is "a bridge".
+    assert "leak" in rejected(demand, draft)
+    draft["tasks"].append(draft["tasks"].pop(0))  # After it: shown once already answered.
+    assert "leak" not in rejected_or_none(demand, draft)
+    one_word = template_draft(demand, FIRST, STORY)
+    one_word["tasks"][0]["acceptable_answers"] = ["bridge", "a bridge"]
+    one_word["tasks"].insert(0, leak)
+    assert "leak" not in rejected_or_none(demand, one_word)  # One-word answers are not compared.
+
+
+def test_open_tasks_check_their_points_and_evidence(demand, draft):
+    retell = sample(draft, "retell-bridge")
+    for points in ([], [f"point {n}" for n in range(6)]):
+        retell["open"]["points"] = points
+        assert rejected(demand, draft) == {"content"}
+    retell["open"]["points"] = ["first"]
+    retell["evidence"] = "Mia flies away."
+    assert rejected(demand, draft) == {"evidence"}
+    retell["evidence"] = "She folds a new piece of paper."
+    for change in ({"correct_text": "对了。"}, {"acceptable_answers": ["x"]}):
+        broken = template_draft(demand, FIRST, STORY)
+        sample(broken, "retell-bridge").update(change)
+        assert rejected(demand, broken) == {"content"}
+    retell["dimension_id"] = SCIENCE
+    assert "purpose" in rejected(demand, draft)
+
+
+def test_reading_comes_before_the_first_open_task(demand, draft):
+    ids = [task.task_id for task in check(demand, draft).course.tasks]
+    reading = [i for i, task_id in enumerate(ids) if task_id.startswith("read-aloud-")]
+    assert reading and ids.index("retell-bridge") == reading[-1] + 1
+    retell = sample(draft, "retell-bridge")
+    draft["tasks"].remove(retell)
+    draft["tasks"].insert(2, retell)  # answer, answer, open, ...
+    ids = [task.task_id for task in check(demand, draft).course.tasks]
+    assert ids[:2] == ["reading-fact", "reading-sequence"]
+    assert ids[2].startswith("read-aloud-") and ids[ids.index("retell-bridge") - 1].startswith(
+        "read-aloud-"
+    )
+    draft["tasks"].remove(retell)
+    unmap(draft, keep={task["task_id"] for task in draft["tasks"]})
+    assert check(demand, draft).course.tasks[-1].task_id.startswith("read-aloud-")
+
+
+def test_study_preparation_refuses_open_until_the_reference_set_passes(demand, draft):
+    with pytest.raises(DraftRejected) as error:
+        checked_course(
+            CourseDraft.model_validate(draft),
+            demand,
+            **REFS,
+            library=library(),
+            read=set(),
+            catalog_ids=CATALOG,
+            open_allowed=False,
+        )
+    assert ("open", "开放问答的课堂判断尚未通过参考题集，正式学习暂不使用") in error.value.problems
+
+
+def test_instructions_register_every_type_and_its_ladder():
+    from project_j.preparation.drafting import PREPARATION_INSTRUCTIONS
+    from project_j.preparation.task_types import LADDERS, PROGRAM_INSTRUCTIONS, TYPE_INSTRUCTIONS
+
+    assert PROGRAM_INSTRUCTIONS in PREPARATION_INSTRUCTIONS
+    assert all(text in PREPARATION_INSTRUCTIONS for text in TYPE_INSTRUCTIONS.values())
+    assert all(ladder in PREPARATION_INSTRUCTIONS for ladder in LADDERS.values())
+    for words in (
+        "至少两道题用到，其中至少一道answer题",
+        "复习课以选择、排序、配对、填空和复述为主",
+        "超过40分钟退回删题",
+        "scores是最近几节课",
+    ):
+        assert words in PREPARATION_INSTRUCTIONS
+    assert "budget从" not in PREPARATION_INSTRUCTIONS

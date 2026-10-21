@@ -218,6 +218,18 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
 
 .notebook section + section { border-top: 1px solid var(--rule); padding-top: 16px; }
 .reading-aloud > p:first-of-type { margin: 0 0 8px; padding: 10px 14px; border-left: 3px solid var(--ink); background: var(--page); font-family: var(--book); font-size: 17px; line-height: 1.7; }
+/* A clicked task: options, cards and words are pieces of paper the student moves in blue ink. */
+.task-input .choices, .task-input .cards { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+.task-input .choices { flex-direction: column; }
+.task-input .choices button, .task-input .cards button, .task-input .pairs button, .task-input .placed button { font-family: var(--book); font-weight: 500; text-align: left; }
+.task-input button[aria-pressed="true"] { background: var(--ink-wash); border-color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); }
+.task-input .placed { margin: 8px 0; padding-left: 28px; min-height: 2em; border-bottom: 1px dashed var(--rule-strong); }
+.task-input .placed li { margin: 0 0 6px; }
+.task-input .pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0 12px; }
+.task-input .pairs > div { display: grid; gap: 8px; align-content: start; }
+.task-input .paired { color: var(--ink); font-family: var(--hand); }
+.task-input .fill-text { font-family: var(--book); font-size: 18px; line-height: 2.2; }
+.task-input .blank { display: inline-block; min-width: 5em; width: auto; margin: 0 4px; padding: 0 8px; font-family: var(--hand); color: var(--ink); border: 0; border-bottom: 2px solid var(--ink); border-radius: 0; background: transparent; box-shadow: none; }
 
 .confirm-box { width: min(520px, calc(100vw - 32px)); padding: 24px 28px; box-shadow: 0 16px 48px #0f1d1866; }
 .confirm-box::backdrop { background: #1d2b2659; }

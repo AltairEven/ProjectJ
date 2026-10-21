@@ -9,8 +9,18 @@ from project_j.preparation.contracts import (
     ResourceSpec,
     TaskDefinition,
 )
+from project_j.preparation.task_types import PROGRAM_JUDGED
 
-__all__ = ["MAX_AUDIO_CHARS", "audio_resources", "goal_text", "question_speech", "question_text"]
+__all__ = [
+    "MAX_AUDIO_CHARS",
+    "WRONG_TEXT",
+    "audio_resources",
+    "goal_text",
+    "question_speech",
+    "question_text",
+]
+# What Jane says first when a clicked task is answered wrong; that level's help follows.
+WRONG_TEXT = "这次还不对。"
 
 
 def goal_text(course: CourseBody) -> str:
@@ -24,8 +34,10 @@ def goal_text(course: CourseBody) -> str:
 def question_text(task: TaskDefinition, budget: dict[str, int]) -> str:
     """What the question shows."""
     if task.purpose == "offscreen":
-        # The offscreen action itself carries its budget and the way back.
-        return f"{task.prompt}这一段约{budget['offscreen']}分钟；做完点“返回”，再说实际结果。"
+        # The offscreen action itself carries its minutes and the way back; a course saved
+        # before ADR-0020 has them in its budget.
+        minutes = task.minutes or budget["offscreen"]
+        return f"{task.prompt}这一段约{minutes}分钟；做完点“返回”，再说实际结果。"
     if task.purpose == "read_aloud":
         return f"{task.prompt}\n{task.reference_text}"
     return task.prompt
@@ -63,6 +75,25 @@ def audio_resources(course: CourseBody) -> tuple[ResourceSpec, ...]:
                 (task.task_id,),
             )
         )
+    for task in course.tasks:
+        if task.purpose in PROGRAM_JUDGED:  # Every line Jane may say on a clicked task.
+            lines = [("correct", "答对时", task.correct_text)]
+            for level, support in enumerate(task.supports, 1):
+                lines += [
+                    (f"wrong-{level}", f"答错时第{level}级帮助", WRONG_TEXT + support.text),
+                    (f"hint-{level}", f"求助时第{level}级帮助", support.text),
+                ]
+            lines.append(("exit", "退出语", task.exit_text))
+            resources += [
+                statement(
+                    f"voice:{task.task_id}:{name}",
+                    f"Jane的固定语句：{task.task_id}{what}",
+                    text,
+                    (task.task_id,),
+                )
+                for name, what, text in lines
+                if len(text) <= MAX_AUDIO_CHARS
+            ]
     for task in course.tasks:
         if task.purpose == "read_aloud":
             resources.append(

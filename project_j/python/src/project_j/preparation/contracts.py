@@ -5,6 +5,16 @@ from pydantic import Field, model_validator
 from project_j.contracts import Contract, RevisionRef
 from project_j.learning.contracts import SKILLS, DemandBody, Goal, Help
 from project_j.preparation.reading import MAX_SEGMENT_WORDS, sentences, words
+from project_j.preparation.task_types import (
+    CONTENT_TYPES,
+    MAX_MINUTES,
+    PROGRAM_JUDGED,
+    ChoiceContent,
+    FillContent,
+    MatchContent,
+    OpenContent,
+    OrderContent,
+)
 
 
 def demand_requirements(demand: DemandBody) -> list[tuple[str, str]]:
@@ -52,7 +62,9 @@ class Support(Contract):
 class TaskDefinition(Contract):
     task_id: str = Field(min_length=1)
     dimension_id: str = Field(min_length=1)
-    purpose: Literal["answer", "point", "offscreen", "read_aloud"]
+    purpose: Literal[
+        "answer", "point", "offscreen", "read_aloud", "choice", "order", "match", "fill", "open"
+    ]
     prompt: str = Field(min_length=1)
     material_ref: RevisionRef
     evidence: str = Field(min_length=1)
@@ -64,6 +76,27 @@ class TaskDefinition(Contract):
     # Read-aloud only: the scoring segment's reference text and the reading it belongs to.
     reference_text: str | None = None
     reading_id: str | None = None
+    # A task type's content sits in the field named after it (preparation/task_types.py).
+    choice: ChoiceContent | None = None
+    order: OrderContent | None = None
+    match: MatchContent | None = None
+    fill: FillContent | None = None
+    open: OpenContent | None = None
+    # What Jane says when a clicked task is answered right.
+    correct_text: str | None = Field(default=None, min_length=1)
+    minutes: int | None = None  # Offscreen only: its estimated minutes.
+    type_version: int = Field(default=1, ge=1, strict=True)
+
+    @model_validator(mode="after")
+    def own_content(self):
+        for code in CONTENT_TYPES:
+            if (getattr(self, code) is not None) != (self.purpose == code):
+                raise ValueError("a task carries exactly the content of its own type")
+        if (self.correct_text is not None) != (self.purpose in PROGRAM_JUDGED):
+            raise ValueError("only a clicked task says a prepared line when answered right")
+        if self.minutes is not None and self.purpose != "offscreen":
+            raise ValueError("only an offscreen task has its own minutes")
+        return self
 
     @model_validator(mode="after")
     def different_supports(self):
@@ -132,8 +165,9 @@ class CourseBody(Contract):
 
     @model_validator(mode="after")
     def consistent_package(self):
-        if sum(self.budget.values()) != 30 or any(value <= 0 for value in self.budget.values()):
-            raise ValueError("the entire course budget must stay within the fixed 30 minutes")
+        # Courses saved before ADR-0020 sum to 30; estimated ones stay within 40.
+        if sum(self.budget.values()) > MAX_MINUTES or any(v <= 0 for v in self.budget.values()):
+            raise ValueError("the entire course budget must stay within 40 minutes")
         if len({task.task_id for task in self.tasks}) != len(self.tasks):
             raise ValueError("task definitions need distinct identities")
         if any(task.material_ref not in self.material_refs for task in self.tasks):

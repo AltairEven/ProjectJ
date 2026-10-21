@@ -77,6 +77,33 @@ def test_classroom_request_carries_task_data_jane_method_and_goals_only():
         "jane_method",
         "goals",
     }
+    # Other tasks get exactly the request they had before open questions (QT-3 reference run).
+    assert "task_purpose为open" not in request.instructions
+
+
+def open_task():
+    from test_task_types import open_task as make
+
+    return make()
+
+
+def test_open_judgment_carries_points_and_guidance():
+    request = judgment_request(open_task(), "First it falls.", 0, False, 10)
+    assert request.context["task_purpose"] == "open" and request.context["variant"] == "retell"
+    assert request.context["points"] == ["first", "then"]
+    assert request.context["guidance"] == "Say both."
+    assert "task_purpose为open时没有唯一答案" in request.instructions
+
+
+def test_simulated_open_judgment():
+    from project_j.platform.models.simulated import SimulatedAdapter
+
+    def judged(text):
+        request = judgment_request(open_task(), text, 0, False, 10)
+        return SimulatedAdapter().respond(request)["judgment"]
+
+    assert judged("First it falls, then it stays.") == "correct"
+    assert judged("It falls.") == "unclear"
 
 
 def test_judgment_request_carries_the_bound_jane_method_and_goals():

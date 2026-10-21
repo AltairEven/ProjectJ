@@ -11,10 +11,21 @@ from project_j.preparation.contracts import (
     demand_requirements,
 )
 from project_j.preparation.reading import segment_reading
+from project_j.preparation.task_types import (
+    CONTENT_TYPES,
+    ChoiceContent,
+    FillContent,
+    MatchContent,
+    OpenContent,
+    OrderContent,
+)
 
 FIRST = "courses/paper-bridge/reading-main.md"
 TRANSFER = "courses/paper-bridge/reading-transfer.md"
 PRONUNCIATION = "english.speaking.pronunciation"
+READING = "english.reading.facts"
+CORRECT_TEXT = "对了，你找得很准。"
+SAMPLE_EXIT = "这题先到这里，我们接着往下。"
 # The two fixed simulation courses are each other's next course, so course switching can loop.
 COURSES = {
     FIRST: {
@@ -52,6 +63,84 @@ COURSES = {
                 "She ___ a new piece of paper.",
             ),
         ],
+        # (task id, prompt, evidence, content, first help, second help); clicked types first.
+        "samples": [
+            (
+                "choice-first-try",
+                "What happens the first time Mia puts her car on the paper?",
+                "The paper bends. The car falls.",
+                ChoiceContent(
+                    variant="single",
+                    options=(
+                        "The car stays on the bridge.",
+                        "The paper bends and the car falls.",
+                        "Mia draws two bridges.",
+                    ),
+                    correct=1,
+                ),
+                "回到第二段最后一句，看看纸和车怎样了。",
+                "第一次纸弯了，车也跟着动了：选说到纸和车的那一项。",
+            ),
+            (
+                "order-bridge",
+                "Put these in the order they happen in the story.",
+                "She folds a new piece of paper.",
+                OrderContent(
+                    variant="events",
+                    items=(
+                        "Mia puts a piece of paper on the books.",
+                        "The paper bends.",
+                        "She folds a new piece of paper.",
+                        "This time, the car stays on the bridge.",
+                    ),
+                ),
+                "先找纸第一次放上书的那一句。",
+                "纸先放上去，弯了以后Mia才想到新办法。",
+            ),
+            (
+                "match-words",
+                "Match each English word with its meaning.",
+                "The paper bends. The car falls.",
+                MatchContent(
+                    left=("bends", "folds", "smiles"),
+                    right=("弯了", "折", "微笑"),
+                    distractors=("掉下来",),
+                ),
+                "在故事里找到这几个词，看看它们说的是纸、人还是车。",
+                "bends说纸，folds是Mia对纸做的事，smiles是Mia的表情。",
+            ),
+            (
+                "fill-puts",
+                "Fill in the blank with a word from the story.",
+                "She puts her car on the paper.",
+                FillContent(
+                    variant="word_bank",
+                    text="She ___ her car on the paper.",
+                    answers=(("puts",),),
+                    distractors=("folds", "draws"),
+                ),
+                "找到写her car on the paper的那一句。",
+                "这一句说Mia把车放到纸上：选表示“放”的词。",
+            ),
+            (
+                "retell-bridge",
+                "Tell the story in two or three sentences: what went wrong first, "
+                "and what did Mia change?",
+                "She folds a new piece of paper. She puts it on the same books. "
+                "She tries the same car again.",
+                OpenContent(
+                    variant="retell",
+                    points=(
+                        "第一次纸弯了、车掉了",
+                        "Mia把一张新纸折起来",
+                        "第二次车留在桥上",
+                    ),
+                    guidance="用自己的话讲出先后，说出改变和结果就够了，不要求逐字复述。",
+                ),
+                "先说第一次发生了什么，再说Mia改了什么。",
+                "可以这样开头：First, the paper … Then Mia …",
+            ),
+        ],
     },
     TRANSFER: {
         "title": "Ben’s Bridge",
@@ -81,6 +170,70 @@ COURSES = {
                 ("it stayed",),
                 "对照第二次试验的最后两句。",
                 "The paper ___ and the big bus ___.",
+            ),
+        ],
+        "samples": [
+            (
+                "choice-small-bus",
+                "判断：The small bus stays on the paper.",
+                "It stays on the paper.",
+                ChoiceContent(variant="true_false", options=("对", "错"), correct=0),
+                "找到He puts the small bus on the bridge后面的那一句。",
+                "小巴士放上去以后，纸没有弯：想想它留住了没有。",
+            ),
+            (
+                "order-buses",
+                "Put these in the order they happen in the story.",
+                "He puts the big bus on the bridge.",
+                OrderContent(
+                    variant="events",
+                    items=(
+                        "He makes a bridge with paper and two books.",
+                        "He puts the small bus on the bridge.",
+                        "He puts the big bus on the bridge.",
+                        "The big bus falls.",
+                    ),
+                ),
+                "先找Ben搭桥的那一句。",
+                "Ben先搭桥，再先试小的、后试大的。",
+            ),
+            (
+                "match-buses",
+                "Match each English word with its meaning.",
+                "One bus is small. One bus is big.",
+                MatchContent(
+                    left=("small", "big", "falls"),
+                    right=("小的", "大的", "掉下来"),
+                    distractors=("弯曲",),
+                ),
+                "在故事里找到这几个词，看看它们说的是哪辆车、发生了什么。",
+                "small和big说两辆车的大小，falls说大巴士最后怎样了。",
+            ),
+            (
+                "fill-bends",
+                "Fill in the blank with a word from the story.",
+                "The paper bends.",
+                FillContent(
+                    variant="word_bank",
+                    text="The paper ___. The big bus falls.",
+                    answers=(("bends",),),
+                    distractors=("stays", "takes"),
+                ),
+                "看故事最后两句。",
+                "大巴士掉下来之前，纸先怎样了：选表示“弯”的词。",
+            ),
+            (
+                "opinion-bus",
+                "Why do you think the big bus fell? What would you change so it stays on the "
+                "bridge?",
+                "The paper bends. The big bus falls.",
+                OpenContent(
+                    variant="opinion",
+                    points=("原因与故事相符（大巴士更重、纸撑不住）", "提出一个说得通的改法"),
+                    guidance="原因与故事相符、改法说得通就算对，没有标准答案。",
+                ),
+                "想一想两辆车有什么不同。",
+                "可以这样说：The big bus is … I would …",
             ),
         ],
     },
@@ -116,7 +269,7 @@ def map_demand(demand: DemandBody, tasks: tuple[TaskDefinition, ...], source: st
     how = {
         "primary_goal": ("本包回答题均取该维度的文本依据。", answers),
         "auxiliary_goal": ("各回答题第二级支持为英语短句框，帮助后表达另记。", answers),
-        "budget_minutes": ("预算各段合计30分钟，挑战只替换活动。", ()),
+        "budget_minutes": ("按各题型预计用时估算约30分钟，挑战只替换活动。", ()),
         "offscreen_requirements": ("离屏任务停止采集，返回后取实际报告。", offscreen),
         "fallback": ("作答以文字模拟；朗读段以模拟录音交模拟评分，不代表真实发音。", every),
         "prerequisites": ("不预设先备，以首个未提示初答取样。", answers),
@@ -212,9 +365,37 @@ def course_tasks(
                 ),
                 exit_text="没有做或没有观察也可以如实报告，不需要补课。",
                 optional=purpose == "offscreen",
+                minutes=7 if purpose == "offscreen" else None,
             )
         )
-    return (*tasks, *reading_tasks(story, material_ref))
+    later = []  # Open questions come after reading aloud.
+    for identity, prompt, evidence, item, hint, scaffold in COURSES[source]["samples"]:
+        kind = type(item).__name__.removesuffix("Content").lower()
+        # Clicked types measure reading facts only; a retelling is English expression (the
+        # auxiliary goal), an opinion on the story's reasons is reading.
+        retell = kind == "open" and item.variant == "retell"
+        dimension = auxiliary_dimension if retell else READING
+        sample = TaskDefinition(
+            task_id=identity,
+            dimension_id=dimension,
+            purpose=kind,
+            prompt=prompt,
+            material_ref=material_ref,
+            evidence=evidence,
+            acceptable_simulated=(),
+            supports=(
+                Support(text=hint, help={dimension: "light_prompt"}),
+                Support(
+                    text=scaffold,
+                    help={primary_dimension: "scaffold", auxiliary_dimension: "scaffold"},
+                ),
+            ),
+            exit_text=SAMPLE_EXIT,
+            correct_text=None if kind == "open" else CORRECT_TEXT,
+            **{kind: item},
+        )
+        (later if kind == "open" else tasks).append(sample)
+    return (*tasks, *reading_tasks(story, material_ref), *later)
 
 
 def reading_tasks(story: str, material_ref: RevisionRef) -> tuple[TaskDefinition, ...]:
@@ -245,14 +426,6 @@ def reading_tasks(story: str, material_ref: RevisionRef) -> tuple[TaskDefinition
     )
 
 
-BUDGET = {
-    "opening": 3,
-    "reading": 7,
-    "expression": 4,
-    "help_practice": 6,
-    "offscreen": 7,
-    "closing": 3,
-}
 PREVIEW_MATERIALS = "纸、同一本书和同一辆小车。"
 BRIEF = {
     "history": "没有学习历史，以初始未知状态开始。",
@@ -267,7 +440,12 @@ def library_entry(source: str, story: str, read: bool) -> dict:
 
 
 def template_draft(
-    demand: DemandBody, source: str, story: str, familiar: bool = False, offscreen: bool = True
+    demand: DemandBody,
+    source: str,
+    story: str,
+    familiar: bool = False,
+    offscreen: bool = True,
+    open_allowed: bool = True,
 ) -> dict:
     """The fixed paper-bridge course written as a course draft the model may reuse or adapt.
 
@@ -277,14 +455,12 @@ def template_draft(
     goals = (demand.primary_goal.dimension_id, demand.auxiliary_goal.dimension_id)
     tasks = course_tasks(source, story, reference, *goals)
     screen_only = demand.purpose == "placement" or not offscreen
-    if screen_only:
+    if demand.purpose == "placement":  # The onboarding test uses no new task type.
         tasks = tuple(task for task in tasks if task.purpose in {"answer", "read_aloud"})
-    budget = (
-        BUDGET
-        if not screen_only
-        else {k: v for k, v in BUDGET.items() if k != "offscreen"}
-        | {"reading": BUDGET["reading"] + BUDGET["offscreen"]}
-    )
+    elif screen_only:
+        tasks = tuple(task for task in tasks if task.purpose not in {"point", "offscreen"})
+    if not open_allowed:  # Study lessons wait for the reference set (QT-3).
+        tasks = tuple(task for task in tasks if task.purpose != "open")
     title = COURSES[source]["title"]
     practice = uses_new_material(demand)
     choice = f"选{title}复习模板，明示已读熟悉条件" if familiar else f"选{title}新材料短观察模板"
@@ -321,12 +497,17 @@ def template_draft(
                 ],
                 "exit_text": task.exit_text,
                 "optional": task.optional,
+                "minutes": task.minutes,
+                "correct_text": task.correct_text,
+            }
+            | {
+                code: getattr(task, code).model_dump(mode="json") if getattr(task, code) else None
+                for code in sorted(CONTENT_TYPES)
             }
             for task in tasks
             if task.purpose != "read_aloud"
         ],
         "read_aloud": True,
-        "budget": [{"part": part, "minutes": minutes} for part, minutes in budget.items()],
         "demand_mapping": [
             {"index": index, "implementation": item.implementation, "task_ids": ids(item.task_ids)}
             for index, item in enumerate(mapping)

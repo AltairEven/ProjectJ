@@ -1485,6 +1485,62 @@
         }
       }
     },
+    "/api/class/response": {
+      "post": {
+        "summary": "Response",
+        "operationId": "response_api_class_response_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResponseInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InputResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/class/recording": {
       "post": {
         "summary": "Recording",
@@ -2346,6 +2402,17 @@
             },
             "type": "array",
             "title": "Lost Activities",
+            "default": []
+          },
+          "scores": {
+            "items": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Scores",
             "default": []
           },
           "active": {
@@ -3353,6 +3420,44 @@
         ],
         "title": "ResourceResult"
       },
+      "ResponseInput": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "intent": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "help"
+            ],
+            "title": "Intent",
+            "default": "answer"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id"
+        ],
+        "title": "ResponseInput",
+        "description": "A clicked task's answer by display position, or a plea for its next hint (ADR-0020)."
+      },
       "RestoreRequest": {
         "properties": {
           "backup_id": {
@@ -3578,6 +3683,20 @@
               }
             ],
             "title": "Recording"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
           },
           "materials": {
             "additionalProperties": {

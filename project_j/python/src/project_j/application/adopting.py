@@ -6,6 +6,7 @@ from dataclasses import replace
 
 from project_j.application.documents import identity, publication, successor
 from project_j.application.ledger import Step
+from project_j.application.progress import lesson_score_summary
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.corrections import release_rechecked
 from project_j.learning.adoption import adopt_state
@@ -89,6 +90,7 @@ class Adopting:
                     suggestion.body,
                     old.body,
                     self.recent_titles(learner_id),
+                    lesson_score_summary(self, learner_id, "planning"),
                 )
             )
             activity_id = evaluation.body["activity_id"]
@@ -469,6 +471,7 @@ class Adopting:
             self.store.read(choice.suggestion_ref, learner_id).body,
             previous.model_dump(mode="json"),
             self.recent_titles(learner_id),
+            lesson_score_summary(self, learner_id, "planning"),
         )
         self.models.require()
         result = await self.models.run(

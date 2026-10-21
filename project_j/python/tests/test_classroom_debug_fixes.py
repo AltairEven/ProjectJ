@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from support import (
     LEARNER,
     answer,
+    answer_clicked,
     confirmed,
     deliver_all,
     judgments,
@@ -232,6 +233,7 @@ def test_api_accepts_a_base64_recording_only_on_a_reading_segment(application):
         core.control("return", "return")
         deliver_all(core)
         say("offscreen", "第二次纸折了，车没有掉。", "report")
+        asyncio.run(answer_clicked(app))
         reference = core.reading_task().reference_text
         silent = recording("silent", "")  # Ended without reading: an unknown score, not an error.
         assert silent.status_code == 200 and silent.json()["ack"] == "accepted"

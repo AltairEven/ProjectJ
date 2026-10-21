@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from support import LEARNER, answer, deliver_all, ready, start
+from support import LEARNER, answer, answer_clicked, deliver_all, ready, start
 from test_preparation_model import ref, science_draft, science_lesson
 
 from project_j.application.configuration import Settings
@@ -27,6 +27,7 @@ async def to_reading(app):
     core.control(str(uuid4()), "return")
     deliver_all(core)
     await answer(app, "第二次纸折了，车没有掉。", "report")
+    await answer_clicked(app)
     assert core.reading_task() is not None
     return core
 

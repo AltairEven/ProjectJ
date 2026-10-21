@@ -1,5 +1,6 @@
 import asyncio
 from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 from support import LEARNER, answer, complete_story, deliver_all, judgments, start
@@ -110,16 +111,21 @@ def test_model_failure_keeps_original_input_and_does_not_advance(application):
     asyncio.run(scenario())
 
 
-def test_budget_boundaries_are_explicit_simulated_clock_events(application):
-    core = asyncio.run(start(application))
-    core.started_clock -= 27 * 60 + 1
-    core.tick()
-    assert core.wait_kind == "closing_confirmation"
-    assert any(event["kind"] == "budget_boundary" for event in core.events)
-    core.started_clock -= 3 * 60
-    core.tick()
-    assert core.mode == "ended" and core.end["reason"] == "unconfirmed"
-    assert application.seal().body["attempts"] == []
+def test_the_class_continues_past_thirty_minutes(application):
+    async def scenario():
+        core = await start(application)
+        deliver_all(core)
+        await answer(application, "听到了。", "confirmation")
+        core.started_clock -= 31 * 60
+        snapshot = core.snapshot()
+        assert snapshot["activity_state"] == "running" and snapshot["elapsed_seconds"] > 30 * 60
+        assert not any(event["kind"] == "budget_boundary" for event in core.events)
+        await answer(application, "a bridge")
+        assert core.current_task().task_id == "reading-sequence"  # The next task, not a close.
+        core.control(str(uuid4()), "close")
+        assert core.wait_kind == "closing_confirmation"
+
+    asyncio.run(scenario())
 
 
 def test_E2E18_explicit_no_addition_reuses_provisional_without_another_model_call(application):

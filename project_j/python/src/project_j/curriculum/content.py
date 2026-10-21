@@ -3,6 +3,9 @@ from project_j.learning.contracts import DemandBody
 from project_j.platform.files import PrivateFiles
 from project_j.preparation.contracts import CourseBody, demand_requirements
 from project_j.preparation.reading import flat
+from project_j.preparation.task_types import CONTENT_TYPES
+
+QUOTED = {"answer"} | CONTENT_TYPES  # Task types whose evidence quotes the material.
 
 
 def check_content(
@@ -27,7 +30,7 @@ def check_content(
         },
     ]
     for task in course.tasks:
-        if task.purpose == "answer" and flat(task.evidence) not in flat(text):
+        if task.purpose in QUOTED and flat(task.evidence) not in flat(text):
             raise ValueError("task evidence is not present in the material")
         checks.append(
             {
@@ -35,7 +38,7 @@ def check_content(
                 "result": "pass",
                 "evidence": task.evidence,
                 "method": "source_comparison"
-                if task.purpose == "answer"
+                if task.purpose in QUOTED
                 else "reported_conditions_only",
             }
         )

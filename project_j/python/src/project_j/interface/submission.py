@@ -1,6 +1,7 @@
 """In-memory input adapter: explicit typed submissions and reading recordings reach the core."""
 
 from project_j.classroom.harness import Harness
+from project_j.classroom.responses import MALFORMED
 from project_j.contracts import SubmittedInput
 
 STOP_WORDS = {"停止", "停课", "stop", "暂停", "pause"}
@@ -58,6 +59,31 @@ class InputAdapter:
             ):
                 raise ValueError("same input event has different content")
             submitted = old
+        return await self.core.submit(submitted)
+
+    async def response(self, event_id: str, response: dict | None, intent="answer"):
+        """A clicked task's answer or hint plea; a resent one replays its first body."""
+        if (response is None) != (intent == "help"):  # An answer carries one; a plea none.
+            raise ValueError(MALFORMED)
+        original = self.core.inputs.get(event_id)
+        if original and original["signature"].get("modality") == "response":
+            old = SubmittedInput.model_validate(original["signature"])
+            if old.response != response or old.intent != intent:
+                raise ValueError("same input event has different content")
+            return await self.core.submit(old)
+        self.sequence += 1
+        submitted = SubmittedInput(
+            **self.binding(),
+            event_id=event_id,
+            realm=self.core.realm,
+            source_type=self.core.source_type,
+            client_sequence=self.sequence,
+            modality="response",
+            response=response,
+            provider=self.provider("simulated_clicker"),
+            intent=intent,
+            completion_trigger="explicit",
+        )
         return await self.core.submit(submitted)
 
     async def recording(

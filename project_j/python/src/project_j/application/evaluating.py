@@ -17,6 +17,7 @@ from project_j.evaluation.assessment import (
     interpret,
     next_suggestion,
 )
+from project_j.evaluation.scoring import scoring_counts
 from project_j.platform.storage import (
     Conflict,
 )
@@ -331,6 +332,15 @@ class Evaluating:
             except DraftMismatch as error:
                 log.warning("evaluation activity=%s draft does not match the facts", activity_id)
                 raise EvaluationUnavailable(str(error)) from error
+            counts = scoring_counts(body["scores"])  # How scored, never the scores.
+            log.info(
+                "evaluation scores activity=%s rule=%d model=%d pronunciation=%d unknown=%d",
+                activity_id,
+                counts["rule"],
+                counts["model"],
+                counts["pronunciation"],
+                counts["unknown"],
+            )
             obj = document(
                 "evaluation",
                 identity(activity_id, "evaluation"),

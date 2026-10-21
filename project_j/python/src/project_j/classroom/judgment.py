@@ -27,6 +27,14 @@ INSTRUCTIONS = (
     "也不说出evidence中能直接回答本题的词（可以使用allowed_supports里的说法）。"
     "correct时肯定学生，可以示范英语说法，但不再要求学生重说或改用英语再答，核心随后直接进入下一题。"
 )
+# Sent with open questions only: added to every request, these rules made the real model judge
+# short unclear answers to other tasks as incorrect (QT-3 reference run, 13/18 against 18/18).
+OPEN_INSTRUCTIONS = (
+    "task_purpose为open时没有唯一答案：points是好回答应覆盖的要点，guidance说明怎样算够；"
+    "回答与故事相符、覆盖要点或给出说得通的想法、用学生自己的话说清楚（中文、英文或中英混合都可以）"
+    "为correct；与故事矛盾、离题、只有一两个词或缺少guidance要求的部分为incorrect，"
+    "并在text里提示还缺什么，不替学生说出完整回答；无法确认意思为unclear。"
+)
 
 
 class ClassroomJudgment(Contract):
@@ -63,9 +71,10 @@ def judgment_request(
     jane_method: dict | None = None,
     goals: tuple[str, ...] = (),
 ) -> ModelRequest:
+    item = task.open if task.purpose == "open" else None
     return ModelRequest(
         purpose="classroom_judgment",
-        instructions=INSTRUCTIONS,
+        instructions=INSTRUCTIONS + (OPEN_INSTRUCTIONS if item else ""),
         context={
             "task_purpose": task.purpose,
             "prompt": task.prompt,
@@ -81,7 +90,13 @@ def judgment_request(
             "pronunciation": pronunciation.model_dump(mode="json") if pronunciation else None,
             "jane_method": jane_method,
             "goals": list(goals),
-        },
+        }
+        # Open questions only: what a good answer covers and when it is enough.
+        | (
+            {"variant": item.variant, "points": list(item.points), "guidance": item.guidance}
+            if item
+            else {}
+        ),
         output=ClassroomJudgment,
         deadline_seconds=deadline_seconds,
     )

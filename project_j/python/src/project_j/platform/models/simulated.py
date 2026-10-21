@@ -41,6 +41,12 @@ class SimulatedAdapter:
     def respond(self, request: ModelRequest) -> dict | None:
         context = request.context
         if request.purpose == "evaluation":
+            # Story and open questions: 10 when every try was right without help, else 6.
+            scored = {t["task_id"] for t in context["tasks"] if t["purpose"] in {"answer", "open"}}
+            tries: dict[str, list[dict]] = {}
+            for attempt in context["attempts"]:
+                if attempt["task_id"] in scored:
+                    tries.setdefault(attempt["task_id"], []).append(attempt)
             return {
                 "tasks": [
                     {
@@ -52,6 +58,20 @@ class SimulatedAdapter:
                         "explanation": "模拟评价：按封存事实整理。",
                     }
                     for attempt in context["attempts"]
+                ],
+                "scores": [
+                    {
+                        "task_id": task_id,
+                        "score": 10
+                        if all(
+                            a["judgment"] == "correct"
+                            and all(v in {"none", "unknown"} for v in a["help"].values())
+                            for a in attempts
+                        )
+                        else 6,
+                        "reason": "模拟评分",
+                    }
+                    for task_id, attempts in tries.items()
                 ],
                 "summary": "模拟评价：按封存事实与反馈整理，未调用真实模型。",
                 "strongest": [],
@@ -149,6 +169,14 @@ class SimulatedAdapter:
                 "text": "这几个词再读一遍：" + "、".join(weak[:5]),
             }
         answer = normalized(context["answer"])
+        if context["task_purpose"] == "open":  # No single answer: three words or more will do.
+            if len(context["answer"].split()) >= 3:
+                return {"judgment": "correct", "evidence": evidence, "text": "说得清楚，我们继续。"}
+            return {
+                "judgment": "unclear",
+                "evidence": evidence,
+                "text": "再多说一点：" + context["guidance"],
+            }
         if context["task_purpose"] in {"point", "offscreen"}:
             judgment = "reported"
             text = "我收到这段报告；只按已报告条件记录，未观察的部分保留未知。"

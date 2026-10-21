@@ -152,6 +152,14 @@ class TextInput(Contract):
     related_event_id: str | None = None
 
 
+class ResponseInput(Contract):
+    """A clicked task's answer by display position, or a plea for its next hint (ADR-0020)."""
+
+    event_id: str
+    intent: Literal["answer", "help"] = "answer"
+    response: dict[str, JsonValue] | None = None
+
+
 # 300 s of 16 kHz mono PCM16 WAV is 9,600,044 bytes.
 MAX_RECORDING_BYTES = 10 * 1024 * 1024
 
@@ -216,6 +224,8 @@ class Snapshot(Contract):
     actual_api: Literal["未验证"]
     actual_voice: Literal["未验证"]
     recording: dict[str, JsonValue] | None = None
+    # A clicked task as the page shows it (options, cards, columns, blanks); never its answer.
+    task: dict[str, JsonValue] | None = None
     materials: dict[str, str] = {}
 
 
@@ -269,6 +279,8 @@ class Dashboard(Contract):
     pending_seals: list[str] = []
     seal_errors: dict[str, str] = {}
     lost_activities: list[dict[str, JsonValue]] = []
+    # Each lesson's averages by task type and ability, oldest first (ADR-0020).
+    scores: list[dict[str, JsonValue]] = []
     active: Snapshot | None = None
     note: str | None = None
 
@@ -440,8 +452,6 @@ def create_app(
                 await asyncio.sleep(1)
                 core = app.state.coordinator.core
                 if core:
-                    if core.mode != "ended":
-                        core.tick()
                     if core.mode == "ended":
                         if app.state.coordinator.store.active_activity_id:
                             app.state.coordinator.freeze_end()
@@ -859,6 +869,14 @@ def create_app(
             request.intent,
             request.relation,
             request.related_event_id,
+        )
+        ended(core, background)
+        return result | {"snapshot": controller().student_view(core)}
+
+    @app.post("/api/class/response", response_model=InputResult)
+    async def response(request: ResponseInput, background: BackgroundTasks, core: ClassCore):
+        result = await controller().adapter.response(
+            request.event_id, request.response, request.intent
         )
         ended(core, background)
         return result | {"snapshot": controller().student_view(core)}

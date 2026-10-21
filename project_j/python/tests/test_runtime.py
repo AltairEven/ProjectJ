@@ -6,6 +6,7 @@ import pytest
 from support import (
     LEARNER,
     answer,
+    answer_clicked,
     complete_story,
     confirmed,
     deliver_all,
@@ -117,7 +118,10 @@ def test_E2E02_state_records_english_expression_only_where_help_marked_it(applic
             assert (speaking["judgment"], speaking["help"]) == ("needs_help", "scaffold")
             assert speaking["evidence_refs"] == dims["english.reading.facts"]["evidence_refs"]
         else:
-            assert (speaking["judgment"], speaking["evidence_refs"]) == ("unknown", [])
+            # The retelling (an open question on English expression) observes it without help;
+            # one unhelped try is not independence, so it stays unknown (ADR-0020).
+            assert speaking["judgment"] == "unknown"
+            assert speaking["evidence_refs"] == dims["english.reading.facts"]["evidence_refs"]
 
     asyncio.run(scenario())
 
@@ -564,6 +568,7 @@ async def reach_reading(app):
     core.control(str(uuid4()), "return")
     deliver_all(core)
     await answer(app, "第二次纸折了，车没有掉。", "report")
+    await answer_clicked(app)
     assert core.reading_task().task_id == "read-aloud-1"
     return core
 

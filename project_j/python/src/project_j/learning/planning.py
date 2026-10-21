@@ -33,6 +33,8 @@ PLANNING_INSTRUCTIONS = (
     "direction：consolidate巩固，review复查，extend拓展，advance小步进阶，observe短观察；"
     "一次通常只增加一种主要难度；需要帮助的先改变支持并留独立尝试。"
     "预算固定30分钟，不改预算，不把时间排满。"
+    "scores是最近几节课按题型与能力的平均分（10分制，未知不计）与题数：参考它决定下节课的目标与加强方向；"
+    "分数低不等于没学会，结合评价的依据与限制判断，题数少于3只作参考。"
     "suggestion_action对候选建议给adopt、modify、defer或reject，suggestion_reason写理由。"
     "周计划可小调整：plan_effect为adjusted时plan_patch只改main_goal、verification或exit_conditions，"
     "plan_reason写如何服务当前重点；不需要调整时为reused。阶段、年度、长期的变化不在这里改，写进gaps。"
@@ -166,6 +168,7 @@ def demand_request(
     suggestion: dict,
     demand: dict,
     recent_titles: list[str],
+    scores: dict | None = None,
 ) -> ModelRequest:
     material = suggestion["material"]
     return ModelRequest(
@@ -190,6 +193,7 @@ def demand_request(
                 "gaps",
             ),
             "recent_titles": recent_titles,
+            "scores": scores or {},
             "skills": [
                 {"skill_id": skill, "group": group, "label": label, "hint": hint}
                 for skill, (group, label, hint) in SKILLS.items()

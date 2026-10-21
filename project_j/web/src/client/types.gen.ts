@@ -257,6 +257,12 @@ export type Dashboard = {
     lost_activities?: Array<{
         [key: string]: JsonValue;
     }>;
+    /**
+     * Scores
+     */
+    scores?: Array<{
+        [key: string]: JsonValue;
+    }>;
     active?: Snapshot | null;
     /**
      * Note
@@ -821,6 +827,28 @@ export type ResourceResult = {
 };
 
 /**
+ * ResponseInput
+ *
+ * A clicked task's answer by display position, or a plea for its next hint (ADR-0020).
+ */
+export type ResponseInput = {
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Intent
+     */
+    intent?: 'answer' | 'help';
+    /**
+     * Response
+     */
+    response?: {
+        [key: string]: JsonValue;
+    } | null;
+};
+
+/**
  * RestoreRequest
  */
 export type RestoreRequest = {
@@ -957,6 +985,12 @@ export type Snapshot = {
      * Recording
      */
     recording?: {
+        [key: string]: JsonValue;
+    } | null;
+    /**
+     * Task
+     */
+    task?: {
         [key: string]: JsonValue;
     } | null;
     /**
@@ -1846,6 +1880,37 @@ export type SubmitApiClassInputPostResponses = {
 };
 
 export type SubmitApiClassInputPostResponse = SubmitApiClassInputPostResponses[keyof SubmitApiClassInputPostResponses];
+
+export type ResponseApiClassResponsePostData = {
+    body: ResponseInput;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/class/response';
+};
+
+export type ResponseApiClassResponsePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ResponseApiClassResponsePostError = ResponseApiClassResponsePostErrors[keyof ResponseApiClassResponsePostErrors];
+
+export type ResponseApiClassResponsePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: InputResult;
+};
+
+export type ResponseApiClassResponsePostResponse = ResponseApiClassResponsePostResponses[keyof ResponseApiClassResponsePostResponses];
 
 export type RecordingApiClassRecordingPostData = {
     body: RecordingInput;
