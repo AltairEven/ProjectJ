@@ -19,7 +19,7 @@ from project_j.application.preparing import Preparing
 from project_j.application.progress import advance, jobs, next_step
 from project_j.application.teaching import Teaching
 from project_j.classroom.harness import Harness
-from project_j.contracts import Document
+from project_j.contracts import Document, RevisionRef
 from project_j.interface.submission import InputAdapter
 from project_j.learning.adoption import review_due
 from project_j.learning.fixtures import initialize
@@ -278,6 +278,14 @@ class Coordinator(Preparing, Teaching, Evaluating, Adopting):
             "actual_voice": "未验证",
             "verification": self.verification,
             "objects": [doc.model_dump(mode="json") for doc in documents],
+            # The version each rewritten evaluation replaced, for the before/after view.
+            "previous_evaluations": [
+                self.store.read(
+                    RevisionRef(object_id=doc.object_id, revision=doc.revision - 1), learner_id
+                ).model_dump(mode="json")
+                for doc in documents
+                if doc.kind == "evaluation" and doc.revision > 1
+            ],
             "review_due": review_due(
                 [doc for doc in documents if doc.kind == "plan"], datetime.now(UTC)
             ),

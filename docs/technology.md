@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.16.0；更新：2026年10月21日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
+版本：1.17.0；更新：2026年10月21日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -77,14 +77,14 @@ Skills用于开发、备课及维护工序；运行时依赖版本化策略、�
 
 | 项目 | 固定版本/路径 | P0实际证据与限制 |
 | --- | --- | --- |
-| Python | CPython3.14.4；project_j/python/.python-version；project_j/.python及python/.venv | 实际安装、锁定同步、Ruff/pytest通过；不用系统3.9，不改全局设置 |
+| Python | CPython3.14.8；project_j/{python,scorer,tts}/.python-version；project_j/.python及各工程.venv | 实际安装、锁定同步、Ruff/pytest通过；不用系统3.9，不改全局设置 |
 | Python库 | FastAPI0.143.0、Pydantic2.14.1、SQLAlchemy2.1.4、Alembic1.20.0、OpenAI3.29.0（只用其严格JSON结构转换，供Codex适配器）；开发测试依赖见uv.lock | uv.lock锁运行/开发依赖及hash；uv_build0.11.11在build-system精确固定，使用uv内置后端。Pydantic/FastAPI导出、SDK mock、临时SQLite事务验证；P1有隔离Alembic迁移及loopback服务 |
 | SQLite | 本解释器3.50.4 | 临时库回滚验证；正式存储、备份恢复待阶段1 |
 | Node/npm | Node26.11.1、npm11.20.0；web/package.json的devEngines（onFail=error） | 实际读取版本；未更新本机全局工具 |
 | 页面基础库 | React/ReactDOM19.3.0、TypeScript7.0.2、Vite8.3.4、React类型19.3.0 | web/package-lock.json锁定；React/ReactDOM为dependencies，类型/TypeScript/Vite及remark为devDependencies。npm ci禁安装脚本、tsconfig独立React类型检查；没有应用页或浏览器行为验收 |
 | 浏览器候选 | 本机macOS26.6.2/build25G83，Chrome154.0.8037.98 | 从本机系统/应用元数据读取；家长已选择内置麦克风＋内置扬声器；Chrome为本批拟定浏览器，实际许可/试听/回声与打断仍未验证，不能称声音已接入 |
 
-Python3.14仍为受维护系列；官方已经发布安全补丁3.14.8。本机uv0.11.11内置清单无3.14.8下载，尝试官方uv远端下载元数据路径返回404，故当前pin3.14.4只用于隔离P0/P1验证；真实接入前更新到可取得的最新安全补丁并重跑相关检查，不静默沿用旧补丁。[Python3.14.8发布](https://www.python.org/downloads/release/python-3148/)、[uv下载元数据设置](https://docs.astral.sh/uv/reference/settings/#python-downloads-json-url)
+Python3.14仍为受维护系列，当前用2026年9月30日的安全补丁3.14.8（2026年10月21日起；此前为3.14.4）。本机uv0.11.11内置清单只到3.14.4，官方远端下载元数据路径返回404；改由`project_j/scripts/uv.sh`把uv的下载清单指向`project_j/scripts/python-downloads.json`，其中只列python-build-standalone 20261020构建的3.14.8（Apple Silicon，含SHA-256摘要），不升级或改动全局uv。之后有新补丁时更新该清单与三个`.python-version`并重跑检查，不静默沿用旧补丁。[Python3.14.8发布](https://www.python.org/downloads/release/python-3148/)、[uv下载元数据设置](https://docs.astral.sh/uv/reference/settings/#python-downloads-json-url)
 
 工程/数据库/私有文件布局唯一维护在[存储规则](../design/platform/storage-lifecycle.md#阶段0路径与阶段1保存单位)，操作身份/保存单位与有限重试在[共同执行](../design/shared/execution-recovery.md#p0操作身份保存与有限接续)。锁定安装与检查命令见AGENTS，检查只验证声明范围。
 
@@ -107,7 +107,7 @@ Codex适配器使用官方Python SDK `openai-codex`（锁定0.163.0，随包附�
 
 ### 本机发音评分初始化与探针
 
-评分器按[ADR-0015](../decisions/ADR-0015.md)是独立子工程`project_j/scorer/`（Python 3.14.4，torch 2.14.1、transformers 5.20.1，锁文件只解析Apple Silicon Mac），与主工程、合成各自维护。主工程经`project-j-scorer-init`初始化，模型与记录存于`project_j/private/scorer/`：
+评分器按[ADR-0015](../decisions/ADR-0015.md)是独立子工程`project_j/scorer/`（Python 3.14.8，torch 2.14.1、transformers 5.20.1，锁文件只解析Apple Silicon Mac），与主工程、合成各自维护。主工程经`project-j-scorer-init`初始化，模型与记录存于`project_j/private/scorer/`：
 
 ```sh
 project_j/scripts/uv.sh sync --locked --project project_j/scorer
@@ -122,7 +122,7 @@ download按固定修订ae45363bf3413b374fecd9dc8bc1df0e24c3b7f4只取4个文件�
 
 ### 本机语音合成初始化与探针
 
-合成器按[ADR-0016](../decisions/ADR-0016.md)是独立子工程`project_j/tts/`（Python 3.14.4，mlx-audio 0.5.9，锁定mlx 0.32.4、transformers 5.20.1，锁文件只解析Apple Silicon Mac），与主工程、评分器各自维护。主工程经`project-j-tts-init`初始化，模型与记录存于`project_j/private/tts/`：
+合成器按[ADR-0016](../decisions/ADR-0016.md)是独立子工程`project_j/tts/`（Python 3.14.8，mlx-audio 0.5.9，锁定mlx 0.32.4、transformers 5.20.1，锁文件只解析Apple Silicon Mac），与主工程、评分器各自维护。主工程经`project-j-tts-init`初始化，模型与记录存于`project_j/private/tts/`：
 
 ```sh
 project_j/scripts/uv.sh sync --locked --project project_j/tts
@@ -186,13 +186,13 @@ ADR-0018起，应用协调层的推进器（project_j/python/src/project_j/appli
 
 上述事实来源：[Sol模型页](https://developers.openai.com/api/docs/models/gpt-6.1-sol)、[实时转写](https://developers.openai.com/api/docs/guides/realtime-transcription)、[WebRTC](https://developers.openai.com/api/docs/guides/voice-webrtc?voice-api=realtime)、[数据控制](https://developers.openai.com/api/docs/guides/your-data)。实际API调用样本数为0、语音操作样本数为0；账号条件缺失可继续隔离阶段1，不能把文档核对当接口通过。
 
-### 合成维护风险与最小待决定方案
+### 远程合成的停用风险（已由ADR-0016取代）
+
+2026年10月18日家长按[ADR-0016](../decisions/ADR-0016.md)改用本机合成（Qwen3-TTS 1.7B），不再接入gpt-4o-mini-tts，本节不是待决定事项；以下停用事实与当时提案只作核对记录保留。
 
 官方停用表于2026年10月1日公告gpt-4o-mini-tts的2025-03-20和2025-12-15两个快照将于2027年1月6日停用，并推荐gpt-realtime-2.1-mini；TTS指南仍有原模型示例，当前alias的具体路由/账户可用性**未验证**。[停用公告](https://developers.openai.com/api/docs/deprecations)、[TTS指南](https://developers.openai.com/api/docs/guides/text-to-speech)
 
 最小提案：真实合成验证时增加该候选的成人对照，要求只能交付Harness已批准文本、实际内容/首播范围可核对、取消和迟到可靠，并重新核对费用/数据覆盖；取得结果后向家长提出具体替换配置。当前不替换gpt-4o-mini-tts、不引入自主语音教师，阶段1仍以模拟合成交付验证同一接口。此提案尚待家长确认，候选官方推荐不表示J条件已满足。
-
-2026年10月18日家长按[ADR-0016](../decisions/ADR-0016.md)改用本机合成（Qwen3-TTS 1.7B），不再接入gpt-4o-mini-tts；上述停用事实与提案保留为当时核对记录。
 
 P0-R1按Opus工程审查采用安装后的project-j-probe/project-j-measure入口，不修改src搜索路径；Python版本由.python-version维护。pytest-socket负责禁网，httpx2为显式开发依赖；文档检查交remark/unified-engine/remark-validate-links官方API，未配远程origin时关闭其repository探测，仍检查本地文件与标题。初试remark-cli时审计发现其监听依赖含无补丁braces告警，故删除CLI及监听依赖；不降级、不强制跨主版本覆盖、不恢复自制链接规则。实际检查和有限审查范围见[交接](handoff.md#p0-r1-工具清理)。
 

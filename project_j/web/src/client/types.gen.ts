@@ -220,6 +220,10 @@ export type Dashboard = {
      */
     objects?: Array<Document>;
     /**
+     * Previous Evaluations
+     */
+    previous_evaluations?: Array<Document>;
+    /**
      * Review Due
      */
     review_due?: Array<{

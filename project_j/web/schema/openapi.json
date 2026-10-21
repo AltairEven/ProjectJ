@@ -2283,6 +2283,14 @@
             "title": "Objects",
             "default": []
           },
+          "previous_evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            },
+            "type": "array",
+            "title": "Previous Evaluations",
+            "default": []
+          },
           "review_due": {
             "items": {
               "additionalProperties": {

@@ -259,6 +259,7 @@ class Dashboard(Contract):
     actual_voice: Literal["未验证"] = "未验证"
     verification: dict[str, JsonValue] = {}
     objects: list[Document] = []
+    previous_evaluations: list[Document] = []
     review_due: list[dict[str, JsonValue]] = []
     model_calls: list[dict[str, JsonValue]] = []
     models: dict[str, JsonValue] = {}

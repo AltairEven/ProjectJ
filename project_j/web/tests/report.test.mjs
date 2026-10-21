@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { describe, discussionLines, evaluationLines, modelLines, resourceLines } from '../src/report.ts'
+import { describe, discussionLines, evaluationLines, modelLines, resourceLines, revisionChanges } from '../src/report.ts'
 
 const doc = (object_id, revision, kind, body) => ({ object_id, revision, kind, body })
 const docs = [
@@ -84,6 +84,18 @@ test('an evaluation reads as summary, evidence, unknowns, differences and per-ta
   assert.deepEqual(rows[3], ['课程与课堂差异', '离屏未做。'])
   assert.deepEqual(rows[4], ['阅读事实与顺序·reading-fact', '单次独立：初答正确，学生说没有求助。'])
   assert.deepEqual(rows.at(-1), ['规则调整', 'reading-sequence：单次独立的条件不足'])
+})
+
+test('a rewritten evaluation shows the replaced summary and each judgment that changed', () => {
+  const task = (task_id, working_judgment) => ({ task_id, dimension_id: 'english.reading.facts', working_judgment })
+  const before = doc('e', 1, 'evaluation', { report: { summary: '两题都独立完成。' }, tasks: [task('reading-fact', 'single_independent'), task('reading-sequence', 'needs_help')] })
+  const after = doc('e', 2, 'evaluation', { report: { summary: '首题看了答案。' }, tasks: [task('reading-fact', 'unknown'), task('reading-sequence', 'needs_help')] })
+  assert.deepEqual(revisionChanges(after, before, docs), [
+    ['上一版概括', '两题都独立完成。'],
+    ['阅读事实与顺序·reading-fact', '单次独立 → 未知'],
+  ])
+  assert.deepEqual(revisionChanges(before, before, docs).at(-1), ['逐题判断', '没有变化'])
+  assert.deepEqual(revisionChanges(after, doc('e', 1, 'evaluation', { tasks: [] }), docs)[0], ['上一版概括', '上一版没有模型解读。'])
 })
 
 test('an evaluation saved before model drafts says so', () => {

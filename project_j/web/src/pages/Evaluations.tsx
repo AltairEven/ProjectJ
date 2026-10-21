@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { api, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
 import { evaluationRows } from '../learning'
-import { endLabels, evaluationLines } from '../report'
+import { endLabels, evaluationLines, revisionChanges } from '../report'
 import { Rows, useRun, type PageProps } from '../ui'
 
 const verdicts: Record<string, string> = { correct: '正确', incorrect: '不正确', unclear: '不清楚' }
@@ -27,6 +27,7 @@ function Detail({ token, dashboard, learner, go, refresh, fact }: PageProps & { 
   const activity = String(fact.body.activity_id)
   const row = evaluationRows(objects).find(item => item.activity_id === activity)
   const evaluation = objects.find(doc => doc.kind === 'evaluation' && doc.body.activity_id === activity)
+  const previous = (dashboard.previous_evaluations ?? []).find(doc => doc.object_id === evaluation?.object_id)
   const notes = objects.filter(doc => doc.kind === 'feedback' && doc.body.activity_id === activity)
     .sort((a, b) => a.source_revision - b.source_revision)
   const send = (objection: boolean, label = objection ? '提出异议' : '补记') => { const body = { request_id: uid(), learner_id: learner, activity_id: activity, text: note.trim(), objection }
@@ -37,6 +38,9 @@ function Detail({ token, dashboard, learner, go, refresh, fact }: PageProps & { 
       <Rows rows={[['状态', row?.state], ['结束', endLabels[String((fact.body.end as Record<string, unknown>)?.reason)] ?? '未知']]} />
       <h3>每题原答与帮助</h3><Rows rows={attemptRows(fact)} />
       {row?.state !== '评价中' && evaluation ? <><h3>评价</h3><Rows rows={evaluationLines(evaluation, objects)} /></> : <p>评价生成中，页面会自动更新。</p>}
+      {row?.state !== '评价中' && evaluation && previous && <><h3>与上一版相比（第{previous.revision}版 → 第{evaluation.revision}版）</h3>
+        <Rows rows={revisionChanges(evaluation, previous, objects)} />
+        {row?.state !== '已认可' && <p>认可这一版之后，学习状态才按它更新。</p>}</>}
       {notes.length > 0 && <><h3>你的补记</h3><Rows rows={notes.map((doc, index): [string, unknown] =>
         [`第${index + 1}条${(doc.body.corrections as unknown[] | undefined)?.length ? '（异议）' : ''}`, doc.body.text])} /></>}</section>
     {status}

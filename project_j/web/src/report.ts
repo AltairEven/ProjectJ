@@ -83,19 +83,34 @@ export function describe(value: unknown, docs: Doc[]): [string, string][] {
   })
 }
 
+const taskName = (task: Body, docs: Doc[]) => `${(docs.find(item => item.kind === 'capability' && item.body.dimension_id === task.dimension_id)
+  ?.body.name as string) ?? task.dimension_id}·${task.task_id}`
+const judgment = (task: Body) => judgmentLabels[task.working_judgment] ?? task.working_judgment
+
 /** A model-drafted evaluation as rows: summary first, then each attempt and any rule changes. */
 export function evaluationLines(doc: Doc, docs: Doc[]): [string, string][] {
   const body = doc.body as Body
   if (!body.report) return [['课后评价', '这一版评价没有模型解读。']]
-  const name = (id: string) => (docs.find(item => item.kind === 'capability' && item.body.dimension_id === id)?.body.name as string) ?? id
   const rows: [string, string][] = [
     ['本课概括', body.report.summary], ['最有依据', joined(body.report.strongest)],
     ['尚未确定', joined(body.report.uncertain)], ['课程与课堂差异', body.report.alignment],
-    ...(body.tasks ?? []).map((task: Body): [string, string] => [`${name(task.dimension_id)}·${task.task_id}`,
-      `${judgmentLabels[task.working_judgment] ?? task.working_judgment}：${task.explanation ?? ''}`]),
+    ...(body.tasks ?? []).map((task: Body): [string, string] => [taskName(task, docs), `${judgment(task)}：${task.explanation ?? ''}`]),
   ]
   if (body.checks?.length) rows.push(['规则调整', body.checks.map((check: Body) => `${check.task_id}：${check.reason}`).join('；')])
   return rows
+}
+
+/** A rewritten evaluation against the version it replaced: the old summary, then each judgment that changed (design/interface). */
+export function revisionChanges(current: Doc, previous: Doc, docs: Doc[]): [string, string][] {
+  const before = new Map(((previous.body as Body).tasks ?? []).map((task: Body) => [task.task_id, task]))
+  const changed = ((current.body as Body).tasks ?? []).flatMap((task: Body): [string, string][] => {
+    const old = before.get(task.task_id) as Body | undefined
+    return old && old.working_judgment !== task.working_judgment ? [[taskName(task, docs), `${judgment(old)} → ${judgment(task)}`]] : []
+  })
+  return [
+    ['上一版概括', (previous.body as Body).report?.summary ?? '上一版没有模型解读。'],
+    ...(changed.length ? changed : [['逐题判断', '没有变化'] as [string, string]]),
+  ]
 }
 
 /** One line per teaching resource: kind, need, stage, purpose, Jane's words, fallback, state and versions. */

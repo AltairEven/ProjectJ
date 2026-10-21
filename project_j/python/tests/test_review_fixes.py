@@ -245,6 +245,27 @@ def test_a_correction_of_an_older_lesson_is_evaluated_again_and_rechecked(applic
     asyncio.run(scenario())
 
 
+def test_the_dashboard_carries_the_version_a_rewritten_evaluation_replaced(application):
+    app = application
+
+    async def evaluated():
+        core, _ = await complete_story(app)
+        activity = core.activity_id
+        return activity, await app.evaluate("first", LEARNER, activity, "after_class")
+
+    activity, first = asyncio.run(evaluated())
+    assert app.dashboard(LEARNER)["previous_evaluations"] == []
+    note = {"note": "看了答案"}
+    app.feedback("objection", LEARNER, activity, "R1我看了答案。", corrections=(note,))
+    second = asyncio.run(app.evaluate("second", LEARNER, activity, "after_class"))
+    assert second.revision == first.revision + 1
+    previous = app.dashboard(LEARNER)["previous_evaluations"]
+    assert [(doc["object_id"], doc["revision"]) for doc in previous] == [
+        (first.object_id, first.revision)
+    ]
+    assert previous[0]["body"] == first.body
+
+
 def test_evaluation_reuse_requires_the_same_sealed_fact_revision(application):
     app = application
 
