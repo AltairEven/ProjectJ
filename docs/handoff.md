@@ -805,7 +805,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## DEV-1 课堂沙盒长期保留
 
-- 状态：完成，未提交（2026年10月21日）。用户：“沙盒功能要一直保留，以后有需要快速调试的场景。”
+- 状态：完成，已本地提交01b604f（2026年10月21日）。用户：“沙盒功能要一直保留，以后有需要快速调试的场景。”
 - 负责人/集成：Claude Opus。
 - 范围：课堂沙盒原在本机project_j/test/ui（不进Git、正式发布时删除），移到project_j/web/sandbox：index.html（真实Classroom配浏览器内假课堂mock.ts，十个场景、正式模式、等待秒数）与app.html（真实App配模拟运行的主页数据快照dashboard.json，可切下一步）；`npm run --prefix project_j/web sandbox`。纳入tsconfig.app类型检查（加resolveJsonModule），不进应用构建。AGENTS 1.31.0在本地维护段写明用途与同步要求；驱动截图的脚本仍在本机project_j/test/ui/sandbox。
 - 检查证据：类型检查覆盖沙盒4个文件；本机烟测脚本check.mjs、confirm.mjs在新位置全部通过、页面无报错（随UI-1更新了进度选择器，停止前先收起确认弹框）。统一check通过（主工程538、评分39、合成15项pytest，前端58、文档1），UTC 2026-10-21T02:20:14.968231+00:00，工程摘要656cd5ffc6560e8c28d0618c40fddf37158eee0401ab9ae873521d974e55dc94；依赖未变。
