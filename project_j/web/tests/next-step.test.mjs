@@ -79,3 +79,10 @@ test('the skills to train are ticked on the main page, Jane\'s suggestions alrea
   assert.equal(focusError(4, ''), '每课最多选3项。')
   assert.equal(focusError(1, 'x'.repeat(101)), '其他想练的最多100字。')
 })
+
+test('a stopped class can be acknowledged as it is or taken again', () => {
+  const view = nextStepView({ kind: 'evaluation', subject: { ...subjects.evaluation, retake: { object_id: 'c1', revision: 2 } } })
+  assert.deepEqual([view.title, view.action, view.page], ['上节课中途停止了：可以认可这份评价，也可以重上这节课', '查看并认可', 'evaluations'])
+  assert.deepEqual(view.also, { action: '重上这节课', page: 'courses', detail: 'c1' })
+  assert.equal(nextStepView({ kind: 'evaluation', subject: subjects.evaluation }).also, undefined)
+})

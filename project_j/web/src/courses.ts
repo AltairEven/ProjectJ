@@ -20,6 +20,15 @@ function state(course: Shape, objects: Shape[]): CourseState {
   return same((preview.body.confirmation as Record<string, unknown> | undefined)?.course_ref, course) ? '待上课' : '等你确认'
 }
 
+/** The main page offers this exact course again: its class was stopped and the evaluation waits (server rule). */
+export const retakeOffered = (next: { kind: string, subject?: Record<string, unknown> | null } | null | undefined, course: Shape) =>
+  next?.kind === 'evaluation' && same(next.subject?.retake, course)
+
+/** The course's latest class: a stopped class taken again keeps both, the newer one is shown. */
+export const latestFact = (course: Shape, objects: Shape[]) =>
+  objects.filter(doc => doc.kind === 'fact' && (doc.body.course_ref as Ref | undefined)?.object_id === course.object_id)
+    .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0] as Shape | undefined
+
 export function courseRows(objects: Shape[]) {
   return objects.filter(doc => doc.kind === 'course')
     .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))

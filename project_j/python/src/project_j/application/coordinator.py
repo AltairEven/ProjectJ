@@ -1259,11 +1259,17 @@ class Coordinator:
         )
         # Held in memory for the class; nothing is read from disk while teaching.
         self.recorded, self.visuals = recorded, visuals
+        # The same course is taught again when the student retakes a stopped class.
+        attempt = 1 + sum(
+            fact.body["course_ref"] == course.ref.model_dump()
+            for fact in self.store.list_current(learner_id, "fact")
+        )
         log.info(
-            "start resources recorded=%d visuals=%d skipped=%d",
+            "start resources recorded=%d visuals=%d skipped=%d attempt=%d",
             len(recorded),
             len(visuals),
             skipped,
+            attempt,
         )
         self.adapter = InputAdapter(self.core)
         self.store.active_activity_id = activity_id

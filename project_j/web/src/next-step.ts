@@ -21,7 +21,8 @@ function jobLine({ name, state, reason, progress }: Job): string {
 
 export const jobLines = (jobs: Job[]): string[] => jobs.map(jobLine)
 
-const views: Record<string, (subject: Subject) => { title: string, action?: string, page: Target, detail?: string }> = {
+type Go = { action: string, page: Target, detail?: string }
+const views: Record<string, (subject: Subject) => { title: string, action?: string, page: Target, detail?: string, also?: Go }> = {
   lexile: () => ({ title: '先填写蓝思值，开始建档', action: '开始建档', page: 'onboarding' }),
   chat: () => ({ title: '和 Jane 聊几句', action: '去聊天', page: 'onboarding' }),
   placement: () => ({ title: '建档小测已备好', action: '开始小测', page: 'onboarding' }),
@@ -29,7 +30,10 @@ const views: Record<string, (subject: Subject) => { title: string, action?: stri
   class: () => ({ title: '课堂进行中', action: '回到课堂', page: 'class' }),
   interrupted: () => ({ title: '有一节课中断了，需要处理', action: '去处理', page: 'settings' }),
   decision: () => ({ title: '有一个计划方案等你决定', action: '去决定', page: 'plan' }),
-  evaluation: subject => ({ title: '课后评价已生成', action: '查看并认可', page: 'evaluations', detail: subject.activity_id }),
+  evaluation: subject => subject.retake
+    ? { title: '上节课中途停止了：可以认可这份评价，也可以重上这节课', action: '查看并认可', page: 'evaluations', detail: subject.activity_id,
+      also: { action: '重上这节课', page: 'courses', detail: subject.retake.object_id } }
+    : { title: '课后评价已生成', action: '查看并认可', page: 'evaluations', detail: subject.activity_id },
   goal: () => ({ title: '新目标等你确认', action: '确认新目标', page: 'plan' }),
   focus: () => ({ title: '下一课想加强什么？', page: 'home' }),  // Ticked right on the main page.
   course: subject => subject.confirmed

@@ -229,6 +229,20 @@ def onboarding_step(app, learner_id: str) -> dict | None:
     return None
 
 
+def retake_course(app, learner_id: str, fact) -> dict | None:
+    """A class the student stopped, or the service cut, may be taken again from the start while
+    its evaluation waits: nothing has been replanned, so the same course and its made resources
+    still fit. The earlier class stays in the history."""
+    if (fact.body.get("end") or {}).get("reason") not in {"stop", "interrupted"}:
+        return None
+    ref = RevisionRef.model_validate(fact.body["course_ref"])
+    course = app.store.current(ref.object_id, learner_id)
+    demand = app.store.current(identity(learner_id, "demand"), learner_id)
+    if course is None or course.ref != ref or demand is None:
+        return None
+    return ref.model_dump() if course.body["demand_ref"] == demand.ref.model_dump() else None
+
+
 def next_step(app, learner_id: str) -> dict:
     """The one thing for the student, in the order of the main page (design/interface)."""
     if in_class(app):
@@ -252,10 +266,10 @@ def next_step(app, learner_id: str) -> dict:
         placed = placement_activity(app, learner_id)
         placement = placed is not None and placed[0] == activity  # accepted with the profile
         if current_source and not placement and app.acknowledged(learner_id, activity) is None:
-            return {
-                "kind": "evaluation",
-                "subject": {"activity_id": activity, "evaluation_ref": evaluation.ref.model_dump()},
-            }
+            subject = {"activity_id": activity, "evaluation_ref": evaluation.ref.model_dump()}
+            if retake := retake_course(app, learner_id, facts[0]):
+                subject["retake"] = retake
+            return {"kind": "evaluation", "subject": subject}
     demand = app.store.current(identity(learner_id, "demand"), learner_id)
     if demand is not None and demand.body.get("goal_confirmation") == "needed":
         return {

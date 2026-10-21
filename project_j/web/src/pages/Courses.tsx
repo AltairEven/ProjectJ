@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { api, fileUrl, show, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
-import { courseRows, needsMaterials, previewLabels, previewOf, previewRank } from '../courses'
+import { courseRows, latestFact, needsMaterials, previewLabels, previewOf, previewRank, retakeOffered } from '../courses'
 import { discussionLines, resourceLines } from '../report'
 import { JobLine, Rows, useRun, type PageProps } from '../ui'
 
@@ -22,12 +22,13 @@ function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & 
   const content = (preview?.body.content ?? course.body.parent_preview) as Record<string, unknown>
   const confirmed = state !== '备课中' && state !== '等你确认'
   const taught = state === '已上' || state === '已评价'
+  const retaking = taught && retakeOffered(dashboard.next, course)  // Stopped: the same class from the start.
   const courseRef = { object_id: course.object_id, revision: course.revision }
   const resources = (preview?.body.resources ?? []) as Resource[]
   const job = (kind: string) => (dashboard.jobs ?? []).find(item => item.name === `${kind}:${course.object_id}:${course.revision}`)
   const confirming = job('confirm'), starting = job('start')
   const materials = needsMaterials(course)
-  const fact = objects.find(doc => doc.kind === 'fact' && (doc.body.course_ref as Doc | undefined)?.object_id === course.object_id)
+  const fact = latestFact(course, objects)
   // Request bodies are made once, so resuming a failed operation repeats the same request.
   const generate = (item: Resource) => {
     const body = { request_id: uid(), learner_id: learner, course_ref: courseRef, resource_id: item.resource_id }
@@ -63,14 +64,15 @@ function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & 
       <p>确认后保存这一版，Jane 在后台生成本课的语音、图片等资源；不会自动开课，准备好后由你开始上课。</p>
       <button disabled={busy} onClick={() => { const body = { request_id: uid(), learner_id: learner, course_ref: courseRef }
         void run(async () => { await api(token, 'course/confirm', body) }, '确认课程') }}>确认课程</button></section>}
-    {confirmed && !taught && <section><h2>开始上课</h2>
+    {confirmed && (!taught || retaking) && <section><h2>{retaking ? '重上这节课' : '开始上课'}</h2>
       {(starting ?? confirming) && <JobLine job={(starting ?? confirming)!} />}
       {materials && <label className="check"><input type="checkbox" checked={ready} onChange={event => setReady(event.target.checked)} />
         实物已按本课安排备好{content?.materials ? `（${show(content.materials)}）` : ''}</label>}
+      {retaking && <p>上次中途停止了。那次的记录和评价都会留着；这次从头再上一遍，语音和图片已经做好。</p>}
       <p>{confirming?.state === 'running' ? '资源准备好后就可以开始。' : '准备好就开始：开课后约30分钟，可以随时暂停或停止。'}</p>
       <button disabled={busy || confirming?.state === 'running' || starting?.state === 'running' || (materials && !ready)} onClick={() => {
         const body = { request_id: uid(), learner_id: learner, course_ref: courseRef, materials_ready: materials && ready }
-        void run(async () => { await api(token, 'course/start', body) }, '开始上课') }}>{starting?.state === 'failed' ? '再试一次' : '开始上课'}</button></section>}
+        void run(async () => { await api(token, 'course/start', body) }, '开始上课') }}>{starting?.state === 'failed' ? '再试一次' : retaking ? '重上这节课' : '开始上课'}</button></section>}
     {taught && fact && <section><h2>这节课已上</h2><button className="quiet" onClick={() => go('evaluations', String(fact.body.activity_id))}>查看课后评价</button></section>}
     {confirmed && preview && <section><h2>教学资源</h2>
       {resources.length ? <ul>{resourceLines(preview.body).map((line, index) => {

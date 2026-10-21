@@ -11,7 +11,7 @@ from test_preparation_model import science_lesson
 from test_preparation_resources import visual_draft
 
 from project_j.application.configuration import Settings
-from project_j.application.progress import next_step
+from project_j.application.progress import latest_facts, next_step, retake_course
 from project_j.interface.api import create_app
 from project_j.platform.models.contracts import AdapterReply
 from project_j.platform.storage import Conflict
@@ -188,3 +188,30 @@ def test_confirming_saves_and_makes_resources_but_waits_for_the_student(
         assert application.core.activity_id != before and application.core.mode != "ended"
         assert caplog.text.count("resource generated") == len(made)  # made once, at confirmation
         end_class(application)
+
+
+def test_a_stopped_class_can_be_taken_again_until_its_evaluation_is_acknowledged(
+    application, monkeypatch, caplog
+):
+    course_ref = science_lesson(application, monkeypatch, visual_draft)
+    asyncio.run(application.confirm_and_start("go", LEARNER, course_ref, True))
+    first = application.core.activity_id
+    end_class(application)  # the student stopped it
+    asyncio.run(application.evaluate("stopped-eval", LEARNER, first, "after_class"))
+    step = next_step(application, LEARNER)
+    assert step["kind"] == "evaluation" and step["subject"]["retake"] == course_ref.model_dump()
+    caplog.set_level(logging.INFO, logger="project_j")
+    asyncio.run(application.confirm_and_start("again", LEARNER, course_ref, True))
+    assert application.core.activity_id != first and application.core.mode != "ended"
+    assert "attempt=2" in caplog.text
+    end_class(application)
+
+
+def test_only_a_class_that_did_not_end_normally_is_offered_again(application, monkeypatch):
+    course_ref = science_lesson(application, monkeypatch, visual_draft)
+    asyncio.run(application.confirm_and_start("go", LEARNER, course_ref, True))
+    end_class(application)
+    stopped = latest_facts(application, LEARNER)[0]
+    assert retake_course(application, LEARNER, stopped) == course_ref.model_dump()
+    finished = stopped.model_copy(update={"body": stopped.body | {"end": {"reason": "normal"}}})
+    assert retake_course(application, LEARNER, finished) is None

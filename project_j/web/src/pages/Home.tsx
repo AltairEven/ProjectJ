@@ -51,7 +51,9 @@ export default function Home({ token, dashboard, learner, go, refresh }: PagePro
   const retry = (name: string) => run(async () => { await api(token, 'jobs/retry', { learner_id: learner, name }) })
   return <>
     <section className="next"><h2>下一步</h2><p className="next-title">{view.title}</p>
-      {view.action && <button onClick={() => go(view.page, view.detail)}>{view.action}</button>}
+      {(view.action || view.also) && <div className="row">
+        {view.action && <button onClick={() => go(view.page, view.detail)}>{view.action}</button>}
+        {view.also && <button className="quiet" onClick={() => go(view.also!.page, view.also!.detail)}>{view.also.action}</button>}</div>}
       {dashboard.next?.kind === 'focus' && <FocusPicker token={token} learner={learner} refresh={refresh} subject={dashboard.next.subject ?? {}} />}</section>
     {status}
     <section><h2>后台进行中</h2>

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { courseRows, needsMaterials } from '../src/courses.ts'
+import { courseRows, latestFact, needsMaterials, retakeOffered } from '../src/courses.ts'
 
 const ref = (object_id, revision) => ({ object_id, revision })
 const course = (id, revision, created_at, story) => ({ object_id: id, revision, kind: 'course', created_at,
@@ -30,4 +30,22 @@ test('each course has one row, newest first, with its state from the saved objec
 test('only a course with an offscreen task needs the student to have the materials ready', () => {
   assert.equal(needsMaterials({ body: { tasks: [{ purpose: 'reading' }, { purpose: 'offscreen' }] } }), true)
   assert.equal(needsMaterials({ body: { tasks: [{ purpose: 'reading' }] } }), false)
+})
+
+test('only the course the main page offers again can be retaken', () => {
+  const next = { kind: 'evaluation', subject: { activity_id: 'a1', retake: ref('c1', 2) } }
+  assert.equal(retakeOffered(next, course('c1', 2, '', 'x')), true)
+  assert.equal(retakeOffered(next, course('c1', 1, '', 'x')), false)
+  assert.equal(retakeOffered(next, course('c2', 2, '', 'x')), false)
+  assert.equal(retakeOffered({ kind: 'evaluation', subject: { activity_id: 'a1' } }, course('c1', 2, '', 'x')), false)
+  assert.equal(retakeOffered(undefined, course('c1', 2, '', 'x')), false)
+})
+
+test('a course taken again shows its latest class', () => {
+  const stopped = { ...fact('a1', ref('c1', 2)), created_at: '2026-10-20T15:58:01Z' }
+  const retaken = { ...fact('a2', ref('c1', 2)), created_at: '2026-10-21T09:00:00Z' }
+  const other = { ...fact('a3', ref('c2', 1)), created_at: '2026-10-22T09:00:00Z' }
+  assert.equal(latestFact(course('c1', 2, '', 'x'), [retaken, other, stopped])?.body.activity_id, 'a2')
+  assert.equal(latestFact(course('c1', 2, '', 'x'), [stopped, other, retaken])?.body.activity_id, 'a2')
+  assert.equal(latestFact(course('c9', 1, '', 'x'), [stopped]), undefined)
 })
