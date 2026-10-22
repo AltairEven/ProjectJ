@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.49.0；更新：2026年10月22日。
+版本：1.50.0；更新：2026年10月22日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -982,3 +982,21 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 未验证：没有启动沙盒或模拟服务看学习状态页的显示；真实模型与正式学习下的运行。
 - 净变化：Python源码+81/−190行，测试+47/−62行，前端源码+23/−28行；依赖不变。
 - 继续条件：已提交。评估中列为“可直接做”的其余五条（第8、13、14、18、21条）与“代价被低估”的七条未动，需用户另行决定。
+
+## LEAN-3 精简五项（ponytail全仓审查后续二）
+
+- 状态：实现与自测完成，用户要求提交，已本地提交（2026年10月22日）。LEAN-2提交后用户要求“继续做8、13、14、18、21五条”。
+- 负责人/集成：Claude Opus。审查由主会话自做，未派审查子代理。
+- 范围：
+  1. 第8条：规划、备课、评价三个“不可用”异常改为共用基类`ModelStepUnavailable`（`evaluation/assessment.py`，统一拼“The X could not be made (原因). 已保存内容; you can try again.”），三个子类保留各自名字与已保存说明，日志和捕获处仍能分辨；接口三个503处理器合为一个，响应只留前端实际读取的`message`（去掉`planning`/`preparation`/`evaluation`: `failed`键）。消息原文不变。
+  2. 第13条：删除`GET /api/onboarding/questions`（页面从下一步的`chat`主题取问句），docs/technology.md 1.20.2同步。保留`GET /api/class/snapshot`：页面虽只用WebSocket，但本机UI测试脚本（project_j/test/ui的walkthrough、fix3_layout、fix5_retake及test/records两份脚本）靠它轮询课堂状态，三项pytest也用它核对课堂令牌权限；删它只省3行却要改这些工具，需用户另行决定。
+  3. 第14条：删除依赖基线时期的类型夹具web/fixtures/dependency-check.ts与tsconfig.fixtures.json，`check:types`只留`tsc -b`；React类型由真实页面的类型检查覆盖。
+  4. 第18条：录音与模拟朗读改用浏览器原生`Uint8Array.prototype.toBase64()`，删`audio.ts`的分块`toBase64`及其300秒测试；tsconfig.app.json的lib加`ESNext.TypedArrays`（该方法只在此库声明）。技术文档登记的Chrome 154与Node 26.11.1都支持。仍以base64上传，接口形状不变。
+  5. 第21条：静态页面的手写后缀表改为`mimetypes.MimeTypes()`（只用Python自带表，不读本机系统表，.js仍为text/javascript）；原表外的类型（如字体）不再一律按octet-stream。
+- 文件边界：project_j/python/src/project_j/{evaluation/assessment.py,learning/planning.py,preparation/drafting.py,interface/api.py}；tests/{test_preparation_resources,test_onboarding,test_maintenance_api}.py；project_j/web/{src/Classroom.tsx,src/audio.ts,tests/audio.test.mjs,tsconfig.app.json,package.json}，删除web/fixtures/dependency-check.ts与web/tsconfig.fixtures.json；重新导出web/schema/openapi.json与web/src/client/{types.gen,index}.ts；docs/technology.md 1.20.2。
+- 验收条件：统一check与其余9项登记命令通过；503响应只含`message`且日志记录`refused POST /api/resource/generate 503 PreparationUnavailable`；建档问句接口返回404；静态文件类型新测试（改前字体会是octet-stream而失败）通过。
+- 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check含主工程725（新增静态类型1项）、评分39、合成15项pytest，前端79（删base64一项）、文档1，UTC 2026-10-22T15:24:07.262655+00:00，工程摘要ee98d457ad1e9d81fc3ea541edf9910e2377808fa1d7d80b72642b8640fba450，检查戳actual_api为unverified。
+- 净变化：Python源码+24/−39行，测试+28/−3行，前端手写代码与配置+5/−32行；依赖不变。
+- 诊断日志：503拒绝沿用`refused`行（记异常类名与消息前200字），新断言覆盖；其余四项不新增链路。
+- 未验证：没有启动沙盒或模拟服务实际录一次音、打开页面；真实模型与正式学习下的运行。
+- 继续条件：已提交；是否删除`GET /api/class/snapshot`（需同步改本机UI测试脚本与三项pytest）由用户决定。评估中“代价被低估”的七条仍未动。

@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import Field
 
 from project_j.contracts import Contract, RevisionRef
-from project_j.evaluation.assessment import FAILURE_TEXT
+from project_j.evaluation.assessment import ModelStepUnavailable
 from project_j.learning.contracts import (
     SKILLS,
     DemandBody,
@@ -227,16 +227,15 @@ def review_request(
     )
 
 
-class PlanningUnavailable(Exception):
+class PlanningUnavailable(ModelStepUnavailable):
     """Nothing of this plan or demand was saved; earlier saved steps stay and it can retry."""
 
     def __init__(self, reason: str, subject: str = "next lesson's plan"):
-        text = FAILURE_TEXT.get(reason, reason)
         kept = {
             "next lesson's plan": "The evaluation and learning state are saved",
             "profile": "The chat and the placement lesson are saved",
         }.get(subject, "The earlier plan stays")
-        super().__init__(f"The {subject} could not be made ({text}). {kept}; you can try again.")
+        super().__init__(reason, subject, kept)
 
 
 def checked_plan(body: dict, catalog_ids: set[str]) -> PlanBody:

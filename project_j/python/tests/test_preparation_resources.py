@@ -218,7 +218,8 @@ def test_backup_restore_keeps_resource_files(application, monkeypatch):
     restored.close()
 
 
-def test_resource_endpoints(application, monkeypatch):
+def test_resource_endpoints(application, monkeypatch, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
     course_ref = science_lesson(application, monkeypatch, visual_draft)
     body = {"learner_id": LEARNER, "course_ref": course_ref.model_dump()}
     with TestClient(create_app(Settings(), application)) as client:
@@ -248,4 +249,9 @@ def test_resource_endpoints(application, monkeypatch):
             headers=parent,
             json=request | {"request_id": "g2", "resource_id": "cup-picture"},
         )
-        assert failed.status_code == 503 and failed.json()["preparation"] == "failed"
+        assert failed.status_code == 503
+        assert failed.json() == {
+            "message": "The resource could not be made (the model is not available now). "
+            "The earlier resource stays; you can try again."
+        }
+        assert "refused POST /api/resource/generate 503 PreparationUnavailable" in caplog.text

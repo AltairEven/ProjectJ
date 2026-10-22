@@ -1397,35 +1397,6 @@ export type OnboardingLexileApiOnboardingLexilePostResponses = {
     200: unknown;
 };
 
-export type OnboardingQuestionsApiOnboardingQuestionsGetData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/onboarding/questions';
-};
-
-export type OnboardingQuestionsApiOnboardingQuestionsGetErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type OnboardingQuestionsApiOnboardingQuestionsGetError = OnboardingQuestionsApiOnboardingQuestionsGetErrors[keyof OnboardingQuestionsApiOnboardingQuestionsGetErrors];
-
-export type OnboardingQuestionsApiOnboardingQuestionsGetResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
 export type OnboardingChatApiOnboardingChatPostData = {
     body: ChatRequest;
     headers?: {

@@ -6,6 +6,7 @@ import base64
 import binascii
 import json
 import logging
+import mimetypes
 import signal
 import threading
 import time
@@ -36,7 +37,7 @@ from project_j.application.coordinator import Coordinator
 from project_j.application.progress import advance, jobs, next_step, retry, run
 from project_j.classroom.harness import AllowedAction, DeliveryFeedback, Harness
 from project_j.contracts import Contract, Document, RevisionRef
-from project_j.evaluation.assessment import EvaluationUnavailable
+from project_j.evaluation.assessment import ModelStepUnavailable
 from project_j.learning.contracts import Challenge, Rating
 from project_j.learning.fixtures import initialize
 from project_j.learning.maintenance import decide, review, revise_demand_after_plan
@@ -47,7 +48,6 @@ from project_j.learning.onboarding import (
     save_chat,
     save_lexile,
 )
-from project_j.learning.planning import PlanningUnavailable
 from project_j.platform.files import PrivateFiles
 from project_j.platform.models.config import ModelFiles
 from project_j.platform.models.registry import load_service
@@ -56,7 +56,6 @@ from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.local import LocalSynthesizer, SynthesizerUnavailable
 from project_j.platform.tts.recorded import speak
-from project_j.preparation.drafting import PreparationUnavailable
 from project_j.preparation.resources import adopt_resource, generate_resource, resource_file
 
 LEARNER_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
@@ -446,18 +445,13 @@ def create_app(
         chatting = next_step(app.state.coordinator, learner)["kind"] in {"lexile", "chat"}
         ahead = asyncio.create_task(say_chat_ahead(local[1])) if chatting else None
         dist = settings.project_root / "project_j/web/dist"
-        types = {
-            ".html": "text/html",
-            ".js": "text/javascript",
-            ".css": "text/css",
-            ".svg": "image/svg+xml",
-        }
+        types = mimetypes.MimeTypes()  # Python's own table, not the host's (.js stays JavaScript)
         if dist.exists():
             for path in dist.rglob("*"):
                 if path.is_file():
                     static[str(path.relative_to(dist))] = (
                         path.read_bytes(),
-                        types.get(path.suffix, "application/octet-stream"),
+                        types.guess_type(path.name)[0] or "application/octet-stream",
                     )
 
         async def watch_budget():
@@ -560,17 +554,9 @@ def create_app(
             },
         )
 
-    @app.exception_handler(EvaluationUnavailable)
-    async def evaluation_failed(request, error):
-        return refused(request, error, 503, {"message": str(error), "evaluation": "failed"})
-
-    @app.exception_handler(PlanningUnavailable)
-    async def planning_failed(request, error):
-        return refused(request, error, 503, {"message": str(error), "planning": "failed"})
-
-    @app.exception_handler(PreparationUnavailable)
-    async def preparation_failed(request, error):
-        return refused(request, error, 503, {"message": str(error), "preparation": "failed"})
+    @app.exception_handler(ModelStepUnavailable)
+    async def model_step_failed(request, error):
+        return refused(request, error, 503, {"message": str(error)})
 
     @app.exception_handler(LookupError)
     async def not_found(request, error):
@@ -751,10 +737,6 @@ def create_app(
     @app.post("/api/onboarding/lexile", dependencies=[Depends(operator)])
     async def onboarding_lexile(request: LexileRequest):
         return save_lexile(controller(), request.request_id, request.learner_id, request.lexile)
-
-    @app.get("/api/onboarding/questions", dependencies=[Depends(operator)])
-    async def onboarding_questions():
-        return list(QUESTIONS)
 
     @app.post("/api/onboarding/chat", dependencies=[Depends(operator)])
     async def onboarding_chat(request: ChatRequest):

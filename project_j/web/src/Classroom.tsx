@@ -10,7 +10,6 @@ import { Microphone } from './microphone'
 import { passage } from './passage'
 import { classProgress, taskMarks } from './progress'
 import { Progress } from './ui'
-import { toBase64 } from './audio'
 import { answerMode, type TaskView } from './tasks'
 import { TaskInput } from './TaskInput'
 import type { AllowedAction, Snapshot, Control, DeliveryFeedback, TextInput, InputResult as Ack } from './client/types.gen'
@@ -200,13 +199,13 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     setRecorder(idle)
     let audio: string
     if (voiced) {
-      try { audio = toBase64(microphone.current ? await microphone.current.finish() : new Uint8Array()) } catch {
+      try { audio = (microphone.current ? await microphone.current.finish() : new Uint8Array()).toBase64() } catch {
         setMessage('The recording could not be read. Please record again.')
         return
       }
     }
     // Simulation convention: the recording bytes are the text the simulated student read.
-    else audio = btoa(String.fromCharCode(...new TextEncoder().encode(readingText)))
+    else audio = new TextEncoder().encode(readingText).toBase64()
     const result = await send('class/recording', { event_id: uid(), audio_base64: audio, ...timing })
     if (result) setReadingText('')
   }

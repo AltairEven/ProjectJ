@@ -131,7 +131,7 @@ def test_onboarding_routes(tmp_path):
     with TestClient(create_app(Settings(), app)) as client:
         auth = {"Authorization": f"Bearer {app.token}"}
         assert client.get("/api/dashboard", headers=auth).json()["next"]["kind"] == "lexile"
-        assert client.get("/api/onboarding/questions", headers=auth).json() == list(QUESTIONS)
+        assert client.get("/api/onboarding/questions", headers=auth).status_code == 404
         speech = client.get("/api/onboarding/speech/0", headers=auth)
         assert speech.status_code == 200 and speech.content
         assert client.get("/api/onboarding/speech/99", headers=auth).status_code == 404

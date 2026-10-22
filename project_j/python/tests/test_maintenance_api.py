@@ -436,3 +436,22 @@ def test_focus_route_refuses_more_than_three_skills(application):
         assert client.get("/api/dashboard", headers=auth).json()["next"]["kind"] == "focus"
         none = body | {"request_id": "f2"}
         assert client.post("/api/focus", headers=auth, json=none).status_code == 200
+
+
+def test_built_pages_are_served_with_their_types(application, tmp_path):
+    dist = tmp_path / "root/project_j/web/dist"
+    dist.mkdir(parents=True)
+    names = ("index.html", "app.js", "app.css", "a.svg", "a.woff2", "blob")
+    for name in names:
+        (dist / name).write_bytes(b"x")
+    with TestClient(create_app(Settings(project_root=tmp_path / "root"), application)) as client:
+        served = [client.get(f"/{name}").headers["content-type"] for name in names]
+        assert client.get("/").headers["content-type"] == served[0]
+    assert served == [
+        "text/html; charset=utf-8",
+        "text/javascript; charset=utf-8",
+        "text/css; charset=utf-8",
+        "image/svg+xml",
+        "font/woff2",
+        "application/octet-stream",
+    ]

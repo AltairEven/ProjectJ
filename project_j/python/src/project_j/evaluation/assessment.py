@@ -360,12 +360,17 @@ FAILURE_TEXT = {
 }
 
 
-class EvaluationUnavailable(Exception):
+class ModelStepUnavailable(Exception):
+    """A model step saved nothing; what it would have changed stays and the request can retry.
+    Each step keeps its own subclass so logs and handlers can tell them apart."""
+
+    def __init__(self, reason: str, subject: str, kept: str):
+        text = FAILURE_TEXT.get(reason, reason)
+        super().__init__(f"The {subject} could not be made ({text}). {kept}; you can try again.")
+
+
+class EvaluationUnavailable(ModelStepUnavailable):
     """No evaluation was saved; the sealed facts and feedback stay and the request can retry."""
 
     def __init__(self, reason: str):
-        text = FAILURE_TEXT.get(reason, reason)
-        super().__init__(
-            f"The evaluation could not be made ({text}). The class record and your notes "
-            "are saved; you can try again."
-        )
+        super().__init__(reason, "evaluation", "The class record and your notes are saved")

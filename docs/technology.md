@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.20.1；更新：2026年10月22日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
+版本：1.20.2；更新：2026年10月22日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -167,7 +167,7 @@ ADR-0018起，应用协调层的推进器（project_j/python/src/project_j/appli
 
 ### 建档
 
-正式学习空间与`--onboarding`模拟从建档开始：`POST /api/onboarding/lexile`（蓝思值规范为“数字+L”或“BR+数字+L”）、`GET /api/onboarding/questions`与`GET /api/onboarding/speech/{index}`（本机合成的Jane问句）、`POST /api/onboarding/chat`（四个问题全部回答后，规则生成建档小测需求：阅读事实加朗读发音）。小测照常备课、生成资源、上课与评价；评价后规划用途整理学习资料（期限180秒），学生经`POST /api/profile`确认或修改（之后在学习状态页修改也用它），同时视为认可小测评价，随后规划第一个目标并请学生确认。
+正式学习空间与`--onboarding`模拟从建档开始：`POST /api/onboarding/lexile`（蓝思值规范为“数字+L”或“BR+数字+L”）、`GET /api/onboarding/speech/{index}`（本机合成的Jane问句；问句随下一步下发）、`POST /api/onboarding/chat`（四个问题全部回答后，规则生成建档小测需求：阅读事实加朗读发音）。小测照常备课、生成资源、上课与评价；评价后规划用途整理学习资料（期限180秒），学生经`POST /api/profile`确认或修改（之后在学习状态页修改也用它），同时视为认可小测评价，随后规划第一个目标并请学生确认。
 
 ### 备课
 

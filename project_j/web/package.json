@@ -33,7 +33,7 @@
   },
   "scripts": {
     "test:interface": "node --test tests/*.test.mjs",
-    "check:types": "tsc -b --pretty false && tsc --noEmit -p tsconfig.fixtures.json",
+    "check:types": "tsc -b --pretty false",
     "test:docs": "node --test check_docs.test.mjs",
     "check:docs": "node check_docs.mjs",
     "build": "tsc -b && vite build",

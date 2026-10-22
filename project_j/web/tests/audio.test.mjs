@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { decodePcm16, encodeWav, toBase64, toMono } from '../src/audio.ts'
+import { decodePcm16, encodeWav, toMono } from '../src/audio.ts'
 
 test('a sample split across network chunks decodes once and in place', () => {
   const first = decodePcm16(new Uint8Array([0x00, 0x40, 0xff]), null)
@@ -22,9 +22,4 @@ test('a 16 kHz recording becomes a mono PCM16 WAV the scorer reads', () => {
 
 test('stereo is averaged to mono', () => {
   assert.deepEqual(Array.from(toMono([new Float32Array([1, 0]), new Float32Array([0, 0])])), [0.5, 0])
-})
-
-test('a 300 second recording converts to base64 without overflowing the stack', () => {
-  const bytes = new Uint8Array(300 * 16000 * 2 + 44).fill(7)
-  assert.equal(Buffer.from(toBase64(bytes), 'base64').equals(Buffer.from(bytes)), true)
 })

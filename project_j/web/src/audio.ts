@@ -34,10 +34,3 @@ export function encodeWav(samples: Float32Array, sampleRate: number): Uint8Array
   samples.forEach((value, i) => view.setInt16(44 + i * 2, Math.round(Math.max(-1, Math.min(1, value)) * 32767), true))
   return wav
 }
-
-// Chunked so a 300 s recording does not spread millions of arguments onto the stack.
-export function toBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-  return btoa(binary)
-}

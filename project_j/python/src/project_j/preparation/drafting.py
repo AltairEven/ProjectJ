@@ -7,7 +7,7 @@ from pydantic import Field
 
 from project_j.contracts import Contract, RevisionRef
 from project_j.english import chinese
-from project_j.evaluation.assessment import FAILURE_TEXT
+from project_j.evaluation.assessment import ModelStepUnavailable
 from project_j.learning.contracts import SKILLS, DemandBody, Text
 from project_j.learning.planning import learning_context, pick
 from project_j.platform.models.contracts import ModelRequest
@@ -316,16 +316,15 @@ class DraftRejected(Exception):
         super().__init__("；".join(text for _, text in problems))
 
 
-class PreparationUnavailable(Exception):
+class PreparationUnavailable(ModelStepUnavailable):
     """Nothing of this course was saved; the demand or the earlier version stays."""
 
     def __init__(self, reason: str, subject: str = "lesson"):
-        text = FAILURE_TEXT.get(reason, reason)
         kept = {
             "lesson": "The next lesson's plan is saved",
             "resource": "The earlier resource stays",
         }.get(subject, "The earlier lesson version stays")
-        super().__init__(f"The {subject} could not be made ({text}). {kept}; you can try again.")
+        super().__init__(reason, subject, kept)
 
 
 class Checked(NamedTuple):
