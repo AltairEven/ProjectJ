@@ -95,7 +95,10 @@ def release_rechecked(app, operation_id: str, learner_id: str, evaluation) -> No
     if not in_use and not replaced:
         return
     if in_use:
-        evidence = f"已按更正后的评价第{evaluation.revision}版复核，仍在使用的版本沿用。"
+        evidence = (
+            f"Checked against corrected evaluation version {evaluation.revision}; "
+            "versions in use stay."
+        )
         objects = [
             resolved(doc, operation_id, evidence, (doc.ref, evaluation.ref)) for doc in in_use
         ]
@@ -104,7 +107,9 @@ def release_rechecked(app, operation_id: str, learner_id: str, evaluation) -> No
             learner_id,
             "release",
             objects,
-            publications=tuple(publication(obj, "按更正复核后解除") for obj in objects),
+            publications=tuple(
+                publication(obj, "Released after review against the correction") for obj in objects
+            ),
         )
     log.info(
         "correction rechecked activity=%s released=%d kept=%d",
@@ -141,7 +146,9 @@ def correct(app, request_id: str, learner_id: str, target: RevisionRef, note: st
                 "original_owner": owner,
                 "note": note,
                 "state": "pending_verification",
-                "limitations": ["保留旧内容、原答和解释；不重放课堂。"],
+                "limitations": [
+                    "Old content, answers and readings stay; the class is not replayed."
+                ],
             },
             refs=(target,),
         )
@@ -150,7 +157,7 @@ def correct(app, request_id: str, learner_id: str, target: RevisionRef, note: st
             learner_id,
             "issue",
             [obj],
-            publications=(publication(obj, "有版本和主责的更正问题"),),
+            publications=(publication(obj, "Correction issue with an exact version and an owner"),),
         )
     impacted = affected(app, target, learner_id)
     restrictions = restrict_affected(app, operation, learner_id, [original], note)
@@ -191,7 +198,9 @@ def release(
             learner_id,
             "release",
             [obj],
-            publications=(publication(obj, "主责针对确切版本复核解除"),),
+            publications=(
+                publication(obj, "Released by the owner after reviewing the exact version"),
+            ),
         )
     return app.ledger.finish(
         operation, learner_id, {"restriction_ref": saved[0].ref.model_dump(), "state": "resolved"}

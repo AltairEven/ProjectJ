@@ -115,8 +115,8 @@ def test_unquoted_external_help_stays_unknown(application):
     assert merged["tasks"][0]["external_help"] == "unknown"
     assert merged["tasks"][0]["working_judgment"] == "unknown"
     assert [c["reason"] for c in merged["checks"]] == [
-        "外部帮助未逐字引用学生补记，按未知处理",
-        "单次独立的条件不足",
+        "Outside help was not quoted word for word from your notes; unknown",
+        "Not enough to call it done alone",
     ]
 
 
@@ -129,7 +129,7 @@ def test_rule_violations_fall_back_to_unknown(application):
     merged = apply_draft(base, draft, [])
     assert merged["tasks"][wrong]["working_judgment"] == "unknown"
     assert merged["tasks"][plain]["working_judgment"] == "unknown"
-    assert "需要帮助缺少依据" in merged["tasks"][plain]["limitations"]
+    assert "No evidence that help was needed" in merged["tasks"][plain]["limitations"]
     assert {c["task_id"] for c in merged["checks"]} == {"reading-fact", "reading-sequence"}
 
 
@@ -162,7 +162,7 @@ def test_corrected_task_is_unknown(application):
     )
     merged = apply_draft(base, draft, [feedback])
     assert merged["tasks"][0]["working_judgment"] == "unknown"
-    assert "受学生更正影响，待复核" in merged["tasks"][0]["limitations"]
+    assert "Your correction affects it; to be checked again" in merged["tasks"][0]["limitations"]
 
 
 def test_draft_with_missing_attempt_is_rejected(application):
@@ -182,7 +182,7 @@ def test_next_course_saves_a_checked_draft(application):
     result = asyncio.run(next_course(application, "next1", LEARNER, activity))
     evaluation = application.store.current(identity(activity, "evaluation"), LEARNER)
     assert evaluation.body["basis_version"] == "evaluation-draft-1"
-    assert evaluation.body["report"]["summary"].startswith("模拟评价")
+    assert evaluation.body["report"]["summary"].startswith("Simulated evaluation")
     assert evaluation.body["draft"]["tasks"]
     assert result["next_package"]  # downstream unchanged
 
@@ -199,7 +199,7 @@ def test_draft_with_wrong_attempts_is_not_saved(application, monkeypatch):
         return reply | {"tasks": reply["tasks"][1:]} if request.purpose == "evaluation" else reply
 
     monkeypatch.setattr(adapter, "respond", drop_one)
-    with pytest.raises(EvaluationUnavailable, match="尝试不一致"):
+    with pytest.raises(EvaluationUnavailable, match="does not match the tries"):
         asyncio.run(application.evaluate("e1", LEARNER, activity, "final_feedback"))
     assert application.store.current(identity(activity, "evaluation"), LEARNER) is None
     monkeypatch.setattr(adapter, "respond", original)
@@ -214,7 +214,8 @@ def test_evaluation_failure_is_reported_and_retryable(application):
         assert name.startswith("evaluate:")
         await wait_jobs(application)
         assert application.job_failures[name] == (
-            "课后评价未取得（模型暂不可用）。事实与反馈已保存，可以重试。"
+            "The evaluation could not be made (the model is not available now). "
+            "The class record and your notes are saved; you can try again."
         )
         retry(application, LEARNER, name)
         await wait_jobs(application)
@@ -241,12 +242,12 @@ def test_evaluation_sees_the_chosen_skills(application):
     assert evaluation_request(fact.body, course.body, [], JANE).context["skill_focus"] == []
     ticked = {
         "field": "skill_focus",
-        "requirement": "一般过去时：过去发生的事",
+        "requirement": "Past simple: things that happened",
         "implementation": "x",
     }
     body = course.body | {"demand_mapping": [*course.body["demand_mapping"], ticked]}
     request = evaluation_request(fact.body, body, [], JANE)
-    assert request.context["skill_focus"] == ["一般过去时：过去发生的事"]
+    assert request.context["skill_focus"] == ["Past simple: things that happened"]
     assert "勾选的加强项目" in request.instructions
 
 
@@ -276,7 +277,10 @@ def test_the_evaluation_scores_every_scored_question(application):
     assert "point-paper" not in basis and "paper-experiment" not in basis
     assert all(item["score"] == 10 for item in merged["scores"] if item["basis"] != "pronunciation")
     reading = next(item for item in merged["scores"] if item["basis"] == "pronunciation")
-    assert reading["limitations"] == ["发音评分门槛未校准。"] and reading["score"] is not None
+    assert (
+        reading["limitations"] == ["The pronunciation score limits are not calibrated."]
+        and reading["score"] is not None
+    )
     assert merged["checks"] == []
 
 
@@ -305,24 +309,26 @@ def test_model_scores_are_checked(application):
     merged = scored(
         base,
         draft,
-        ScoreReading(task_id="reading-sequence", score=11, reason="满分以上"),
-        ScoreReading(task_id="reading-fact", score=10, reason="满分"),
-        ScoreReading(task_id="no-such-task", score=5, reason="多给"),
+        ScoreReading(task_id="reading-sequence", score=11, reason="Above full"),
+        ScoreReading(task_id="reading-fact", score=10, reason="Full"),
+        ScoreReading(task_id="no-such-task", score=5, reason="Extra"),
     )
     assert entry(merged, "reading-sequence")["score"] is None
-    assert entry(merged, "reading-sequence")["reason"] == "评价模型给分越界"
-    assert entry(merged, "reading-fact")["reason"] == "有答错记录不能给10分"
+    assert entry(merged, "reading-sequence")["reason"] == "Score out of range"
+    assert entry(merged, "reading-fact")["reason"] == "No 10 after a wrong try"
     assert entry(merged, "retell-bridge") | {"score": None} == entry(merged, "retell-bridge")
-    assert entry(merged, "retell-bridge")["reason"] == "评价模型没有给这题打分"
+    assert entry(merged, "retell-bridge")["reason"] == "The evaluation gave no score for it"
     assert {(c["task_id"], c["reason"]) for c in merged["checks"]} >= {
-        ("reading-sequence", "评价模型给分越界，按未知处理"),
-        ("reading-fact", "有答错记录不能给10分，按未知处理"),
-        ("no-such-task", "不是需要打分的题"),
+        ("reading-sequence", "The score was out of range, so it stays unknown"),
+        ("reading-fact", "A 10 after a wrong try is not allowed; unknown"),
+        ("no-such-task", "Not a scored question"),
     }
-    fine = scored(base, draft, ScoreReading(task_id="reading-fact", score=7, reason="错1次后答对"))
+    fine = scored(
+        base, draft, ScoreReading(task_id="reading-fact", score=7, reason="Right after 1 wrong try")
+    )
     assert (entry(fine, "reading-fact")["score"], entry(fine, "reading-fact")["reason"]) == (
         7,
-        "错1次后答对",
+        "Right after 1 wrong try",
     )
 
 
@@ -346,7 +352,9 @@ def test_a_draft_from_before_scoring_is_reused_without_failing(application):
     assert evaluation_calls(application) == calls  # Reused, not asked again.
     model = [item for item in second.body["scores"] if item["basis"] == "model"]
     assert model and all(item["score"] is None for item in model)
-    assert {item["reason"] for item in model} == {"评价草稿早于计分"}
+    assert {item["reason"] for item in model} == {
+        "The evaluation was written before scores existed"
+    }
     assert any(
         item["score"] is not None for item in second.body["scores"] if item["basis"] == "rule"
     )
@@ -358,5 +366,58 @@ def test_corrections_make_the_score_unknown(application):
     base = interpret(fact, [SimpleNamespace(body=feedback, ref=fact.ref)], 2, "final")
     merged = apply_draft(base, draft, [feedback])
     assert entry(merged, "choice-first-try")["score"] is None
-    assert entry(merged, "choice-first-try")["reason"] == "受学生更正影响，待复核"
+    assert (
+        entry(merged, "choice-first-try")["reason"]
+        == "Your correction affects it; to be checked again"
+    )
     assert entry(merged, "order-bridge")["score"] == 10
+
+
+def test_evaluation_request_carries_the_reading_level(application):
+    fact, course = sealed(application)
+    for level in ("500L", None):
+        request = evaluation_request(fact.body, course.body, [], JANE, level)
+        assert request.context["reading_level"] == level
+    assert "reading_level" in request.instructions and "初学者" in request.instructions
+
+
+def test_an_evaluation_draft_with_chinese_fails_and_can_retry(application, monkeypatch, caplog):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="project_j")
+    _, fact = asyncio.run(complete_story(application))
+    activity = fact.body["activity_id"]
+    adapter = application.models.adapters["simulated"]
+    original = adapter.respond
+
+    def chinese_summary(request):
+        reply = original(request)
+        return reply | {"summary": "学得不错。"} if request.purpose == "evaluation" else reply
+
+    monkeypatch.setattr(adapter, "respond", chinese_summary)
+    with pytest.raises(EvaluationUnavailable, match="the reply was not in English"):
+        asyncio.run(application.evaluate("e1", LEARNER, activity, "after_class"))
+    assert application.store.current(identity(activity, "evaluation"), LEARNER) is None
+    assert "failure=language" in caplog.text and "学得不错" not in caplog.text
+    monkeypatch.setattr(adapter, "respond", original)
+    assert asyncio.run(application.evaluate("e1", LEARNER, activity, "after_class"))
+
+
+def test_a_chinese_feedback_quote_does_not_fail_the_evaluation(application, monkeypatch):
+    _, fact = asyncio.run(complete_story(application))
+    activity = fact.body["activity_id"]
+    quote = "妈妈帮我读了第一段"
+    application.feedback("fb1", LEARNER, activity, quote, [])
+    adapter = application.models.adapters["simulated"]
+    original = adapter.respond
+
+    def quoting(request):
+        reply = original(request)
+        if request.purpose != "evaluation":
+            return reply
+        first = reply["tasks"][0] | {"external_help": "reported", "help_quote": quote}
+        return reply | {"tasks": [first, *reply["tasks"][1:]]}
+
+    monkeypatch.setattr(adapter, "respond", quoting)
+    evaluation = asyncio.run(application.evaluate("e1", LEARNER, activity, "final_feedback"))
+    assert evaluation.body["tasks"][0]["help_quote"] == quote

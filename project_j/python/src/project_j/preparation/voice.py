@@ -20,15 +20,24 @@ __all__ = [
     "question_text",
 ]
 # What Jane says first when a clicked task is answered wrong; that level's help follows.
-WRONG_TEXT = "这次还不对。"
+WRONG_TEXT = "Not yet."
 
 
 def goal_text(course: CourseBody) -> str:
-    reading = "先复习读过的故事" if course.lesson_type == "review" else "先读故事"
-    observe = (
-        "，再做离屏短观察" if any(task.purpose == "offscreen" for task in course.tasks) else ""
+    reading = (
+        "First we review a story you have read"
+        if course.lesson_type == "review"
+        else "First we read a story"
     )
-    return f"我是Jane。{reading}、找依据{observe}；可随时暂停或停止。请确认收到安排。"
+    observe = (
+        ", then do a short observation away from the screen"
+        if any(task.purpose == "offscreen" for task in course.tasks)
+        else ""
+    )
+    return (
+        f"I'm Jane. {reading} and find the words that show the answers{observe}. "
+        "You can pause or stop at any time. Did you hear the plan?"
+    )
 
 
 def question_text(task: TaskDefinition, budget: dict[str, int]) -> str:
@@ -37,7 +46,10 @@ def question_text(task: TaskDefinition, budget: dict[str, int]) -> str:
         # The offscreen action itself carries its minutes and the way back; a course saved
         # before ADR-0020 has them in its budget.
         minutes = task.minutes or budget["offscreen"]
-        return f"{task.prompt}这一段约{minutes}分钟；做完点“返回”，再说实际结果。"
+        return (
+            f"{task.prompt} This takes about {minutes} minutes. When you are done, "
+            'press "Back" and tell me what really happened.'
+        )
     if task.purpose == "read_aloud":
         return f"{task.prompt}\n{task.reference_text}"
     return task.prompt
@@ -54,15 +66,15 @@ def audio_resources(course: CourseBody) -> tuple[ResourceSpec, ...]:
             resource_id=resource_id,
             kind="audio",
             purpose=purpose,
-            content="按课程文字预合成，课堂直接播放",
+            content="Made ahead from the course text and played in class",
             task_ids=task_ids,
             audience="student",
             required=False,
-            fallback="未采用时课堂现场合成同一句",
+            fallback="If not adopted, the same sentence is spoken live",
             text=text,
         )
 
-    resources = [statement("voice:goal", "Jane的固定语句：开场说明", goal_text(course))]
+    resources = [statement("voice:goal", "Jane's fixed line: opening", goal_text(course))]
     for task in course.tasks:
         # Too long for one synthesis request: nothing to prepare; live speech says so in class.
         if len(question_speech(task, course.budget)) > MAX_AUDIO_CHARS:
@@ -70,24 +82,28 @@ def audio_resources(course: CourseBody) -> tuple[ResourceSpec, ...]:
         resources.append(
             statement(
                 f"voice:{task.task_id}",
-                f"Jane的固定语句：{task.task_id}题目",
+                f"Jane's fixed line: question {task.task_id}",
                 question_speech(task, course.budget),
                 (task.task_id,),
             )
         )
     for task in course.tasks:
         if task.purpose in PROGRAM_JUDGED:  # Every line Jane may say on a clicked task.
-            lines = [("correct", "答对时", task.correct_text)]
+            lines = [("correct", "when right", task.correct_text)]
             for level, support in enumerate(task.supports, 1):
                 lines += [
-                    (f"wrong-{level}", f"答错时第{level}级帮助", WRONG_TEXT + support.text),
-                    (f"hint-{level}", f"求助时第{level}级帮助", support.text),
+                    (
+                        f"wrong-{level}",
+                        f"help {level} after a wrong answer",
+                        f"{WRONG_TEXT} {support.text}",
+                    ),
+                    (f"hint-{level}", f"help {level} on a hint", support.text),
                 ]
-            lines.append(("exit", "退出语", task.exit_text))
+            lines.append(("exit", "exit line", task.exit_text))
             resources += [
                 statement(
                     f"voice:{task.task_id}:{name}",
-                    f"Jane的固定语句：{task.task_id}{what}",
+                    f"Jane's fixed line: {task.task_id}, {what}",
                     text,
                     (task.task_id,),
                 )
@@ -100,12 +116,13 @@ def audio_resources(course: CourseBody) -> tuple[ResourceSpec, ...]:
                 ResourceSpec(
                     resource_id=f"demo:{task.task_id}",
                     kind="audio",
-                    purpose=f"朗读示范：{task.task_id}",
-                    content="Jane示范朗读本段，作为第二级帮助",
+                    purpose=f"Reading model: {task.task_id}",
+                    content="Jane reads this part aloud as the second help",
                     task_ids=(task.task_id,),
                     audience="student",
                     required=True,
-                    fallback="采用示范音后才能开课；不现场合成冒充示范",
+                    fallback="The class starts only after the model reading is adopted; "
+                    "live speech never stands in for it",
                     stage="help",
                     text=task.reference_text,
                 )

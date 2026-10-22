@@ -44,14 +44,17 @@ def test_rule_score_follows_wrong_answers_then_hints(wrong, hints, score):
 
 
 def test_rule_score_reasons_read_for_the_student():
-    assert rule_score(question()) == (10, "一次答对")
-    assert rule_score(question(wrong=1, hints=1)) == (6, "错1次后答对，用了1次提示")
+    assert rule_score(question()) == (10, "Right the first time")
+    assert rule_score(question(wrong=1, hints=1)) == (6, "Right after 1 wrong try, 1 hint used")
 
 
 def test_never_correct_after_trying_is_zero_but_never_answering_is_unknown():
     assert rule_score(question(wrong=2, correct=False, exited=True))[0] == 0
     assert rule_score(question(wrong=1, correct=False, skipped=True))[0] == 0
-    assert rule_score(question(wrong=0, correct=False, hints=1, skipped=True)) == (None, "没有作答")
+    assert rule_score(question(wrong=0, correct=False, hints=1, skipped=True)) == (
+        None,
+        "No answer",
+    )
     assert (
         rule_score(question(wrong=1, correct=False))[0] is None
     )  # Still current at stop or close.
@@ -84,9 +87,9 @@ def test_questions_group_attempts_hints_and_exits_by_task_instance(application):
             False,
             False,
         )
-        assert rule_score(found) == (6, "错1次后答对，用了1次提示")
+        assert rule_score(found) == (6, "Right after 1 wrong try, 1 hint used")
         current = [q for q in questions(sealed) if q.purpose == "order"]
-        assert current and rule_score(current[0]) == (None, "没有作答")
+        assert current and rule_score(current[0]) == (None, "No answer")
 
     asyncio.run(scenario())
 
@@ -165,3 +168,22 @@ def test_the_dashboard_lists_each_lessons_scores(application):
     after = application.dashboard(LEARNER)["scores"]
     assert len(after) == 1 and after[0]["by_type"]["choice"] == {"average": None, "count": 0}
     assert after[0]["unknown"] == first[0]["unknown"] + 1
+
+
+def test_score_reasons_are_english():
+    import project_j.evaluation.scoring as scoring
+    from project_j.english import chinese
+
+    texts = [
+        value for name, value in vars(scoring).items() if name.isupper() and isinstance(value, str)
+    ]
+    assert texts and not chinese(texts)
+    attempt = {"judgment": "incorrect", "task_instance_id": "i"}
+    right = {"judgment": "correct", "task_instance_id": "i"}
+    for question in (
+        scoring.Question("t", "i", "choice", "d", [right], 0, False, False),
+        scoring.Question("t", "i", "choice", "d", [attempt, right], 1, False, False),
+        scoring.Question("t", "i", "choice", "d", [attempt], 0, True, False),
+        scoring.Question("t", "i", "choice", "d", [attempt], 0, False, True),
+    ):
+        assert not chinese(scoring.rule_score(question)[1])

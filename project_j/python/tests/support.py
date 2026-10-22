@@ -111,23 +111,27 @@ async def read_aloud_all(app):
 async def complete_story(app, helped=False, offscreen_report=True):
     core = await start(app)
     deliver_all(core)
-    await answer(app, "听到了，先读故事再试纸桥。", "confirmation")
+    await answer(app, "Yes, I heard. Read first, then try the paper bridge.", "confirmation")
     if helped:
         await answer(app, "a car")
-        await answer(app, "帮我一下", "help")
-        await answer(app, "还是不懂，帮我一下", "help")
+        await answer(app, "Help me", "help")
+        await answer(app, "I still don't understand. Help me.", "help")
     await answer(app, "a bridge")
     await answer(app, "She folded it.")
-    await answer(app, "我指的是折过的纸。", "report")
+    await answer(app, "I pointed to the folded paper.", "report")
     if offscreen_report:
         core.control(str(uuid4()), "return")
         deliver_all(core)
-        await answer(app, "用同一本书和同一辆车，第二次纸折了，车没有掉。", "report")
+        await answer(
+            app,
+            "Same book and car; the second time the paper was folded and the car did not fall.",
+            "report",
+        )
     else:
         core.control(str(uuid4()), "close")
         deliver_all(core)
     await read_aloud_all(app)
-    await answer(app, "听到了，下次看不同的桥。", "confirmation")
+    await answer(app, "Yes, I heard. Next time a different bridge.", "confirmation")
     assert core.mode == "ended"
     fact = app.seal()
     return core, fact
@@ -142,15 +146,15 @@ async def teach(app, request_id, course_ref, answers):
     assert result["decision"] == "allow_simulation"
     core = app.core
     deliver_all(core)
-    await answer(app, "听到了。", "confirmation")
+    await answer(app, "Yes, I heard.", "confirmation")
     for text in answers:
         await answer(app, text)
-    await answer(app, "我指的是折过的纸。", "report")
+    await answer(app, "I pointed to the folded paper.", "report")
     core.control(str(uuid4()), "return")
     deliver_all(core)
-    await answer(app, "第二次纸折了，车没有掉。", "report")
+    await answer(app, "The second time the paper was folded and the car did not fall.", "report")
     await read_aloud_all(app)
-    await answer(app, "听到了。", "confirmation")
+    await answer(app, "Yes, I heard.", "confirmation")
     assert core.mode == "ended"
     return app.seal()
 

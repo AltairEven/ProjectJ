@@ -89,7 +89,7 @@ def test_study_class_takes_student_inputs_and_seals_student_facts(study):
     assert core.snapshot()["realm"] == "study"
     assert core.snapshot()["source_type"] == "student"
     deliver_all(core)
-    result = asyncio.run(answer(study, "听到了", "confirmation"))
+    result = asyncio.run(answer(study, "Yes, I heard.", "confirmation"))
     assert result["ack"] == "accepted"
     core.control("stop-1", "stop")
     sealed = study.seal()  # same call the API makes after an end
@@ -167,7 +167,7 @@ def test_a_process_that_fails_to_start_leaves_class_start_blocked(tmp_path):
     coordinator = study_coordinator(tmp_path, "ok", "not_ready")
     settings = Settings(realm="study", project_root=tmp_path)
     with TestClient(create_app(settings, coordinator)) as client:
-        assert "合成进程未启动" in coordinator.synthesizer.reasons()
+        assert "Speech process not started" in coordinator.synthesizer.reasons()
         dashboard = client.get(
             "/api/dashboard",
             headers={"Authorization": f"Bearer {coordinator.token}"},
@@ -220,7 +220,7 @@ def test_study_limitations_name_no_role(study):
     texts = [text for doc in study.store.list_current("learner") for text in limitations(doc.body)]
     assert texts
     for text in texts:
-        for word in ("儿童", "孩子", "家长", "成人检查", "模拟"):
+        for word in ("儿童", "孩子", "家长", "模拟", "child", "parent", "Simulat", "simulat"):
             assert word not in text, text
 
 
@@ -242,7 +242,7 @@ def test_study_state_wording_is_not_simulated(study):
     asyncio.run(next_course(study, "next1", core.learner_id, activity))
     for item in study.current(core.learner_id, "state").body["dimensions"]:
         if item["observed_at"]:
-            assert "模拟" not in item["task_scope"] + item["material_condition"]
+            assert "simulated" not in item["task_scope"] + item["material_condition"]
 
 
 def test_study_starts_at_onboarding(tmp_path):

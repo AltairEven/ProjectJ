@@ -27,10 +27,11 @@ class SynthesizerUnavailable(Exception):
 
 
 class LocalSynthesizer(LocalProcess):
-    kind, noun, init_command = "synthesizer", "合成", "project-j-tts-init"
+    kind, noun, init_command = "synthesizer", "Speech", "project-j-tts-init"
+    cli_noun = "合成"
     models, init, binary = MODELS, INIT, BINARY
     identity_keys = ("synthesizer", "version", "voice", "model", "revision")
-    identity_words = "版本、声音配置或模型"
+    identity_words = "version, voice setup or model"
     Unavailable = SynthesizerUnavailable
     stream_limit = 1 << 22
 

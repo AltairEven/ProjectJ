@@ -39,7 +39,7 @@ def demand_requirements(demand: DemandBody) -> list[tuple[str, str]]:
         items.append(("topic", demand.topic))
     # What the student ticked must show in the story, the questions and the help.
     items += [
-        ("skill_focus", f"{SKILLS[skill][1]}：{SKILLS[skill][2]}")
+        ("skill_focus", f"{SKILLS[skill][1]}: {SKILLS[skill][2]}")
         for skill in demand.skill_focus or ()
     ]
     if demand.skill_note:

@@ -9,10 +9,11 @@ import random
 from collections.abc import Callable
 from hashlib import sha256
 
+from project_j.english import ENGLISH_ONLY, han
 from project_j.preparation.contracts import TaskDefinition
 from project_j.preparation.task_types import BLANK, BLANKS, PROGRAM_JUDGED
 
-MALFORMED = "作答格式不对，请重新作答。"
+MALFORMED = "That answer doesn't fit this question. Please try again."
 
 
 def shuffled(task_id: str, count: int) -> tuple[int, ...]:
@@ -123,6 +124,8 @@ def judge_fill(task: TaskDefinition, response: dict) -> bool:
         or any(not isinstance(item, str) or not item.strip() for item in value)
     ):
         raise ValueError(MALFORMED)
+    if any(han(item) for item in value):  # Not counted as wrong: answer again in English.
+        raise ValueError(ENGLISH_ONLY)
     return all(
         normal(given) in {normal(spelling) for spelling in spellings}
         for given, spellings in zip(value, answers, strict=True)
@@ -154,4 +157,4 @@ def describe(task: TaskDefinition, response: dict) -> str:
     if task.purpose == "order":
         return " → ".join(shown[i] for i in response["order"])
     pairs = zip(task.match.left, response["pairs"], strict=True)
-    return "；".join(f"{left} = {shown[i]}" for left, i in pairs)
+    return "; ".join(f"{left} = {shown[i]}" for left, i in pairs)

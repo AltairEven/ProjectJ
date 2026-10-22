@@ -18,8 +18,8 @@ def preflight() -> dict:
             for adapter_id, adapter in ADAPTERS.items()
         ],
         "live_probe": "project-j-init probe",
-        "actual_api": "未验证",
-        "actual_voice": "未验证",
+        "actual_api": "unverified",
+        "actual_voice": "unverified",
     }
 
 

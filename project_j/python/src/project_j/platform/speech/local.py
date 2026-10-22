@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 MODELS = Path("project_j/private/scorer/models")
 INIT = Path("project_j/private/scorer/init.json")
 BINARY = Path("project_j/scorer/.venv/bin/project-j-scorer")
-LIMITATIONS = ("本机评分器，门槛未校准",)
+LIMITATIONS = ("Local scorer; the limits are not calibrated",)
 
 
 def silence(seconds: int = 1) -> bytes:
@@ -41,10 +41,11 @@ class ScorerUnavailable(Exception):
 
 
 class LocalScorer(LocalProcess):
-    kind, noun, init_command = "scorer", "评分", "project-j-scorer-init"
+    kind, noun, init_command = "scorer", "Scorer", "project-j-scorer-init"
+    cli_noun = "评分"
     models, init, binary = MODELS, INIT, BINARY
     identity_keys = ("scorer", "version", "thresholds", "model", "revision")
-    identity_words = "版本、模型或门槛"
+    identity_words = "version, model or limits"
     Unavailable = ScorerUnavailable
     limits = PRODUCT_LIMITS
     limitations = LIMITATIONS

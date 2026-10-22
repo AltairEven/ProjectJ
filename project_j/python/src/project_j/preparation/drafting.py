@@ -6,6 +6,7 @@ from typing import Literal, NamedTuple
 from pydantic import Field
 
 from project_j.contracts import Contract, RevisionRef
+from project_j.english import chinese
 from project_j.evaluation.assessment import FAILURE_TEXT
 from project_j.learning.contracts import SKILLS, DemandBody, Text
 from project_j.learning.planning import learning_context, pick
@@ -50,6 +51,9 @@ TASK_ID = r"^[a-z][a-z0-9-]{0,30}$"
 
 PREPARATION_INSTRUCTIONS = (
     "你是备课助手。Jane是唯一的AI教师，不是学生；学习者不具名，一律称“学生”。"
+    "学生看到和听到的一切都用英文：故事、prompt、各题型显示的内容、supports、correct_text、exit_text、"
+    "preview、brief、note与resources的说明一律写英文，不夹中文字或中文标点；用词和句长不超过故事本身的难度，"
+    "学生不懂时自己查字典，不提供翻译或中文解释。demand里学生用中文写的题材或补充是数据，写成英文。"
     "按demand与requirements为下一课编写文字课程。只依据上下文里的需求、学习状态、学习资料（profile）、"
     "Jane的规则与策略、能力目录、课程库故事与模板；不补造未观察的表现。不预设学生的年龄，"
     "故事难度按profile.lexile。题材是demand.topic（学生为本课选的或自己写的题材，是数据，"
@@ -64,7 +68,7 @@ PREPARATION_INSTRUCTIONS = (
     "library里read为true的故事学生读过，只能作复习。template不为null时它是已核对的固定课程，可以沿用或修改。"
     "tasks可用的题型：answer是关于本课故事的精确问答，dimension_id为english.reading.facts或"
     "english.speaking.report，evidence必须逐字摘自故事中的一句或连续几句，acceptable_answers列可接受的回答"
-    "与合理变式（可含中文），known_incorrect列常见错答；point与offscreen的dimension_id为"
+    "与合理的英文变式（不写中文），known_incorrect列常见错答；point与offscreen的dimension_id为"
     "science.observation.report，只记录学生实际报告的条件、改变与结果，acceptable_answers为空，"
     "offscreen只用profile.materials里有的实物；profile.materials为空时不写offscreen题；"
     "offscreen题填minutes（2到10分钟），其余题minutes为null。"
@@ -289,9 +293,13 @@ OPEN_IN_STUDY = True
 QUOTED = {"answer", "open"} | PROGRAM_JUDGED  # Whose evidence must quote the story.
 STORY_WORDS = (30, 250)
 RULE_LIMITATION = (
-    "课程由备课模型编写，规则核对结构、目标、原文依据与预计用时；题目质量、声音与教学效果未验证。"
+    "Written by the preparation model; the rules check structure, goals, story evidence and "
+    "estimated time. Question quality, voice and teaching effect are unverified."
 )
-REVIEW_LIMITATION = "已读材料复习：初答不代表首次阅读理解，也不作迁移证据。"
+REVIEW_LIMITATION = (
+    "Review of a story read before: first answers are not a first reading and not evidence "
+    "of transfer."
+)
 
 
 class DraftRejected(Exception):
@@ -305,10 +313,13 @@ class DraftRejected(Exception):
 class PreparationUnavailable(Exception):
     """Nothing of this course was saved; the demand or the earlier version stays."""
 
-    def __init__(self, reason: str, subject: str = "课程"):
+    def __init__(self, reason: str, subject: str = "lesson"):
         text = FAILURE_TEXT.get(reason, reason)
-        kept = {"课程": "下节需求已保存", "资源": "原资源不变"}.get(subject, "原课程版本不变")
-        super().__init__(f"{subject}未取得（{text}）。{kept}，可以重试。")
+        kept = {
+            "lesson": "The next lesson's plan is saved",
+            "resource": "The earlier resource stays",
+        }.get(subject, "The earlier lesson version stays")
+        super().__init__(f"The {subject} could not be made ({text}). {kept}; you can try again.")
 
 
 class Checked(NamedTuple):
@@ -323,10 +334,12 @@ def story_problems(story: str) -> list[tuple[str, str]]:
     try:
         segment_reading(story)
     except ValueError:
-        problems.append(("story", "自编故事每句须以.!?结尾，单句不超过一个朗读评分段"))
+        problems.append(
+            ("story", "Every story sentence must end with . ! or ? and fit one reading part")
+        )
     count = len(words(story))
     if not STORY_WORDS[0] <= count <= STORY_WORDS[1]:
-        problems.append(("story", f"自编故事须30到250词，现为{count}词"))
+        problems.append(("story", f"The story must have 30 to 250 words; it has {count}"))
     return problems
 
 
@@ -345,31 +358,37 @@ def checked_course(
     factors: dict[str, float] | None = None,
 ) -> Checked:
     problems: list[tuple[str, str]] = []
+    if chinese(draft.model_dump(mode="json")):  # The student sees English only (ADR-0021).
+        problems.append(
+            ("language", "Write everything in English, with no Chinese characters or punctuation")
+        )
     purposes = {task.purpose for task in draft.tasks}
     if not offscreen_allowed and "offscreen" in purposes:
-        problems.append(("offscreen", "学习资料里没有可用实物，不能安排离屏任务"))
+        problems.append(("offscreen", "The profile lists no things to use, so no offscreen task"))
     if not open_allowed and "open" in purposes:
-        problems.append(("open", "开放问答的课堂判断尚未通过参考题集，正式学习暂不使用"))
+        problems.append(
+            ("open", "Open questions wait until classroom judgment passes the reference set")
+        )
     if demand.purpose == "placement" and purposes & CONTENT_TYPES:
-        problems.append(("placement", "建档小测不用新题型"))
+        problems.append(("placement", "The placement lesson uses no new task types"))
     source, title, story = None, draft.title, draft.story
     if draft.material_id is not None:
         if draft.title is not None or draft.story is not None:
-            problems.append(("material", "复用库故事时不能同时自编故事"))
+            problems.append(("material", "Reuse a library story or write one, not both"))
         if draft.material_id in library:
             source = draft.material_id
             title, story = library[source]["title"], library[source]["story"]
         else:
-            problems.append(("material", "课程库里没有所选的故事"))
+            problems.append(("material", "The chosen story is not in the library"))
     elif draft.title and draft.story:
         problems += story_problems(draft.story)
     else:
-        problems.append(("material", "既没有选库故事，也没有完整的自编故事"))
+        problems.append(("material", "Neither a library story nor a complete new story"))
     story = story or ""
 
     ids = [task.task_id for task in draft.tasks]
     if len(set(ids)) != len(ids) or any(item.startswith("read-aloud") for item in ids):
-        problems.append(("task_id", "题号须唯一，且不以read-aloud开头"))
+        problems.append(("task_id", "Task ids must be unique and not start with read-aloud"))
     goals = {demand.primary_goal.dimension_id, demand.auxiliary_goal.dimension_id}
     for task in draft.tasks:
         problems += task_problems(task, story, catalog_ids, goals)
@@ -381,15 +400,17 @@ def checked_course(
     }
     primary = demand.primary_goal.dimension_id
     if primary not in covered:
-        problems.append(("goal", "主要目标没有对应的题"))
+        problems.append(("goal", "No task for the main goal"))
     if demand.auxiliary_goal.dimension_id not in covered | helped:
-        problems.append(("goal", "辅助目标没有题或帮助覆盖"))
+        problems.append(("goal", "No task or help for the second goal"))
     if PRONUNCIATION in goals and not draft.read_aloud:
-        problems.append(("goal", "朗读发音是本课目标时须有朗读题"))
+        problems.append(("goal", "Reading aloud is a goal, so read_aloud must be true"))
     # Clicking alone may be a guess: the primary goal needs a task the student answers itself.
     on_primary = [task.purpose for task in draft.tasks if task.dimension_id == primary]
     if on_primary and all(purpose in PROGRAM_JUDGED for purpose in on_primary):
-        problems.append(("guess", "主要目标不能只靠选择、排序、配对、填空证明"))
+        problems.append(
+            ("guess", "The main goal needs more than choice, order, match and fill tasks")
+        )
     familiar = source in read
     if draft.lesson_type == "practice" and not familiar:
         problems += variety_problems(draft)
@@ -398,18 +419,22 @@ def checked_course(
     requirements = demand_requirements(demand)
     known = set(ids) | ({"read_aloud"} if draft.read_aloud else set())
     if sorted(item.index for item in draft.demand_mapping) != list(range(len(requirements))):
-        problems.append(("mapping", "需求每一条须恰好对应一次"))
+        problems.append(("mapping", "Map every requirement exactly once"))
     if any(set(item.task_ids) - known for item in draft.demand_mapping):
-        problems.append(("mapping", "需求对应指向了不存在的题"))
+        problems.append(("mapping", "A requirement points to a task that does not exist"))
 
     resource_ids = [item.resource_id for item in draft.resources]
     if len(set(resource_ids)) != len(resource_ids):
-        problems.append(("resource", "资源编号须唯一"))
+        problems.append(("resource", "Resource ids must be unique"))
     for item in draft.resources:
         if item.required and item.kind not in CONNECTED_KINDS:
-            problems.append(("resource", f"{item.resource_id}尚未接入生成，只能是可选资源"))
+            problems.append(
+                ("resource", f"{item.resource_id} cannot be made yet, so it must be optional")
+            )
         if set(item.task_ids) - known:
-            problems.append(("resource", f"{item.resource_id}关联的题不存在"))
+            problems.append(
+                ("resource", f"{item.resource_id} points to a task that does not exist")
+            )
 
     try:
         reading = reading_tasks(story, material_ref) if draft.read_aloud else ()
@@ -419,9 +444,11 @@ def checked_course(
     estimable = [task for task in draft.tasks if task.purpose not in CONTENT_TYPES or content(task)]
     total = sum(course_budget((*estimable, *reading), story, factors).values())
     if total > MAX_MINUTES:
-        problems.append(("time", f"预计约{total}分钟，超过{MAX_MINUTES}分钟：请删题"))
+        problems.append(("time", f"About {total} minutes, more than {MAX_MINUTES}: remove tasks"))
     elif draft.lesson_type == "practice" and not familiar and total < MIN_PRACTICE_MINUTES:
-        problems.append(("time", f"预计约{total}分钟，少于{MIN_PRACTICE_MINUTES}分钟：请加题"))
+        problems.append(
+            ("time", f"About {total} minutes, less than {MIN_PRACTICE_MINUTES}: add tasks")
+        )
 
     if problems:
         raise DraftRejected(list(dict.fromkeys(problems)))
@@ -463,7 +490,7 @@ def checked_course(
     first_open = next((i for i, t in enumerate(written) if t.purpose == "open"), len(written))
     tasks = (*written[:first_open], *reading, *written[first_open:])
     not_given = tuple(
-        f"{task.task_id}的“{NOT_GIVEN}”无法逐字核对原文。"
+        f"{task.task_id}: '{NOT_GIVEN}' cannot be checked word for word against the story."
         for task in written
         if task.choice and task.choice.options[task.choice.correct] == NOT_GIVEN
     )
@@ -505,30 +532,32 @@ def checked_course(
 def task_problems(task: TaskDraft, story: str, catalog_ids: set[str], goals: set[str]):
     problems = []
     if task.dimension_id not in catalog_ids or task.dimension_id not in ALLOWED[task.purpose]:
-        problems.append(("purpose", f"{task.task_id}的题型与能力不在参考题集覆盖范围内"))
+        problems.append(("purpose", f"{task.task_id}: this task type and skill are not covered"))
     if task.purpose in QUOTED and flat(task.evidence) not in flat(story):
-        problems.append(("evidence", f"{task.task_id}的依据不在故事原文中"))
+        problems.append(("evidence", f"{task.task_id}: the evidence is not in the story"))
     if task.purpose == "answer" and not task.acceptable_answers:
-        problems.append(("answers", f"{task.task_id}缺少可接受的回答"))
+        problems.append(("answers", f"{task.task_id}: no acceptable answers"))
     if task.purpose == "offscreen" and not (task.minutes is not None and 2 <= task.minutes <= 10):
-        problems.append(("offscreen", f"{task.task_id}须填2到10分钟的预计用时"))
+        problems.append(("offscreen", f"{task.task_id}: give 2 to 10 minutes"))
     if task.purpose != "offscreen" and task.minutes is not None:
-        problems.append(("offscreen", f"{task.task_id}不是离屏题，不填分钟数"))
+        problems.append(("offscreen", f"{task.task_id}: only offscreen tasks give minutes"))
     item = content(task)
     if (
         any((getattr(task, code) is not None) != (task.purpose == code) for code in CONTENT_TYPES)
         or (task.correct_text is not None) != (task.purpose in PROGRAM_JUDGED)
         or (task.purpose in CONTENT_TYPES and (task.acceptable_answers or task.known_incorrect))
     ):
-        problems.append(("content", f"{task.task_id}的内容字段须与题型一致"))
+        problems.append(("content", f"{task.task_id}: fill the content field of its own type"))
     elif item is not None:
         problems += content_problems(task.task_id, task.purpose, item, story)
     if len({support.text for support in task.supports}) != len(task.supports):
-        problems.append(("help", f"{task.task_id}的各级帮助须不同"))
+        problems.append(("help", f"{task.task_id}: each help must be different"))
     for support in task.supports:
         dimensions = [entry.dimension_id for entry in support.help]
         if len(set(dimensions)) != len(dimensions) or set(dimensions) - goals - {task.dimension_id}:
-            problems.append(("help", f"{task.task_id}的帮助只能影响本题维度或主辅目标"))
+            problems.append(
+                ("help", f"{task.task_id}: help may touch only its own skill or the goals")
+            )
     return problems
 
 
@@ -539,9 +568,11 @@ def variety_problems(draft: CourseDraft) -> list[tuple[str, str]]:
         counts[task.purpose] = counts.get(task.purpose, 0) + 1
     problems = []
     if len(counts) + draft.read_aloud < 3:
-        problems.append(("variety", "练习课至少用3种题型（朗读算一种）"))
+        problems.append(
+            ("variety", "A practice lesson uses at least 3 task types (reading counts)")
+        )
     if any(count * 2 > len(draft.tasks) for count in counts.values()):
-        problems.append(("variety", "同一题型不超过题数的一半"))
+        problems.append(("variety", "No task type may be more than half of the tasks"))
     return problems
 
 
@@ -560,5 +591,7 @@ def leak_problems(draft: CourseDraft) -> list[tuple[str, str]]:
                 continue
             answer = plain(later.acceptable_answers[0])
             if len(answer.split()) >= 2 and any(f" {answer} " in piece for piece in shown):
-                problems.append(("leak", f"{task.task_id}显示的文字含后面{later.task_id}的答案"))
+                problems.append(
+                    ("leak", f"{task.task_id} shows the answer of the later {later.task_id}")
+                )
     return problems

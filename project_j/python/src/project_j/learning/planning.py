@@ -44,6 +44,9 @@ PLANNING_INSTRUCTIONS = (
     "topic_suggestions给3–4个下一课短文的题材供学生挑选（学生也可以自己写）：title一句短标题，"
     "reason写为什么（如出自学生的哪项兴趣）；从profile.interests出发，可以延伸到相邻的方面，"
     "彼此要有区别；避开recent_titles里最近几课的题材；难度适合profile.lexile与本课目标。"
+    "所有写给学生的文字（goal_reason、suggestion_reason、plan_reason、note、各reason、title、"
+    "new_capabilities的name与definition、gaps）一律用简单英文，不夹中文字或中文标点，"
+    "用词和句长不超过profile.lexile（为null时按初学者写短句、常用词）。"
 )
 
 REVIEW_INSTRUCTIONS = (
@@ -56,6 +59,8 @@ REVIEW_INSTRUCTIONS = (
     "main_goal的dimension_id只能取catalog里已有的；预算固定30分钟不改。"
     "周计划的小调整会直接生效；阶段、年度、长期的变化交学生决定，"
     "reason写依据，impact写影响，alternatives列其他选择。"
+    "所有写给学生的文字一律用简单英文，不夹中文字或中文标点，"
+    "用词和句长不超过profile.lexile（为null时按初学者写短句、常用词）。"
 )
 
 Direction = Literal["consolidate", "review", "extend", "advance", "observe"]
@@ -225,12 +230,13 @@ def review_request(
 class PlanningUnavailable(Exception):
     """Nothing of this plan or demand was saved; earlier saved steps stay and it can retry."""
 
-    def __init__(self, reason: str, subject: str = "下节需求"):
+    def __init__(self, reason: str, subject: str = "next lesson's plan"):
         text = FAILURE_TEXT.get(reason, reason)
-        kept = {"下节需求": "评价与学习状态已保存", "学习资料": "聊天与小测已保存"}.get(
-            subject, "原计划不变"
-        )
-        super().__init__(f"{subject}未取得（{text}）。{kept}，可以重试。")
+        kept = {
+            "next lesson's plan": "The evaluation and learning state are saved",
+            "profile": "The chat and the placement lesson are saved",
+        }.get(subject, "The earlier plan stays")
+        super().__init__(f"The {subject} could not be made ({text}). {kept}; you can try again.")
 
 
 def checked_plan(body: dict, catalog_ids: set[str]) -> PlanBody:
@@ -270,12 +276,12 @@ def apply_demand_draft(
     if any(item in catalog_ids or not item.startswith("english.") for item in proposed) or len(
         proposed
     ) != len(draft.new_capabilities):
-        raise PlanningUnavailable("新能力条目不合规")
+        raise PlanningUnavailable("a new skill entry is not valid")
     goals = (draft.primary_goal.dimension_id, draft.auxiliary_goal.dimension_id)
     if any(goal not in catalog_ids | proposed for goal in goals):
-        raise PlanningUnavailable("目标不在能力目录")
+        raise PlanningUnavailable("a goal is not in the skill list")
     if goals[0] == goals[1]:
-        raise PlanningUnavailable("主要与辅助目标相同")
+        raise PlanningUnavailable("the two goals are the same")
     # A proposal no goal uses is dropped; the catalog only grows by what a lesson needs.
     used = tuple(item for item in draft.new_capabilities if item.dimension_id in goals)
     body = DemandBody(
@@ -331,7 +337,7 @@ def week_plan_after(draft: DemandDraft, plan: dict, catalog_ids: set[str]) -> Pl
     try:
         return checked_plan(plan | patch, catalog_ids)
     except ValueError as error:
-        raise PlanningUnavailable("周计划目标不在能力目录") from error
+        raise PlanningUnavailable("a week plan goal is not in the skill list") from error
 
 
 def apply_review_draft(
@@ -343,13 +349,15 @@ def apply_review_draft(
         return None, None, checks
     patch = draft.patch.model_dump(mode="json", exclude_none=True)
     if patch.pop("budget_minutes", None) is not None:
-        checks.append("预算固定30分钟，改动不生效。")
+        checks.append("The time is fixed at 30 minutes; the change does not apply.")
     if not patch:
         return None, None, checks
     try:
         body = checked_plan(plan | patch, catalog_ids)
     except ValueError:
-        checks.append("计划目标不在能力目录，补丁作废，沿用原计划。")
+        checks.append(
+            "The goal is not in the skill list; the change is dropped and the plan stays."
+        )
         return None, None, checks
     # Week adjustments are within the standing authorization; higher levels are the student's.
     return (body, None, checks) if level == "week" else (None, patch, checks)

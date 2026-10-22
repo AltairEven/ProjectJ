@@ -84,7 +84,7 @@ def hold_run(run: Path) -> int:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         os.close(fd)
-        raise StorageBlocked(f"另一个服务正在使用运行编号 {run.name}。") from None
+        raise StorageBlocked(f"Another service is using run {run.name}.") from None
     return fd
 
 

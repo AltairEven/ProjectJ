@@ -13,6 +13,7 @@ from pydantic import AwareDatetime, Field
 from project_j.classroom.judgment import ModelProposal, judgment_request, method_context
 from project_j.classroom.responses import describe, judge, presentation
 from project_j.contracts import Contract, RevisionRef, SubmittedInput
+from project_j.english import chinese
 from project_j.platform.models.service import ModelService
 from project_j.platform.speech.contracts import PronunciationResult, PronunciationScorer
 from project_j.platform.storage import REALMS, Conflict, canonical, digest
@@ -39,8 +40,14 @@ TRANSITIONS = {
 }
 # A bare plea: nothing is left once help words, fillers and punctuation are removed.
 PLEA = re.compile(
-    r"帮帮我|帮我|帮助|需要|一下|还是|请|能|可以|吗|我|不懂|不会|help|please|need|can|you|me|i|[\W_]+"
+    r"\b(?:help|please|need|can|could|you|me|i|still|don['’]?t|do|not|understand|the|question)\b"
+    r"|[\W_]+"
 )
+# Asking for help in English (ADR-0021); "I don't know" is an unclear answer, not a plea.
+HELP = re.compile(
+    r"\bhelp\b|\bi\s+(?:still\s+)?(?:don['’]?t|do\s+not)\s+understand\b", re.IGNORECASE
+)
+CONFIRM = re.compile(r"\b(?:yes|yeah|ok|okay|got it|sure|understood|i heard)\b", re.IGNORECASE)
 
 
 def is_help_request(task: TaskDefinition, text: str, intent: str) -> bool:
@@ -49,39 +56,48 @@ def is_help_request(task: TaskDefinition, text: str, intent: str) -> bool:
         # A report task asks what help was used, so there only a bare plea is a help request.
         not PLEA.sub("", text.casefold())
         if task.purpose in {"point", "offscreen"}
-        else any(word in text for word in ("帮我", "不懂", "help"))
+        else bool(HELP.search(text))
     )
+
+
+def is_confirmation(text: str) -> bool:
+    """The student says they heard the plan or the summary."""
+    return bool(CONFIRM.search(text))
 
 
 # Per realm: a text attempt, a recorded attempt, the sealed activity.
 LIMITATIONS = {
     "simulation": (
-        "明确模拟；外部帮助、保持与迁移未知。",
-        "明确模拟录音与模拟评分；不代表真实发音。",
-        "明确模拟活动，不是学习记录。",
+        "Simulated; outside help, recall and transfer are unknown.",
+        "Simulated recording and score; not real pronunciation.",
+        "Simulated activity, not a learning record.",
     ),
     "study": (
-        "学生实际学习；外部帮助、保持与迁移未知。",
-        "学生朗读录音，交本机发音评分；评分门槛未校准。",
-        "学生实际学习活动；保持与迁移未知。",
+        "Real study; outside help, recall and transfer are unknown.",
+        "Your reading was scored on this computer; the score limits are not calibrated.",
+        "Real study activity; recall and transfer are unknown.",
     ),
 }
+NOT_ENGLISH = "model proposal text is not in English"
 HELP_ORDER = {"none": 0, "light_prompt": 1, "scaffold": 2, "full_model": 3, "unknown": 4}
-SCORE_RULE_NOTE = "课堂判断未在期限内取得，本段回应按评分结果的固定规则给出。"
+SCORE_RULE_NOTE = "No judgment came in time; this reply follows fixed rules from the score."
 
 
 def score_rule(pronunciation: dict | None) -> tuple[str, str]:
     """A reading's prepared response when no judgment came: the scorer's own word flags."""
     if not pronunciation or pronunciation["status"] != "scored":
-        return "unclear", "这一段没有取得朗读结果，不算读错。可以按麦克风再读一次，也可以跳过。"
+        return "unclear", (
+            "No reading came through, so it is not counted as wrong. "
+            "Press the microphone to read again, or skip."
+        )
     flagged = dict.fromkeys(
         word["word"].strip(".,!?;:\"'")
         for word in pronunciation["words"]
         if word["error"] in {"mispronounced", "omitted"}
     )
     if not flagged:
-        return "correct", "这一段读完了，我们接着往下。"
-    return "incorrect", f"这几个词再注意一下：{'、'.join(list(flagged)[:3])}。"
+        return "correct", "You read this part. Let's go on."
+    return "incorrect", f"Look again at these words: {', '.join(list(flagged)[:3])}."
 
 
 class AllowedAction(Contract):
@@ -309,8 +325,8 @@ class Harness:
             # A clicked task as the page shows it; never its answer.
             "task": presentation(clicked) if (clicked := self.clicked_task()) else None,
             "end": self.end,
-            "actual_api": "未验证",
-            "actual_voice": "未验证",
+            "actual_api": "unverified",
+            "actual_voice": "unverified",
         }
 
     def delivery(self, feedback: DeliveryFeedback):
@@ -394,7 +410,8 @@ class Harness:
             self.wait_kind = "closing_confirmation"
             return self.action(
                 "closing",
-                "我们保留实际回答、帮助和未观察项。下次课按课后安排继续；请确认收到小结。",
+                "We keep your real answers, the help you had and what was not seen. Next class "
+                "follows from today. Did you hear this summary?",
                 "end_confirmation",
             )
         task, budget = self.course.tasks[self.task_index], self.course.budget
@@ -465,7 +482,8 @@ class Harness:
             self.wait_kind = "offscreen_report"
             self.action(
                 "question",
-                "请报告实际材料、改变、结果和帮助；没有观察的部分可以说不知道。",
+                "Tell me the things you used, what you changed, what happened and any help. "
+                'You can say "I don\'t know" for what you did not see.',
                 "input",
             )
         elif command == "skip":
@@ -492,7 +510,8 @@ class Harness:
                 self.wait_kind = "closing_confirmation"
                 self.action(
                     "closing",
-                    "我们只总结已发生范围，其余保持未知。请确认收到小结。",
+                    "We sum up only what happened; the rest stays unknown. "
+                    "Did you hear this summary?",
                     "end_confirmation",
                 )
         elif command == "end_unconfirmed":
@@ -540,7 +559,7 @@ class Harness:
             "goal_confirmation",
             "closing_confirmation",
         }:
-            raise ValueError("当前不需要确认收到；请回答或补充当前问题。")
+            raise ValueError("Nothing to confirm now. Please answer the current question.")
         supplement = submitted.relation == "supplement"
         if supplement:
             original = self.inputs.get(submitted.related_event_id)
@@ -570,46 +589,50 @@ class Harness:
         clicked = self.clicked_task() if answering else None
         if submitted.modality == "response":
             if clicked is None:
-                raise ValueError("这道题不用按钮作答。")
+                raise ValueError("This question is not answered with buttons.")
             return self.submit_response(clicked, submitted, signature)
         if clicked is not None:
-            raise ValueError("这道题请在题目上作答，或点“给我提示”。")
+            raise ValueError('Answer on the question itself, or press "Hint".')
         if submitted.modality == "audio":
             if reading is None or audio is None or not answering or self.scorer is None:
-                raise ValueError("录音只用于当前朗读段。")
+                raise ValueError("Recordings are only for the current reading part.")
             if submitted.recording_ms > self.scorer.limits.max_seconds * 1000:
-                raise ValueError("录音超过本段最长时长。")
+                raise ValueError("The recording is longer than this part allows.")
         elif reading is not None and answering and submitted.intent != "help":
-            if not any(word in submitted.text for word in ("帮我", "不懂", "help")):
-                raise ValueError("朗读段请按麦克风录音提交。")
+            if not HELP.search(submitted.text):
+                raise ValueError("For a reading part, press the microphone and read aloud.")
         self.record("input", signature)
         self.inputs[submitted.event_id] = {"signature": signature, "attempt_id": None}
         if submitted.relation == "supplement" and not supplement:
             self.record(
                 "relation_ruled",
-                {"event_id": submitted.event_id, "relation": "new", "reason": "原回应已交付"},
+                {
+                    "event_id": submitted.event_id,
+                    "relation": "new",
+                    "reason": "original response delivered",
+                },
             )
         if self.wait_kind == "goal_confirmation":
-            if submitted.intent == "confirmation" or any(
-                word in submitted.text for word in ("听到", "收到", "明白", "好的", "yes")
-            ):
+            if submitted.intent == "confirmation" or is_confirmation(submitted.text):
                 self.record(
                     "goal_received", {"event_id": submitted.event_id, "understanding": "unknown"}
                 )
                 self.next_task()
             else:
-                self.action("clarification", "请确认是否收到本课安排；这不是知识测验。", "input")
+                self.action(
+                    "clarification",
+                    "Did you hear today's plan? This is not a test question.",
+                    "input",
+                )
             return {"ack": "accepted", "snapshot": self.snapshot()}
         if self.wait_kind == "closing_confirmation":
-            if submitted.intent == "confirmation" or any(
-                word in submitted.text for word in ("听到", "收到", "明白", "好的", "yes")
-            ):
+            if submitted.intent == "confirmation" or is_confirmation(submitted.text):
                 self.record("closing_received", {"event_id": submitted.event_id})
                 self.finish("normal_confirmed")
             else:
                 self.action(
                     "clarification",
-                    "请确认收到小结；也可以直接结束并保留未确认。",
+                    "Did you hear the summary? You can also just end the class without saying so.",
                     "end_confirmation",
                 )
             return {"ack": "accepted", "snapshot": self.snapshot()}
@@ -716,20 +739,28 @@ class Harness:
                 self.move("waiting_input")
                 self.action(
                     "clarification",
-                    "判断未取得。原输入已保留，可补充、跳过或停止。",
+                    "I could not check that answer. It is kept: add to it, skip, or stop.",
                     "clarification",
                 )
             return {"ack": "failed", "snapshot": self.snapshot()}
         proposal = ModelProposal(**binding, **result.output.model_dump(), call_id=result.call_id)
         try:
             self.approve(proposal)
-        except ValueError:
+        except ValueError as error:
             if self.mode == "judging" and self.epoch == binding["cancellation_epoch"]:
-                self.record("proposal_rejected", {"event_id": submitted.event_id})
+                reason = (
+                    "binding"
+                    if isinstance(error, Conflict)
+                    else "language"
+                    if str(error) == NOT_ENGLISH
+                    else "evidence"
+                )
+                log.info("classroom proposal rejected reason=%s", reason)
+                self.record("proposal_rejected", {"event_id": submitted.event_id, "reason": reason})
                 self.move("waiting_input")
                 self.action(
                     "clarification",
-                    "判断超出当前任务依据，原输入保留；可澄清、跳过或停止。",
+                    "I could not use that reply. Your answer is kept: say more, skip, or stop.",
                     "clarification",
                 )
             return {"ack": "rejected_proposal", "snapshot": self.snapshot()}
@@ -829,7 +860,7 @@ class Harness:
                 return {"ack": "accepted", "snapshot": self.snapshot()}
             help_map = task.supports[count].help
             if by_rule:  # No model wording: the support is said as prepared.
-                text += task.supports[count].text
+                text = f"{text} {task.supports[count].text}".lstrip()
         speech = ()
         # The full-model help of a reading segment plays its adopted demonstration.
         if (
@@ -866,6 +897,8 @@ class Harness:
             raise Conflict("expired or out-of-bound model proposal")
         if proposal.evidence != self.course.tasks[self.task_index].evidence:
             raise ValueError("model proposal does not use the fixed task evidence")
+        if chinese(proposal.text):  # The student hears English only (ADR-0021).
+            raise ValueError(NOT_ENGLISH)
         self.record("approved_proposal", proposal.model_dump(mode="json"))
 
     def facts(self):

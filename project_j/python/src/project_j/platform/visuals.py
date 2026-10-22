@@ -35,41 +35,41 @@ def checked_svg(text: str) -> bytes:
     """The SVG bytes when every element and attribute is allowed; ValueError otherwise."""
     data = text.encode()
     if len(data) > MAX_SVG_BYTES:
-        raise ValueError("动画超过大小上限")
+        raise ValueError("The animation is too large")
     try:
         root = ElementTree.fromstring(data)
     except ElementTree.ParseError as error:
-        raise ValueError("动画不是有效的SVG") from error
+        raise ValueError("The animation is not valid SVG") from error
     if root.tag != f"{{{SVG_NAMESPACE}}}svg":
-        raise ValueError("动画的根元素须为SVG")
+        raise ValueError("The animation root must be SVG")
     for element in root.iter():
         if not element.tag.startswith(f"{{{SVG_NAMESPACE}}}") or (
             local(element.tag) not in SVG_ELEMENTS
         ):
-            raise ValueError(f"动画含不允许的元素：{local(str(element.tag))}")
+            raise ValueError(f"The animation has a forbidden element: {local(str(element.tag))}")
         for name, value in element.attrib.items():
             attribute, compact = local(name), re.sub(r"\s", "", value).lower()
             if attribute.lower().startswith("on"):
-                raise ValueError("动画含事件属性")
+                raise ValueError("The animation has event attributes")
             if attribute == "href" and not value.startswith("#"):
-                raise ValueError("动画含外部链接")
+                raise ValueError("The animation has outside links")
             if attribute == "attributeName" and local(value.replace(":", "}")) == "href":
-                raise ValueError("动画不能改写链接")
+                raise ValueError("The animation cannot rewrite links")
             if "javascript:" in compact or any(
                 not target.startswith("#") for target in URL.findall(value)
             ):
-                raise ValueError("动画引用了外部内容")
+                raise ValueError("The animation refers to outside content")
     return data
 
 
 def image_type(data: bytes) -> str:
     """png, jpeg or webp by the file's own header; ValueError for anything else."""
     if len(data) > MAX_IMAGE_BYTES:
-        raise ValueError("图片超过大小上限")
+        raise ValueError("The image is too large")
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         return "png"
     if data.startswith(b"\xff\xd8\xff"):
         return "jpeg"
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return "webp"
-    raise ValueError("生成结果不是图片")
+    raise ValueError("The result is not an image")

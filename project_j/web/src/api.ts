@@ -22,6 +22,6 @@ export async function api<T>(token: string, path: string, body?: unknown): Promi
 // A generated file fetched with the bearer token, as a URL the page can play or show.
 export async function fileUrl(token: string, path: string): Promise<string> {
   const response = await fetch(path, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
-  if (!response.ok) throw requestFailure(response.status, '资源文件未取得')
+  if (!response.ok) throw requestFailure(response.status, 'The file did not come back.')
   return URL.createObjectURL(await response.blob())
 }

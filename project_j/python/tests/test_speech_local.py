@@ -50,7 +50,10 @@ def test_scores_map_to_results_with_identity_and_limitations(tmp_path):
     assert local.model == "facebook/wav2vec2-lv-60-espeak-cv-ft@r1"
     bridge = next(w for w in result.words if w.word == "bridge")
     assert bridge.error == "mispronounced" and bridge.min_phone == 1.0
-    assert result.limitations == ("本机评分器，门槛未校准",) and not result.simulated
+    assert (
+        result.limitations == ("Local scorer; the limits are not calibrated",)
+        and not result.simulated
+    )
     assert empty.status == "unknown" and empty.reason == "no_speech"
     assert local.last_stats == {"elapsed_ms": 7, "memory_bytes": 200}
 
@@ -59,7 +62,7 @@ def test_a_scorer_that_cannot_load_is_unavailable(tmp_path):
     local = scorer(tmp_path, "not_ready")
     with pytest.raises(ScorerUnavailable, match="digest_mismatch"):
         asyncio.run(local.start())
-    assert "评分进程未启动" in local.reasons()
+    assert "Scorer process not started" in local.reasons()
 
 
 def test_a_dead_process_gives_unknown_without_hanging(tmp_path):
@@ -72,7 +75,7 @@ def test_a_dead_process_gives_unknown_without_hanging(tmp_path):
 
     local, first, second = asyncio.run(go())
     assert first.status == second.status == "unknown" and first.reason == "failed"
-    assert "评分进程已退出" in local.reasons()
+    assert "Scorer process has stopped" in local.reasons()
 
 
 def test_a_cancelled_request_does_not_leak_its_late_reply(tmp_path):
@@ -121,11 +124,14 @@ def test_reasons_follow_files_and_the_probed_identity(tmp_path):
         await local.aclose()
         return reasons
 
-    assert "评分模型未下载" in scorer(tmp_path).reasons()[0]
+    assert "Scorer model not downloaded" in scorer(tmp_path).reasons()[0]
     write_init(tmp_path)
     assert asyncio.run(go(scorer(tmp_path))) == []
     write_init(tmp_path, identity_revision="r0")
-    assert "不一致" in asyncio.run(go(scorer(tmp_path)))[0]
+    assert (
+        "Scorer: the version, model or limits no longer matches the probe record"
+        in asyncio.run(go(scorer(tmp_path)))[0]
+    )
 
 
 def test_scoring_logs_round_trip_and_compute_time_without_the_text(tmp_path, caplog):

@@ -67,7 +67,7 @@ def test_course_template_and_mapping_follow_the_saved_demand(application):
         choice = next(
             item for item in again.body["demand_mapping"] if item["field"] == "suggestion_choices"
         )
-        assert choice["implementation"].startswith("采纳")
+        assert choice["implementation"].startswith("Suggestion adopted")
 
     asyncio.run(scenario())
 
@@ -86,7 +86,7 @@ def test_two_fixed_courses_alternate_and_label_familiar_material(application):
             fact = await teach(app, f"start{number}", course_ref, answers[prompt])
             opening = next(a.text for a in app.core.actions.values() if a.kind == "goal")
             # Jane does not present an already-read story as a first reading.
-            assert ("复习" in opening) == (course["lesson_type"] == "review")
+            assert ("review" in opening) == (course["lesson_type"] == "review")
             activity = fact.body["activity_id"]
             app.feedback(f"feedback{number}", LEARNER, activity, "无额外补充")
             result = await next_course(app, f"next{number}", LEARNER, activity)
@@ -94,13 +94,13 @@ def test_two_fixed_courses_alternate_and_label_familiar_material(application):
             demand = app.store.read(ref(result["adoption"]["demand_ref"]), LEARNER).body
             sampling = demand["sampling_requirements"][0]
             # D2 is the only new-material observation; from D3 on both stories were already read.
-            assert ("已读" in sampling) == (number >= 2)
-            assert ("不作首次新材料观察" in sampling) == (number >= 2)
+            assert ("read before" in sampling) == (number >= 2)
+            assert ("not a first look at new material" in sampling) == (number >= 2)
         assert seen == [
-            (mia, "observation", "The Paper Bridge（首课）"),
-            (ben, "practice", "Ben’s Bridge（新材料）"),
-            (mia, "review", "The Paper Bridge（已读，复习）"),
-            (ben, "review", "Ben’s Bridge（已读，复习）"),
+            (mia, "observation", "The Paper Bridge (first lesson)"),
+            (ben, "practice", "Ben’s Bridge (new material)"),
+            (mia, "review", "The Paper Bridge (read before, review)"),
+            (ben, "review", "Ben’s Bridge (read before, review)"),
         ]
 
     asyncio.run(scenario())
@@ -275,7 +275,7 @@ def test_evaluation_reuse_requires_the_same_sealed_fact_revision(application):
     async def scenario():
         core = await start(app)
         deliver_all(core)
-        await answer(app, "收到", "confirmation")
+        await answer(app, "Got it.", "confirmation")
         await app.adapter.text("speech", "a car")
         unseen = core.actions[core.pending]  # The correction was never presented before stop.
         core.control("stop", "stop")
@@ -500,7 +500,7 @@ def test_E2E06_rechecking_an_older_lesson_keeps_newer_evidence_and_the_lesson_or
         later = app.store.current(identity(second.body["activity_id"], "evaluation"), LEARNER)
         reading = dims["english.reading.facts"]
         assert reading["evidence_refs"] == [later.ref.model_dump()]
-        assert any("较早活动" in item for item in reading["limitations"])
+        assert any("An earlier class" in item for item in reading["limitations"])
         # English expression was only observed in C1, so its corrected source is re-reviewed.
         rechecked = app.store.current(identity(first.activity_id, "evaluation"), LEARNER)
         speaking = dims["english.speaking.report"]

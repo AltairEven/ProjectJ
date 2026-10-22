@@ -40,8 +40,8 @@ def test_a_missed_misread_fails_the_probe(tmp_path):
         return text.replace("brige", "bridge").encode()
 
     record = asyncio.run(probe(tmp_path, fake(tmp_path), no_misread))
-    assert not record["passed"] and "bridge未标出" in record["reasons"][0]
-    assert LocalScorer.file_reasons(tmp_path)[0].startswith("评分探针未通过")
+    assert not record["passed"] and "misread bridge was not flagged" in record["reasons"][0]
+    assert LocalScorer.file_reasons(tmp_path)[0].startswith("Scorer probe failed")
 
 
 def test_missing_voice_or_unloadable_scorer_fails_with_a_reason(tmp_path):
@@ -49,26 +49,26 @@ def test_missing_voice_or_unloadable_scorer_fails_with_a_reason(tmp_path):
         raise FileNotFoundError("say")
 
     record = asyncio.run(probe(tmp_path, fake(tmp_path), no_say))
-    assert "需要macOS语音Samantha" in record["reasons"][0]
+    assert "needs the macOS voice Samantha" in record["reasons"][0]
     record = asyncio.run(probe(tmp_path, fake(tmp_path, "not_ready"), text_synth))
-    assert record["reasons"][0].startswith("评分进程无法启动")
+    assert record["reasons"][0].startswith("the scorer process cannot start")
 
 
 def test_changed_models_need_a_new_probe(tmp_path):
     with_manifest(tmp_path)
     asyncio.run(probe(tmp_path, fake(tmp_path), text_synth))
     (tmp_path / MODELS / "manifest.json").write_text('{"revision": "other"}')
-    assert "评分模型已改动" in LocalScorer.file_reasons(tmp_path)[0]
+    assert "Scorer model changed" in LocalScorer.file_reasons(tmp_path)[0]
 
 
 def test_status_and_adult_score_commands(tmp_path, monkeypatch, capsys):
     (tmp_path / "project_j").mkdir()
     monkeypatch.chdir(tmp_path)
-    assert main(["status"]) == 1 and "评分模型未下载" in capsys.readouterr().out
+    assert main(["status"]) == 1 and "Scorer model not downloaded" in capsys.readouterr().out
     wav = tmp_path / "me.wav"
     wav.write_bytes(b"brige")
     command = [sys.executable, str(FAKE), "ok"]
     assert main(["score", str(wav), "--text", SAMPLES["correct"]], command) == 0
     out = capsys.readouterr().out
-    assert "bridge" in out and "mispronounced" in out and "门槛未校准" in out
+    assert "bridge" in out and "mispronounced" in out and "limits are not calibrated" in out
     assert not (tmp_path / INIT).exists()

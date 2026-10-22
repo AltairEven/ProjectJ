@@ -24,20 +24,20 @@ agree within two — differ by no more than two`
 
 const tasks: Task[] = [
   { kind: 'question', text: 'Why did Mia go up to the post herself instead of trusting the app? Answer in one or two sentences.' },
-  { kind: 'reading', text: '请朗读第三段。读完按“结束并提交”。', reference: 'She looked closely at the post. A young tree had grown in front of the sensor, and its leaves covered half of the small window.' },
+  { kind: 'reading', text: 'Please read paragraph 3 aloud. When you finish, press "Finish and submit".', reference: 'She looked closely at the post. A young tree had grown in front of the sensor, and its leaves covered half of the small window.' },
   { kind: 'question', text: 'What did Mia change, and how did she check that it worked?' },
-  { kind: 'offscreen', text: '离开屏幕：找一样你家里会“计数”的东西（电表、计步器……），想想它可能怎样数错。回来后说说你发现了什么。' },
-  { kind: 'clicked', text: '判断：The app counted more people than Mia did.', hint: '看第二段最后两句，比一比两个数字。',
-    view: { type: 'choice', version: 1, variant: 'true_false', options: ['对', '错'] }, right: { choice: 1 } },
-  { kind: 'clicked', text: 'Why did the app count fewer people?', hint: '看第三段：Mia 在柱子前看到了什么？',
+  { kind: 'offscreen', text: 'Away from the screen: find something at home that counts (a meter, a step counter...). Think how it could count wrong. Then come back and tell me.' },
+  { kind: 'clicked', text: 'True or false: The app counted more people than Mia did.', hint: 'Look at the last two sentences of paragraph 2 and compare the numbers.',
+    view: { type: 'choice', version: 1, variant: 'true_false', options: ['True', 'False'] }, right: { choice: 1 } },
+  { kind: 'clicked', text: 'Why did the app count fewer people?', hint: 'Look at paragraph 3: what did Mia see at the post?',
     view: { type: 'choice', version: 1, variant: 'single', options: ['Fewer people hiked in the rain.', "Leaves covered half of the sensor's window.", 'The phone app was broken.'] }, right: { choice: 1 } },
-  { kind: 'clicked', text: 'Put these in the order they happen in the story.', hint: '先找数字突然变少的那一句。',
+  { kind: 'clicked', text: 'Put these in the order they happen in the story.', hint: 'First find the sentence where the numbers suddenly drop.',
     view: { type: 'order', version: 1, variant: 'events', items: ['Mia cut the branch back.', 'The numbers dropped by half.', 'Mia counted hikers for two hours.', 'The group checks the sensor once a month.'] }, right: { order: [1, 2, 0, 3] } },
-  { kind: 'clicked', text: 'Match each English word with its meaning.', hint: '看页边的 Words to watch。',
-    view: { type: 'match', version: 1, left: ['volunteer', 'sensor', 'crossing'], right: ['过河的地方', '志愿做事', '传感器', '计步器'] }, right: { pairs: [1, 2, 0] } },
-  { kind: 'clicked', text: 'Fill in the blank with a word from the story.', hint: '找 She wrote down 那一句。',
+  { kind: 'clicked', text: 'Match each English word with its meaning.', hint: 'Look at Words to watch beside the story.',
+    view: { type: 'match', version: 1, left: ['volunteer', 'sensor', 'crossing'], right: ['a place to cross a river', 'to work for free', 'a device that notices and measures', 'a step counter'] }, right: { pairs: [1, 2, 0] } },
+  { kind: 'clicked', text: 'Fill in the blank with a word from the story.', hint: 'Find the sentence with "She wrote down".',
     view: { type: 'fill', version: 1, variant: 'word_bank', text: 'She wrote down ___ people.', blanks: 1, bank: ['nineteen', 'forty-two', 'two'] }, right: { blanks: ['forty-two'] } },
-  { kind: 'clicked', text: 'Fill in the blank with a word from the story.', hint: '看 The app showed only 那一句。',
+  { kind: 'clicked', text: 'Fill in the blank with a word from the story.', hint: 'Look at the sentence with "The app showed only".',
     view: { type: 'fill', version: 1, variant: 'free', text: 'The app showed only ___ for the same two hours.', blanks: 1, bank: null }, right: { blanks: ['nineteen'] } },
   { kind: 'question', text: 'Tell the story in two or three sentences: what went wrong, and how did Mia find out?' },
 ]
@@ -70,7 +70,7 @@ const say = (pending: AllowedAction, patch: Partial<Snapshot> = {}) =>
 // Jane asks task n: the reading text appears with a reading task, pictures with the first question.
 function ask(index: number) {
   const task = tasks[index]
-  if (!task) return say(action('closing', '今天就到这里。你找到了传感器为什么少数，也读完了第三段。确认收到这段小结就下课。', 'end_confirmation'),
+  if (!task) return say(action('closing', 'That is all for today. You found why the sensor counted too few, and you read paragraph 3. Say you heard this summary, and we are done.', 'end_confirmation'),
     { task_index: tasks.length, wait_kind: 'closing_confirmation', recording: null })
   const after = task.kind === 'offscreen' ? 'offscreen' : 'input'
   return say(action('question', task.text, after, index === 0 ? { visuals: ['trail-sensor'] } : {}), {
@@ -85,47 +85,47 @@ const base = (realm: Snapshot['realm']): Snapshot => ({
   mode: 'waiting_input', activity_state: 'running', wait_kind: 'answer', task_instance_id: 'task', wait_id: 'wait',
   core_revision: 0, cancellation_epoch: 0, input_policy_ref: { object_id: 'policy', revision: 1 },
   pending_action: null, presented_action: null, attempt_count: 0, task_index: 0, task_count: tasks.length,
-  elapsed_seconds: 0, end: null, actual_api: '未验证', actual_voice: '未验证', recording: null, task: null,
+  elapsed_seconds: 0, end: null, actual_api: 'unverified', actual_voice: 'unverified', recording: null, task: null,
   materials: { 'passage': passage },
 })
 
 export const scenes: Record<string, (realm: Snapshot['realm']) => void> = {
-  '开场说明（等确认）': realm => {
+  'Opening (waiting to confirm)': realm => {
     snapshot = { ...base(realm), task_index: -1, materials: {} }
-    say(action('goal', '今天我们读一篇关于登山步道传感器的短文，练习从文中找原因、说清楚经过，最后朗读一段。准备好就按“确认收到说明”。', 'input'),
+    say(action('goal', 'Today we read a short story about a trail sensor. We find reasons in the story, tell what happened, and read a part aloud. When you are ready, press "Yes, I heard".', 'input'),
       { wait_kind: 'goal_confirmation' })
   },
-  '问答题（有课文和图）': realm => { snapshot = base(realm); ask(0) },
-  '朗读段': realm => { snapshot = base(realm); ask(1) },
-  'Jane 在看回答': realm => {
+  'Question (story and picture)': realm => { snapshot = base(realm); ask(0) },
+  'Read aloud': realm => { snapshot = base(realm); ask(1) },
+  'Jane reading the answer': realm => {
     snapshot = { ...base(realm), mode: 'judging' }
     snapshot.presented_action = action('question', tasks[0].text, 'input')
   },
-  '离屏活动中': realm => {
+  'Away from the screen': realm => {
     snapshot = { ...base(realm), task_index: 3, mode: 'offscreen', activity_state: 'offscreen', wait_kind: 'offscreen_return' }
     snapshot.presented_action = action('offscreen', tasks[3].text, 'offscreen')
   },
-  '已暂停': realm => {
+  'Paused': realm => {
     snapshot = { ...base(realm), mode: 'paused', activity_state: 'paused' }
     snapshot.presented_action = action('question', tasks[2].text, 'input')
   },
-  '收尾（等确认）': realm => { snapshot = base(realm); ask(tasks.length) },
-  '已结束': realm => {
+  'Wrap-up (waiting to confirm)': realm => { snapshot = base(realm); ask(tasks.length) },
+  'Finished': realm => {
     snapshot = { ...base(realm), mode: 'ended', activity_state: 'ended', task_index: tasks.length, end: { reason: 'normal' } }
-    snapshot.presented_action = action('closing', '这节课结束了，课后评价会自动生成。', 'end_confirmation')
+    snapshot.presented_action = action('closing', 'The class is over. Your evaluation comes next by itself.', 'end_confirmation')
   },
-  '很长的课文（滚动）': realm => {
+  'Very long story (scrolls)': realm => {
     snapshot = { ...base(realm), materials: { passage, notes, again: passage } }
     ask(2)
   },
-  '没有课文': realm => { snapshot = { ...base(realm), materials: {} }; ask(2) },
-  '判断题': realm => { snapshot = base(realm); ask(4) },
-  '单选题': realm => { snapshot = base(realm); ask(5) },
-  '排序题': realm => { snapshot = base(realm); ask(6) },
-  '配对题': realm => { snapshot = base(realm); ask(7) },
-  '填空题（选词）': realm => { snapshot = { ...base(realm), materials: { passage, notes } }; ask(8) },
-  '填空题（自由）': realm => { snapshot = base(realm); ask(9) },
-  '开放问答': realm => { snapshot = base(realm); ask(10) },
+  'No story': realm => { snapshot = { ...base(realm), materials: {} }; ask(2) },
+  'True or false': realm => { snapshot = base(realm); ask(4) },
+  'Single choice': realm => { snapshot = base(realm); ask(5) },
+  'Order': realm => { snapshot = base(realm); ask(6) },
+  'Match': realm => { snapshot = base(realm); ask(7) },
+  'Fill (word bank)': realm => { snapshot = { ...base(realm), materials: { passage, notes } }; ask(8) },
+  'Fill (free)': realm => { snapshot = base(realm); ask(9) },
+  'Open question': realm => { snapshot = base(realm); ask(10) },
 }
 
 export function load(scene: string, realm: Snapshot['realm']) {
@@ -152,11 +152,11 @@ async function answered(body: Body) {
   if (intent === 'confirmation' && snapshot.wait_kind === 'goal_confirmation') { set({ materials: { passage } }); return ask(0) }
   if (intent === 'confirmation' && snapshot.wait_kind === 'closing_confirmation')
     return set({ mode: 'ended', activity_state: 'ended', end: { reason: 'normal' }, recording: null })
-  if (intent === 'help') return say(action('help', '提示：看第二段最后两句，app 和她自己数的数字差了多少？', 'input'))
-  if (snapshot.wait_kind === 'offscreen_report') return say(action('feedback', '谢谢，你说清楚了它可能怎样数错。我们接着往下。', 'next_task'))
+  if (intent === 'help') return say(action('help', 'Hint: look at the last two sentences of paragraph 2. How far apart are the app and her own count?', 'input'))
+  if (snapshot.wait_kind === 'offscreen_report') return say(action('feedback', 'Thanks. You said clearly how it could count wrong. Let\'s go on.', 'next_task'))
   if (String(body.text).trim().length < 6)
-    return say(action('feedback', '再多说一点：她是怎样发现 app 的数字不对的？', 'input'), { attempt_count: snapshot.attempt_count + 1 })
-  return say(action('feedback', '对，她先自己数了一遍，发现和 app 差了一大截，才去找原因。', 'next_task'))
+    return say(action('feedback', 'Say a little more: how did she find out the app was wrong?', 'input'), { attempt_count: snapshot.attempt_count + 1 })
+  return say(action('feedback', 'Yes. She counted for herself first, saw a big gap from the app, and then looked for the reason.', 'next_task'))
 }
 
 // A clicked task: right moves on with the prepared line, wrong says so and gives the hint.
@@ -165,9 +165,9 @@ async function responded(body: Body) {
   set({ mode: 'judging' }); push()
   await wait()
   const task = tasks[snapshot.task_index]
-  if (body.intent === 'help') return say(action('help', task.hint ?? '再看一遍课文。', 'input'))
-  if (plain(body.response) === plain(task.right)) return say(action('feedback', '对了，你找得很准。', 'next_task'), { attempt_count: snapshot.attempt_count + 1 })
-  return say(action('help', `这次还不对。${task.hint ?? ''}`, 'retry'), { attempt_count: snapshot.attempt_count + 1 })
+  if (body.intent === 'help') return say(action('help', task.hint ?? 'Read the story again.', 'input'))
+  if (plain(body.response) === plain(task.right)) return say(action('feedback', 'Right! You found it.', 'next_task'), { attempt_count: snapshot.attempt_count + 1 })
+  return say(action('help', `Not yet. ${task.hint ?? ''}`, 'retry'), { attempt_count: snapshot.attempt_count + 1 })
 }
 
 async function controlled(command: string) {
@@ -178,7 +178,7 @@ async function controlled(command: string) {
     case 'skip': return ask(snapshot.task_index + 1)
     case 'close': return ask(tasks.length)
     case 'repeat': return snapshot.presented_action ? say(action('repeat', snapshot.presented_action.text, 'input')) : snapshot
-    case 'return': return say(action('question', '欢迎回来。说说你找到了什么、它可能怎样数错？', 'input'),
+    case 'return': return say(action('question', 'Welcome back. What did you find, and how could it count wrong?', 'input'),
       { mode: 'delivering', activity_state: 'running', wait_kind: 'offscreen_report' })
   }
   return snapshot
@@ -214,7 +214,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (route === 'class/delivery') return json(delivered(body))
   if (route === 'class/input' || route === 'class/recording') {
     const result = route === 'class/input' ? await answered(body)
-      : (set({ mode: 'judging' }), push(), await wait(), say(action('feedback', '读得很清楚。“leaves”和“window”再读得饱满一点就更好了。', 'next_task'), { recording: null }))
+      : (set({ mode: 'judging' }), push(), await wait(), say(action('feedback', 'Clear reading. Say "leaves" and "window" a little more fully next time.', 'next_task'), { recording: null }))
     return json({ ack: 'accepted', snapshot: result, event_id: body.event_id })
   }
   if (route === 'class/response') return json({ ack: 'accepted', snapshot: await responded(body), event_id: body.event_id })
@@ -226,7 +226,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   }
   if (route.startsWith('class/visual/')) return picture(decodeURIComponent(route.split('/').pop()!))
   if (route === 'class/playback') return json({})
-  return new Response(JSON.stringify({ detail: `沙盒没有 ${route}` }), { status: 404 })
+  return new Response(JSON.stringify({ detail: `The sandbox has no ${route}` }), { status: 404 })
 }
 
 // Only the class event stream is pretend; Vite's own reload socket stays real.

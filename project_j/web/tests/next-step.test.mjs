@@ -12,7 +12,7 @@ const subjects = {
 
 test('the navigation lists the six pages in order', () => {
   assert.deepEqual(pages.map(([page]) => page), ['home', 'state', 'plan', 'courses', 'evaluations', 'settings'])
-  assert.deepEqual(pages.map(([, label]) => label), ['主页', '学习状态', '学习计划', '课程', '课后评价', '设置'])
+  assert.deepEqual(pages.map(([, label]) => label), ['Home', 'Progress', 'Plan', 'Lessons', 'Evaluations', 'Settings'])
 })
 
 test('every next step has a title and a page to go to', () => {
@@ -28,21 +28,21 @@ test('every next step has a title and a page to go to', () => {
 
 test('the student is asked to act with the right words, and waiting asks nothing', () => {
   const evaluation = nextStepView({ kind: 'evaluation', subject: subjects.evaluation })
-  assert.deepEqual([evaluation.action, evaluation.page, evaluation.detail], ['查看并认可', 'evaluations', 'a1'])
+  assert.deepEqual([evaluation.action, evaluation.page, evaluation.detail], ['Read and acknowledge', 'evaluations', 'a1'])
   const course = nextStepView({ kind: 'course', subject: subjects.course })
-  assert.deepEqual([course.action, course.page, course.detail], ['查看并确认', 'courses', 'c1'])
+  assert.deepEqual([course.action, course.page, course.detail], ['Look and confirm', 'courses', 'c1'])
   // Confirmed is saved and waits: the student starts the class when ready.
   const ready = nextStepView({ kind: 'course', subject: { ...subjects.course, confirmed: true } })
-  assert.deepEqual([ready.title, ready.action, ready.page, ready.detail], ['课程已确认，准备好就开始上课', '去上课', 'courses', 'c1'])
-  assert.equal(nextStepView({ kind: 'goal', subject: {} }).action, '确认新目标')
+  assert.deepEqual([ready.title, ready.action, ready.page, ready.detail], ['The lesson is confirmed. Start when you are ready.', 'Go to class', 'courses', 'c1'])
+  assert.equal(nextStepView({ kind: 'goal', subject: {} }).action, 'Look at the goal')
   assert.equal(nextStepView({ kind: 'waiting', subject: { failed: [] } }).action, undefined)
   assert.equal(nextStepView({ kind: 'none', subject: {} }).action, undefined)
   const resources = nextStepView({ kind: 'resources', subject: subjects.resources })
   assert.deepEqual([resources.page, resources.detail], ['courses', 'c1'])
-  assert.match(resources.title, /第2\/5项/)
-  const failed = nextStepView({ kind: 'resources', subject: { ...subjects.resources, state: 'failed', reason: '资源未就绪', progress: null } })
-  assert.match(failed.title, /失败/)
-  assert.match(failed.title, /资源未就绪/)
+  assert.match(resources.title, /item 2\/5/)
+  const failed = nextStepView({ kind: 'resources', subject: { ...subjects.resources, state: 'failed', reason: 'Resources not ready', progress: null } })
+  assert.match(failed.title, /failed/)
+  assert.match(failed.title, /Resources not ready/)
 })
 
 test('background jobs read as what the AI is doing, with the reason when one failed', () => {
@@ -55,10 +55,11 @@ test('background jobs read as what the AI is doing, with the reason when one fai
     { name: 'start:c1:2', state: 'running', progress: '2/5' },
     { name: 'confirm:c1:2', state: 'running', progress: '1/3' },
     { name: 'recheck:e:2', state: 'running' },
-    { name: 'prepare:d:2', state: 'failed', reason: '备课未取得（超时）' },
+    { name: 'prepare:d:2', state: 'failed', reason: 'The lesson could not be made (it took too long)' },
   ]), [
-    '正在备课', '正在评价', '正在更新学习状态与计划', '正在整理学习资料', '正在复盘',
-    '正在准备资源并开课：第2/5项', '正在确认课程并准备资源：第1/3项', '正在按更正复核学习状态', '备课失败：备课未取得（超时）',
+    'Making the lesson', 'Evaluating', 'Updating progress and plan', 'Writing your profile', 'Reviewing the plan',
+    'Getting resources and starting: item 2/5', 'Confirming the lesson and getting resources: item 1/3',
+    'Checking progress after your correction', 'Making the lesson failed: The lesson could not be made (it took too long)',
   ])
 })
 
@@ -74,24 +75,24 @@ test('onboarding lasts until the profile is confirmed, also while the AI works o
 
 test('the skills to train are ticked on the main page, Jane\'s suggestions already ticked', () => {
   const focus = nextStepView({ kind: 'focus', subject: {} })
-  assert.deepEqual([focus.title, focus.page, focus.action], ['下一课读什么、练什么？', 'home', undefined])
+  assert.deepEqual([focus.title, focus.page, focus.action], ['What should the next lesson be about?', 'home', undefined])
   assert.deepEqual(initialFocus([{ skill_id: 'past_simple', reason: 'r' }]), ['past_simple'])
-  assert.equal(focusError(3, '', '塞尔达'), null)
-  assert.equal(focusError(0, '', '塞尔达'), null)
-  assert.equal(focusError(1, '', '  '), '先选一个题材，或写下你想读的。')
-  assert.equal(focusError(1, '', 'x'.repeat(101)), '题材最多100字。')
-  assert.equal(focusError(4, '', '塞尔达'), '每课最多选3项。')
-  assert.equal(focusError(1, 'x'.repeat(101), '塞尔达'), '其他想练的最多100字。')
+  assert.equal(focusError(3, '', 'Zelda'), null)
+  assert.equal(focusError(0, '', 'Zelda'), null)
+  assert.equal(focusError(1, '', '  '), 'Choose a topic, or write what you want to read about.')
+  assert.equal(focusError(1, '', 'x'.repeat(101)), 'A topic can have at most 100 characters.')
+  assert.equal(focusError(4, '', 'Zelda'), 'Choose at most 3 a lesson.')
+  assert.equal(focusError(1, 'x'.repeat(101), 'Zelda'), 'Other things to practise: at most 100 characters.')
 })
 
 test('a stopped class can be acknowledged as it is or taken again', () => {
   const view = nextStepView({ kind: 'evaluation', subject: { ...subjects.evaluation, retake: { object_id: 'c1', revision: 2 } } })
-  assert.deepEqual([view.title, view.action, view.page], ['上节课中途停止了：可以认可这份评价，也可以重上这节课', '查看并认可', 'evaluations'])
-  assert.deepEqual(view.also, { action: '重上这节课', page: 'courses', detail: 'c1' })
+  assert.deepEqual([view.title, view.action, view.page], ['The last class stopped early. Acknowledge its evaluation, or take the lesson again.', 'Read and acknowledge', 'evaluations'])
+  assert.deepEqual(view.also, { action: 'Take it again', page: 'courses', detail: 'c1' })
   assert.equal(nextStepView({ kind: 'evaluation', subject: subjects.evaluation }).also, undefined)
 })
 
 test('an evaluation written again after the student\'s correction asks to be acknowledged again', () => {
   const view = nextStepView({ kind: 'evaluation', subject: { ...subjects.evaluation, corrected: true } })
-  assert.deepEqual([view.title, view.action, view.detail], ['评价已按你的更正重写，请再认可一次', '查看并认可', 'a1'])
+  assert.deepEqual([view.title, view.action, view.detail], ['The evaluation was rewritten after your correction. Please acknowledge it again.', 'Read and acknowledge', 'a1'])
 })

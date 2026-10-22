@@ -51,7 +51,7 @@ def test_a_fast_tier_binding_needs_its_tier_probed():
     }
     assert admission(report(**base), "classroom_judgment", "low") == []
     reasons = admission(report(**base), "classroom_judgment", "low", "fast")
-    assert reasons == ["Fast层级：未探测"]
+    assert reasons == ["Fast tier: not probed"]
     listed = report(**base, **{"tier:fast": "unverified"})
     assert admission(listed, "classroom_judgment", "low", "fast") == []
 
@@ -67,11 +67,11 @@ def test_unverified_items_pass_admission_but_failed_or_missing_items_do_not():
     assert admission(ok, "classroom_judgment", "low") == []
     bad = report(auth="verified", model="failed", structured_output="unsupported")
     reasons = admission(bad, "classroom_judgment", "low")
-    assert any(r.startswith("模型") for r in reasons)
-    assert any(r.startswith("结构化输出") for r in reasons)
-    assert any(r.startswith("取消") for r in reasons)  # never probed
-    assert any(r.startswith("档位low") for r in reasons)
-    assert admission(None, "evaluation", "medium") == ["尚未探测"]
+    assert any(r.startswith("Model") for r in reasons)
+    assert any(r.startswith("Structured output") for r in reasons)
+    assert any(r.startswith("Cancel") for r in reasons)  # never probed
+    assert any(r.startswith("Effort low") for r in reasons)
+    assert admission(None, "evaluation", "medium") == ["not probed yet"]
 
 
 @pytest.mark.parametrize("purpose", ["planning", "preparation"])
@@ -96,9 +96,9 @@ def test_evaluation_does_not_require_cancellation():
     assert admission(ok, "evaluation", "medium") == []
 
 
-def test_parent_facing_reasons_use_chinese_names():
+def test_parent_facing_reasons_use_english_names():
     bad = report(auth="verified", model="failed", structured_output="unsupported")
     reasons = admission(bad, "classroom_judgment", "low")
-    assert "模型：失败" in reasons and "结构化输出：不支持" in reasons
-    assert "档位low：未探测" in reasons
+    assert "Model: failed" in reasons and "Structured output: not supported" in reasons
+    assert "Effort low: not probed" in reasons
     assert not any("structured_output" in r or "effort:" in r for r in reasons)

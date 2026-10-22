@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Project J 隔离模拟",
+    "title": "Project J",
     "version": "0.1.0"
   },
   "paths": {
@@ -2313,15 +2313,15 @@
           },
           "actual_api": {
             "type": "string",
-            "const": "未验证",
+            "const": "unverified",
             "title": "Actual Api",
-            "default": "未验证"
+            "default": "unverified"
           },
           "actual_voice": {
             "type": "string",
-            "const": "未验证",
+            "const": "unverified",
             "title": "Actual Voice",
-            "default": "未验证"
+            "default": "unverified"
           },
           "verification": {
             "additionalProperties": {
@@ -3662,12 +3662,12 @@
           },
           "actual_api": {
             "type": "string",
-            "const": "未验证",
+            "const": "unverified",
             "title": "Actual Api"
           },
           "actual_voice": {
             "type": "string",
-            "const": "未验证",
+            "const": "unverified",
             "title": "Actual Voice"
           },
           "recording": {

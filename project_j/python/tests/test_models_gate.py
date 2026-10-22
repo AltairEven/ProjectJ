@@ -12,14 +12,16 @@ LEARNER = "fictional-L1"
 @pytest.fixture
 def blocked(application):
     """The same application with an uninitialized model service."""
-    application.models = ModelService({}, {}, [], problem="未配置默认模型")
+    application.models = ModelService(
+        {}, {}, [], problem="No default model; run project-j-init configure"
+    )
     return application
 
 
 def test_model_dependent_use_cases_refuse_until_initialized(blocked):
     from project_j.learning.maintenance import review
 
-    with pytest.raises(ModelsNotReady, match="模型未初始化"):
+    with pytest.raises(ModelsNotReady, match="The model is not set up"):
         asyncio.run(blocked.prepare("prep-1", LEARNER))
     with pytest.raises(ModelsNotReady):
         blocked.start("start-1", LEARNER, RevisionRef(object_id="course", revision=1), {})
@@ -32,7 +34,9 @@ def test_model_dependent_use_cases_refuse_until_initialized(blocked):
 def test_viewing_and_export_do_not_need_models(blocked):
     dashboard = blocked.dashboard(LEARNER)
     assert dashboard["models"]["initialized"] is False
-    assert dashboard["models"]["purposes"]["evaluation"]["reasons"] == ["未配置默认模型"]
+    assert dashboard["models"]["purposes"]["evaluation"]["reasons"] == [
+        "No default model; run project-j-init configure"
+    ]
     assert blocked.files.export(LEARNER).exists()
 
 

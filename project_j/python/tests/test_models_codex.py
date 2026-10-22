@@ -282,7 +282,10 @@ def test_probe_reports_each_item(tmp_path):
     statuses = {name: item.status for name, item in report.items.items()}
     assert statuses["auth"] == statuses["model"] == statuses["structured_output"] == "verified"
     assert statuses["effort:low"] == "unverified" and statuses["effort:high"] == "unsupported"
-    assert statuses["cancellation"] == "verified" and "中断" in report.items["cancellation"].detail
+    assert (
+        statuses["cancellation"] == "verified"
+        and "stop requested" in report.items["cancellation"].detail
+    )
     assert statuses["image_input"] == "verified" and statuses["audio"] == "not_probed"
     assert statuses["tools"] == "verified"
     text, image = fake.turns[-1][0]

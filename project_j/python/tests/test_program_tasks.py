@@ -29,13 +29,13 @@ async def to_clicked(app):
     """Through the story questions and the reports to the first clicked task."""
     core = await start(app)
     deliver_all(core)
-    await answer(app, "听到了。", "confirmation")
+    await answer(app, "Yes, I heard.", "confirmation")
     await answer(app, "a bridge")
     await answer(app, "She folded it.")
-    await answer(app, "我指的是折过的纸。", "report")
+    await answer(app, "I pointed to the folded paper.", "report")
     core.control(str(uuid4()), "return")
     deliver_all(core)
-    await answer(app, "第二次纸折了，车没有掉。", "report")
+    await answer(app, "The second time the paper was folded and the car did not fall.", "report")
     assert core.current_task().task_id == "choice-first-try"
     return core
 
@@ -61,7 +61,7 @@ def test_a_choice_task_is_judged_by_rule_without_a_model_call(application):
         calls = len(judgments(application))
         instance = core.task_instance_id
         _, said = await respond(application, wrong_choice(task))
-        assert said == WRONG_TEXT + task.supports[0].text
+        assert said == f"{WRONG_TEXT} {task.supports[0].text}"
         assert core.wait_kind == "retry" and core.wrong_count[instance] == 1
         _, said = await respond(application, correct_response(task))
         assert said == task.correct_text
@@ -110,9 +110,9 @@ def test_text_or_recording_on_a_clicked_task_is_refused(application):
         core = await to_clicked(application)
         inputs = len(core.inputs)
         for intent in ("unknown", "help"):
-            with pytest.raises(ValueError, match="这道题请在题目上作答"):
+            with pytest.raises(ValueError, match="Answer on the question itself"):
                 await application.adapter.text(str(uuid4()), "b", intent)
-        with pytest.raises(ValueError, match="这道题请在题目上作答"):
+        with pytest.raises(ValueError, match="Answer on the question itself"):
             await read(application, str(uuid4()), "The paper bends.")
         assert len(core.inputs) == inputs and not core.wrong_count
 
@@ -123,11 +123,13 @@ def test_a_clicked_answer_elsewhere_is_refused(application):
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        with pytest.raises(ValueError, match="这道题不用按钮作答"):  # At the goal confirmation.
+        with pytest.raises(
+            ValueError, match="not answered with buttons"
+        ):  # At the goal confirmation.
             await application.adapter.response(str(uuid4()), {"choice": 0})
-        await answer(application, "听到了。", "confirmation")
+        await answer(application, "Yes, I heard.", "confirmation")
         assert core.snapshot()["task"] is None  # A story question has no page view.
-        with pytest.raises(ValueError, match="这道题不用按钮作答"):
+        with pytest.raises(ValueError, match="not answered with buttons"):
             await application.adapter.response(str(uuid4()), {"choice": 0})
         assert not core.attempts
 
@@ -147,7 +149,7 @@ def test_a_malformed_response_is_refused_and_not_counted(application, response, 
     async def scenario():
         core = await to_clicked(application)
         attempts, inputs = len(core.attempts), len(core.inputs)
-        with pytest.raises(ValueError, match="作答格式不对"):
+        with pytest.raises(ValueError, match="doesn't fit this question"):
             await application.adapter.response(str(uuid4()), response, intent)
         assert len(core.attempts) == attempts and len(core.inputs) == inputs
         assert not core.wrong_count and core.mode == "waiting_input"
@@ -188,13 +190,15 @@ def test_the_http_route_and_snapshot_carry_the_task_view(application):
         assert view["task"] is None  # The goal, then a story question: nothing to click.
 
         async def walk():
-            await answer(app, "听到了。", "confirmation")
+            await answer(app, "Yes, I heard.", "confirmation")
             await answer(app, "a bridge")
             await answer(app, "She folded it.")
-            await answer(app, "我指的是折过的纸。", "report")
+            await answer(app, "I pointed to the folded paper.", "report")
             core.control(str(uuid4()), "return")
             deliver_all(core)
-            await answer(app, "第二次纸折了，车没有掉。", "report")
+            await answer(
+                app, "The second time the paper was folded and the car did not fall.", "report"
+            )
 
         asyncio.run(walk())
         view = client.get("/api/class/snapshot", headers=student).json()
@@ -203,7 +207,9 @@ def test_the_http_route_and_snapshot_carry_the_task_view(application):
         refused = client.post(
             "/api/class/response", headers=student, json={"event_id": "bad", "response": {"x": 1}}
         )
-        assert refused.status_code == 400 and "作答格式不对" in refused.json()["message"]
+        assert (
+            refused.status_code == 400 and "doesn't fit this question" in refused.json()["message"]
+        )
         hint = client.post(
             "/api/class/response", headers=student, json={"event_id": "hint", "intent": "help"}
         )
@@ -230,7 +236,7 @@ def test_an_open_task_is_answered_by_text_and_judged_by_the_model(application):
             await read(application, str(uuid4()), core.current_task().reference_text)
             deliver_all(core)
         assert core.current_task().task_id == "retell-bridge" and core.snapshot()["task"] is None
-        with pytest.raises(ValueError, match="这道题不用按钮作答"):
+        with pytest.raises(ValueError, match="not answered with buttons"):
             await application.adapter.response(str(uuid4()), {"choice": 0})
         calls = len(judgments(application))
         await answer(application, "It fell.")  # Too short for the simulated judge.

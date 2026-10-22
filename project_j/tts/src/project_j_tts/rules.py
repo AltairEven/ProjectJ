@@ -9,12 +9,12 @@ import math
 SYNTHESIZER = "local-qwen3-tts"
 VERSION = "1"
 
-# Jane's voice: preset speaker plus the teacher instruction, the same voice for Chinese and
-# English. Sampling values are passed explicitly so a library default change cannot alter it.
-VOICE = "teacher-1"
+# Jane's voice: preset speaker plus the teacher instruction; Jane speaks English only
+# (ADR-0021). Sampling values are passed explicitly so a library default change cannot alter it.
+VOICE = "teacher-2"
 SPEAKER = "serena"
-INSTRUCT = "语气温柔亲切，像给小学生上课的老师，吐字清楚，语速稍慢。"
-LANGUAGE = "auto"
+INSTRUCT = "Warm and kind, like a teacher reading to a young learner; clear and a little slow."
+LANGUAGE = "english"
 TEMPERATURE = 0.9
 TOP_K = 50
 TOP_P = 1.0
@@ -58,7 +58,8 @@ MAX_TOKENS = 4096
 
 
 def max_tokens_for(text: str) -> int:
-    """Cap generation so a model stuck repeating ends; slow Chinese takes about 0.3 s a character.
+    """Cap generation so a model stuck repeating ends; the teacher-2 probe read English at about
+    0.09 s a character (2026-10-22), well inside the 0.5 s allowance.
 
     ponytail: a length heuristic with headroom; tune from probe and adult runs if real lines
     are truncated.

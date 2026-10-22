@@ -49,11 +49,11 @@ async def placement_lesson(app):
     assert app.start("placement", LEARNER, course_ref)["decision"] == "allow_simulation"
     core = app.core
     deliver_all(core)
-    await answer(app, "听到了，先读故事。", "confirmation")
+    await answer(app, "Yes, I heard. Read the story first.", "confirmation")
     await answer(app, "a bridge")
     await answer(app, "She folded it.")
     await read_aloud_all(app)
-    await answer(app, "听到了。", "confirmation")
+    await answer(app, "Yes, I heard.", "confirmation")
     assert core.mode == "ended"
     app.seal()
     advance(app, LEARNER)
@@ -181,3 +181,38 @@ def test_no_chat_questions_are_said_ahead_after_onboarding(application, caplog):
     with TestClient(create_app(Settings(), application)):
         pass
     assert "onboarding speech pregenerated" not in caplog.text
+
+
+def test_chat_questions_are_english_only():
+    from project_j.english import chinese
+
+    assert not chinese(QUESTIONS)
+
+
+def test_a_profile_summary_with_chinese_fails(tmp_path, monkeypatch, caplog):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="project_j")
+    app = onboarding_app(tmp_path)
+    adapter = app.models.adapters["simulated"]
+    original = adapter.respond
+
+    def chinese_profile(request):
+        reply = original(request)
+        if request.purpose == "planning" and "chat" in request.context:
+            return reply | {"background": "为了工作。"}
+        return reply
+
+    monkeypatch.setattr(adapter, "respond", chinese_profile)
+
+    async def scenario():
+        initialize(app)
+        save_lexile(app, "l1", LEARNER, "650L")
+        save_chat(app, "c1", LEARNER, ANSWERS)
+        advance(app, LEARNER)
+        await wait_jobs(app)
+        await placement_lesson(app)
+
+    asyncio.run(scenario())
+    assert any("the reply was not in English" in text for text in app.job_failures.values())
+    assert "profile summary failure=language" in caplog.text and "为了工作" not in caplog.text

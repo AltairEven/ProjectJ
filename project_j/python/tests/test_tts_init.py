@@ -31,10 +31,10 @@ def test_probe_records_timings_cancel_and_seed(tmp_path):
     manifest.write_text("{}")
     record = asyncio.run(probe(tmp_path, synth(tmp_path)))
     assert record["passed"], record["reasons"]
-    assert set(record["samples"]) == {"zh", "en", "mixed"}
-    zh = record["samples"]["zh"]
-    assert zh["status"] == "ok" and zh["audio_seconds"] >= 0.5 and zh["peak"] >= 300
-    assert zh["first_chunk_ms"] >= 0 and zh["rtf"] > 0 and zh["chunks"] >= 1
+    assert set(record["samples"]) == {"story", "task"}
+    story = record["samples"]["story"]
+    assert story["status"] == "ok" and story["audio_seconds"] >= 0.5 and story["peak"] >= 300
+    assert story["first_chunk_ms"] >= 0 and story["rtf"] > 0 and story["chunks"] >= 1
     assert record["cancel"]["stop_ms"] <= 2000 and record["recovered"] is True
     assert record["seed_repeatable"] is True and record["identity"]["voice"] == "teacher-1"
     assert record["manifest_sha256"] == hashlib.sha256(b"{}").hexdigest()
@@ -45,19 +45,23 @@ def test_probe_records_timings_cancel_and_seed(tmp_path):
 
 def test_probe_fails_on_silent_audio(tmp_path):
     record = asyncio.run(probe(tmp_path, synth(tmp_path, "silent")))
-    assert not record["passed"] and "中文合成结果无声或过短" in record["reasons"]
+    assert not record["passed"] and "the story sample is silent or too short" in record["reasons"]
 
 
 def test_probe_fails_when_cancel_is_not_acknowledged(tmp_path):
     stuck = synth(tmp_path, "stuck_cancel", chunk_timeout=0.5, cancel_timeout=0.3)
     record = asyncio.run(probe(tmp_path, stuck))
     assert not record["passed"]
-    assert {"中途取消未确认停止", "取消后合成进程未恢复服务"} <= set(record["reasons"])
+    assert {"the cancel was not confirmed", "the process did not recover after the cancel"} <= set(
+        record["reasons"]
+    )
 
 
 def test_probe_without_a_process_records_why(tmp_path):
     record = asyncio.run(probe(tmp_path, synth(tmp_path, "not_ready")))
-    assert not record["passed"] and record["reasons"][0].startswith("合成进程无法启动")
+    assert not record["passed"] and record["reasons"][0].startswith(
+        "the speech process cannot start"
+    )
     assert (tmp_path / INIT).is_file()
 
 
@@ -77,3 +81,14 @@ def test_status_lists_what_is_missing(tmp_path, monkeypatch, capsys):
     assert main(["status"]) == 1
     out = capsys.readouterr().out
     assert "合成器未就绪" in out and "project-j-tts-init download" in out
+
+
+def test_samples_are_english_only():
+    from project_j.english import chinese
+    from project_j.platform.tts.init import SAMPLES
+
+    assert SAMPLES == {
+        "story": "Mia has a toy car. She wants a bridge for her car.",
+        "task": "Which bus did Ben try first? Tap your answer.",
+    }
+    assert not chinese(SAMPLES)

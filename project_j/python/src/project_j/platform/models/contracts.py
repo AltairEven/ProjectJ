@@ -30,27 +30,27 @@ Failure = Literal[
     "not_initialized",
 ]
 LABELS = {
-    "verified": "已核实",
-    "unverified": "未核实",
-    "unsupported": "不支持",
-    "failed": "失败",
-    "not_probed": "未探测",
+    "verified": "verified",
+    "unverified": "unverified",
+    "unsupported": "not supported",
+    "failed": "failed",
+    "not_probed": "not probed",
 }
 PURPOSE_LABELS = {
-    "planning": "学习规划",
-    "preparation": "备课",
-    "classroom_judgment": "课堂判断",
-    "evaluation": "课后评价",
+    "planning": "Planning",
+    "preparation": "Lesson making",
+    "classroom_judgment": "Class judgment",
+    "evaluation": "Evaluation",
 }
 ITEM_LABELS = {
-    "auth": "鉴权",
-    "model": "模型",
-    "structured_output": "结构化输出",
-    "cancellation": "取消",
-    "image_input": "图片输入",
-    "audio": "音频",
-    "tools": "工具关闭",
-    "tier:fast": "Fast层级",
+    "auth": "Sign-in",
+    "model": "Model",
+    "structured_output": "Structured output",
+    "cancellation": "Cancel",
+    "image_input": "Image input",
+    "audio": "Audio",
+    "tools": "Tools off",
+    "tier:fast": "Fast tier",
 }
 # Requests carry learning stage/state and task data only (ADR-0013).
 IDENTITY_KEYS = frozenset(
@@ -101,7 +101,7 @@ class CapabilityReport(Contract):
 def item_label(name: str) -> str:
     """Parent-facing name of a probe item."""
     if name.startswith("effort:"):
-        return f"档位{name.removeprefix('effort:')}"
+        return f"Effort {name.removeprefix('effort:')}"
     return ITEM_LABELS.get(name, name)
 
 
@@ -177,25 +177,25 @@ def admission(
 ) -> list[str]:
     """Why a probed binding cannot serve a purpose; unverified items pass and stay recorded."""
     if report is None:
-        return ["尚未探测"]
+        return ["not probed yet"]
     reasons = []
     tiers = () if tier == "default" else (f"tier:{tier}",)
     for name in (*REQUIRED[purpose], f"effort:{effort}", *tiers):
         item = report.items.get(name, ProbeItem(status="not_probed"))
         if item.status in {"unsupported", "failed", "not_probed"}:
-            detail = f"（{item.detail}）" if item.detail else ""
-            reasons.append(f"{item_label(name)}：{LABELS[item.status]}{detail}")
+            detail = f" ({item.detail})" if item.detail else ""
+            reasons.append(f"{item_label(name)}: {LABELS[item.status]}{detail}")
     return reasons
 
 
 FAILURE_TEXT = {
-    "auth": "密钥无效或未配置",
-    "quota": "额度不足或限流",
-    "timeout": "超时",
-    "unavailable": "模型或服务不可用",
-    "refused": "模型拒绝回答",
-    "incomplete": "返回不完整",
-    "invalid_output": "输出不合结构",
+    "auth": "the key is wrong or missing",
+    "quota": "out of quota or rate-limited",
+    "timeout": "timed out",
+    "unavailable": "the model or service is not available",
+    "refused": "the model refused",
+    "incomplete": "the reply was incomplete",
+    "invalid_output": "the reply did not fit the format",
 }
 
 

@@ -221,8 +221,8 @@ class Snapshot(Contract):
     task_count: int
     elapsed_seconds: float
     end: dict[str, JsonValue] | None
-    actual_api: Literal["未验证"]
-    actual_voice: Literal["未验证"]
+    actual_api: Literal["unverified"]
+    actual_voice: Literal["unverified"]
     recording: dict[str, JsonValue] | None = None
     # A clicked task as the page shows it (options, cards, columns, blanks); never its answer.
     task: dict[str, JsonValue] | None = None
@@ -268,8 +268,8 @@ class Dashboard(Contract):
     next: NextStep | None = None
     jobs: list[JobRow] = []
     qualification: Literal["not_granted"] = "not_granted"
-    actual_api: Literal["未验证"] = "未验证"
-    actual_voice: Literal["未验证"] = "未验证"
+    actual_api: Literal["unverified"] = "unverified"
+    actual_voice: Literal["unverified"] = "unverified"
     verification: dict[str, JsonValue] = {}
     objects: list[Document] = []
     previous_evaluations: list[Document] = []
@@ -500,7 +500,7 @@ def create_app(
                     await part.aclose()
 
     app = FastAPI(
-        title="Project J 隔离模拟",
+        title="Project J",
         version="0.1.0",
         lifespan=lifespan,
         docs_url=None,
@@ -577,7 +577,11 @@ def create_app(
             request,
             error,
             503,
-            {"message": "保存或回执未取得，请查询原操作，不要更换身份重建。", "save": "unknown"},
+            {
+                "message": "The save or receipt did not come back. Check the original "
+                "request; do not send it again under a new id.",
+                "save": "unknown",
+            },
         )
 
     async def save_after_end():
@@ -620,7 +624,7 @@ def create_app(
                 "verification": app_controller.verification,  # held in memory since startup
                 "models": app_controller.models.status(),
                 "objects": [],
-                "note": "课堂进行中，主页只返回内存控制状态，不访问数据库。",
+                "note": "A class is running; the home page shows only the class state.",
             }
         return app_controller.dashboard(learner_id) | {"seal_errors": seal_errors}
 
@@ -886,7 +890,7 @@ def create_app(
         try:
             audio = base64.b64decode(request.audio_base64, validate=True)
         except binascii.Error as error:
-            raise ValueError("录音数据无法解码") from error
+            raise ValueError("The recording could not be decoded.") from error
         result = await controller().adapter.recording(
             request.event_id,
             audio,
@@ -942,7 +946,7 @@ def create_app(
             await stream.aclose()
             reason = error.reason if isinstance(error, SynthesisFailed) else "failed"
             return JSONResponse(
-                status_code=503, content={"message": f"语音合成失败：{reason}", "reason": reason}
+                status_code=503, content={"message": f"Speech failed: {reason}", "reason": reason}
             )
         # A failure after the first chunk aborts the response; the page keeps what it played.
         return StreamingResponse(

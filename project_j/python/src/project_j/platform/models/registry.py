@@ -12,7 +12,7 @@ NEEDS_LOGIN = {"codex"}  # Subscription login kept in the adapter's own home dir
 
 def build(adapter_id: str, files: ModelFiles):
     if adapter_id not in ADAPTERS:
-        raise ValueError(f"未知适配器：{adapter_id}")
+        raise ValueError(f"Unknown adapter: {adapter_id}")
     if adapter_id in NEEDS_LOGIN:
         return ADAPTERS[adapter_id](files.path(f"{adapter_id}-home"))
     return ADAPTERS[adapter_id]()
@@ -30,20 +30,20 @@ def load_service(files: ModelFiles) -> ModelService:
         bindings = files.bindings()
         if bindings is None:
             return ModelService(
-                {}, {}, [], problem="未配置默认模型，请运行 project-j-init configure"
+                {}, {}, [], problem="No default model; run project-j-init configure"
             )
         adapters = {a: build(a, files) for a in {b.adapter for b in bindings.values()}}
         record = files.init_record()
         if record is None:
             return ModelService(
-                adapters, bindings, [], problem="尚未探测，请运行 project-j-init probe"
+                adapters, bindings, [], problem="Not probed yet; run project-j-init probe"
             )
         if record["config_digest"] != files.digest(versions(bindings)):
             return ModelService(
                 adapters,
                 bindings,
                 [],
-                problem="配置或适配器版本已改动，请运行 project-j-init probe",
+                problem="The setup or adapter version changed; run project-j-init probe",
             )
         reports = [CapabilityReport.model_validate(report) for report in record["reports"]]
         return ModelService(adapters, bindings, reports)

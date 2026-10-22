@@ -5,18 +5,18 @@ import { evaluationRows } from '../learning'
 import { endLabels, evaluationLines, revisionChanges } from '../report'
 import { Rows, useRun, type PageProps } from '../ui'
 
-const verdicts: Record<string, string> = { correct: '正确', incorrect: '不正确', unclear: '不清楚' }
-const helpNames: Record<string, string> = { light_prompt: '轻提示', scaffold: '支架', full_model: '完整示范' }
+const verdicts: Record<string, string> = { correct: 'right', incorrect: 'not right', unclear: 'unclear' }
+const helpNames: Record<string, string> = { light_prompt: 'a small hint', scaffold: 'a frame', full_model: 'a full model' }
 type Attempt = { task_id: string, judgment: string, inputs?: { text?: string }[], help?: Record<string, string>, pronunciation?: { status?: string } | null }
 
 const storyOf = (fact: Doc, objects: Doc[]) => String((objects.find(doc => doc.kind === 'course' && doc.object_id === (fact.body.course_ref as Doc).object_id)
-  ?.body.parent_preview as Record<string, unknown> | undefined)?.story ?? '课堂')
+  ?.body.parent_preview as Record<string, unknown> | undefined)?.story ?? 'Class')
 
 function attemptRows(fact: Doc): [string, string][] {
   return ((fact.body.attempts ?? []) as Attempt[]).map(attempt => {
-    const said = (attempt.inputs ?? []).map(input => input.text).filter(Boolean).join(' / ') || (attempt.pronunciation ? '朗读录音' : '无')
-    const help = Object.values(attempt.help ?? {}).map(level => helpNames[level] ?? level).join('、')
-    return [attempt.task_id, `原答：${said}；课堂判断：${verdicts[attempt.judgment] ?? attempt.judgment}${help ? `；帮助：${help}` : ''}`]
+    const said = (attempt.inputs ?? []).map(input => input.text).filter(Boolean).join(' / ') || (attempt.pronunciation ? 'reading aloud' : 'none')
+    const help = Object.values(attempt.help ?? {}).map(level => helpNames[level] ?? level).join(', ')
+    return [attempt.task_id, `Your answer: ${said}; in class: ${verdicts[attempt.judgment] ?? attempt.judgment}${help ? `; help: ${help}` : ''}`]
   })
 }
 
@@ -30,30 +30,30 @@ function Detail({ token, dashboard, learner, go, refresh, fact }: PageProps & { 
   const previous = (dashboard.previous_evaluations ?? []).find(doc => doc.object_id === evaluation?.object_id)
   const notes = objects.filter(doc => doc.kind === 'feedback' && doc.body.activity_id === activity)
     .sort((a, b) => a.source_revision - b.source_revision)
-  const send = (objection: boolean, label = objection ? '提出异议' : '补记') => { const body = { request_id: uid(), learner_id: learner, activity_id: activity, text: note.trim(), objection }
-    void run(async () => { await api(token, 'evaluation/feedback', body); setNote(''); setMessage('已保存，Jane 会据此重新评价。') }, label) }
+  const send = (objection: boolean, label = objection ? 'Sending your objection' : 'Saving your note') => { const body = { request_id: uid(), learner_id: learner, activity_id: activity, text: note.trim(), objection }
+    void run(async () => { await api(token, 'evaluation/feedback', body); setNote(''); setMessage('Saved. Jane will evaluate again with it.') }, label) }
   return <>
-    <button className="quiet" onClick={() => go('evaluations')}>← 全部评价</button>
+    <button className="quiet" onClick={() => go('evaluations')}>← All evaluations</button>
     <section><h2>{storyOf(fact, objects)}</h2>
-      <Rows rows={[['状态', row?.state], ['结束', endLabels[String((fact.body.end as Record<string, unknown>)?.reason)] ?? '未知']]} />
-      <h3>每题原答与帮助</h3><Rows rows={attemptRows(fact)} />
-      {row?.state !== '评价中' && evaluation ? <><h3>评价</h3><Rows rows={evaluationLines(evaluation, objects)} /></> : <p>评价生成中，页面会自动更新。</p>}
-      {row?.state !== '评价中' && evaluation && previous && <><h3>与上一版相比（第{previous.revision}版 → 第{evaluation.revision}版）</h3>
+      <Rows rows={[['Status', row?.state], ['Ended', endLabels[String((fact.body.end as Record<string, unknown>)?.reason)] ?? 'Unknown']]} />
+      <h3>Your answers and help</h3><Rows rows={attemptRows(fact)} />
+      {row?.state !== 'Evaluating' && evaluation ? <><h3>Evaluation</h3><Rows rows={evaluationLines(evaluation, objects)} /></> : <p>The evaluation is being written; this page updates by itself.</p>}
+      {row?.state !== 'Evaluating' && evaluation && previous && <><h3>Compared with the last version (version {previous.revision} → version {evaluation.revision})</h3>
         <Rows rows={revisionChanges(evaluation, previous, objects)} />
-        {row?.state !== '已认可' && <p>认可这一版之后，学习状态才按它更新。</p>}</>}
-      {notes.length > 0 && <><h3>你的补记</h3><Rows rows={notes.map((doc, index): [string, unknown] =>
-        [`第${index + 1}条${(doc.body.corrections as unknown[] | undefined)?.length ? '（异议）' : ''}`, doc.body.text])} /></>}</section>
+        {row?.state !== 'Acknowledged' && <p>Your progress updates from this version after you acknowledge it.</p>}</>}
+      {notes.length > 0 && <><h3>Your notes</h3><Rows rows={notes.map((doc, index): [string, unknown] =>
+        [`Note ${index + 1}${(doc.body.corrections as unknown[] | undefined)?.length ? ' (objection)' : ''}`, doc.body.text])} /></>}</section>
     {status}
-    {row && row.state !== '已认可' && <section><h2>补记或异议</h2>
-      <label>课上没记下的帮助、离开屏幕的结果，或你不同意的地方<textarea value={note} onChange={event => setNote(event.target.value)} /></label>
-      <div className="row"><button className="quiet" disabled={busy || !note.trim()} onClick={() => send(false)}>补记</button>
-        <button className="quiet" disabled={busy || !note.trim()} onClick={() => send(true)}>提出异议</button>
+    {row && row.state !== 'Acknowledged' && <section><h2>Add a note or object</h2>
+      <label>Help that was not recorded, what happened away from the screen, or what you disagree with<textarea value={note} onChange={event => setNote(event.target.value)} /></label>
+      <div className="row"><button className="quiet" disabled={busy || !note.trim()} onClick={() => send(false)}>Add a note</button>
+        <button className="quiet" disabled={busy || !note.trim()} onClick={() => send(true)}>Object</button>
         {row.evaluation_ref && <button disabled={busy} onClick={() => { const body = { request_id: uid(), learner_id: learner, activity_id: activity, evaluation_ref: row.evaluation_ref }
-          void run(async () => { await api(token, 'evaluation/acknowledge', body) }, '认可评价') }}>认可这份评价</button>}</div></section>}
-    {row?.state === '已认可' && evaluation && <section><h2>更正</h2>
-      <p>发现记错的地方可以追加更正：Jane 会按更正重新评价，评完请再认可一次；原评价和记录都保留。</p>
-      <label>更正说明<textarea value={note} onChange={event => setNote(event.target.value)} /></label>
-      <button className="quiet" disabled={busy || !note.trim()} onClick={() => send(true, '追加更正')}>追加更正</button></section>}
+          void run(async () => { await api(token, 'evaluation/acknowledge', body) }, 'Acknowledging') }}>Acknowledge</button>}</div></section>}
+    {row?.state === 'Acknowledged' && evaluation && <section><h2>Correct something</h2>
+      <p>Found a mistake? Add a correction. Jane evaluates again with it, and you acknowledge the new version; the old evaluation and record stay.</p>
+      <label>Your correction<textarea value={note} onChange={event => setNote(event.target.value)} /></label>
+      <button className="quiet" disabled={busy || !note.trim()} onClick={() => send(true, 'Adding your correction')}>Add correction</button></section>}
   </>
 }
 
@@ -64,7 +64,7 @@ export default function Evaluations(props: PageProps) {
   if (fact) return <Detail {...props} fact={fact} />
   const facts = new Map(objects.filter(doc => doc.kind === 'fact').map(doc => [String(doc.body.activity_id), doc]))
   const rows = evaluationRows(objects)
-  return <section><h2>课后评价</h2>{rows.length ? <ul className="list">{rows.map(row => <li key={row.activity_id}>
+  return <section><h2>Evaluations</h2>{rows.length ? <ul className="list">{rows.map(row => <li key={row.activity_id}>
     <button className="link" onClick={() => go('evaluations', row.activity_id)}>{storyOf(facts.get(row.activity_id)!, objects)}</button><span className="tag">{row.state}</span></li>)}</ul>
-    : <p>还没有课后评价。</p>}</section>
+    : <p>No evaluations yet.</p>}</section>
 }

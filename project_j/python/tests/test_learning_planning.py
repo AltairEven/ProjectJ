@@ -90,7 +90,7 @@ def test_planning_reads_the_recent_scores(application, caplog):
     assert scores["lessons"] == 1 and scores["by_type"]["choice"]["average"] == 10.0
     with_scores = demand_request(**data, scores=scores)
     text = json.dumps(with_scores.context["scores"], ensure_ascii=False)
-    assert "Mia" not in text and "reason" not in text and "模拟评分" not in text
+    assert "Mia" not in text and "reason" not in text and "Simulated score" not in text
     assert "scores是最近几节课按题型与能力的平均分" in with_scores.instructions
     assert "planning scores lessons=1 types=" in caplog.text
 
@@ -116,8 +116,14 @@ def test_simulated_planning_keeps_goals_and_adopts(application):
     assert ReviewDraft.model_validate(adapter.respond(review)).plan_effect == "reused"
 
 
-SCIENCE = {"dimension_id": "science.observation.report", "description": "说出纸桥的实际条件与结果"}
-REPORT = {"dimension_id": "english.speaking.report", "description": "用短英语报告结果"}
+SCIENCE = {
+    "dimension_id": "science.observation.report",
+    "description": "Say what really happened to the paper bridge",
+}
+REPORT = {
+    "dimension_id": "english.speaking.report",
+    "description": "Report the result in short English",
+}
 
 
 def model_changes_goals(application, monkeypatch, primary=SCIENCE, adjust=True):
@@ -130,12 +136,12 @@ def model_changes_goals(application, monkeypatch, primary=SCIENCE, adjust=True):
         if request.purpose == "planning" and "demand" in request.context:
             reply |= {
                 "suggestion_action": "modify",
-                "suggestion_reason": "模型理由：阅读两题都需要提示，下节先观察实际报告。",
+                "suggestion_reason": "Model reason: reading needed hints; observe a report next.",
                 "direction": "observe",
                 "primary_goal": primary,
                 "auxiliary_goal": REPORT,
                 "plan_effect": "adjusted" if adjust else "reused",
-                "plan_reason": "本周先补实际观察报告的样本。",
+                "plan_reason": "This week first adds samples of real reports.",
                 "plan_patch": {"main_goal": primary} if adjust else None,
             }
         return reply
@@ -157,12 +163,12 @@ def test_model_demand_changes_goals_and_explains(application, monkeypatch, caplo
     assert demand.body["primary_goal"] == SCIENCE and demand.body["direction"] == "observe"
     assert demand.body["note"]["after"]
     choice = demand.body["suggestion_choices"][0]
-    assert choice["action"] == "modify" and choice["reason"].startswith("模型理由")
+    assert choice["action"] == "modify" and choice["reason"].startswith("Model reason")
     assert week.body["main_goal"] == SCIENCE and week.revision == 2
     assert demand.body["plan_ref"] == week.ref.model_dump()
     assert (
         result["plan_effect"] == "adjusted"
-        and result["plan_reason"] == "本周先补实际观察报告的样本。"
+        and result["plan_reason"] == "This week first adds samples of real reports."
     )
     assert f"planning activity={activity}" in caplog.text and "孩子说很好玩" not in caplog.text
 
@@ -171,9 +177,9 @@ def test_unknown_goal_rejects_the_draft_and_retry_succeeds(application, monkeypa
     activity = taught(application)
     demand, week = application.current(LEARNER, "demand"), application.current(LEARNER, "plan:week")
     model_changes_goals(
-        application, monkeypatch, {"dimension_id": "math.counting", "description": "数数"}
+        application, monkeypatch, {"dimension_id": "math.counting", "description": "Counting"}
     )
-    with pytest.raises(PlanningUnavailable, match="目标不在能力目录"):
+    with pytest.raises(PlanningUnavailable, match="is not in the skill list"):
         asyncio.run(application.adopt("adopt1", LEARNER, evaluation_of(application, activity)))
     assert application.current(LEARNER, "demand").ref == demand.ref
     assert application.current(LEARNER, "plan:week").ref == week.ref
@@ -194,7 +200,9 @@ def test_planning_failure_keeps_state_and_retries(application):
         name = advance(application, LEARNER)
         assert name.startswith("adopt:")
         await wait_jobs(application)
-        assert application.job_failures[name].startswith("下节需求未取得（模型暂不可用）")
+        assert application.job_failures[name].startswith(
+            "The next lesson's plan could not be made (the model is not available now)"
+        )
         state = application.current(LEARNER, "state")
         retry(application, LEARNER, name)
         await wait_jobs(application)
@@ -214,10 +222,13 @@ def test_uncovered_goals_leave_the_course_not_ready(application, monkeypatch, ca
     result = asyncio.run(next_course(application, "next1", LEARNER, activity))
     package = result["next_package"]
     assert package["status"] == "not_ready"
-    assert package["reason"] == "课程未取得（模型暂不可用）。下节需求已保存，可以重试。"
+    assert package["reason"] == (
+        "The lesson could not be made (the model is not available now). "
+        "The next lesson's plan is saved; you can try again."
+    )
     assert {kind: len(application.store.list_current(LEARNER, kind)) for kind in kinds} == before
     assert "preparation failure stage=prepare failure=unavailable" in caplog.text
-    with pytest.raises(PreparationUnavailable, match="^课程未取得"):
+    with pytest.raises(PreparationUnavailable, match="^The lesson could not be made"):
         asyncio.run(application.prepare("p2", LEARNER))
 
 
@@ -228,7 +239,9 @@ def model_reviews(application, monkeypatch, **reply):
     def respond(request):
         answer = original(request)
         if request.purpose == "planning" and "level" in request.context:
-            answer |= {"conclusion": "模型复盘：阅读需要提示，先补实际报告。"} | reply
+            answer |= {
+                "conclusion": "Model review: reading needed hints; add real reports first."
+            } | reply
         return answer
 
     monkeypatch.setattr(adapter, "respond", respond)
@@ -240,7 +253,7 @@ def planning_calls(application):
 
 def test_week_review_adjusts_the_plan_directly(application, monkeypatch, caplog):
     taught(application)
-    patch = {"verification": "下次只看实际报告的条件与结果。"}
+    patch = {"verification": "Next time only check the conditions and results of real reports."}
     model_reviews(application, monkeypatch, plan_effect="adjusted", patch=patch)
     caplog.set_level(logging.INFO, logger="project_j")
     result = asyncio.run(review(application, "r1", LEARNER, "week"))
@@ -249,7 +262,7 @@ def test_week_review_adjusts_the_plan_directly(application, monkeypatch, caplog)
     assert result["plan_effect"] == "adjusted"
     assert result["next_step"] == "recheck_demand_and_course" and "decision_ref" not in result
     saved = application.store.read(RevisionRef.model_validate(result["review_ref"]), LEARNER)
-    assert saved.body["conclusion"].startswith("模型复盘")
+    assert saved.body["conclusion"].startswith("Model review")
     assert "review level=week plan_effect=adjusted" in caplog.text
 
 
@@ -260,26 +273,29 @@ def test_upper_level_changes_wait_for_the_parent(application, monkeypatch):
         monkeypatch,
         plan_effect="adjusted",
         patch={"main_goal": SCIENCE},
-        reason="两次课的阅读都需要提示。",
+        reason="Reading needed hints in both classes.",
     )
     result = asyncio.run(review(application, "r1", LEARNER, "stage"))
     proposal = application.store.read(RevisionRef.model_validate(result["decision_ref"]), LEARNER)
     assert proposal.body["decision_state"] == "pending"
     assert proposal.body["patch"] == {"main_goal": SCIENCE}
-    assert proposal.body["reason"] == "两次课的阅读都需要提示。"
+    assert proposal.body["reason"] == "Reading needed hints in both classes."
     assert application.current(LEARNER, "plan:stage").revision == 1
     assert result["plan_effect"] == "reused"
 
 
 def test_budget_changes_never_apply(application, monkeypatch):
     taught(application)
-    patch = {"budget_minutes": 45, "verification": "缩短为两项观察。"}
+    patch = {"budget_minutes": 45, "verification": "Shorten to two observations."}
     model_reviews(application, monkeypatch, plan_effect="adjusted", patch=patch)
     result = asyncio.run(review(application, "r1", LEARNER, "week"))
     week = application.current(LEARNER, "plan:week")
-    assert week.body["budget_minutes"] == 30 and week.body["verification"] == "缩短为两项观察。"
+    assert (
+        week.body["budget_minutes"] == 30
+        and week.body["verification"] == "Shorten to two observations."
+    )
     saved = application.store.read(RevisionRef.model_validate(result["review_ref"]), LEARNER)
-    assert "预算固定30分钟，改动不生效。" in saved.body["checks"]
+    assert "The time is fixed at 30 minutes; the change does not apply." in saved.body["checks"]
 
 
 def test_review_retry_reuses_the_saved_draft(application, monkeypatch):
@@ -331,10 +347,10 @@ def test_planning_suggests_at_most_two_known_skills(application, monkeypatch):
             seen.append(request)
             reply |= {
                 "focus_suggestions": [
-                    {"skill_id": "unknown", "reason": "清单外"},
-                    {"skill_id": "past_simple", "reason": "两处过去时用成原形"},
-                    {"skill_id": "articles", "reason": "漏了冠词"},
-                    {"skill_id": "verbs", "reason": "第三项"},
+                    {"skill_id": "unknown", "reason": "Not on the list"},
+                    {"skill_id": "past_simple", "reason": "Two past verbs were in the base form"},
+                    {"skill_id": "articles", "reason": "Missed articles"},
+                    {"skill_id": "verbs", "reason": "A third one"},
                 ]
             }
         return reply
@@ -351,7 +367,7 @@ def test_planning_lists_topics_for_the_student(application, monkeypatch, caplog)
     activity = taught(application)
     adapter = application.models.adapters["simulated"]
     original, seen = adapter.respond, []
-    topics = [{"title": f"塞尔达第{n}个角度", "reason": f"兴趣原话{n}"} for n in range(5)]
+    topics = [{"title": f"Zelda angle {n}", "reason": f"Interest {n}"} for n in range(5)]
 
     def respond(request):
         reply = original(request)
@@ -386,7 +402,10 @@ def test_a_long_topic_is_dropped_without_voiding_the_plan(application, monkeypat
     activity = taught(application)
     adapter = application.models.adapters["simulated"]
     original = adapter.respond
-    topics = [{"title": "长" * 101, "reason": "太长"}, {"title": "火山", "reason": "兴趣"}]
+    topics = [
+        {"title": "L" * 101, "reason": "Too long"},
+        {"title": "Volcanoes", "reason": "Interest"},
+    ]
 
     def respond(request):
         reply = original(request)
@@ -397,3 +416,34 @@ def test_a_long_topic_is_dropped_without_voiding_the_plan(application, monkeypat
     monkeypatch.setattr(adapter, "respond", respond)
     asyncio.run(application.adopt("adopt1", LEARNER, evaluation_of(application, activity)))
     assert application.current(LEARNER, "demand").body["topic_suggestions"] == topics[1:]
+
+
+def test_a_plan_with_chinese_fails(application, monkeypatch, caplog):
+    from project_j.learning.planning import PlanningUnavailable
+
+    caplog.set_level(logging.INFO, logger="project_j")
+    activity = taught(application)
+    adapter = application.models.adapters["simulated"]
+    original = adapter.respond
+
+    def chinese_plan(request):
+        reply = original(request)
+        if request.purpose == "planning" and "demand" in request.context:
+            return reply | {"plan_reason": "沿用。"}
+        return reply
+
+    monkeypatch.setattr(adapter, "respond", chinese_plan)
+    with pytest.raises(PlanningUnavailable, match="the reply was not in English"):
+        asyncio.run(next_course(application, "n1", LEARNER, activity))
+    assert "failure=language" in caplog.text and "沿用。" not in caplog.text
+
+
+def test_a_plan_review_with_chinese_fails(application, monkeypatch, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    taught(application)
+    model_reviews(application, monkeypatch, conclusion="先补实际报告。")
+    with pytest.raises(PlanningUnavailable, match="the reply was not in English"):
+        asyncio.run(review(application, "r1", LEARNER, "week"))
+    assert application.current(LEARNER, "plan:week").revision == 1
+    assert "review level=week failure=language" in caplog.text
+    assert "先补实际报告" not in caplog.text

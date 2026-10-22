@@ -14,6 +14,17 @@ SCORER_PROJECT = ROOT / "project_j/scorer"
 TTS_PROJECT = ROOT / "project_j/tts"
 
 
+# What the stamp always says; the main page shows it as is (ADR-0021: English).
+STAMP = {
+    "source_type": "simulated",
+    "evidence": "automated_simulation_checks",
+    "scope": "simulation_only",
+    "qualification": "not_granted",
+    "actual_api": "unverified",
+    "actual_voice": "unverified",
+}
+
+
 def main() -> int:
     # Deliberately remove the key from all test subprocesses. Tests use explicit SDK mocks.
     env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY"}
@@ -74,17 +85,11 @@ def main() -> int:
         for report in ("simulation-tests.xml", "scorer-tests.xml", "tts-tests.xml")
         for suite in ElementTree.parse(report_dir / report).getroot().iter("testsuite")
     )
-    evidence = {
-        "source_type": "simulated",
-        "evidence": "automated_simulation_checks",
+    evidence = STAMP | {
         "result": "pass",
         "fingerprint": fingerprint(ROOT),
         "tests": count,
         "verified_at_utc": datetime.now(UTC).isoformat(),
-        "scope": "simulation_only",
-        "qualification": "not_granted",
-        "actual_api": "未验证",
-        "actual_voice": "未验证",
     }
     (report_dir / "simulation-verification.json").write_text(
         json.dumps(evidence, ensure_ascii=False, indent=2) + "\n"

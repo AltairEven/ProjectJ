@@ -165,8 +165,8 @@ def test_E2E08_content_restriction_owner_and_versioned_release(application):
 def test_E2E17_simulation_report_never_grants_real_interface_or_child_qualification(application):
     dashboard = application.dashboard(LEARNER)
     assert dashboard["qualification"] == "not_granted"
-    assert dashboard["actual_api"] == "未验证"
-    assert dashboard["actual_voice"] == "未验证"
+    assert dashboard["actual_api"] == "unverified"
+    assert dashboard["actual_voice"] == "unverified"
     with pytest.raises(ValueError):
         Settings(realm="family")
 
@@ -296,7 +296,7 @@ def test_E2E12_scoped_aliases_and_split_do_not_duplicate_old_learning_evidence(a
     from project_j.learning.catalog import Capability, define, resolve
 
     app = application
-    original = resolve(app, LEARNER, "english.reading", "故事排序")
+    original = resolve(app, LEARNER, "english.reading", "Story order")
     assert original.body["dimension_id"] == "english.reading.facts"
     state = app.current(LEARNER, "state")
     math = Capability(
@@ -316,7 +316,7 @@ def test_E2E12_scoped_aliases_and_split_do_not_duplicate_old_learning_evidence(a
             Capability(
                 dimension_id="english.reading.other",
                 subject="english.reading",
-                name="故事排序",
+                name="Story order",
                 definition="同名不能创造新的能力身份。",
             ),
         )

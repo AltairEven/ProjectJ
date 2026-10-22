@@ -91,7 +91,9 @@ def test_failed_job_waits_for_retry(application):
         application.models.adapters["simulated"].fail_next = True
         name = advance(application, LEARNER)
         await wait_jobs(application)
-        assert application.job_failures[name].startswith("课程未取得（模型暂不可用）")
+        assert application.job_failures[name].startswith(
+            "The lesson could not be made (the model is not available now)"
+        )
         assert advance(application, LEARNER) is None  # no silent retry loop
         step = next_step(application, LEARNER)
         assert step["kind"] == "waiting" and step["subject"]["failed"] == [name]
@@ -172,7 +174,9 @@ def test_dashboard_shows_the_next_step_and_retry_restarts_a_job(application):
         assert first["next"]["kind"] == "waiting"  # this very load started the preparation
         name = first["jobs"][0]["name"]
         failed = until(lambda data: data["jobs"] and data["jobs"][0]["state"] == "failed")
-        assert failed["jobs"][0]["reason"].startswith("课程未取得（模型暂不可用）")
+        assert failed["jobs"][0]["reason"].startswith(
+            "The lesson could not be made (the model is not available now)"
+        )
         body = {"learner_id": LEARNER, "name": name}
         assert client.post("/api/jobs/retry", headers=auth, json=body).json()["started"] == name
         assert until(lambda data: data["next"]["kind"] == "course")["jobs"] == []

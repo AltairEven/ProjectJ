@@ -7,31 +7,31 @@ import '../src/style.css'
 import dashboard from './dashboard.json'
 
 const skills: [string, string, string][] = [
-  ['verbs', '词类', '动词'], ['adjectives', '词类', '形容词'], ['adverbs', '词类', '副词'], ['nouns', '词类', '名词单复数'],
-  ['prepositions', '词类', '介词'], ['articles', '词类', '冠词'], ['present_simple', '时态', '一般现在时'], ['past_simple', '时态', '一般过去时'],
-  ['present_continuous', '时态', '现在进行时'], ['future', '时态', '将来时'], ['present_perfect', '时态', '现在完成时'],
-  ['comparatives', '句型', '比较级与最高级'], ['questions', '句型', '疑问句'],
+  ['verbs', 'Word types', 'Verbs'], ['adjectives', 'Word types', 'Adjectives'], ['adverbs', 'Word types', 'Adverbs'], ['nouns', 'Word types', 'One and many'],
+  ['prepositions', 'Word types', 'Prepositions'], ['articles', 'Word types', 'A, an, the'], ['present_simple', 'Tenses', 'Present simple'], ['past_simple', 'Tenses', 'Past simple'],
+  ['present_continuous', 'Tenses', 'Present continuous'], ['future', 'Tenses', 'Future'], ['present_perfect', 'Tenses', 'Present perfect'],
+  ['comparatives', 'Sentences', 'Comparing'], ['questions', 'Sentences', 'Questions'],
 ]
 const course = dashboard.objects.find(doc => doc.kind === 'course')!
 const nexts: Record<string, { kind: string, subject: Record<string, unknown> }> = {
-  '评价等你认可（可重上）': dashboard.next as { kind: string, subject: Record<string, unknown> },
-  '下一课读什么、练什么': { kind: 'focus', subject: { demand_ref: { object_id: 'demand', revision: 2 },
+  'Evaluation waiting (can retake)': dashboard.next as { kind: string, subject: Record<string, unknown> },
+  'Next lesson topic and practice': { kind: 'focus', subject: { demand_ref: { object_id: 'demand', revision: 2 },
     options: skills.map(([skill_id, group, label]) => ({ skill_id, group, label })),
-    suggestions: [{ skill_id: 'past_simple', reason: '上节课两处过去时用成了原形' }],
+    suggestions: [{ skill_id: 'past_simple', reason: 'Two past verbs were in the base form last time' }],
     topics: [
-      { title: '塞尔达：林克怎样用滑翔伞飞过峡谷', reason: '你说空闲时想玩《塞尔达传说》' },
-      { title: '塞尔达：海拉鲁的烹饪——什么食材能回血', reason: '同一个游戏，换个角度' },
-      { title: '一款冒险游戏是怎么做出来的', reason: '从游戏延伸到它背后的人' },
-      { title: '真实世界里的地图和指南针', reason: '游戏里的探索，换到现实' },
+      { title: 'Zelda: how Link glides over a canyon', reason: 'You said you like playing Zelda' },
+      { title: 'Zelda: cooking in Hyrule', reason: 'The same game, another side' },
+      { title: 'How an adventure game is made', reason: 'From the game to the people behind it' },
+      { title: 'Maps and compasses in the real world', reason: 'Exploring, but in real life' },
     ] } },
-  'Jane 没列出题材': { kind: 'focus', subject: { demand_ref: { object_id: 'demand', revision: 2 },
+  'Jane listed no topics': { kind: 'focus', subject: { demand_ref: { object_id: 'demand', revision: 2 },
     options: skills.map(([skill_id, group, label]) => ({ skill_id, group, label })), suggestions: [], topics: [] } },
-  '课程已确认，等你开始': { kind: 'course', subject: { course_ref: { object_id: course.object_id, revision: course.revision }, confirmed: true } },
-  'AI 正在处理': { kind: 'waiting', subject: { failed: [] } },
-  '建档：蓝思值': { kind: 'lexile', subject: {} },
-  '建档：聊几句': { kind: 'chat', subject: { questions: ['What do you read in English at work, and what do you read for fun?', '你平时有什么爱好？', '每周大概能学几次、每次多久？', '你最想加强英语的哪一方面？'] } },
+  'Lesson confirmed, waiting to start': { kind: 'course', subject: { course_ref: { object_id: course.object_id, revision: course.revision }, confirmed: true } },
+  'Jane is working': { kind: 'waiting', subject: { failed: [] } },
+  'Getting started: Lexile': { kind: 'lexile', subject: {} },
+  'Getting started: chat': { kind: 'chat', subject: { questions: ['Why do you learn English?', 'What do you like to do?', 'How much time can you study each week?', 'What do you want to do better: reading, speaking, listening or saying words?'] } },
 }
-const jobs = { 'AI 正在处理': [{ name: 'prepare:demand', state: 'running', reason: null, progress: null }, { name: 'confirm:c:1', state: 'running', reason: null, progress: '3/9' }] } as Record<string, unknown[]>
+const jobs = { 'Jane is working': [{ name: 'prepare:demand', state: 'running', reason: null, progress: null }, { name: 'confirm:c:1', state: 'running', reason: null, progress: '3/9' }] } as Record<string, unknown[]>
 let chosen = new URLSearchParams(location.hash.slice(1)).get('next') ?? Object.keys(nexts)[0]
 
 const realFetch = window.fetch.bind(window)
@@ -45,12 +45,12 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 
 function Panel() {
   const [value, setValue] = React.useState(chosen)
-  return <details className="sandbox-panel" open><summary>预览</summary>
-    <label>下一步 <select value={value} onChange={event => {
+  return <details className="sandbox-panel" open><summary>Preview</summary>
+    <label>Next step <select value={value} onChange={event => {
       chosen = event.target.value; setValue(chosen)
       const params = new URLSearchParams(location.hash.slice(1)); params.set('next', chosen); location.hash = params.toString()
     }}>{Object.keys(nexts).map(name => <option key={name}>{name}</option>)}</select></label>
-    <span>改完要等几秒（页面每 3 秒刷新）</span></details>
+    <span>Changes show within a few seconds (the page refreshes every 3 s)</span></details>
 }
 
 if (!new URLSearchParams(location.hash.slice(1)).get('token')) location.hash = 'token=sandbox&page=home'

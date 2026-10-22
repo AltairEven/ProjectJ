@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { playbackOf, playbackPath, reportsFor, speechPath, startedReport, visualReport } from '../src/speaker.ts'
 
-const action = { action_id: 'a1', activity_id: 'act', task_instance_id: 't1', text: '你好' }
+const action = { action_id: 'a1', activity_id: 'act', task_instance_id: 't1', text: 'Hello.' }
 const now = new Date('2026-10-18T00:00:00Z')
 const shape = reports => reports.map(r => [r.delivery_id, r.modality, r.status, r.sequence, r.delivered_range])
 

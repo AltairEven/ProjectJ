@@ -16,6 +16,7 @@ from project_j.application.acceptance import fingerprint
 from project_j.classroom.harness import is_help_request
 from project_j.classroom.judgment import ClassroomJudgment, judgment_request, method_context
 from project_j.contracts import Contract, RevisionRef
+from project_j.english import CHINESE
 from project_j.learning.fixtures import AUXILIARY_GOAL, PRIMARY_GOAL
 from project_j.paths import check_path
 from project_j.platform.models.config import ModelFiles
@@ -53,6 +54,7 @@ class ReferenceCase(Contract):
         "help",
         "after_help",
         "read_aloud",
+        "report",
     ]
     source: str
     task_id: str
@@ -60,7 +62,7 @@ class ReferenceCase(Contract):
     intent: Literal["answer", "help"] = "answer"
     help_count: int = Field(default=0, ge=0)
     pronunciation: PronunciationFixture | None = None
-    expected: Literal["correct", "incorrect", "unclear", "help"]
+    expected: Literal["correct", "incorrect", "unclear", "help", "reported"]
     forbidden: tuple[str, ...] = ()
     required_any: tuple[str, ...] = ()
     basis: str = Field(min_length=1)
@@ -182,6 +184,8 @@ def grade(
         reasons.append(f"judgment:{output.judgment}")
     if output.evidence != task.evidence:
         reasons.append("evidence_changed")  # The core would reject the proposal.
+    if CHINESE.search(output.text):  # The student hears English only (ADR-0021).
+        reasons.append("chinese")
     text = output.text.casefold()
     # ponytail: substring heuristic for leaks; the report keeps every text for adult reading.
     reasons += [f"leak:{word}" for word in case.forbidden if word.casefold() in text]

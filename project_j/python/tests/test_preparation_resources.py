@@ -55,7 +55,7 @@ def test_resources_wait_for_confirmation(application):
     course_ref = prepared(application)
     demo = demo_of(application, course_ref)
     assert demo["state"] == "planned"
-    with pytest.raises(Conflict, match="课程未确认"):
+    with pytest.raises(Conflict, match="Confirm the lesson first"):
         generate(application, "g0", course_ref, demo["resource_id"])
 
 
@@ -104,7 +104,7 @@ def visual_draft(context):
             "kind": "animation",
             "required": False,
             "stage": "help",
-            "purpose": "求助后演示水倒出",
+            "purpose": "After a plea, show the water pouring out",
         },
         picture | {"resource_id": "cup-video", "kind": "video", "required": False},
     ]
@@ -127,7 +127,7 @@ def test_image_and_animation_are_generated_by_the_model(application, monkeypatch
     generate(application, "g2", course_ref, "cup-motion")
     svg, media_type = resource_file(application, LEARNER, course_ref, "cup-motion", 1)
     assert media_type == "image/svg+xml" and svg.startswith(b"<svg")
-    with pytest.raises(Conflict, match="视频资源尚未接入生成"):
+    with pytest.raises(Conflict, match="Video resources cannot be made yet"):
         generate(application, "g3", course_ref, "cup-video")
     assert "kind=image" in caplog.text and "kind=animation" in caplog.text
     assert "两个杯子" not in caplog.text and "<svg" not in caplog.text
@@ -147,7 +147,11 @@ def test_unsafe_animation_keeps_the_preview(application, monkeypatch, caplog):
 
     monkeypatch.setattr(adapter, "respond", respond)
     caplog.set_level(logging.INFO, logger="project_j")
-    with pytest.raises(PreparationUnavailable, match="资源未取得（动画核对未通过）。原资源不变"):
+    with pytest.raises(
+        PreparationUnavailable,
+        match=r"The resource could not be made \(The animation did not pass the check\)\. "
+        "The earlier resource stays",
+    ):
         generate(application, "g1", course_ref, "cup-motion")
     assert preview(application, course_ref).revision == before
     assert "reason=animation_rejected" in caplog.text and "script" not in caplog.text
@@ -163,7 +167,9 @@ def test_failed_synthesis_keeps_the_preview(application, monkeypatch):
         yield b""
 
     monkeypatch.setattr(application.synthesizer, "stream", fail)
-    with pytest.raises(PreparationUnavailable, match="资源未取得（语音合成：超时）"):
+    with pytest.raises(
+        PreparationUnavailable, match=r"The resource could not be made \(Voice: it took too long\)"
+    ):
         generate(application, "g1", course_ref, demo_of(application, course_ref)["resource_id"])
     assert preview(application, course_ref).revision == before
 
@@ -171,10 +177,10 @@ def test_failed_synthesis_keeps_the_preview(application, monkeypatch):
 @pytest.mark.parametrize(
     ("failure", "text"),
     [
-        ("unavailable", "模型暂不可用"),
-        ("quota", "出图额度不足或限流"),
-        ("incomplete", "没有取得图片"),
-        ("config_mismatch", "模型用了出图以外的工具"),
+        ("unavailable", "the model is not available now"),
+        ("quota", "the picture limit is used up or busy"),
+        ("incomplete", "no picture came back"),
+        ("config_mismatch", "the model used a tool other than drawing"),
     ],
 )
 def test_failed_drawing_names_the_model_failure(application, monkeypatch, failure, text):
@@ -186,7 +192,7 @@ def test_failed_drawing_names_the_model_failure(application, monkeypatch, failur
         return AdapterReply(data=None, failure=failure)
 
     monkeypatch.setattr(adapter, "invoke", fail)
-    with pytest.raises(PreparationUnavailable, match=f"资源未取得（{text}）"):
+    with pytest.raises(PreparationUnavailable, match=rf"The resource could not be made \({text}\)"):
         generate(application, "g1", course_ref, "cup-picture")
 
 

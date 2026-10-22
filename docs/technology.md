@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.19.0；更新：2026年10月21日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
+版本：1.20.0；更新：2026年10月22日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -40,7 +40,7 @@ SQLite适合当前本机、低写并发的范围。以后出现多服务器或�
 | --- | --- | --- |
 | 课堂判断与指导 | gpt-6.1-sol，reasoning.effort为low，Codex订阅Fast层级 | 实际配置、语义、允许动作、取消、用量与响应时间 |
 | 备课、评价、学习规划与复盘 | 同模型，reasoning.effort为xhigh（extra high） | 来源、结构、证据限制、内容核验及结果复用 |
-| 合成 | 本机Qwen3-TTS 1.7B CustomVoice（MLX），预设音色Serena加老师语气指令，独立子工程与后端子进程 | 中英文、可懂度、流式首段与实际首播、打断与取消、GPU争用时的合成速度 |
+| 合成 | 本机Qwen3-TTS 1.7B CustomVoice（MLX），预设音色Serena加老师语气指令，独立子工程与后端子进程 | 英文、可懂度、流式首段与实际首播、打断与取消、GPU争用时的合成速度 |
 | 英语发音评分 | 本机评分器：wav2vec2-lv-60-espeak-cv-ft加GOP，独立子工程与后端子进程 | 读错、漏读、多读的标出与误报，评分耗时与内存，门槛未校准 |
 
 Sol官方模型说明列明low、medium及结构化输出支持；格式正确仍可能有语义错误。模型页另列fast与ultrafast服务层级，核对时价格分别为标准层的2倍和6倍；层级按[质量门槛](acceptance.md#最小版本质量门槛)作为延迟测量变量，不默认启用。2026年10月18日家长决定课堂判断先用Codex订阅的Fast层级跑通全流程，之后再考虑是否换模型；其他用途保持默认层级。Codex订阅列表中gpt-6.1-sol另列high、xhigh、max与ultra档；家长同日决定学习规划、备课与课后评价用xhigh（OpenAI API适配器已按[ADR-0019](../decisions/ADR-0019.md)删除）。[模型说明](https://developers.openai.com/api/docs/models/gpt-6.1-sol)、[结构化输出](https://developers.openai.com/api/docs/guides/structured-outputs)
@@ -51,7 +51,7 @@ Sol官方模型说明列明low、medium及结构化输出支持；格式正确�
 
 英语发音评分按[ADR-0015](../decisions/ADR-0015.md)采用本机评分器：facebook/wav2vec2-lv-60-espeak-cv-ft音素识别加espeak-ng转音素、CTC强制对齐与GOP打分，作为后端子进程常驻，独立子工程与锁定依赖，与合成各自维护，评分初始化负责模型下载、摘要核对与探针（待实现）。2026年10月18日在M3 Pro（MPS、18 GB内存）上用合成成人语音实测：16.6秒音频0.24秒、74.9秒1.7秒出结果，加载约6秒，MPS分配峰值5.45 GB；读错、读成别的词、漏读与重复都能标出，慢读长段有1处误报。门槛按合成语音试算，未经语料校准，儿童效果与CPU运行未验证；faster-whisper、FunASR与云端口语评测的比较见ADR-0015。此前查到的云端上限（腾讯云段落模式文本不超过120词、录音不超过300秒）只作记录，评分段改按产品上限切分：首版每段不超过100词、录音不超过300秒。[模型卡](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft)
 
-语音合成按[ADR-0016](../decisions/ADR-0016.md)采用本机Qwen3-TTS 1.7B CustomVoice的MLX版本，经mlx-audio（须锁定版本）运行：预设音色Serena加老师语气指令“语气温柔亲切，像给小学生上课的老师，吐字清楚，语速稍慢。”，中英文同一声音，独立子工程与常驻子进程，与评分器各自维护；同音色加同一指令的0.6B为备选。2026年10月18日在同机比较5个离线候选并经家长试听：Kokoro与macOS自带语音电子音明显，CosyVoice3在Mac上只能用CPU、首段11–18秒，MeloTTS部署依赖多；两档Qwen3用12句复杂句复测，1.7B稍优。1.7B实测首段0.27–0.42秒、RTF约0.76、GPU峰值5.1 GB、加载约7秒，离线运行正常；两个模型同时合成时RTF升到1.78，因此课中不并行运行其他GPU任务。合成需要Apple Silicon，评分与合成同时常驻时GPU峰值合计约10.6 GB。[模型](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16)
+语音合成按[ADR-0016](../decisions/ADR-0016.md)采用本机Qwen3-TTS 1.7B CustomVoice的MLX版本，经mlx-audio（须锁定版本）运行：预设音色Serena加老师语气指令（按[ADR-0021](../decisions/ADR-0021.md)改为英文“Warm and kind, like a teacher reading to a young learner; clear and a little slow.”、合成语言固定为英语；原为中文指令、中英文同一声音），独立子工程与常驻子进程，与评分器各自维护；同音色加同一指令的0.6B为备选。2026年10月18日在同机比较5个离线候选并经家长试听：Kokoro与macOS自带语音电子音明显，CosyVoice3在Mac上只能用CPU、首段11–18秒，MeloTTS部署依赖多；两档Qwen3用12句复杂句复测，1.7B稍优。1.7B实测首段0.27–0.42秒、RTF约0.76、GPU峰值5.1 GB、加载约7秒，离线运行正常；两个模型同时合成时RTF升到1.78，因此课中不并行运行其他GPU任务。合成需要Apple Silicon，评分与合成同时常驻时GPU峰值合计约10.6 GB。[模型](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16)
 
 长期密钥由本地后端管理，不在浏览器持有；朗读录音由后端交本机评分进程，不出本机。账号、接口、区域、权限、保留和实际参数均需实测核对。首选配置不可用时记录缺口和具体替代，不静默更换。声音配置与接入选择不会创建第二位教师。
 
@@ -131,7 +131,7 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python projec
 project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-tts-init status
 ```
 
-download按固定修订52f4770fd9726457eae3d3b6aa92047a25a10776只取运行所需的12个文件（约4.5 GB）并逐一核对SHA-256，是合成唯一的联网步骤；合成进程每次启动重新核对摘要、离线加载并预热，再把已加载的权重固定在内存里（MLX `set_wired_limit`），经标准输入输出每行一个JSON通信，按约0.32秒一段输出24 kHz单声道16位PCM，收到取消即在下一段边界停止，不开端口、不写文件。声音配置版本teacher-1包括音色Serena、老师语气指令与显式的采样参数，改任何一项即升版本并须重新探针；每次文字不超过1000字符，生成上限为5秒加每字0.5秒（不超过4096个语音token），达到上限记为未正常结束。probe合成中文、英文、中英混读三句，要求都有声；合成一段长文并在第一段后取消，要求2秒内确认停止且之后还能合成；固定种子两次合成是否相同只记录；记录写入init.json。`speak --text "…" --out 文件.wav`供成人试听，只写到尚不存在的文件。
+download按固定修订52f4770fd9726457eae3d3b6aa92047a25a10776只取运行所需的12个文件（约4.5 GB）并逐一核对SHA-256，是合成唯一的联网步骤；合成进程每次启动重新核对摘要、离线加载并预热，再把已加载的权重固定在内存里（MLX `set_wired_limit`），经标准输入输出每行一个JSON通信，按约0.32秒一段输出24 kHz单声道16位PCM，收到取消即在下一段边界停止，不开端口、不写文件。声音配置版本teacher-2（[ADR-0021](../decisions/ADR-0021.md)，原teacher-1）包括音色Serena、老师语气指令与显式的采样参数，改任何一项即升版本并须重新探针；每次文字不超过1000字符，生成上限为5秒加每字0.5秒（不超过4096个语音token），达到上限记为未正常结束。probe合成两句英文（故事句与题目句），要求都有声；合成一段长文并在第一段后取消，要求2秒内确认停止且之后还能合成；固定种子两次合成是否相同只记录；记录写入init.json。`speak --text "…" --out 文件.wav`供成人试听，只写到尚不存在的文件。
 
 2026年10月18日在M3 Pro上的真实探针：GPU，模型刚复制后的首次加载41.6秒（冷读4.5 GB，含摘要核对与预热），再次加载6.7秒；三句首段0.27–0.41秒，RTF 0.74–0.78；取消后0.23–0.24秒停止；固定种子两次合成相同；内存峰值5.11 GB。用本机评分器给英文样本打分，只标出人名Mia（评分器此前对Mia结尾的音也有口音误报），其余11词正常。音色与听感须成人试听，课中实际声音、延迟与GPU争用下的表现未验证。
 
@@ -147,7 +147,7 @@ download按固定修订52f4770fd9726457eae3d3b6aa92047a25a10776只取运行所�
 
 ### 课堂判断参考题集
 
-题集在courses/paper-bridge/judgment-reference.json，共37题：两课四道回答题的标准答案、换说法、纯中文、中英混答、错答、含糊、连续三次求助与帮助后再答，另有4道朗读纠正题（给模型构造的发音评分结果，不录音）。多数作答不在课程包答案表里，测的是语义判断。何时重跑或补题以[总验收](acceptance.md#最小版本质量门槛)为准。
+题集在courses/paper-bridge/judgment-reference.json，2.0.0共54题（[ADR-0021](../decisions/ADR-0021.md)）：两课四道回答题的标准答案、换说法、英文小错、纯中文与中英混答（预期含糊并提醒用英文）、错答、含糊、连续三次求助与帮助后再答，开放问答题，指认报告（含中文报告），另有4道朗读纠正题（给模型构造的发音评分结果，不录音）。多数作答不在课程包答案表里，测的是语义判断。何时重跑或补题以[总验收](acceptance.md#最小版本质量门槛)为准。
 
 模型初始化显示课堂判断就绪、且没有课堂在运行时，用`project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-judge-reference --run-id <id>`运行（`--repeats N`每题调用N次）。请求与真实课堂逐字段相同（同一指令、Jane方法、本课目标、核心求助判定，截止10秒），顺序调用、不重试，超时或格式无效都算不通过。自动比对判断标签、原文依据是否原样返回（课堂会拒收改写）、禁止词（防泄露答案，子串粗查）与必含词（如第二次求助须给句框）；报告写`project_j/private/adult_checks/<run_id>/judgment-reference.json`，保存每题回应原文供成人逐条阅读。全部通过退出码0，有不通过1，模型未就绪、题集与课程不一致或报告已存在为2。
 
@@ -184,7 +184,7 @@ ADR-0018起，应用协调层的推进器（project_j/python/src/project_j/appli
 | 转写WebRTC | 官方推荐gpt-live-transcribe，客户端commit且无server_vad/semantic_vad；本批未建音频连接 | 2026年10月16日按[ADR-0014](../decisions/ADR-0014.md)不再采用，作答改为文字/点选，只有英语朗读录音交发音评分；本行保留为当时核对记录 |
 | 凭据/数据条件 | 官方WebRTC示例有client_secrets及calls；数据控制保留表未单列这些或transcription_sessions。该页区域服务清单提到transcription_sessions，不能由此推断ZDR覆盖 | ADR-0013起不以ZDR为数据条件，记录实际发送范围与条款；儿童入口按验收关闭 |
 | Responses/合成/按轮转写保留 | 官方表列responses、audio/speech、audio/transcriptions与realtime有ZDR资格，带适用限制；本账户资格**未验证** | 记录所选路径的发送范围与保留条款，store=false不代账户批准 |
-| 声音与设备 | 家长选择当前Mac内置麦克风＋内置扬声器，Chrome候选已记录版本；未请求麦克风或播放声音 | 成人在场授权设备、试听中英固定声音；回声/插话/停止/延迟实测，不能移用其他设备检查 |
+| 声音与设备 | 家长选择当前Mac内置麦克风＋内置扬声器，Chrome候选已记录版本；未请求麦克风或播放声音 | 成人在场授权设备、试听英文固定声音；回声/插话/停止/延迟实测，不能移用其他设备检查 |
 
 上述事实来源：[Sol模型页](https://developers.openai.com/api/docs/models/gpt-6.1-sol)、[实时转写](https://developers.openai.com/api/docs/guides/realtime-transcription)、[WebRTC](https://developers.openai.com/api/docs/guides/voice-webrtc?voice-api=realtime)、[数据控制](https://developers.openai.com/api/docs/guides/your-data)。实际API调用样本数为0、语音操作样本数为0；账号条件缺失可继续隔离阶段1，不能把文档核对当接口通过。
 

@@ -22,28 +22,28 @@ from project_j.preparation.materials import animation_request, image_request
 
 log = logging.getLogger(__name__)
 GENERATED = ("audio", "image", "animation")
-KIND_LABELS = {"audio": "语音", "image": "图片", "animation": "动画", "video": "视频"}
+KIND_LABELS = {"audio": "Audio", "image": "Picture", "animation": "Animation", "video": "Video"}
 SYNTHESIS_TEXT = {
-    "not_ready": "合成器未就绪",
-    "empty_text": "文字为空",
-    "too_long": "文字过长",
-    "timeout": "超时",
-    "truncated": "未正常结束",
-    "failed": "合成失败",
+    "not_ready": "the voice maker is not ready",
+    "empty_text": "the text is empty",
+    "too_long": "the text is too long",
+    "timeout": "it took too long",
+    "truncated": "it stopped too early",
+    "failed": "making the voice failed",
 }
 SUFFIXES = {media_type: suffix for suffix, media_type in MEDIA_TYPES.items()}
 # Picture failures as the parent reads them; the rest use the shared labels.
 MODEL_TEXT = {
-    "quota": "出图额度不足或限流",
-    "incomplete": "没有取得图片",
-    "config_mismatch": "模型用了出图以外的工具",
+    "quota": "the picture limit is used up or busy",
+    "incomplete": "no picture came back",
+    "config_mismatch": "the model used a tool other than drawing",
 }
 
 
 def confirmed_package(app, learner_id: str, course_ref: RevisionRef):
     course, _, preview = app.current_package(learner_id, course_ref)
     if (preview.body.get("confirmation") or {}).get("course_ref") != course_ref.model_dump():
-        raise Conflict("课程未确认：确认后才能生成资源。")
+        raise Conflict("Confirm the lesson first; then its resources can be made.")
     return course, preview
 
 
@@ -72,7 +72,7 @@ async def produce(app, item: dict, course: CourseBody) -> tuple[bytes, str, dict
                     pcm += chunk
         except SynthesisFailed as error:
             text = SYNTHESIS_TEXT.get(error.reason, error.reason)
-            raise Failed(f"synthesis_{error.reason}", f"语音合成：{text}") from None
+            raise Failed(f"synthesis_{error.reason}", f"Voice: {text}") from None
         rate = app.synthesizer.sample_rate
         return (
             encode_wav(bytes(pcm), rate),
@@ -101,7 +101,7 @@ async def produce(app, item: dict, course: CourseBody) -> tuple[bytes, str, dict
     try:
         return checked_svg(result.output.svg), MEDIA_TYPES["svg"], source
     except ValueError:
-        raise Failed("animation_rejected", "动画核对未通过") from None
+        raise Failed("animation_rejected", "The animation did not pass the check") from None
 
 
 async def generate_resource(app, request_id, learner_id, course_ref: RevisionRef, resource_id):
@@ -113,7 +113,9 @@ async def generate_resource(app, request_id, learner_id, course_ref: RevisionRef
     course, preview = confirmed_package(app, learner_id, course_ref)
     _, item = entry(preview, resource_id)
     if item["kind"] not in GENERATED:
-        raise Conflict(f"{KIND_LABELS[item['kind']]}资源尚未接入生成，请按备用办法准备。")
+        raise Conflict(
+            f"{KIND_LABELS[item['kind']]} resources cannot be made yet; use the fallback."
+        )
     operation = app.request(
         request_id,
         learner_id,
@@ -141,7 +143,7 @@ async def generate_resource(app, request_id, learner_id, course_ref: RevisionRef
                 error.code,
                 round((time.perf_counter() - started) * 1000),
             )
-            raise PreparationUnavailable(error.reason, "资源") from None
+            raise PreparationUnavailable(error.reason, "resource") from None
         version = {
             "version": len(item["versions"]) + 1,
             "asset": app.files.binary_asset(content, SUFFIXES[media_type]),
@@ -163,7 +165,7 @@ async def generate_resource(app, request_id, learner_id, course_ref: RevisionRef
             learner_id,
             "resource",
             [obj],
-            publications=(publication(obj, "生成资源新版本"),),
+            publications=(publication(obj, "A new version of the resource"),),
             baselines=(course.ref,),
         )
         log.info(
@@ -228,7 +230,7 @@ def adopt_resource(app, request_id, learner_id, course_ref: RevisionRef, resourc
             learner_id,
             "adoption",
             [obj],
-            publications=(publication(obj, "采用这一版本"),),
+            publications=(publication(obj, "This version adopted"),),
             baselines=(course.ref,),
         )
         log.info(

@@ -74,18 +74,18 @@ class ModelService:
             return [self.problem]
         binding = self.bindings.get(purpose)
         if binding is None or binding.adapter not in self.adapters:
-            return ["未配置该用途的模型"]
+            return ["no model set for this use"]
         return admission(self.report_for(binding), purpose, binding.effort, binding.tier)
 
     def require(self):
         reasons = [
-            f"{PURPOSE_LABELS[purpose]}：{reason}"
+            f"{PURPOSE_LABELS[purpose]}: {reason}"
             for purpose in PURPOSES
             for reason in self.reasons(purpose)
         ]
         if reasons:
             raise ModelsNotReady(
-                "模型未初始化：" + "；".join(reasons) + "。请运行 project-j-init probe。"
+                "The model is not set up: " + "; ".join(reasons) + ". Run project-j-init probe."
             )
 
     async def run(self, request: ModelRequest) -> ModelResult:

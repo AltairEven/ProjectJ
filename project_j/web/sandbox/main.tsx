@@ -26,12 +26,12 @@ function Sandbox() {
   return <>
     <Classroom key={key} token="sandbox" onLeave={() => restart(names[0], study)} />
     <details className="sandbox-panel" open>
-      <summary>沙盒</summary>
-      <label>场景 <select value={scene} onChange={event => restart(event.target.value, study)}>
+      <summary>Sandbox</summary>
+      <label>Scene <select value={scene} onChange={event => restart(event.target.value, study)}>
         {names.map(name => <option key={name}>{name}</option>)}</select></label>
-      <label><input type="checkbox" checked={study} onChange={event => restart(scene, event.target.checked)} /> 正式模式（有声音）</label>
-      <label>等待 <input type="number" min="0" step="0.5" value={waitSeconds} onChange={event => setWaitSeconds(Number(event.target.value))} /> 秒</label>
-      <button className="quiet" onClick={() => restart(scene, study)}>重来</button>
+      <label><input type="checkbox" checked={study} onChange={event => restart(scene, event.target.checked)} /> Study mode (with sound)</label>
+      <label>Wait <input type="number" min="0" step="0.5" value={waitSeconds} onChange={event => setWaitSeconds(Number(event.target.value))} /> s</label>
+      <button className="quiet" onClick={() => restart(scene, study)}>Restart</button>
     </details>
   </>
 }

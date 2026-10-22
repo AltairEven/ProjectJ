@@ -10,13 +10,15 @@ from project_j.platform.speech.simulated import SimulatedScorer
 
 class NotReady(SimulatedScorer):
     def reasons(self):
-        return ["评分进程未启动"]
+        return ["Scorer process not started"]
 
 
 def test_a_course_with_reading_segments_needs_a_ready_scorer(application):
     prepared = asyncio.run(application.prepare("prepare1", LEARNER))
     application.scorer = NotReady()
-    with pytest.raises(ScorerNotReady, match="发音评分未就绪：评分进程未启动"):
+    with pytest.raises(
+        ScorerNotReady, match="Pronunciation scoring is not ready: Scorer process not started"
+    ):
         application.start(
             "start1",
             LEARNER,

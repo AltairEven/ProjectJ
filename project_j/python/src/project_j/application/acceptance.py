@@ -36,10 +36,13 @@ def fingerprint(root: Path) -> str:
 def simulation_evidence(root: Path) -> dict:
     path = root / "project_j/.cache/simulation-verification.json"
     if not path.exists():
-        return {"result": "unknown", "reason": "隔离工程检查尚未完成。"}
+        return {"result": "unknown", "reason": "The project checks have not run yet."}
     evidence = json.loads(path.read_text())
     if evidence.get("fingerprint") != fingerprint(root) or evidence.get("result") != "pass":
-        return {"result": "unknown", "reason": "工程版本变化，已有检查范围失效。"}
+        return {
+            "result": "unknown",
+            "reason": "The code changed; the earlier checks no longer count.",
+        }
     if evidence.get("source_type") != "simulated" or evidence.get("qualification") != "not_granted":
         raise ValueError("invalid simulation-only verification evidence")
     return evidence

@@ -77,7 +77,7 @@ def test_required_resource_failure_blocks_with_retry(application, monkeypatch):
     course_ref = science_lesson(application, monkeypatch, visual_draft)
     fail_picture_once(application, monkeypatch)  # the required picture
     before = application.core  # the earlier, ended lesson
-    with pytest.raises(Conflict, match="^资源未就绪"):
+    with pytest.raises(Conflict, match="^Resources not ready"):
         asyncio.run(application.confirm_and_start("go", LEARNER, course_ref, True))
     assert application.core is before
     result = asyncio.run(application.confirm_and_start("go", LEARNER, course_ref, True))
@@ -100,7 +100,7 @@ def test_optional_resource_failure_still_starts(application, monkeypatch):
 
 def test_offscreen_course_needs_materials_ready(application, monkeypatch):
     course_ref = science_lesson(application, monkeypatch, visual_draft)
-    with pytest.raises(Conflict, match="实物已备好"):
+    with pytest.raises(Conflict, match="Things are ready"):
         asyncio.run(application.confirm_and_start("go", LEARNER, course_ref, False))
     assert not preview_of(application, course_ref).body.get("confirmation")
 
@@ -108,7 +108,7 @@ def test_offscreen_course_needs_materials_ready(application, monkeypatch):
 def test_a_build_without_checks_is_refused_before_any_resource(application, monkeypatch):
     course_ref = science_lesson(application, monkeypatch, visual_draft)
     application.verification = {"result": "unknown"}
-    with pytest.raises(Conflict, match="登记检查"):
+    with pytest.raises(Conflict, match="has not passed the checks"):
         asyncio.run(application.confirm_and_start("go", LEARNER, course_ref, True))
     assert not preview_of(application, course_ref).body.get("confirmation")
 

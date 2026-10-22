@@ -1,7 +1,7 @@
 {
-  "version": "1.1.0",
+  "version": "2.0.0",
   "course": "L-C2026-01-001",
-  "authored": "成人编写的虚构作答；预期逐句核对reading-main.md与reading-transfer.md 1.1.0；不依赖模型自评。1.1.0补开放问答（复述与谈看法）13题，同为成人编写的虚构作答，预期按要点与原文核对。",
+  "authored": "成人编写的虚构作答；预期逐句核对reading-main.md与reading-transfer.md 1.1.0；不依赖模型自评。1.1.0补开放问答（复述与谈看法）13题。2.0.0（2026年10月22日，ADR-0021全英文）：学生一律用英文作答，原中文与中英混合作答12题预期改为unclear并须提醒用英文（required_any为English），求助与含糊题作答改为英文，禁止词去掉中文，退出语改英文后F1-help-3必含词改为skip；新增英文拼错、听不懂题目求助、英文与中文报告4题。回应含任何中文字符即不通过。",
   "cases": [
     {
       "case_id": "F1-correct",
@@ -36,8 +36,11 @@
       "source": "courses/paper-bridge/reading-main.md",
       "task_id": "reading-fact",
       "answer": "她想做一座桥",
-      "expected": "correct",
-      "basis": "She wants a bridge for her car."
+      "expected": "unclear",
+      "basis": "She wants a bridge for her car. 2.0.0：中文作答判unclear，提醒用英文。",
+      "required_any": [
+        "English"
+      ]
     },
     {
       "case_id": "F1-mixed-1",
@@ -45,8 +48,11 @@
       "source": "courses/paper-bridge/reading-main.md",
       "task_id": "reading-fact",
       "answer": "She wants a 桥.",
-      "expected": "correct",
-      "basis": "She wants a bridge for her car."
+      "expected": "unclear",
+      "basis": "She wants a bridge for her car. 2.0.0：中文作答判unclear，提醒用英文。",
+      "required_any": [
+        "English"
+      ]
     },
     {
       "case_id": "F1-mixed-2",
@@ -54,8 +60,11 @@
       "source": "courses/paper-bridge/reading-main.md",
       "task_id": "reading-fact",
       "answer": "Mia想要一个bridge给她的car",
-      "expected": "correct",
-      "basis": "She wants a bridge for her car."
+      "expected": "unclear",
+      "basis": "She wants a bridge for her car. 2.0.0：中文作答判unclear，提醒用英文。",
+      "required_any": [
+        "English"
+      ]
     },
     {
       "case_id": "F1-wrong-known",
@@ -65,8 +74,7 @@
       "answer": "a car",
       "expected": "incorrect",
       "forbidden": [
-        "bridge",
-        "桥"
+        "bridge"
       ],
       "basis": "Mia has a toy car. 她已有车，想要的是桥。"
     },
@@ -78,8 +86,7 @@
       "answer": "two books",
       "expected": "incorrect",
       "forbidden": [
-        "bridge",
-        "桥"
+        "bridge"
       ],
       "basis": "She puts two books on the table. 书是搭桥用的材料。"
     },
@@ -91,8 +98,7 @@
       "answer": "that thing",
       "expected": "unclear",
       "forbidden": [
-        "bridge",
-        "桥"
+        "bridge"
       ],
       "basis": "作答没有可辨认的所指。"
     },
@@ -101,11 +107,10 @@
       "category": "unclear",
       "source": "courses/paper-bridge/reading-main.md",
       "task_id": "reading-fact",
-      "answer": "我不知道",
+      "answer": "I don't know",
       "expected": "unclear",
       "forbidden": [
-        "bridge",
-        "桥"
+        "bridge"
       ],
       "basis": "没有作答内容；不含求助词，核心不判求助。"
     },
@@ -114,11 +119,10 @@
       "category": "help",
       "source": "courses/paper-bridge/reading-main.md",
       "task_id": "reading-fact",
-      "answer": "帮我一下",
+      "answer": "Help me",
       "expected": "help",
       "forbidden": [
-        "bridge",
-        "桥"
+        "bridge"
       ],
       "required_any": [
         "wants"
@@ -130,12 +134,11 @@
       "category": "help",
       "source": "courses/paper-bridge/reading-main.md",
       "task_id": "reading-fact",
-      "answer": "还是不懂，帮我一下",
+      "answer": "I still don't understand. Help me.",
       "help_count": 1,
       "expected": "help",
       "forbidden": [
-        "bridge",
-        "桥"
+        "bridge"
       ],
       "required_any": [
         "She wants a"
@@ -151,12 +154,10 @@
       "help_count": 2,
       "expected": "help",
       "forbidden": [
-        "bridge",
-        "桥"
+        "bridge"
       ],
       "required_any": [
-        "跳过",
-        "未知"
+        "skip"
       ],
       "basis": "支持用完，给exit_text。"
     },
@@ -179,8 +180,7 @@
       "help_count": 1,
       "expected": "incorrect",
       "forbidden": [
-        "bridge",
-        "桥"
+        "bridge"
       ],
       "basis": "帮助后再试仍错；She puts two books on the table. 桌子是放书的地方。"
     },
@@ -199,8 +199,11 @@
       "source": "courses/paper-bridge/reading-main.md",
       "task_id": "reading-sequence",
       "answer": "她把纸对折了",
-      "expected": "correct",
-      "basis": "She folds a new piece of paper."
+      "expected": "unclear",
+      "basis": "She folds a new piece of paper. 2.0.0：中文作答判unclear，提醒用英文。",
+      "required_any": [
+        "English"
+      ]
     },
     {
       "case_id": "F2-mixed",
@@ -208,8 +211,11 @@
       "source": "courses/paper-bridge/reading-main.md",
       "task_id": "reading-sequence",
       "answer": "她fold了新的纸",
-      "expected": "correct",
-      "basis": "She folds a new piece of paper."
+      "expected": "unclear",
+      "basis": "She folds a new piece of paper. 2.0.0：中文作答判unclear，提醒用英文。",
+      "required_any": [
+        "English"
+      ]
     },
     {
       "case_id": "F2-wrong-cut",
@@ -219,8 +225,7 @@
       "answer": "She cut it.",
       "expected": "incorrect",
       "forbidden": [
-        "fold",
-        "折"
+        "fold"
       ],
       "basis": "原文没有剪纸；She folds a new piece of paper."
     },
@@ -232,8 +237,7 @@
       "answer": "She drew a bridge on it.",
       "expected": "incorrect",
       "forbidden": [
-        "fold",
-        "折"
+        "fold"
       ],
       "basis": "She draws the two bridges for Dad. 画桥在成功之后，且不是对新纸做的。"
     },
@@ -245,8 +249,7 @@
       "answer": "she did something",
       "expected": "unclear",
       "forbidden": [
-        "fold",
-        "折"
+        "fold"
       ],
       "basis": "没有说出做了什么。"
     },
@@ -274,8 +277,11 @@
       "source": "courses/paper-bridge/reading-transfer.md",
       "task_id": "reading-first",
       "answer": "小的那辆",
-      "expected": "correct",
-      "basis": "He puts the small bus on the bridge."
+      "expected": "unclear",
+      "basis": "He puts the small bus on the bridge. 2.0.0：中文作答判unclear，提醒用英文。",
+      "required_any": [
+        "English"
+      ]
     },
     {
       "case_id": "B1-mixed",
@@ -283,8 +289,11 @@
       "source": "courses/paper-bridge/reading-transfer.md",
       "task_id": "reading-first",
       "answer": "small的那辆bus",
-      "expected": "correct",
-      "basis": "He puts the small bus on the bridge."
+      "expected": "unclear",
+      "basis": "He puts the small bus on the bridge. 2.0.0：中文作答判unclear，提醒用英文。",
+      "required_any": [
+        "English"
+      ]
     },
     {
       "case_id": "B1-wrong",
@@ -295,8 +304,6 @@
       "expected": "incorrect",
       "forbidden": [
         "small bus",
-        "小巴士",
-        "小的那",
         "little"
       ],
       "basis": "He puts the big bus on the bridge.是第二次试。"
@@ -310,8 +317,6 @@
       "expected": "unclear",
       "forbidden": [
         "small bus",
-        "小巴士",
-        "小的那",
         "little"
       ],
       "basis": "Ben has two toy buses. 没说哪一辆。"
@@ -331,8 +336,11 @@
       "source": "courses/paper-bridge/reading-transfer.md",
       "task_id": "reading-result",
       "answer": "纸弯下去，大车掉下来了",
-      "expected": "correct",
-      "basis": "The paper bends. The big bus falls."
+      "expected": "unclear",
+      "basis": "The paper bends. The big bus falls. 2.0.0：中文作答判unclear，提醒用英文。",
+      "required_any": [
+        "English"
+      ]
     },
     {
       "case_id": "B2-mixed",
@@ -340,8 +348,11 @@
       "source": "courses/paper-bridge/reading-transfer.md",
       "task_id": "reading-result",
       "answer": "the big bus 掉下去了",
-      "expected": "correct",
-      "basis": "The paper bends. The big bus falls."
+      "expected": "unclear",
+      "basis": "The paper bends. The big bus falls. 2.0.0：中文作答判unclear，提醒用英文。",
+      "required_any": [
+        "English"
+      ]
     },
     {
       "case_id": "B2-wrong-stayed",
@@ -352,9 +363,7 @@
       "expected": "incorrect",
       "forbidden": [
         "falls",
-        "fell",
-        "掉了",
-        "掉下"
+        "fell"
       ],
       "basis": "The big bus falls."
     },
@@ -366,9 +375,7 @@
       "answer": "The small bus fell.",
       "expected": "incorrect",
       "forbidden": [
-        "big bus falls",
-        "大巴士掉",
-        "大车掉"
+        "big bus falls"
       ],
       "basis": "小巴士It stays on the paper.，掉下的是大巴士。"
     },
@@ -381,9 +388,7 @@
       "expected": "unclear",
       "forbidden": [
         "falls",
-        "fell",
-        "掉了",
-        "掉下"
+        "fell"
       ],
       "basis": "没有说出发生了什么。"
     },
@@ -397,9 +402,7 @@
       },
       "expected": "correct",
       "forbidden": [
-        "90",
-        "分数",
-        "等级"
+        "90"
       ],
       "basis": "各词无错误；门槛未校准，不向孩子报分数或等级。"
     },
@@ -419,9 +422,7 @@
       },
       "expected": "incorrect",
       "forbidden": [
-        "35",
-        "分数",
-        "等级"
+        "35"
       ],
       "required_any": [
         "between"
@@ -443,10 +444,7 @@
         }
       },
       "expected": "incorrect",
-      "forbidden": [
-        "分数",
-        "等级"
-      ],
+      "forbidden": [],
       "required_any": [
         "table"
       ],
@@ -462,10 +460,7 @@
         "reason": "too_short"
       },
       "expected": "unclear",
-      "forbidden": [
-        "分数",
-        "等级"
-      ],
+      "forbidden": [],
       "basis": "评分为unknown（too_short），不判对错。"
     },
     {
@@ -492,8 +487,11 @@
       "source": "courses/paper-bridge/reading-main.md",
       "task_id": "retell-bridge",
       "answer": "第一次纸弯了车掉下去，后来她把新纸折起来，车就没掉。",
-      "expected": "correct",
-      "basis": "要点：第一次纸弯了、车掉了；Mia把一张新纸折起来；第二次车留在桥上。中文复述，三点都对。"
+      "expected": "unclear",
+      "basis": "要点：第一次纸弯了、车掉了；Mia把一张新纸折起来；第二次车留在桥上。中文复述，三点都对。 2.0.0：中文作答判unclear，提醒用英文。",
+      "required_any": [
+        "English"
+      ]
     },
     {
       "case_id": "O1-mixed",
@@ -501,8 +499,11 @@
       "source": "courses/paper-bridge/reading-main.md",
       "task_id": "retell-bridge",
       "answer": "第一次 the car falls，然后她 fold 了一张新纸，车 stays on the bridge。",
-      "expected": "correct",
-      "basis": "要点：第一次纸弯了、车掉了；Mia把一张新纸折起来；第二次车留在桥上。中英混合，三点都对。"
+      "expected": "unclear",
+      "basis": "要点：第一次纸弯了、车掉了；Mia把一张新纸折起来；第二次车留在桥上。中英混合，三点都对。 2.0.0：中文作答判unclear，提醒用英文。",
+      "required_any": [
+        "English"
+      ]
     },
     {
       "case_id": "O1-incorrect",
@@ -527,7 +528,7 @@
       "category": "unclear",
       "source": "courses/paper-bridge/reading-main.md",
       "task_id": "retell-bridge",
-      "answer": "嗯……那个……",
+      "answer": "Um... that thing...",
       "expected": "unclear",
       "basis": "没有可判断的内容。"
     },
@@ -536,11 +537,9 @@
       "category": "help",
       "source": "courses/paper-bridge/reading-main.md",
       "task_id": "retell-bridge",
-      "answer": "帮我一下",
+      "answer": "Help me",
       "intent": "help",
-      "required_any": [
-        "第一次"
-      ],
+      "required_any": [],
       "expected": "help",
       "basis": "第一级支持：先说第一次发生了什么，再说Mia改了什么。"
     },
@@ -569,8 +568,11 @@
       "source": "courses/paper-bridge/reading-transfer.md",
       "task_id": "opinion-bus",
       "answer": "大车太重了，纸撑不住。我会多放几张纸。",
-      "expected": "correct",
-      "basis": "要点：原因与故事相符（大巴士更重、纸撑不住）；改法说得通。中文作答，原因与改法都说得通。"
+      "expected": "unclear",
+      "basis": "要点：原因与故事相符（大巴士更重、纸撑不住）；改法说得通。中文作答，原因与改法都说得通。 2.0.0：中文作答判unclear，提醒用英文。",
+      "required_any": [
+        "English"
+      ]
     },
     {
       "case_id": "O2-incorrect",
@@ -589,6 +591,48 @@
       "answer": "I like buses.",
       "expected": "incorrect",
       "basis": "要点：原因与故事相符（大巴士更重、纸撑不住）；改法说得通。离题，没有说原因和改法。"
+    },
+    {
+      "case_id": "F1-typo",
+      "category": "variant",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "She wants a brige for her car.",
+      "expected": "correct",
+      "basis": "She wants a bridge for her car. 拼错brige，意思对。"
+    },
+    {
+      "case_id": "F1-dont-understand",
+      "category": "help",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "I don't understand the question.",
+      "expected": "help",
+      "forbidden": [
+        "bridge"
+      ],
+      "basis": "听不懂题目，核心判为求助，给第一级帮助。"
+    },
+    {
+      "case_id": "P1-report",
+      "category": "report",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "point-paper",
+      "answer": "I pointed to the folded paper.",
+      "expected": "reported",
+      "basis": "指认报告，只记录已报告的条件。"
+    },
+    {
+      "case_id": "P1-chinese-report",
+      "category": "report",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "point-paper",
+      "answer": "我指的是折过的纸。",
+      "expected": "unclear",
+      "required_any": [
+        "English"
+      ],
+      "basis": "用中文报告，判unclear并提醒用英文。"
     }
   ]
 }

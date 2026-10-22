@@ -17,7 +17,7 @@ class Capability(Contract):
     definition: str = Field(min_length=1)
     aliases: tuple[str, ...] = ()
     split_from: RevisionRef | None = None
-    limitations: tuple[str, ...] = ("定义不构成学习观察或掌握。",)
+    limitations: tuple[str, ...] = ("A definition is not an observation or mastery.",)
 
     @model_validator(mode="after")
     def names(self):
@@ -32,27 +32,29 @@ INITIAL = (
     Capability(
         dimension_id="english.reading.facts",
         subject="english.reading",
-        name="阅读事实与顺序",
-        definition="在固定文本中定位事实、顺序与依据。",
-        aliases=("故事排序",),
+        name="Reading facts and order",
+        definition="Find facts, their order and the words that show them in a fixed text.",
+        aliases=("Story order",),
     ),
     Capability(
         dimension_id="english.speaking.report",
         subject="english.speaking",
-        name="短英语报告",
-        definition="报告当前实际结果；帮助与语言维度分开。",
+        name="Short English reports",
+        definition="Report what really happened; help and language are kept apart.",
     ),
     Capability(
         dimension_id="english.speaking.pronunciation",
         subject="english.speaking",
-        name="英语朗读发音",
-        definition="朗读参考文本的发音；以发音评分模块结果为据，模型不另评。",
+        name="Reading aloud",
+        definition="Pronunciation when reading a text aloud, from the pronunciation score; "
+        "the model does not judge it again.",
     ),
     Capability(
         dimension_id="science.observation.report",
         subject="science",
-        name="实际观察报告",
-        definition="提供实际条件、改变、结果与来源，不凭故事推断实物。",
+        name="Real observation reports",
+        definition="Give the real conditions, change, result and source; never infer "
+        "real things from the story.",
     ),
 )
 
@@ -111,7 +113,7 @@ def define(app, request_id: str, learner_id: str, body: Capability):
             learner_id,
             "capability",
             [obj],
-            publications=(publication(obj, "明确范围的模拟目录定义"),),
+            publications=(publication(obj, "Simulated catalog definitions with a stated scope"),),
         )
     return app.ledger.finish(
         operation,

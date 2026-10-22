@@ -71,13 +71,13 @@ def test_cancelled_call_is_recorded_as_cancelled():
 
 
 def test_not_initialized_service_refuses_and_reports_reasons():
-    service = ModelService({}, {}, [], problem="未配置默认模型")
-    with pytest.raises(ModelsNotReady, match="模型未初始化"):
+    service = ModelService({}, {}, [], problem="No default model")
+    with pytest.raises(ModelsNotReady, match="The model is not set up"):
         service.require()
     assert asyncio.run(service.run(request())).failure == "not_initialized"
     status = service.status()
     assert status["initialized"] is False
-    assert status["purposes"]["evaluation"]["reasons"] == ["未配置默认模型"]
+    assert status["purposes"]["evaluation"]["reasons"] == ["No default model"]
 
 
 def test_simulated_service_is_initialized_and_marked_simulated():
@@ -118,11 +118,11 @@ def test_unexpected_adapter_error_becomes_unavailable_without_text():
     assert "sk-secret" not in repr(service.calls)
 
 
-def test_not_ready_message_names_purposes_in_chinese():
-    service = ModelService({}, {}, [], problem="未配置默认模型")
+def test_not_ready_message_names_purposes_in_english():
+    service = ModelService({}, {}, [], problem="No default model")
     with pytest.raises(ModelsNotReady) as caught:
         service.require()
-    assert "课堂判断：未配置默认模型" in str(caught.value)
-    assert "学习规划：未配置默认模型" in str(caught.value)
-    assert "备课：未配置默认模型" in str(caught.value)
+    assert "Class judgment: No default model" in str(caught.value)
+    assert "Planning: No default model" in str(caught.value)
+    assert "Lesson making: No default model" in str(caught.value)
     assert "classroom_judgment" not in str(caught.value)

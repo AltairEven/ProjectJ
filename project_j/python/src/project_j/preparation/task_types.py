@@ -21,9 +21,9 @@ PROGRAM_JUDGED = frozenset({"choice", "order", "match", "fill"})
 CONTENT_TYPES = PROGRAM_JUDGED | {"open"}
 BLANK = "___"
 BLANKS = re.compile(r"_{3,}")
-TRUE_FALSE = ("对", "错")
-NOT_GIVEN = "文中没提"
-TRUE_FALSE_NOT_GIVEN = ("对", "错", NOT_GIVEN)
+TRUE_FALSE = ("True", "False")
+NOT_GIVEN = "Not given"
+TRUE_FALSE_NOT_GIVEN = (*TRUE_FALSE, NOT_GIVEN)
 MAX_MINUTES, MIN_PRACTICE_MINUTES = 40, 20
 
 
@@ -122,23 +122,23 @@ def content_problems(task_id: str, purpose: str, item, story: str) -> list[tuple
     found = []
 
     def problem(text):
-        found.append(("content", f"{task_id}{text}"))
+        found.append(("content", f"{task_id}: {text}"))
 
     if purpose == "choice":
         fixed = {"true_false": TRUE_FALSE, "true_false_not_given": TRUE_FALSE_NOT_GIVEN}.get(
             item.variant
         )
         if fixed and item.options != fixed:
-            problem(f"的选项须固定为{'、'.join(fixed)}")
+            problem(f"the options must be exactly {', '.join(fixed)}")
         if not fixed and not (2 <= len(item.options) <= 5 and distinct(item.options)):
-            problem("须有2到5个互不相同的选项")
+            problem("give 2 to 5 different options")
         if not 0 <= item.correct < len(item.options):
-            problem("的正确项不在选项里")
+            problem("the correct option is not among the options")
     elif purpose == "order":
         if not (3 <= len(item.items) <= 6 and distinct(item.items)):
-            problem("须有3到6张互不相同的卡片")
+            problem("give 3 to 6 different cards")
         if item.variant == "words" and not quoted(" ".join(item.items), story):
-            problem("连起来不是故事原句")
+            problem("the cards together are not a story sentence")
     elif purpose == "match":
         if not (
             3 <= len(item.left) <= 6
@@ -147,21 +147,21 @@ def content_problems(task_id: str, purpose: str, item, story: str) -> list[tuple
             and distinct(item.left)
             and distinct(item.right + item.distractors)
         ):
-            problem("须左右各3到6项一一对应、0到2个干扰项且互不相同")
+            problem("give 3 to 6 different pairs and 0 to 2 different extra items")
     elif purpose == "fill":
         if not item.answers or len(BLANKS.findall(item.text)) != len(item.answers):
-            problem("的空格数须与答案数相同且至少一个")
+            problem("give one answer for each blank, at least one blank")
         elif any(not 1 <= len(spellings) <= 3 for spellings in item.answers):
-            problem("每空须有1到3种可接受写法")
+            problem("give 1 to 3 accepted spellings for each blank")
         elif not quoted(filled(item), story):
-            problem("填回答案后不是故事原句")
+            problem("with the answers filled in it is not a story sentence")
         if item.variant == "word_bank" and not 1 <= len(item.distractors) <= 3:
-            problem("选词填空须有1到3个干扰词")
+            problem("a word bank needs 1 to 3 extra words")
         if item.variant == "free" and item.distractors:
-            problem("自由填空不给干扰词")
+            problem("a free fill-in has no extra words")
     elif purpose == "open":
         if not (1 <= len(item.points) <= 5 and distinct(item.points)):
-            problem("须有1到5条互不相同的要点")
+            problem("give 1 to 5 different points")
     return found
 
 
@@ -191,12 +191,12 @@ def plain(text: str) -> str:
 PROGRAM_INSTRUCTIONS = (
     "choice、order、match、fill由程序对照答案判断，课上学生只能点选或填写、不能提问："
     "dimension_id为english.reading.facts，evidence逐字摘自故事，acceptable_answers与known_incorrect为空，"
-    "correct_text写答对时Jane说的一句话；各级帮助在学生答错或点“给我提示”时由Jane照原文说出，"
+    "correct_text写答对时Jane说的一句话；各级帮助在学生答错或点“Hint”时由Jane照原文说出，"
     "不能直接说出答案。"
 )
 TYPE_INSTRUCTIONS = {
-    "choice": 'choice是选择题：variant为true_false（options固定为["对","错"]）、'
-    'true_false_not_given（options固定为["对","错","文中没提"]）或single（2到5个选项），'
+    "choice": 'choice是选择题：variant为true_false（options固定为["True","False"]）、'
+    'true_false_not_given（options固定为["True","False","Not given"]）或single（2到5个选项），'
     "correct是正确项在options里的序号（从0起），判断题把要判断的那句话写进prompt。",
     "order": "order是排序题：variant为events（故事事件）或words"
     "（连词成句，items连起来须是故事原句），items按正确顺序写3到6项。",

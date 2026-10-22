@@ -20,13 +20,13 @@ from project_j.preparation.resources import adopt_resource, generate_resource
 async def to_reading(app):
     core = await start(app)
     deliver_all(core)
-    await answer(app, "听到了。", "confirmation")
+    await answer(app, "Yes, I heard.", "confirmation")
     await answer(app, "a bridge")
     await answer(app, "She folded it.")
-    await answer(app, "我指的是折过的纸。", "report")
+    await answer(app, "I pointed to the folded paper.", "report")
     core.control(str(uuid4()), "return")
     deliver_all(core)
-    await answer(app, "第二次纸折了，车没有掉。", "report")
+    await answer(app, "The second time the paper was folded and the car did not fall.", "report")
     await answer_clicked(app)
     assert core.reading_task() is not None
     return core
@@ -36,7 +36,7 @@ def test_start_needs_adopted_required_resources(application, caplog):
     course_ref = ref(asyncio.run(application.prepare("prepare1", LEARNER))["course_ref"])
     application.confirm("c1", LEARNER, course_ref)
     caplog.set_level(logging.INFO, logger="project_j")
-    with pytest.raises(Conflict, match="资源未就绪：朗读示范"):
+    with pytest.raises(Conflict, match="Reading model"):
         application.start("s1", LEARNER, course_ref, materials_ready=True)
     assert "start refused reason=resources_missing" in caplog.text
     asyncio.run(ready(application, {"course_ref": course_ref}))
@@ -50,7 +50,7 @@ def test_changed_voice_counts_as_missing(application, monkeypatch):
     course_ref = ref(asyncio.run(application.prepare("prepare1", LEARNER))["course_ref"])
     asyncio.run(ready(application, {"course_ref": course_ref}))
     monkeypatch.setattr(application.synthesizer, "voice", "another-voice")
-    with pytest.raises(Conflict, match="资源未就绪"):
+    with pytest.raises(Conflict, match="Resources not ready"):
         application.start("s1", LEARNER, course_ref, materials_ready=True)
 
 
@@ -64,9 +64,9 @@ def test_second_help_plays_the_adopted_demonstration(application):
     async def scenario():
         core = await to_reading(application)
         task = core.reading_task()
-        await answer(application, "帮我一下", "help")
+        await answer(application, "Help me", "help")
         first = core.actions[core.presented]
-        await answer(application, "还是不会，帮我一下", "help")
+        await answer(application, "I still don't understand. Help me.", "help")
         return task, first, core.actions[core.presented]
 
     task, first, second = asyncio.run(scenario())
@@ -80,8 +80,8 @@ def test_no_demonstration_without_adopted_audio(application, monkeypatch):
     async def scenario():
         core = await to_reading(application)
         core.voiced = frozenset()  # As if the demonstration had not been adopted.
-        await answer(application, "帮我一下", "help")
-        await answer(application, "还是不会，帮我一下", "help")
+        await answer(application, "Help me", "help")
+        await answer(application, "I still don't understand. Help me.", "help")
         return core.actions[core.presented]
 
     assert asyncio.run(scenario()).speech == ()
@@ -118,7 +118,7 @@ def visual_class(application, monkeypatch, client=None):
     result = application.start("visual", LEARNER, course_ref, materials_ready=True)
     core = application.core
     deliver_all(core)
-    asyncio.run(answer(application, "听到了。", "confirmation"))
+    asyncio.run(answer(application, "Yes, I heard.", "confirmation"))
     return result, core
 
 
@@ -126,7 +126,7 @@ def test_visuals_follow_their_stage(application, monkeypatch):
     _, core = visual_class(application, monkeypatch)
     question = core.actions[core.presented]
     assert question.kind == "question" and question.visuals == ("cup-picture",)
-    asyncio.run(answer(application, "帮我一下", "help"))
+    asyncio.run(answer(application, "Help me", "help"))
     helped = core.actions[core.presented]
     assert helped.kind == "help" and helped.visuals == ("cup-motion",)
     assert all("cup-note" not in action.visuals for action in core.actions.values())
@@ -153,8 +153,8 @@ def test_speech_plays_the_recorded_demonstration(application):
 
         async def scenario():
             core = await to_reading(application)
-            await answer(application, "帮我一下", "help")
-            await answer(application, "还是不会，帮我一下", "help")
+            await answer(application, "Help me", "help")
+            await answer(application, "I still don't understand. Help me.", "help")
             return core
 
         core = asyncio.run(scenario())
@@ -224,7 +224,7 @@ def test_picture_report_names_only_the_actions_own_visuals(application, monkeypa
 def test_an_attempt_keeps_the_pictures_seen_before_it(application, monkeypatch):
     _, core = visual_class(application, monkeypatch)
     shown(core, core.actions[core.presented], ("cup-picture",))
-    asyncio.run(answer(application, "帮我一下", "help"))
+    asyncio.run(answer(application, "Help me", "help"))
     help_action = core.actions[core.presented]
     shown(core, help_action, (), status="failed")  # The animation never displayed.
     asyncio.run(answer(application, "the cup"))

@@ -24,13 +24,13 @@ FIRST = "courses/paper-bridge/reading-main.md"
 TRANSFER = "courses/paper-bridge/reading-transfer.md"
 PRONUNCIATION = "english.speaking.pronunciation"
 READING = "english.reading.facts"
-CORRECT_TEXT = "对了，你找得很准。"
-SAMPLE_EXIT = "这题先到这里，我们接着往下。"
+CORRECT_TEXT = "Right! You found it."
+SAMPLE_EXIT = "Let's stop this one here and go on."
 # The two fixed simulation courses are each other's next course, so course switching can loop.
 COURSES = {
     FIRST: {
         "title": "The Paper Bridge",
-        "focus": "想做什么与新纸变化",
+        "focus": "What Mia wants and how the new paper changes",
         "next": TRANSFER,
         "tasks": [
             (
@@ -39,13 +39,13 @@ COURSES = {
                 "She wants a bridge for her car.",
                 (
                     "a bridge",
-                    "给车搭桥",
                     "She wants to build a bridge for her toy car.",
                     "She wants a bridge.",
                     "She wants a bridge for her car.",
                 ),
                 ("a car",),
-                "找到含wants的句子，说说她已经有什么、还想做什么。",
+                'Find the sentence with "wants". '
+                "What does she have, and what does she want to make?",
                 "She wants a ___.",
             ),
             (
@@ -54,12 +54,11 @@ COURSES = {
                 "She folds a new piece of paper.",
                 (
                     "She folded it.",
-                    "把新纸折了",
                     "She folds a new piece of paper.",
                     "She folded a new piece of paper.",
                 ),
                 ("added books",),
-                "从Can I make a new bridge往下找到新纸发生的变化。",
+                'Read on from "Can I make a new bridge". What happens to the new paper?',
                 "She ___ a new piece of paper.",
             ),
         ],
@@ -78,8 +77,8 @@ COURSES = {
                     ),
                     correct=1,
                 ),
-                "回到第二段最后一句，看看纸和车怎样了。",
-                "第一次纸弯了，车也跟着动了：选说到纸和车的那一项。",
+                "Go back to the last sentence of part two. What happens to the paper and the car?",
+                "The first time, the paper moves and so does the car. Pick the one about both.",
             ),
             (
                 "order-bridge",
@@ -94,20 +93,21 @@ COURSES = {
                         "This time, the car stays on the bridge.",
                     ),
                 ),
-                "先找纸第一次放上书的那一句。",
-                "纸先放上去，弯了以后Mia才想到新办法。",
+                "Find the sentence where the paper first goes on the books.",
+                "First the paper goes on. Only after it bends does Mia have a new idea.",
             ),
             (
                 "match-words",
-                "Match each English word with its meaning.",
+                "Match each word from the story with what it means.",
                 "The paper bends. The car falls.",
                 MatchContent(
                     left=("bends", "folds", "smiles"),
-                    right=("弯了", "折", "微笑"),
-                    distractors=("掉下来",),
+                    right=("curves down", "doubles it over", "looks happy"),
+                    distractors=("drops down",),
                 ),
-                "在故事里找到这几个词，看看它们说的是纸、人还是车。",
-                "bends说纸，folds是Mia对纸做的事，smiles是Mia的表情。",
+                "Find these words in the story. Is each one about the paper, Mia or the car?",
+                '"bends" is about the paper, "folds" is what Mia does to the paper, '
+                '"smiles" is about her face.',
             ),
             (
                 "fill-puts",
@@ -119,8 +119,8 @@ COURSES = {
                     answers=(("puts",),),
                     distractors=("folds", "draws"),
                 ),
-                "找到写her car on the paper的那一句。",
-                "这一句说Mia把车放到纸上：选表示“放”的词。",
+                'Find the sentence with "her car on the paper".',
+                "In this sentence Mia moves her car onto the paper. Pick the word for that.",
             ),
             (
                 "retell-bridge",
@@ -131,29 +131,30 @@ COURSES = {
                 OpenContent(
                     variant="retell",
                     points=(
-                        "第一次纸弯了、车掉了",
-                        "Mia把一张新纸折起来",
-                        "第二次车留在桥上",
+                        "The first time, the paper bends and the car falls.",
+                        "Mia folds a new piece of paper.",
+                        "The second time, the car stays on the bridge.",
                     ),
-                    guidance="用自己的话讲出先后，说出改变和结果就够了，不要求逐字复述。",
+                    guidance="Tell what happened in order in your own words; the change and the "
+                    "result are enough. Word for word is not needed.",
                 ),
-                "先说第一次发生了什么，再说Mia改了什么。",
-                "可以这样开头：First, the paper … Then Mia …",
+                "First say what happened the first time, then what Mia changed.",
+                "You can start like this: First, the paper … Then Mia …",
             ),
         ],
     },
     TRANSFER: {
         "title": "Ben’s Bridge",
-        "focus": "先小后大及实际结果",
+        "focus": "Small bus then big bus, and what really happened",
         "next": FIRST,
         "tasks": [
             (
                 "reading-first",
                 "Which bus did Ben try first?",
                 "He puts the small bus on the bridge.",
-                ("the small bus", "small", "小车", "小巴士", "He first tries the small bus."),
-                ("the big bus", "大车"),
-                "找到first try对应的句子，留意small和big。",
+                ("the small bus", "small", "He first tries the small bus."),
+                ("the big bus",),
+                'Find the sentence about the first try. Look for "small" and "big".',
                 "He first tries the ___ bus.",
             ),
             (
@@ -163,23 +164,21 @@ COURSES = {
                 (
                     "it fell",
                     "the big bus falls",
-                    "纸弯了，车掉了",
-                    "大巴士掉了",
                     "The paper bends and the big bus falls.",
                 ),
                 ("it stayed",),
-                "对照第二次试验的最后两句。",
+                "Compare the last two sentences of the second try.",
                 "The paper ___ and the big bus ___.",
             ),
         ],
         "samples": [
             (
                 "choice-small-bus",
-                "判断：The small bus stays on the paper.",
+                "True or false: The small bus stays on the paper.",
                 "It stays on the paper.",
-                ChoiceContent(variant="true_false", options=("对", "错"), correct=0),
-                "找到He puts the small bus on the bridge后面的那一句。",
-                "小巴士放上去以后，纸没有弯：想想它留住了没有。",
+                ChoiceContent(variant="true_false", options=("True", "False"), correct=0),
+                'Find the sentence after "He puts the small bus on the bridge".',
+                "After the small bus goes on, the paper does not bend. Does the bus stay?",
             ),
             (
                 "order-buses",
@@ -194,20 +193,21 @@ COURSES = {
                         "The big bus falls.",
                     ),
                 ),
-                "先找Ben搭桥的那一句。",
-                "Ben先搭桥，再先试小的、后试大的。",
+                "Find the sentence where Ben makes the bridge.",
+                "Ben makes the bridge first, then tries the small bus, then the big one.",
             ),
             (
                 "match-buses",
-                "Match each English word with its meaning.",
+                "Match each word from the story with what it means.",
                 "One bus is small. One bus is big.",
                 MatchContent(
                     left=("small", "big", "falls"),
-                    right=("小的", "大的", "掉下来"),
-                    distractors=("弯曲",),
+                    right=("little", "large", "drops down"),
+                    distractors=("curves down",),
                 ),
-                "在故事里找到这几个词，看看它们说的是哪辆车、发生了什么。",
-                "small和big说两辆车的大小，falls说大巴士最后怎样了。",
+                "Find these words in the story. Is each one about a bus, or about what happens?",
+                '"small" and "big" tell the size of the buses; '
+                '"falls" tells what the big bus does at the end.',
             ),
             (
                 "fill-bends",
@@ -219,8 +219,8 @@ COURSES = {
                     answers=(("bends",),),
                     distractors=("stays", "takes"),
                 ),
-                "看故事最后两句。",
-                "大巴士掉下来之前，纸先怎样了：选表示“弯”的词。",
+                "Look at the last two sentences of the story.",
+                "Before the big bus falls, what does the paper do? Pick that word.",
             ),
             (
                 "opinion-bus",
@@ -229,11 +229,16 @@ COURSES = {
                 "The paper bends. The big bus falls.",
                 OpenContent(
                     variant="opinion",
-                    points=("原因与故事相符（大巴士更重、纸撑不住）", "提出一个说得通的改法"),
-                    guidance="原因与故事相符、改法说得通就算对，没有标准答案。",
+                    points=(
+                        "A reason that fits the story (the big bus is heavier; the paper "
+                        "cannot hold it).",
+                        "A change that makes sense.",
+                    ),
+                    guidance="A reason that fits the story and a change that makes sense are "
+                    "enough; there is no single right answer.",
                 ),
-                "想一想两辆车有什么不同。",
-                "可以这样说：The big bus is … I would …",
+                "Think about how the two buses are different.",
+                "You can say: The big bus is … I would …",
             ),
         ],
     },
@@ -267,28 +272,64 @@ def map_demand(demand: DemandBody, tasks: tuple[TaskDefinition, ...], source: st
     offscreen = tuple(task.task_id for task in tasks if task.purpose == "offscreen")
     every = tuple(task.task_id for task in tasks)
     how = {
-        "primary_goal": ("本包回答题均取该维度的文本依据。", answers),
-        "auxiliary_goal": ("各回答题第二级支持为英语短句框，帮助后表达另记。", answers),
-        "budget_minutes": ("按各题型预计用时估算约30分钟，挑战只替换活动。", ()),
-        "offscreen_requirements": ("离屏任务停止采集，返回后取实际报告。", offscreen),
-        "fallback": ("作答以文字模拟；朗读段以模拟录音交模拟评分，不代表真实发音。", every),
-        "prerequisites": ("不预设先备，以首个未提示初答取样。", answers),
-        "sampling_requirements": (
-            f"使用{source}；每题先取未提示初答，帮助后再答另记尝试。",
+        "primary_goal": ("Every answer task here uses the story text for this skill.", answers),
+        "auxiliary_goal": (
+            "The second help of each answer task is a short English sentence frame; "
+            "an answer after help is recorded apart.",
             answers,
         ),
-        "help_requirements": ("每题两级不同支持：定位提示与句框。", answers),
-        "gaps": ("沿用：本包不验证此项，课后保持未知。", ()),
-        "topic": ("固定模板课使用课程库短文，不按所选题材改写；课后据实记录。", ()),
+        "budget_minutes": (
+            "About 30 minutes from the task types; a challenge only replaces an activity.",
+            (),
+        ),
+        "offscreen_requirements": (
+            "Nothing is collected away from the screen; back here, the student reports.",
+            offscreen,
+        ),
+        "fallback": (
+            "Answers are simulated text; reading aloud uses a simulated recording and score, "
+            "not real pronunciation.",
+            every,
+        ),
+        "prerequisites": (
+            "Nothing is assumed beforehand; the first answer without help is the sample.",
+            answers,
+        ),
+        "sampling_requirements": (
+            f"Uses {source}; each task takes the first answer without help, and an answer after "
+            "help is a new try.",
+            answers,
+        ),
+        "help_requirements": (
+            "Two different helps per task: where to look, then a sentence frame.",
+            answers,
+        ),
+        "gaps": ("Kept: this course does not check it; it stays unknown after class.", ()),
+        "topic": (
+            "The fixed course uses a library story and is not rewritten for the chosen "
+            "topic; the class records what happens.",
+            (),
+        ),
         # The fixed course cannot be rewritten around a ticked skill; it says so.
-        "skill_focus": ("固定模板课不专门安排该项目；回答里用到时课后据实记录。", answers),
-        "skill_note": ("固定模板课不专门安排；课后据实记录。", ()),
+        "skill_focus": (
+            "The fixed course has nothing special for this skill; if answers use it, the "
+            "class records it.",
+            answers,
+        ),
+        "skill_note": (
+            "The fixed course has nothing special for it; the class records what happens.",
+            (),
+        ),
     }
     mapping = []
     for field, requirement in demand_requirements(demand):
         if field == "suggestion_choices":
             adopted = requirement.split(":", 1)[0] in {"adopt", "modify"}
-            text = f"采纳建议，{choice}。" if adopted else "未采纳，模板不因该建议改变。"
+            text = (
+                f"Suggestion adopted: {choice}."
+                if adopted
+                else "Suggestion not adopted; the course does not change for it."
+            )
             mapping.append(
                 RequirementMapping(field=field, requirement=requirement, implementation=text)
             )
@@ -333,15 +374,21 @@ def course_tasks(
                         },
                     ),
                 ),
-                exit_text="可以保留未知，换一个短观察或跳过。",
+                exit_text="That's OK. Let's skip this one for now.",
             )
         )
     for identity, purpose, prompt in [
-        ("point-paper", "point", "指一指你说的那张纸，再报告你指的是哪一张。"),
+        (
+            "point-paper",
+            "point",
+            "Point to the paper you mean, then say which one you pointed to.",
+        ),
         (
             "paper-experiment",
             "offscreen",
-            "离屏比较两次纸桥尝试。回来报告材料是否相同、改变了什么、实际发生什么及帮助。",
+            "Away from the screen, compare your two paper bridge tries. Come back and report: "
+            "were the things the same, what did you change, what really happened, and did "
+            "anyone help?",
         ),
     ]:
         tasks.append(
@@ -351,19 +398,21 @@ def course_tasks(
                 purpose=purpose,
                 prompt=prompt,
                 material_ref=material_ref,
-                evidence="只有提供者实际报告可用；没有视觉观察，不声称看见动作。",
+                evidence="Only the student's own report counts; nothing was watched, so do not "
+                "claim to have seen it.",
                 acceptable_simulated=(),
                 supports=(
                     Support(
-                        text="先用中文说实际看到或做了什么。",
+                        text="First say what you really saw or did.",
                         help={"science.observation.report": "light_prompt"},
                     ),
                     Support(
-                        text="分开报告材料、改变和结果；不知道的部分保留未知。",
+                        text="Tell the things, the change and the result one by one; say \"I don't "
+                        "know\" for any part you don't know.",
                         help={"science.observation.report": "scaffold"},
                     ),
                 ),
-                exit_text="没有做或没有观察也可以如实报告，不需要补课。",
+                exit_text="It's OK to say you did not do it or did not see it.",
                 optional=purpose == "offscreen",
                 minutes=7 if purpose == "offscreen" else None,
             )
@@ -406,31 +455,37 @@ def reading_tasks(story: str, material_ref: RevisionRef) -> tuple[TaskDefinition
             task_id=f"read-aloud-{index}",
             dimension_id=PRONUNCIATION,
             purpose="read_aloud",
-            prompt=f"请朗读故事第{index}/{len(segments)}段：按麦克风开始，读完按结束。",
+            prompt=f"Read part {index} of {len(segments)} aloud. Press the microphone to start "
+            "and Done when you finish.",
             material_ref=material_ref,
-            evidence="以发音评分模块对本段参考文本的评分为据；模型不另评发音。",
+            evidence="The pronunciation score of this part's text is the evidence; the model "
+            "does not judge pronunciation itself.",
             acceptable_simulated=(),
             reference_text=segment,
             reading_id="story-read-aloud",
             supports=(
                 Support(
-                    text="看着标出的词再读一遍，读慢一点。",
+                    text="Look at the marked words and read it again, a little slower.",
                     help={PRONUNCIATION: "light_prompt"},
                 ),
-                Support(text="先听Jane示范这一段，再跟读。", help={PRONUNCIATION: "full_model"}),
+                Support(
+                    text="Listen to Jane read this part first, then read after her.",
+                    help={PRONUNCIATION: "full_model"},
+                ),
             ),
-            exit_text="这一段先读到这里，我们接着往下。",
+            exit_text="Let's stop this part here and go on.",
             optional=True,
         )
         for index, segment in enumerate(segments, 1)
     )
 
 
-PREVIEW_MATERIALS = "纸、同一本书和同一辆小车。"
+PREVIEW_MATERIALS = "Paper, the same book and the same small car."
 BRIEF = {
-    "history": "没有学习历史，以初始未知状态开始。",
-    "adjustments": "挑战替换活动，降阶/跳过/暂停/停止遵守原目标与预算。",
-    "closing": "只总结实际范围，取得收到确认；停止不强迫小结。",
+    "history": "No learning history yet; everything starts as unknown.",
+    "adjustments": "A challenge replaces an activity; making it easier, skipping, pausing "
+    "and stopping keep the goals and the time.",
+    "closing": "Sum up only what happened and ask the student to confirm; a stop needs no summary.",
 }
 
 
@@ -463,9 +518,13 @@ def template_draft(
         tasks = tuple(task for task in tasks if task.purpose != "open")
     title = COURSES[source]["title"]
     practice = uses_new_material(demand)
-    choice = f"选{title}复习模板，明示已读熟悉条件" if familiar else f"选{title}新材料短观察模板"
+    choice = (
+        f"{title} as a review course, read before"
+        if familiar
+        else f"{title} as a short observation course with new material"
+    )
     mapping = map_demand(demand, tasks, source, choice)
-    stage = "已读，复习" if familiar else "新材料" if practice else "首课"
+    stage = "read before, review" if familiar else "new material" if practice else "first lesson"
 
     def ids(task_ids):
         named = [i for i in task_ids if not i.startswith("read-aloud-")]
@@ -514,16 +573,19 @@ def template_draft(
         ],
         "resources": [],
         "preview": {
-            "story": f"{title}（{stage}）",
-            "why": "复习已读故事：熟悉条件下的回答不作首次新材料观察或迁移，科学只按实际报告解释。"
+            "story": f"{title} ({stage})",
+            "why": "Review of a story read before: answers in a familiar story are not a first "
+            "look at new material; science is judged only from real reports."
             if familiar
-            else "按当前需求观察阅读事实与短表达，科学只按实际报告解释。",
-            "materials": "不需要实物。" if screen_only else PREVIEW_MATERIALS,
-            "help": "定位提示和不同句框分开；外部帮助随后补记。",
-            "exit": "30分钟内，挑战只替换；可跳过、暂停或停止。",
+            else "Watches reading facts and short English answers for the current need; "
+            "science is judged only from real reports.",
+            "materials": "No objects needed." if screen_only else PREVIEW_MATERIALS,
+            "help": "Where-to-look hints and sentence frames are separate; outside help can be "
+            "added after class.",
+            "exit": "A challenge only replaces an activity; you can skip, pause or stop.",
         },
         "brief": BRIEF,
-        "note": "沿用课程库的纸桥模板。",
+        "note": "Reused the paper bridge course from the library.",
         "limitations": [],
     }
 

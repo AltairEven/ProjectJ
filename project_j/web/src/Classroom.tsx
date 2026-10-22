@@ -15,7 +15,7 @@ import { answerMode, type TaskView } from './tasks'
 import { TaskInput } from './TaskInput'
 import type { AllowedAction, Snapshot, Control, DeliveryFeedback, TextInput, InputResult as Ack } from './client/types.gen'
 
-const stateLabels: Record<string, string> = { running: '进行中', offscreen: '离屏活动中', paused: '已暂停', closing: '收尾', ended: '已结束' }
+const stateLabels: Record<string, string> = { running: 'In class', offscreen: 'Away from the screen', paused: 'Paused', closing: 'Wrapping up', ended: 'Finished' }
 
 // Pictures and animations the core approved with an action; shown as images only. Once each
 // has displayed or failed, onShown names the ones the student could see.
@@ -39,7 +39,7 @@ function Visuals({ token, action, onShown }: { token: string, action?: AllowedAc
       .then(list => { if (alive) setItems(list.filter(item => item !== undefined)) })
     return () => { alive = false; made.forEach(url => URL.revokeObjectURL(url)) }
   }, [token, id, key])
-  return items.length ? <section className="visuals">{items.map(({ resource, url }) => <img key={url} src={url} alt="Jane 展示的图"
+  return items.length ? <section className="visuals">{items.map(({ resource, url }) => <img key={url} src={url} alt="A picture Jane shows"
     onLoad={() => settle(resource, true)} onError={() => settle(resource, false)} />)}</section> : null
 }
 
@@ -84,13 +84,13 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
       if (result.snapshot) setCurrent(result.snapshot)
       if (result.error) setMessage(result.error)
     }
-    socket.onerror = () => setMessage('连接状态未知。停止按钮仍可独立使用；刷新只接回原会话。')
+    socket.onerror = () => setMessage('The connection is unclear. Stop still works; refreshing only rejoins this class.')
     return () => socket.close()
   }, [token, setCurrent])
   const send = async (path: string, payload: unknown) => {
     setInFlight(count => count + 1); setMessage('')
     const previous = lastInput
-    // An answer's request returns only after judging; bind it now so "还没说完" can follow it meanwhile.
+    // An answer's request returns only after judging; bind it now so "I'm not done" can follow it meanwhile.
     if (path === 'class/input') setLastInput((payload as TextInput).event_id)
     try {
       const value = await api<Ack>(token, path, payload)
@@ -116,13 +116,13 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     } catch (error) {
       const failure = error as RequestFailure
       setMessage(command !== 'stop' && command !== 'pause' ? failure.message
-        : failure.unknown ? '本端已停止呈现；核心回执未取得，可再按一次。' : `本端已停止呈现；${failure.message}`)
+        : failure.unknown ? 'Stopped on this page; no reply came back, so you can press it again.' : `Stopped on this page. ${failure.message}`)
     }
   }
   const sendDelivery = (payload: DeliveryFeedback) => api<Snapshot>(token, 'class/delivery', payload).then(setCurrent).catch(error => {
     const failure = error as RequestFailure
     if (failure.unknown) setFailedDelivery(payload)
-    setMessage(failure.unknown ? '呈现回执未取得；请接续原呈现回执。' : failure.message)
+    setMessage(failure.unknown ? 'The delivery receipt did not come back; send it again.' : failure.message)
   })
   useEffect(() => {
     if (!voiced || speaker.current) return
@@ -187,7 +187,7 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     if (voiced) {
       microphone.current ??= new Microphone()
       try { await microphone.current.start() } catch {
-        setMessage('需要允许使用麦克风才能朗读；可在地址栏允许后重试。')
+        setMessage('Reading aloud needs the microphone. Allow it in the address bar, then try again.')
         return
       }
     }
@@ -201,7 +201,7 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     let audio: string
     if (voiced) {
       try { audio = toBase64(microphone.current ? await microphone.current.finish() : new Uint8Array()) } catch {
-        setMessage('录音无法读取，请重录。')
+        setMessage('The recording could not be read. Please record again.')
         return
       }
     }
@@ -234,7 +234,7 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     if (asking && !box?.open) box?.showModal()
     if (!asking && box?.open) box.close()
   }, [asking])
-  const confirm = () => void input('听到了，收到当前说明。', 'confirmation')
+  const confirm = () => void input('Yes, I heard.', 'confirmation')
   // A clicked task is answered on the task itself: no text box, and a hint instead of a plea.
   const mode = answerMode(snapshot)
   const respond = async (payload: { intent: 'answer' | 'help', response?: Record<string, unknown> }) => {
@@ -247,32 +247,32 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
   // scrolling on its own: no page scroll between her question, the story and the answer box.
   return <main className="student classroom">
     <header className="class-bar">
-      <h1>和 Jane 上课{!voiced && <span className="tag">模拟</span>}</h1>
+      <h1>Class with Jane{!voiced && <span className="tag">Simulation</span>}</h1>
       {progress && snapshot && <div className="class-progress"><span>{progress.label}</span>
-        <progress className="sr-only" value={progress.value} max={progress.max} aria-label="课堂进度" />
+        <progress className="sr-only" value={progress.value} max={progress.max} aria-label="Class progress" />
         <span className="ticks" aria-hidden="true">{taskMarks(snapshot.task_index, snapshot.task_count).map((mark, index) => <i key={index} className={mark} />)}</span></div>}
-      <div className="controls"><span>{snapshot ? stateLabels[snapshot.activity_state] : '正在连接原会话'}</span>
+      <div className="controls"><span>{snapshot ? stateLabels[snapshot.activity_state] : 'Joining the class'}</span>
         {snapshot?.mode !== 'ended' && <div className="row">
-          {snapshot?.mode === 'paused' ? <button onClick={() => void control('resume')}>继续</button>
-            : <button className="quiet" disabled={halted} onClick={() => void control('pause')}>暂停</button>}
-          <button className="danger" onClick={() => void control('stop')}>立即停止</button>
-          <details className="more"><summary>更多</summary><div className="row">
-            <button className="quiet" disabled={halted} onClick={() => void control('skip')}>跳过当前题</button>
-            <button className="quiet" disabled={halted} onClick={() => void control('close')}>收尾</button></div></details></div>}</div>
+          {snapshot?.mode === 'paused' ? <button onClick={() => void control('resume')}>Resume</button>
+            : <button className="quiet" disabled={halted} onClick={() => void control('pause')}>Pause</button>}
+          <button className="danger" onClick={() => void control('stop')}>Stop now</button>
+          <details className="more"><summary>More</summary><div className="row">
+            <button className="quiet" disabled={halted} onClick={() => void control('skip')}>Skip this question</button>
+            <button className="quiet" disabled={halted} onClick={() => void control('close')}>Wrap up</button></div></details></div>}</div>
     </header>
     <div className="stage">
       <div className="side board">
         <section className="jane"><span className="avatar" aria-hidden="true">J</span><div><h2>Jane</h2>
-          {localCancelled ? <p>呈现已取消。</p>
-            : voiced && locked ? <p>请点“打开声音”，听 Jane 说话。</p>
-            : voicing === 'preparing' ? <Progress label="Jane 正在准备要说的话……" />
-            : voicing === 'speaking' ? <p aria-live="polite">Jane 正在说话……</p>
-            : <p aria-live="polite" className="said" key={shown?.action_id}>{shown?.text ?? '等待同一核心的下一动作。'}</p>}
-          {!localCancelled && !voicing && (busy || snapshot?.mode === 'judging') && <Progress label="Jane 正在看你的回答……" />}
-          {voiced && locked && <button onClick={() => void speaker.current?.resume().then(() => setLocked(false))}>打开声音</button>}
+          {localCancelled ? <p>Stopped on this page.</p>
+            : voiced && locked ? <p>Press "Turn on sound" to hear Jane.</p>
+            : voicing === 'preparing' ? <Progress label="Jane is getting ready to speak…" />
+            : voicing === 'speaking' ? <p aria-live="polite">Jane is speaking…</p>
+            : <p aria-live="polite" className="said" key={shown?.action_id}>{shown?.text ?? 'Waiting for Jane.'}</p>}
+          {!localCancelled && !voicing && (busy || snapshot?.mode === 'judging') && <Progress label="Jane is reading your answer…" />}
+          {voiced && locked && <button onClick={() => void speaker.current?.resume().then(() => setLocked(false))}>Turn on sound</button>}
           {snapshot && snapshot.mode !== 'offscreen' && snapshot.mode !== 'ended' && <div className="row">
-            {mode !== 'task' && <button className="quiet" disabled={busy || halted} onClick={() => void input('帮我一下', 'help')}>帮我一下</button>}
-            <button className="quiet" disabled={halted} onClick={() => void control('repeat')}>重复当前内容</button></div>}</div></section>
+            {mode !== 'task' && <button className="quiet" disabled={busy || halted} onClick={() => void input('Help me, please.', 'help')}>Help me</button>}
+            <button className="quiet" disabled={halted} onClick={() => void control('repeat')}>Say it again</button></div>}</div></section>
       </div>
       <div className="side book">
         {!localCancelled && <Visuals token={token} action={shown ?? undefined} onShown={(action, shown) => {
@@ -285,11 +285,11 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
           return <section key={id} className="reading">{title && <h2>{title}</h2>}
             <ol>{paragraphs.map((text, index) => <li key={index}>{text}</li>)}</ol></section>
         })}
-        {!Object.keys(snapshot?.materials ?? {}).length && <p className="hint">课文会在这里显示。</p>}
+        {!Object.keys(snapshot?.materials ?? {}).length && <p className="hint">The story shows here.</p>}
       </div>
       <div className="side notebook">
         {message && <div className="notice" role="alert">{message}</div>}
-        {failedRequest && <button className="quiet" disabled={busy} onClick={() => void send(failedRequest.path, failedRequest.payload)}>接续原提交</button>}
+        {failedRequest && <button className="quiet" disabled={busy} onClick={() => void send(failedRequest.path, failedRequest.payload)}>Send it again</button>}
         {failedDelivery && <button className="quiet" onClick={() => {
           const payload = failedDelivery
           void api<Snapshot>(token, 'class/delivery', payload).then(value => {
@@ -299,38 +299,38 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
             if (!failure.unknown) setFailedDelivery(undefined)
             setMessage(failure.message)
           })
-        }}>接续原呈现回执</button>}
-        {localCancelled && <p className="notice">本端已停止呈现。暂停后按“继续”恢复；停止后不能恢复。</p>}
+        }}>Send the receipt again</button>}
+        {localCancelled && <p className="notice">Stopped on this page. After Pause, press Resume to go on; after Stop, the class cannot go on.</p>}
         {reading && snapshot?.mode !== 'ended' && <section className="reading-aloud">
-          <h2>朗读这一段</h2><p>{String(reading.reference_text)}</p>
-          {!voiced && <label>模拟朗读内容（不使用麦克风，录音只交发音评分）<textarea value={readingText} onChange={event => setReadingText(event.target.value)} disabled={halted} /></label>}
-          <p>{{ idle: '未开始', recording: '录音中', paused: '已暂停' }[recorder.state]}</p>
+          <h2>Read this part aloud</h2><p>{String(reading.reference_text)}</p>
+          {!voiced && <label>Simulated reading (no microphone; it only goes to scoring)<textarea value={readingText} onChange={event => setReadingText(event.target.value)} disabled={halted} /></label>}
+          <p>{{ idle: 'Not started', recording: 'Recording', paused: 'Paused' }[recorder.state]}</p>
           <div className="row">
-            {recorder.state === 'idle' && <button disabled={busy || halted} onClick={() => void beginReading()}>开始录音</button>}
-            {recorder.state === 'recording' && <button className="quiet" onClick={() => { microphone.current?.pause(); setRecorder(pauseRecording(recorder, performance.now())) }}>暂停录音</button>}
-            {recorder.state === 'paused' && <button className="quiet" onClick={() => { microphone.current?.resume(); setRecorder(resumeRecording(recorder, performance.now())) }}>继续录音</button>}
-            {recorder.state !== 'idle' && <><button disabled={busy} onClick={() => void finishReading(performance.now())}>结束并提交</button>
-              <button className="quiet" onClick={() => { microphone.current?.discard(); setRecorder(idle) }}>重录</button></>}
+            {recorder.state === 'idle' && <button disabled={busy || halted} onClick={() => void beginReading()}>Start recording</button>}
+            {recorder.state === 'recording' && <button className="quiet" onClick={() => { microphone.current?.pause(); setRecorder(pauseRecording(recorder, performance.now())) }}>Pause recording</button>}
+            {recorder.state === 'paused' && <button className="quiet" onClick={() => { microphone.current?.resume(); setRecorder(resumeRecording(recorder, performance.now())) }}>Resume recording</button>}
+            {recorder.state !== 'idle' && <><button disabled={busy} onClick={() => void finishReading(performance.now())}>Finish and submit</button>
+              <button className="quiet" onClick={() => { microphone.current?.discard(); setRecorder(idle) }}>Record again</button></>}
           </div></section>}
         {mode === 'task' && snapshot ? <TaskInput key={snapshot.task_instance_id} task={snapshot.task as TaskView} disabled={busy || halted}
           onSubmit={response => void respond({ intent: 'answer', response })} onHint={() => void respond({ intent: 'help' })} /> :
-          snapshot?.mode === 'offscreen' ? <section><p>离屏期间没有采集。回来后需要报告实际条件与结果，返回本身不算完成。</p><button onClick={() => void control('return')}>返回，报告结果</button></section> :
-          snapshot?.mode !== 'ended' && <section><label>{voiced ? '你的回答或报告' : '你的回答或报告（模拟）'}<textarea value={text} onChange={event => setText(event.target.value)} disabled={localCancelled} /></label>
-            <div className="row"><button disabled={busy || !text.trim() || halted || Boolean(reading)} onClick={() => void input(text)}>提交</button>
-              {canConfirm(snapshot) && setAside === confirming && <button className="quiet" disabled={busy || halted} onClick={confirm}>确认收到说明</button>}
-              <button className="quiet" disabled={!lastInput || !text.trim() || halted} onClick={() => void input(text, 'unknown', true)}>还没说完，补充</button></div></section>}
-        {snapshot?.mode === 'ended' && <section><h2>本堂已结束</h2>{snapshot.end && <p>结束原因：{endLabels[String(snapshot.end.reason)] ?? String(snapshot.end.reason)}。</p>}<p>只保留已发生范围；课后评价会自动生成。</p><button onClick={onLeave}>回到主页</button></section>}
-        <p className="hint">{voiced ? '先听 Jane 说，说完再显示文字；朗读录音只交本机评分，不保存。' : '文字模拟；不会录音或播放真实声音。'}</p>
+          snapshot?.mode === 'offscreen' ? <section><p>Nothing is recorded while you are away. When you come back, tell Jane what you did and what happened; coming back alone does not finish it.</p><button onClick={() => void control('return')}>I'm back: report</button></section> :
+          snapshot?.mode !== 'ended' && <section><label>{voiced ? 'Your answer or report' : 'Your answer or report (simulation)'}<textarea value={text} onChange={event => setText(event.target.value)} disabled={localCancelled} /></label>
+            <div className="row"><button disabled={busy || !text.trim() || halted || Boolean(reading)} onClick={() => void input(text)}>Submit</button>
+              {canConfirm(snapshot) && setAside === confirming && <button className="quiet" disabled={busy || halted} onClick={confirm}>Yes, I heard</button>}
+              <button className="quiet" disabled={!lastInput || !text.trim() || halted} onClick={() => void input(text, 'unknown', true)}>I'm not done: add more</button></div></section>}
+        {snapshot?.mode === 'ended' && <section><h2>The class is over</h2>{snapshot.end && <p>How it ended: {endLabels[String(snapshot.end.reason)] ?? String(snapshot.end.reason)}.</p>}<p>Only what happened is kept; your evaluation comes next by itself.</p><button onClick={onLeave}>Back to home</button></section>}
+        <p className="hint">{voiced ? 'Listen to Jane first; her words show after she speaks. Reading aloud is scored on this computer and not saved.' : 'Text simulation; nothing is recorded or played.'}</p>
       </div>
     </div>
     {/* Closed by the page while the confirmation is being sent; by the student (button or Esc) to set it aside. */}
     <dialog ref={confirmBox} className="confirm-box" onClose={() => { if (!busy) setSetAside(confirming) }}>
-      <h2>{snapshot?.wait_kind === 'closing_confirmation' ? '本课小结' : '本课说明'}</h2>
+      <h2>{snapshot?.wait_kind === 'closing_confirmation' ? 'Summary' : 'About this lesson'}</h2>
       <p>{snapshot?.presented_action?.text}</p>
       {message && <div className="notice" role="alert">{message}</div>}
-      <div className="row"><button onClick={confirm}>确认收到说明</button>
-        <button className="quiet" onClick={() => confirmBox.current?.close()}>先不确认</button></div>
-      <p className="hint">先不确认也可以提问、重听或停止；之后在作答区确认。</p>
+      <div className="row"><button onClick={confirm}>Yes, I heard</button>
+        <button className="quiet" onClick={() => confirmBox.current?.close()}>Not yet</button></div>
+      <p className="hint">You can still ask, listen again or stop; confirm later in the answer area.</p>
     </dialog>
   </main>
 }

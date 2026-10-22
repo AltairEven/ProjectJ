@@ -40,16 +40,16 @@ from project_j.teacher.methods import JANE
 log = logging.getLogger(__name__)
 
 
-STALE_COURSE = "课程已有更新版本或需求已变，请刷新后对当前版本操作。"
+STALE_COURSE = "This lesson has a newer version or its plan changed. Refresh and try again."
 
 
 def publications(objects: list[Document]):
     """Course, brief, check and preview become effective together; material needs no publication."""
     reasons = {
-        "course": "备课模型编写、规则核对的课程",
-        "brief": "同包简报合同",
-        "content_check": "原文依据与结构已核对",
-        "preview": "生成同版本预览；不代表已阅读、确认或开始",
+        "course": "Lesson written by the model and checked by the rules",
+        "brief": "Brief of the same package",
+        "content_check": "Story evidence and structure checked",
+        "preview": "Preview of the same version; not read, confirmed or started yet",
     }
     return tuple(publication(obj, reasons[obj.kind]) for obj in objects if obj.kind in reasons)
 
@@ -124,10 +124,10 @@ class Preparing:
         self.models.require()
         demand = self.current(learner_id, "demand")
         if demand.body.get("goal_confirmation") == "needed":
-            raise Conflict("新目标等你确认：确认后才备课。")
+            raise Conflict("Confirm the new goal first; then the lesson is prepared.")
         body = DemandBody.model_validate(demand.body)
         if body.purpose != "placement" and body.topic is None:
-            raise Conflict("先选下一课的题材，选好才备课。")
+            raise Conflict("Choose a topic for the next lesson first.")
         state, plan = [self.store.read(ref, learner_id) for ref in (body.state_ref, body.plan_ref)]
         for obj in (state, plan):
             if self.store.current(obj.object_id, learner_id).ref != obj.ref:
@@ -165,7 +165,7 @@ class Preparing:
                 learner_id,
                 "jane",
                 [jane],
-                publications=(publication(jane, "唯一Jane模拟方法"),),
+                publications=(publication(jane, "The one Jane method"),),
             )
         package = self.saved_step(operation, learner_id, "package")
         if package is None:
@@ -420,7 +420,11 @@ class Preparing:
                 learner_id,
                 "confirmation",
                 [obj],
-                publications=(publication(obj, "学生确认这一课程版本；资源待生成"),),
+                publications=(
+                    publication(
+                        obj, "The student confirmed this lesson version; resources to be made"
+                    ),
+                ),
                 baselines=(course.ref, preview.ref),
             )
         resources = sum(item["kind"] in GENERATED for item in saved[0].body["resources"])
@@ -451,7 +455,7 @@ class Preparing:
 
     async def draft_course(self, request, stage, demand, jane, refs, library, read):
         """One model draft, one repair round on rule problems; nothing is saved here."""
-        subject = "课程" if stage == "prepare" else "修改"
+        subject = "lesson" if stage == "prepare" else "change"
         body = DemandBody.model_validate(demand.body)
         catalog = {
             doc.body["dimension_id"]
@@ -487,7 +491,7 @@ class Preparing:
                 reasons = [text for _, text in rejected.problems]
                 if attempt == 2:
                     raise PreparationUnavailable(
-                        "规则核对未通过：" + "；".join(reasons[:3]), subject
+                        "the rules found problems: " + "; ".join(reasons[:3]), subject
                     ) from None
                 request = repair_request(request, draft, reasons)
                 continue
@@ -515,11 +519,16 @@ class Preparing:
         if checked.source:
             text = (self.root / checked.source).read_text()
             origin, source = "library", checked.source
-            limitation = "自编材料；未测Lexile或RAZ，不证明科学实物定律。"
+            limitation = (
+                "Written story; no measured Lexile or RAZ level; proves no real science laws."
+            )
         else:
             text = f"# {checked.title}\n\n{checked.story}\n"
             origin, source = "model", f"model:{digest(text)}"
-            limitation = "模型自编；未测Lexile或RAZ，只经规则核对依据原文，不证明科学实物定律。"
+            limitation = (
+                "Story written by the model; no measured Lexile or RAZ level; only the "
+                "evidence was checked against it; proves no real science laws."
+            )
         material = document(
             "material",
             refs["material"].object_id,
@@ -616,5 +625,5 @@ class Preparing:
         result = self.confirm(f"{request_id}:confirm", learner_id, course_ref)
         failed = await ready_resources(self, learner_id, course_ref, on_progress)
         if failed:
-            raise Conflict(f"资源未就绪：{'、'.join(failed)}。可以重试。")
+            raise Conflict(f"Resources not ready: {', '.join(failed)}. You can try again.")
         return result

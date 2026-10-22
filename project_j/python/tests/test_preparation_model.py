@@ -49,77 +49,84 @@ def science_draft(context, evidence="He fills it with water."):
                 "purpose": "answer",
                 "prompt": "What does Sam put in the cup?",
                 "evidence": evidence,
-                "acceptable_answers": ["water", "He fills it with water.", "水"],
+                "acceptable_answers": ["water", "He fills it with water."],
                 "known_incorrect": ["milk"],
                 "supports": [
-                    support("找到fills这个词，看它后面是什么。", (REPORT, "light_prompt")),
-                    support("用句框回答：He fills it with ___.", (REPORT, "scaffold")),
+                    support(
+                        'Find the word "fills". What comes after it?', (REPORT, "light_prompt")
+                    ),
+                    support("Answer with: He fills it with ___.", (REPORT, "scaffold")),
                 ],
-                "exit_text": "可以先跳过这题。",
+                "exit_text": "Let's skip this one for now.",
                 "optional": False,
             },
             {
                 "task_id": "point-cup",
                 "dimension_id": SCIENCE,
                 "purpose": "point",
-                "prompt": "指一指你用的杯子，说说它是空的还是满的。",
-                "evidence": "只有实际报告可用。",
+                "prompt": "Point to the cup you used and say if it is empty or full.",
+                "evidence": "Only the real report counts.",
                 "acceptable_answers": [],
                 "known_incorrect": [],
                 "supports": [
-                    support("先说你看到了什么。", (SCIENCE, "light_prompt")),
-                    support("分开说杯子和里面的东西。", (SCIENCE, "scaffold")),
+                    support("First say what you saw.", (SCIENCE, "light_prompt")),
+                    support("Tell the cup and what is in it one by one.", (SCIENCE, "scaffold")),
                 ],
-                "exit_text": "没有杯子也可以如实说。",
+                "exit_text": "If you have no cup, just say so.",
                 "optional": False,
             },
             {
                 "task_id": "cup-experiment",
                 "dimension_id": SCIENCE,
                 "purpose": "offscreen",
-                "prompt": "离屏比较空杯和装水的杯子哪个重。回来报告做了什么、结果怎样。",
-                "evidence": "只有实际报告可用。",
+                "prompt": "Away from the screen, find out which is heavier: an empty cup or a cup "
+                "of water. Come back and tell what you did and what happened.",
+                "evidence": "Only the real report counts.",
                 "acceptable_answers": [],
                 "known_incorrect": [],
                 "supports": [
-                    support("先用中文说你做了什么。", (SCIENCE, "light_prompt")),
-                    support("分开报告材料、改变和结果。", (SCIENCE, "scaffold")),
+                    support("First say what you did.", (SCIENCE, "light_prompt")),
+                    support("Tell the things, the change and the result.", (SCIENCE, "scaffold")),
                 ],
-                "exit_text": "没有做也可以如实报告。",
+                "exit_text": "If you did not do it, just say so.",
                 "optional": True,
             },
         ],
         "read_aloud": False,
         "demand_mapping": [
-            {"index": item["index"], "implementation": "本课按离屏观察落实。", "task_ids": []}
+            {
+                "index": item["index"],
+                "implementation": "Done by the offscreen observation.",
+                "task_ids": [],
+            }
             for item in context["requirements"]
         ],
         "resources": [
             {
                 "resource_id": "cup-picture",
                 "kind": "image",
-                "purpose": "开场展示两个杯子",
-                "content": "一个空杯和一个装满水的杯子并排放着。",
+                "purpose": "Show two cups at the start",
+                "content": "An empty cup next to a cup full of water.",
                 "task_ids": ["cup-experiment"],
                 "audience": "student",
                 "required": False,
-                "fallback": "家长拿出实物杯子。",
+                "fallback": "Use two real cups.",
                 "stage": "question",
             }
         ],
         "preview": {
-            "story": "Sam's Cup（自编新材料）",
-            "why": "按需求先取实际观察报告。",
-            "materials": "两个一样的杯子和水。",
-            "help": "先中文报告，再用英语句框。",
-            "exit": "30分钟内可跳过、暂停或停止。",
+            "story": "Sam's Cup (new story)",
+            "why": "The need asks for a real observation report first.",
+            "materials": "Two same cups and water.",
+            "help": "Where to look first, then an English sentence frame.",
+            "exit": "You can skip, pause or stop.",
         },
         "brief": {
-            "history": "没有儿童历史，走无历史分支。",
-            "adjustments": "挑战只替换活动，可降阶、跳过、暂停或停止。",
-            "closing": "只总结实际报告；停止时简短结束。",
+            "history": "No history yet.",
+            "adjustments": "A challenge only replaces an activity; easier, skip, pause or stop.",
+            "closing": "Sum up only the real reports; end briefly on stop.",
         },
-        "note": "这节先用杯子做实际观察。",
+        "note": "This lesson starts with a real cup observation.",
         "limitations": [],
     }
     draft["tasks"] = [typed(task) for task in draft["tasks"]]
@@ -198,9 +205,13 @@ def test_rejected_twice_saves_nothing_and_reports_not_ready(application, monkeyp
     result = asyncio.run(next_course(application, "next1", LEARNER, activity))
     package = result["next_package"]
     assert package["status"] == "not_ready"
-    assert package["reason"].startswith("课程未取得（规则核对未通过：cup-fact的依据不在故事原文中")
+    assert package["reason"].startswith(
+        "The lesson could not be made (the rules found problems: cup-fact: the evidence"
+    )
     assert counts(application) == before
-    with pytest.raises(PreparationUnavailable, match="^课程未取得（规则核对未通过"):
+    with pytest.raises(
+        PreparationUnavailable, match=r"^The lesson could not be made \(the rules found problems"
+    ):
         asyncio.run(application.prepare("p2", LEARNER))
 
 
@@ -213,7 +224,10 @@ def test_preparation_failure_keeps_demand_and_retries(application, caplog):
         name = advance(application, LEARNER)
         await wait_jobs(application)
         reason = application.job_failures[name]
-        assert reason == "课程未取得（模型暂不可用）。下节需求已保存，可以重试。"
+        assert reason == (
+            "The lesson could not be made (the model is not available now). "
+            "The next lesson's plan is saved; you can try again."
+        )
         assert application.current(LEARNER, "demand").ref == demand.ref
         retry(application, LEARNER, name)
         await wait_jobs(application)
@@ -241,7 +255,9 @@ def revised(context):
     draft = science_draft(context)
     if "feedback" in context:
         draft["tasks"][0]["prompt"] = "What is in the cup?"
-        draft["note"] = "第一题改得更直接；离屏实验原本就用杯子，未改。"
+        draft["note"] = (
+            "The first question is more direct now; the offscreen test already used cups."
+        )
     return draft
 
 
@@ -260,7 +276,7 @@ def start(application, course_ref, request_id="start2"):
 def test_new_goals_are_prepared_confirmed_and_started(application, monkeypatch, caplog):
     course_ref = science_lesson(application, monkeypatch)
     caplog.set_level(logging.INFO, logger="project_j")
-    with pytest.raises(Conflict, match="^课程未确认"):
+    with pytest.raises(Conflict, match="^Confirm the lesson first"):
         start(application, course_ref, "s2")
     started = asyncio.run(application.confirm_and_start("s3", LEARNER, course_ref, True))
     assert started["decision"] == "allow_simulation"
@@ -291,7 +307,10 @@ def test_discussion_creates_a_new_version(application, monkeypatch, caplog):
     )
     preview = application.store.read(ref(result["preview_ref"]), LEARNER)
     assert preview.body["discussion"] == [
-        {"feedback": FEEDBACK, "note": "第一题改得更直接；离屏实验原本就用杯子，未改。"}
+        {
+            "feedback": FEEDBACK,
+            "note": "The first question is more direct now; the offscreen test already used cups.",
+        }
     ]
     assert preview.body["confirmation"] is None
     assert application.current(LEARNER, "demand").ref == demand
@@ -303,10 +322,10 @@ def test_discussion_requires_a_new_confirmation(application, monkeypatch):
     course_ref = science_lesson(application, monkeypatch)
     application.confirm("c1", LEARNER, course_ref)
     result = asyncio.run(application.discuss("d1", LEARNER, course_ref, FEEDBACK))
-    with pytest.raises(Conflict, match="课程已有更新版本"):
+    with pytest.raises(Conflict, match="has a newer version"):
         start(application, course_ref)
     newer = ref(result["course_ref"])
-    with pytest.raises(Conflict, match="课程未确认"):
+    with pytest.raises(Conflict, match="Confirm the lesson first"):
         start(application, newer, "start3")
     application.confirm("c2", LEARNER, newer)
     assert start(application, newer, "start4")["decision"] == "allow_simulation"
@@ -316,7 +335,7 @@ def test_discussion_on_an_old_version_is_refused(application, monkeypatch):
     course_ref = science_lesson(application, monkeypatch)
     asyncio.run(application.discuss("d1", LEARNER, course_ref, FEEDBACK))
     before = calls(application)
-    with pytest.raises(Conflict, match="课程已有更新版本"):
+    with pytest.raises(Conflict, match="has a newer version"):
         asyncio.run(application.discuss("d2", LEARNER, course_ref, "再改一次。"))
     assert calls(application) == before
 
@@ -338,7 +357,10 @@ def test_failed_discussion_keeps_the_version(application, monkeypatch):
             },
         )
     assert failed.status_code == 503
-    assert failed.json()["message"] == "修改未取得（模型暂不可用）。原课程版本不变，可以重试。"
+    assert failed.json()["message"] == (
+        "The change could not be made (the model is not available now). "
+        "The earlier lesson version stays; you can try again."
+    )
     assert application.store.current(course_ref.object_id, LEARNER).ref == course_ref
     assert start(application, course_ref)["decision"] == "allow_simulation"
 
@@ -380,10 +402,10 @@ def reading_draft(context, skip=()):
         "acceptable_answers": ["water", "He fills it with water."],
         "known_incorrect": ["milk"],
         "supports": [
-            support("找到fills这个词，看它后面是什么。", (READING, "light_prompt")),
-            support("用句框回答：He fills it with ___.", (REPORT, "scaffold")),
+            support('Find the word "fills". What comes after it?', (READING, "light_prompt")),
+            support("Answer with: He fills it with ___.", (REPORT, "scaffold")),
         ],
-        "exit_text": "可以先跳过这题。",
+        "exit_text": "Let's skip this one for now.",
         "optional": False,
     }
     report = answer | {
@@ -394,8 +416,8 @@ def reading_draft(context, skip=()):
         "acceptable_answers": ["He poured the water into a bowl."],
         "known_incorrect": ["He pour the water into a bowl."],
         "supports": [
-            support("看pours这一句。", (REPORT, "light_prompt")),
-            support("用过去式说：He ___ the water into a bowl.", (REPORT, "scaffold")),
+            support('Look at the sentence with "pours".', (REPORT, "light_prompt")),
+            support("Say it in the past: He ___ the water into a bowl.", (REPORT, "scaffold")),
         ],
     }
     # A short observation: a practice lesson would need three task types and 20 minutes.
@@ -405,7 +427,7 @@ def reading_draft(context, skip=()):
         "resources": [],
     }
     draft["demand_mapping"] = [
-        {"index": item["index"], "implementation": "本课落实。", "task_ids": ["cup-pour"]}
+        {"index": item["index"], "implementation": "Done in this lesson.", "task_ids": ["cup-pour"]}
         for item in context["requirements"]
         if item["field"] not in skip
     ]
@@ -467,7 +489,7 @@ def test_study_preparation_writes_by_interests_and_maps_the_chosen_skill(
     context = seen[0]
     assert context["library"] == [] and context["candidate"] is None and context["template"] is None
     assert context["recent_titles"] == []
-    assert context["demand"]["skill_focus"][0]["label"] == "一般过去时"
+    assert context["demand"]["skill_focus"][0]["label"] == "Past simple"
     assert context["demand"]["topic"] == "The Paper Bridge"
     assert ("topic", "The Paper Bridge") in [
         (item["field"], item["requirement"]) for item in context["requirements"]

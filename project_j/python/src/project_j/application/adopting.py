@@ -9,6 +9,7 @@ from project_j.application.ledger import Step
 from project_j.application.progress import lesson_score_summary
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.corrections import release_rechecked
+from project_j.english import chinese
 from project_j.learning.adoption import adopt_state
 from project_j.learning.catalog import Capability, define
 from project_j.learning.contracts import DemandBody, LearningState
@@ -97,6 +98,9 @@ class Adopting:
             if not result.ok:
                 log.warning("planning activity=%s failure=%s", activity_id, result.failure)
                 raise PlanningUnavailable(result.failure)
+            if chinese(result.output.model_dump()):
+                log.warning("planning activity=%s failure=language", activity_id)
+                raise PlanningUnavailable("language")
             week_before = plan
             try:
                 adjusted = week_plan_after(result.output, plan.body, known)
@@ -113,7 +117,10 @@ class Adopting:
                     )
                     objects.append(new_plan)
                     publications.append(
-                        publication(new_plan, f"授权内周计划小调整：{result.output.plan_reason}")
+                        publication(
+                            new_plan,
+                            f"Small weekly plan change within scope: {result.output.plan_reason}",
+                        )
                     )
                     plan = new_plan
                 data = apply_demand_draft(
@@ -158,7 +165,9 @@ class Adopting:
                 [obj, *objects],
                 source_revision=current_revision,
                 publications=(
-                    publication(obj, "规划模型提出、规则核对后的下节需求"),
+                    publication(
+                        obj, "Next demand proposed by the planning model, checked by the rules"
+                    ),
                     *publications,
                 ),
                 baselines=baselines,
@@ -209,7 +218,7 @@ class Adopting:
                         attempts=1,
                         execution="complete",
                         effect_refs=(old.ref,),
-                        required_input=("无变化：沿用当前有效状态。",),
+                        required_input=("No change: the current state stays in effect.",),
                     ),
                     replace_unfinished=True,
                 )
@@ -229,7 +238,12 @@ class Adopting:
                     "state",
                     [obj],
                     source_revision=current_revision,
-                    publications=(publication(obj, "只采用评价支持维度，保持未知"),),
+                    publications=(
+                        publication(
+                            obj,
+                            "Only the dimensions the evaluation supports; the rest stay unknown",
+                        ),
+                    ),
                     baselines=(old.ref,),
                 )
         state = state[0]
@@ -285,7 +299,11 @@ class Adopting:
                     "demand",
                     [obj],
                     source_revision=current_revision,
-                    publications=(publication(obj, "按更正后的状态复核需求，不重新规划"),),
+                    publications=(
+                        publication(
+                            obj, "Demand rechecked against the corrected state; no replanning"
+                        ),
+                    ),
                     baselines=(demand.ref, state.ref),
                 )
             demand = saved[0]
@@ -314,7 +332,7 @@ class Adopting:
             raise ValueError("choice must be accept or reject")
         demand = self.current(learner_id, "demand")
         if demand.ref != demand_ref or demand.body.get("goal_confirmation") != "needed":
-            raise Conflict("这个目标已不是等你确认的版本。", demand.ref)
+            raise Conflict("This goal is no longer the version waiting for you.", demand.ref)
         body = DemandBody.model_validate(demand.body)
         operation = self.request(
             request_id,
@@ -340,7 +358,9 @@ class Adopting:
                             subject=item.dimension_id.rsplit(".", 1)[0],
                             name=item.name,
                             definition=item.definition,
-                            limitations=("规划提出、学生确认；定义不构成学习观察或掌握。",),
+                            limitations=(
+                                "Planned and confirmed; a definition is not an observation.",
+                            ),
                         ),
                     )
                 decided = body.model_copy(update={"goal_confirmation": "confirmed"})
@@ -361,7 +381,10 @@ class Adopting:
                 [obj],
                 publications=(
                     publication(
-                        obj, "学生确认新目标" if choice == "accept" else "学生不同意换目标"
+                        obj,
+                        "The student accepted the new goal"
+                        if choice == "accept"
+                        else "The student kept the old goal",
                     ),
                 ),
                 baselines=(demand.ref,),
@@ -397,7 +420,7 @@ class Adopting:
             return completed
         demand = self.current(learner_id, "demand")
         if demand.ref != demand_ref or demand.body.get("topic"):
-            raise Conflict("这一版需求已不需要选择，请刷新。", demand.ref)
+            raise Conflict("This plan no longer needs a choice. Please refresh.", demand.ref)
         chosen = DemandBody.model_validate(
             demand.body
             | {
@@ -432,7 +455,9 @@ class Adopting:
                 learner_id,
                 "demand",
                 [obj],
-                publications=(publication(obj, "学生选择本课题材与加强项目"),),
+                publications=(
+                    publication(obj, "The student chose the topic and skills for this lesson"),
+                ),
                 baselines=(demand.ref,),
             )
         listed = chosen.topic in {item.title for item in chosen.topic_suggestions}
@@ -480,11 +505,14 @@ class Adopting:
         if not result.ok:
             raise PlanningUnavailable(result.failure)
         draft = result.output
+        if chinese(draft.model_dump()):
+            log.warning("planning activity=%s failure=language", evaluation.body["activity_id"])
+            raise PlanningUnavailable("language")
         if (draft.primary_goal.dimension_id, draft.auxiliary_goal.dimension_id) != (
             previous.primary_goal.dimension_id,
             previous.auxiliary_goal.dimension_id,
         ):
-            raise PlanningUnavailable("没有沿用原目标")
+            raise PlanningUnavailable("the goals were not kept")
         known = {item["dimension_id"] for item in catalog}
         kept = apply_demand_draft(
             draft,

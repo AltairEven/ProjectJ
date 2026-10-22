@@ -12,18 +12,18 @@ const evaluation = activity => ({ object_id: `e-${activity}`, revision: 1, kind:
 
 test('each course has one row, newest first, with its state from the saved objects', () => {
   const objects = [
-    course('c1', 1, '2026-10-01', '已评价的课'), preview('p1', ref('c1', 1), true), fact('a1', ref('c1', 1)), evaluation('a1'),
-    course('c2', 1, '2026-10-02', '上过的课'), preview('p2', ref('c2', 1), true), fact('a2', ref('c2', 1)),
-    course('c3', 2, '2026-10-03', '确认过的课'), preview('p3', ref('c3', 2), true),
-    course('c4', 3, '2026-10-04', '等确认的课'), preview('p4', ref('c4', 3), false),
-    course('c5', 2, '2026-10-05', '还在改的课'), preview('p5', ref('c5', 1), false),
+    course('c1', 1, '2026-10-01', 'An evaluated lesson'), preview('p1', ref('c1', 1), true), fact('a1', ref('c1', 1)), evaluation('a1'),
+    course('c2', 1, '2026-10-02', 'A taken lesson'), preview('p2', ref('c2', 1), true), fact('a2', ref('c2', 1)),
+    course('c3', 2, '2026-10-03', 'A confirmed lesson'), preview('p3', ref('c3', 2), true),
+    course('c4', 3, '2026-10-04', 'A lesson to confirm'), preview('p4', ref('c4', 3), false),
+    course('c5', 2, '2026-10-05', 'A lesson being changed'), preview('p5', ref('c5', 1), false),
   ]
   assert.deepEqual(courseRows(objects).map(row => [row.object_id, row.revision, row.title, row.state]), [
-    ['c5', 2, '还在改的课', '备课中'],
-    ['c4', 3, '等确认的课', '等你确认'],
-    ['c3', 2, '确认过的课', '待上课'],
-    ['c2', 1, '上过的课', '已上'],
-    ['c1', 1, '已评价的课', '已评价'],
+    ['c5', 2, 'A lesson being changed', 'Being made'],
+    ['c4', 3, 'A lesson to confirm', 'Waiting for you'],
+    ['c3', 2, 'A confirmed lesson', 'Ready'],
+    ['c2', 1, 'A taken lesson', 'Taken'],
+    ['c1', 1, 'An evaluated lesson', 'Evaluated'],
   ])
 })
 

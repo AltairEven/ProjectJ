@@ -63,7 +63,7 @@ ERRORS = {
 }
 # Startup, transport and SDK failures; their text may carry account details: keep the kind only.
 RUNTIME_ERRORS = (CodexError, OSError, RuntimeError)
-LOGIN_HINT = "未登录，请运行 project-j-init login codex"
+LOGIN_HINT = "Not signed in; run project-j-init login codex"
 # Each call stands alone: no memories or history kept; no project docs, web search, analytics,
 # apps, plugins or skills, and as little built-in context as the runtime allows.
 OVERRIDES = (
@@ -324,7 +324,7 @@ class CodexAdapter:
     async def probe(
         self, model: str, efforts: tuple[Effort, ...], tiers: tuple[Tier, ...] = ()
     ) -> CapabilityReport:
-        items = {"audio": ProbeItem(status="not_probed", detail="语音另行设计")}
+        items = {"audio": ProbeItem(status="not_probed", detail="voice is handled elsewhere")}
         calls: list[dict] = []
         rest = ("model", "structured_output", "tools", "cancellation", "image_input")
         rest = (*rest, *(f"effort:{e}" for e in efforts), *(f"tier:{t}" for t in tiers))
@@ -334,18 +334,21 @@ class CodexAdapter:
         except RUNTIME_ERRORS:
             account, listed = None, None
         if account is None or account.account is None:
-            detail = "Codex 运行时无法启动" if account is None else LOGIN_HINT
+            detail = "the Codex runtime cannot start" if account is None else LOGIN_HINT
             items["auth"] = ProbeItem(status="failed", detail=detail)
             items.update(
-                {name: ProbeItem(status="not_probed", detail="鉴权未通过") for name in rest}
+                {name: ProbeItem(status="not_probed", detail="sign-in failed") for name in rest}
             )
             return self.report(model, items, calls)
-        items["auth"] = ProbeItem(status="verified", detail="ChatGPT 订阅登录")
+        items["auth"] = ProbeItem(status="verified", detail="ChatGPT subscription sign-in")
         entry = next((m for m in listed.data if model in {m.id, m.model}), None)
         items["model"] = (
-            ProbeItem(status="verified", detail="订阅模型列表包含；每次实际模型返回未标明")
+            ProbeItem(
+                status="verified",
+                detail="in the subscription model list; each reply does not name its model",
+            )
             if entry
-            else ProbeItem(status="failed", detail="订阅模型列表不含该模型")
+            else ProbeItem(status="failed", detail="not in the subscription model list")
         )
         supported = (
             {o.reasoning_effort.value for o in entry.supported_reasoning_efforts or []}
@@ -355,9 +358,14 @@ class CodexAdapter:
         offered = {t.id for t in entry.service_tiers or []} if entry else set()
         for tier in tiers:
             items[f"tier:{tier}"] = (
-                ProbeItem(status="unverified", detail="订阅列表声明支持；实际层级返回未标明")
+                ProbeItem(
+                    status="unverified",
+                    detail="the list says supported; replies do not name their tier",
+                )
                 if SERVICE_TIERS[tier] in offered
-                else ProbeItem(status="unsupported", detail="订阅模型列表未声明该层级")
+                else ProbeItem(
+                    status="unsupported", detail="the model list does not offer this tier"
+                )
             )
         broken, tool_checks = None, []
         for effort in efforts:
@@ -377,22 +385,27 @@ class CodexAdapter:
             broken = broken or reply.failure
             tool_checks.append(reply.actual.get("tools"))
             items[f"effort:{effort}"] = (
-                ProbeItem(status="unverified", detail="列表声明支持；实际档位返回未标明")
+                ProbeItem(
+                    status="unverified",
+                    detail="the list says supported; replies do not name their effort",
+                )
                 if effort in supported
-                else ProbeItem(status="unsupported", detail="订阅模型列表未声明该档位")
+                else ProbeItem(
+                    status="unsupported", detail="the model list does not offer this effort"
+                )
             )
         items["structured_output"] = (
             ProbeItem(status="failed", detail=FAILURE_TEXT.get(broken, broken))
             if broken
-            else ProbeItem(status="verified", detail="严格结构")
+            else ProbeItem(status="verified", detail="strict format")
         )
         leaked = {c.actual for c in tool_checks if c is not None and c.status == "mismatch"}
         items["tools"] = (
-            ProbeItem(status="failed", detail=f"出现工具调用：{','.join(sorted(leaked))}")
+            ProbeItem(status="failed", detail=f"tool calls appeared: {','.join(sorted(leaked))}")
             if leaked
-            else ProbeItem(status="verified", detail="探测各轮未出现工具调用")
+            else ProbeItem(status="verified", detail="no tool calls in any probe round")
             if all(tool_checks)
-            else ProbeItem(status="unverified", detail="调用未完成")
+            else ProbeItem(status="unverified", detail="the call did not finish")
         )
         items["cancellation"] = await self.probe_cancel(model, efforts[0])
         items["image_input"] = await self.probe_image(model, efforts[0], calls)
@@ -408,8 +421,11 @@ class CodexAdapter:
             await job
         elapsed = round((time.perf_counter() - started) * 1000)
         if elapsed > 2000:
-            return ProbeItem(status="failed", detail=f"{elapsed}ms才收回")
-        return ProbeItem(status="verified", detail=f"已请求服务端中断，{elapsed}ms收回；计费未核实")
+            return ProbeItem(status="failed", detail=f"came back only after {elapsed}ms")
+        return ProbeItem(
+            status="verified",
+            detail=f"server stop requested; back in {elapsed}ms; billing not checked",
+        )
 
     async def probe_image(self, model: str, effort: Effort, calls: list[dict]) -> ProbeItem:
         image = base64.b64encode(solid_png()).decode()
@@ -428,7 +444,7 @@ class CodexAdapter:
         color = str(reply.data.get("color", ""))
         if "red" in color.casefold():
             return ProbeItem(status="verified")
-        return ProbeItem(status="failed", detail=f"识别为{color}")
+        return ProbeItem(status="failed", detail=f"seen as {color}")
 
     def report(
         self, model: str, items: dict[str, ProbeItem], calls: list[dict]

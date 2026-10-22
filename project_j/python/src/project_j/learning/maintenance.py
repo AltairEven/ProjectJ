@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 from project_j.application.documents import document, identity, publication, successor
 from project_j.contracts import RevisionRef
+from project_j.english import chinese
 from project_j.learning.contracts import DemandBody, PlanBody
 from project_j.learning.planning import (
     PlanningUnavailable,
@@ -72,8 +73,11 @@ async def review(
         )
         if not reply.ok:
             log.warning("review level=%s failure=%s", level, reply.failure)
-            raise PlanningUnavailable(reply.failure, "复盘")
+            raise PlanningUnavailable(reply.failure, "plan review")
         draft = reply.output
+        if chinese(draft.model_dump()):
+            log.warning("review level=%s failure=language", level)
+            raise PlanningUnavailable("language", "plan review")
         adjusted, pending, checks = apply_review_draft(
             level, draft, plan.body, {item["dimension_id"] for item in catalog}
         )
@@ -103,13 +107,17 @@ async def review(
             sources=tuple(e.ref for e in evaluations),
         )
         objects = [obj]
-        publications = [publication(obj, "复盘复用原证据，不新增活动")]
+        publications = [
+            publication(obj, "The review reuses the original evidence; no new activity")
+        ]
         if adjusted:
             new_plan = successor(
                 plan, operation, adjusted, refs=plan.dependency_refs, sources=(obj.ref,)
             )
             objects.append(new_plan)
-            publications.append(publication(new_plan, f"授权内周计划小调整：{draft.reason}"))
+            publications.append(
+                publication(new_plan, f"Small weekly plan change within scope: {draft.reason}")
+            )
         saved = app.save_step(
             operation,
             learner_id,
@@ -142,14 +150,17 @@ async def review(
                     "plan_ref": plan.ref.model_dump(),
                     "state_ref": state.ref.model_dump(),
                     "patch": patch,
-                    "reason": "重要计划变化须对具体版本决定。" if parents else draft.reason,
-                    "impact": "保留既有有效安排，接受后仍需保存与后续需求/课程复核。"
+                    "reason": "A big plan change needs a decision on a given version."
+                    if parents
+                    else draft.reason,
+                    "impact": "The current plan stays; after you accept, the next plan "
+                    "and lesson are checked again."
                     if parents
                     else draft.impact,
-                    "alternatives": ["沿用原安排", "取得更多依据后修改方案"]
+                    "alternatives": ["Keep the current plan", "Change it after more evidence"]
                     if parents
-                    else list(draft.alternatives) or ["沿用原安排"],
-                    "review_condition": "基线或重要条件变化时待重新确认。",
+                    else list(draft.alternatives) or ["Keep the current plan"],
+                    "review_condition": "Confirm again if the plan or important conditions change.",
                 },
                 refs=(plan.ref, state.ref, saved[0].ref),
             )
@@ -158,7 +169,9 @@ async def review(
                 learner_id,
                 "decision",
                 [obj],
-                publications=(publication(obj, "具体方案待决定，不改变原计划"),),
+                publications=(
+                    publication(obj, "The proposal waits for a decision; the plan stays as it is"),
+                ),
             )
         result["decision_ref"] = decision[0].ref.model_dump()
     log.info(
@@ -210,7 +223,7 @@ def decide(app, request_id: str, learner_id: str, decision_ref: RevisionRef, cho
             learner_id,
             "decision",
             [obj],
-            publications=(publication(obj, "保存绑定版本的学生决定"),),
+            publications=(publication(obj, "The student's decision, bound to the exact versions"),),
         )
     result = {
         "decision_ref": decided[0].ref.model_dump(),
@@ -237,7 +250,12 @@ def decide(app, request_id: str, learner_id: str, decision_ref: RevisionRef, cho
                 learner_id,
                 "plan",
                 [obj],
-                publications=(publication(obj, "接受不等于生效；此步保存后才生效"),),
+                publications=(
+                    publication(
+                        obj,
+                        "Accepting is not taking effect; it takes effect once this step is saved",
+                    ),
+                ),
                 baselines=(plan_ref, state_ref),
             )
         result.update(
@@ -283,7 +301,7 @@ def revise_demand_after_plan(app, request_id: str, learner_id: str):
             learner_id,
             "demand",
             [obj],
-            publications=(publication(obj, "以已保存计划复核需求"),),
+            publications=(publication(obj, "Demand rechecked against the saved plan"),),
             baselines=(state.ref, plan.ref, old.ref),
         )
     return app.ledger.finish(operation, learner_id, {"demand_ref": saved[0].ref.model_dump()})

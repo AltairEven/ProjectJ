@@ -56,16 +56,18 @@ def seconds(audio: bytes) -> float | None:
 
 def judge(samples: dict) -> list[str]:
     reasons = [
-        f"{SAMPLE_LABELS[name]}未取得评分"
+        f"{name} sample got no score"
         for name in ("correct", "misread")
         if samples.get(name, {}).get("status") != "scored"
     ]
     if reasons:
         return reasons
     if flagged := samples["correct"]["flagged"]:
-        reasons.append("正确朗读出现误报：" + "、".join(flagged))
+        reasons.append("the correct reading was flagged: " + ", ".join(flagged))
     if (flagged := samples["misread"]["flagged"]) != ["bridge"]:
-        reasons.append("故意读错的bridge未标出或有其他误报：" + ("、".join(flagged) or "无标出"))
+        reasons.append(
+            "the misread bridge was not flagged alone: " + (", ".join(flagged) or "none flagged")
+        )
     return reasons
 
 
@@ -93,7 +95,7 @@ async def probe(
     try:
         ready = await scorer.start()
     except ScorerUnavailable as error:
-        record["reasons"] = [f"评分进程无法启动：{error}"]
+        record["reasons"] = [f"the scorer process cannot start: {error}"]
         LocalScorer.save_init(root, record)
         return record
     record |= {"identity": LocalScorer.identity(ready), "device": ready.get("device")}
@@ -104,7 +106,9 @@ async def probe(
             try:
                 audio = synth(text)
             except OSError, subprocess.CalledProcessError:
-                record["reasons"].append("无法生成探针样本（需要macOS语音Samantha）")
+                record["reasons"].append(
+                    "cannot make the probe samples (needs the macOS voice Samantha)"
+                )
                 break
             scorer.last_stats = {}
             result = await scorer.score(audio, REFERENCES[name])

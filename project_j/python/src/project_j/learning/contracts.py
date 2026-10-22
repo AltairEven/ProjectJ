@@ -99,19 +99,19 @@ class ProposedCapability(Contract):
 
 # What the student may tick to train in the next lesson: id -> (group, name, hint for the model).
 SKILLS: dict[str, tuple[str, str, str]] = {
-    "verbs": ("词类", "动词", "实义动词的意思与搭配"),
-    "adjectives": ("词类", "形容词", "形容词的意思、位置与描述"),
-    "adverbs": ("词类", "副词", "副词修饰动作的方式、频率与程度"),
-    "nouns": ("词类", "名词单复数", "可数名词单复数与不可数名词"),
-    "prepositions": ("词类", "介词", "表示时间、地点与方向的介词"),
-    "articles": ("词类", "冠词", "a、an与the的用法"),
-    "present_simple": ("时态", "一般现在时", "习惯、事实与第三人称单数"),
-    "past_simple": ("时态", "一般过去时", "过去发生的事，规则与不规则动词过去式"),
-    "present_continuous": ("时态", "现在进行时", "be加动词ing表示正在进行"),
-    "future": ("时态", "将来时", "will与be going to表示将来"),
-    "present_perfect": ("时态", "现在完成时", "have/has加过去分词表示经历或结果"),
-    "comparatives": ("句型", "比较级与最高级", "比较两个或多个事物"),
-    "questions": ("句型", "疑问句", "一般疑问句与特殊疑问句的语序"),
+    "verbs": ("Word types", "Verbs", "What action words mean and go with"),
+    "adjectives": ("Word types", "Adjectives", "Words that describe, and where they go"),
+    "adverbs": ("Word types", "Adverbs", "How, how often and how much"),
+    "nouns": ("Word types", "One and many", "Plural nouns and nouns you cannot count"),
+    "prepositions": ("Word types", "Prepositions", "Words for time, place and direction"),
+    "articles": ("Word types", "A, an, the", "When to use a, an and the"),
+    "present_simple": ("Tenses", "Present simple", "Habits, facts, and he/she/it with -s"),
+    "past_simple": ("Tenses", "Past simple", "Things that happened; regular and irregular verbs"),
+    "present_continuous": ("Tenses", "Present continuous", "Be + -ing for what is happening now"),
+    "future": ("Tenses", "Future", "Will and be going to"),
+    "present_perfect": ("Tenses", "Present perfect", "Have/has + past participle"),
+    "comparatives": ("Sentences", "Comparing", "Bigger, the biggest"),
+    "questions": ("Sentences", "Questions", "Word order in yes/no and wh- questions"),
 }
 MAX_FOCUS = 3
 
@@ -185,7 +185,9 @@ def normalize_lexile(raw: str) -> str:
     """A Lexile measure as "650L" or "BR100L"; anything else is refused, never guessed."""
     value = re.sub(r"\s+", "", raw).upper()
     if not re.fullmatch(r"(BR)?\d{1,4}L", value):
-        raise ValueError("蓝思值写成“数字+L”（如650L）或“BR+数字+L”（如BR100L）")
+        raise ValueError(
+            "Write a Lexile as a number and L (like 650L) or BR, a number and L (like BR100L)"
+        )
     return value
 
 

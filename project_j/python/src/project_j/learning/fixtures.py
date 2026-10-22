@@ -11,9 +11,12 @@ from project_j.preparation.packages import (
 )
 
 PRIMARY_GOAL = Goal(
-    dimension_id="english.reading.facts", description="观察故事事实、顺序与文本依据"
+    dimension_id="english.reading.facts",
+    description="Find story facts, their order and the words that show them",
 )
-AUXILIARY_GOAL = Goal(dimension_id="english.speaking.report", description="用短英语报告实际结果")
+AUXILIARY_GOAL = Goal(
+    dimension_id="english.speaking.report", description="Report real results in short English"
+)
 
 
 def initialize(app, learner_id: str | None = None):
@@ -46,9 +49,9 @@ def initialize(app, learner_id: str | None = None):
                     task_scope=goal.description,
                     judgment="unknown",
                     help="unknown",
-                    material_condition="尚未观察",
+                    material_condition="Not observed yet",
                     observed_at=None,
-                    limitations=("初始未知状态，尚无学习样本。",),
+                    limitations=("Unknown at the start; no learning samples yet.",),
                 )
                 for goal in (
                     primary,
@@ -57,7 +60,7 @@ def initialize(app, learner_id: str | None = None):
                         (
                             Goal(
                                 dimension_id="english.speaking.pronunciation",
-                                description="英语朗读发音",
+                                description="Reading aloud",
                             ),
                         )
                         if app.onboarding
@@ -65,7 +68,7 @@ def initialize(app, learner_id: str | None = None):
                     ),
                     Goal(
                         dimension_id="science.observation.report",
-                        description="实际科学条件与结果报告",
+                        description="Report real science conditions and results",
                     ),
                 )
             ),
@@ -83,7 +86,7 @@ def initialize(app, learner_id: str | None = None):
             learner_id,
             "state",
             [obj],
-            publications=(publication(obj, "模拟初始未知状态"),),
+            publications=(publication(obj, "Simulated unknown start"),),
         )
     state = state[0]
     parent = None
@@ -97,10 +100,13 @@ def initialize(app, learner_id: str | None = None):
                 main_goal=primary,
                 budget_minutes=30,
                 basis_refs=(state.ref,),
-                verification="首次、帮助后、延迟保持与新材料分别观察，不预填成绩。",
-                exit_conditions="疲惫或停止则结束，不自动加时或产生补课债务。",
+                verification="First tries, tries after help, later recall and new material are "
+                "observed apart; no scores are filled in ahead.",
+                exit_conditions="End when tired or stopped; never add time or catch-up work.",
                 review_at=None,
-                limitations=("初始方向与近期安排，不预排每日课程。",),
+                limitations=(
+                    "A first direction and near-term plan; no daily lessons are planned ahead.",
+                ),
             )
             obj = document(
                 "plan",
@@ -115,7 +121,7 @@ def initialize(app, learner_id: str | None = None):
                 learner_id,
                 f"plan:{level}",
                 [obj],
-                publications=(publication(obj, "模拟计划检查与层次连接"),),
+                publications=(publication(obj, "Simulated plan check and links between levels"),),
             )
         parent = result[0]
     if app.onboarding:  # Profile and first demand come from onboarding.
@@ -132,13 +138,13 @@ def initialize(app, learner_id: str | None = None):
             ProfileBody(
                 confirmed=True,
                 lexile="500L",
-                background="模拟学习者：用于开发与测试。",
-                interests="故事、动手做小实验",
-                weekly_time="每周三次，每次30分钟",
-                focus="阅读找依据与短英语报告",
-                materials="纸、书和小车",
+                background="Simulated learner for development and tests.",
+                interests="Stories and small hands-on experiments",
+                weekly_time="Three times a week, 30 minutes each",
+                focus="Finding facts in reading and short English reports",
+                materials="Paper, books and a small car",
                 summarized=True,
-                limitations=("模拟学习资料，不是学习记录。",)
+                limitations=("Simulated profile, not a learning record.",)
                 if app.store.realm == "simulation"
                 else (),
             ),
@@ -148,7 +154,7 @@ def initialize(app, learner_id: str | None = None):
             learner_id,
             "profile",
             [obj],
-            publications=(publication(obj, "模拟学习资料"),),
+            publications=(publication(obj, "Simulated profile"),),
         )
     profile = profile[0]
     demand = app.saved_step(operation, learner_id, "demand")
@@ -161,12 +167,21 @@ def initialize(app, learner_id: str | None = None):
             primary_goal=primary,
             auxiliary_goal=auxiliary,
             budget_minutes=30,
-            prerequisites=("相关阅读、表达和材料经历未知，用短观察取样。",),
-            sampling_requirements=("保留未提示初答与帮助后新尝试。",),
-            help_requirements=("两次求助用不同指导；未知外部帮助不填独立。",),
-            offscreen_requirements="离屏停止采集，返回取得实际条件/结果报告。",
-            fallback="已核实不依赖声音评价的任务可使用文字模拟。",
-            gaps=("尚无学习样本，用短观察取样。",),
+            prerequisites=(
+                "Reading, speaking and hands-on experience are unknown; "
+                "short observations sample them.",
+            ),
+            sampling_requirements=(
+                "Keep the first answer without help and each new try after help.",
+            ),
+            help_requirements=(
+                "Two pleas get two different helps; "
+                "unknown outside help is never marked independent.",
+            ),
+            offscreen_requirements="Nothing is collected away from the screen; back here, the "
+            "student reports the real conditions and result.",
+            fallback="Checked tasks that do not need voice can be simulated in text.",
+            gaps=("No learning samples yet; short observations sample them.",),
             # The simulation's fixture lesson is the library's first story, nothing ticked.
             topic=COURSES[FIRST]["title"],
             skill_focus=(),
@@ -184,7 +199,7 @@ def initialize(app, learner_id: str | None = None):
             learner_id,
             "demand",
             [obj],
-            publications=(publication(obj, "模拟需求已复核"),),
+            publications=(publication(obj, "Simulated demand rechecked"),),
             baselines=(state.ref, parent.ref, profile.ref),
         )
     return app.ledger.finish(

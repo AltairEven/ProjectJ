@@ -48,7 +48,7 @@ def test_E2E11_out_of_bound_proposal_does_not_advance(application):
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
         before = core.task_index
         with pytest.raises(Conflict):
             core.approve(
@@ -66,7 +66,7 @@ def test_E2E11_out_of_bound_proposal_does_not_advance(application):
                 )
             )
         assert core.task_index == before and core.mode == "waiting_input"
-        assert core.snapshot()["actual_api"] == "未验证"
+        assert core.snapshot()["actual_api"] == "unverified"
 
     asyncio.run(scenario())
 
@@ -75,7 +75,7 @@ def test_stale_input_after_next_question_is_not_scored(application):
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
         old = application.adapter.binding()
         await answer(application, "a bridge")
         event = SubmittedInput(
@@ -102,7 +102,7 @@ def test_model_failure_keeps_original_input_and_does_not_advance(application):
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
         application.models.adapters["simulated"].fail_next = True
         result = await application.adapter.text("failure-input", "a bridge")
         assert result["ack"] == "failed"
@@ -115,7 +115,7 @@ def test_the_class_continues_past_thirty_minutes(application):
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "听到了。", "confirmation")
+        await answer(application, "Yes, I heard.", "confirmation")
         core.started_clock -= 31 * 60
         snapshot = core.snapshot()
         assert snapshot["activity_state"] == "running" and snapshot["elapsed_seconds"] > 30 * 60
@@ -224,7 +224,7 @@ def test_invalid_structured_proposal_retains_input_and_offers_clarification(
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
 
         monkeypatch.setattr(
             application.models.adapters["simulated"],

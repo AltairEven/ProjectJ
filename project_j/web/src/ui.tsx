@@ -22,21 +22,21 @@ export function useRun(refresh: () => Promise<void>) {
     catch (error) {
       const failure = error as RequestFailure
       failed.current = failure.unknown ? operation : null
-      setMessage(failure.detail && failure.detail !== failure.message ? `${failure.message}（${failure.detail}）` : failure.message)
+      setMessage(failure.detail && failure.detail !== failure.message ? `${failure.message} (${failure.detail})` : failure.message)
     }
     finally { setBusy(false); setDoing('') }
   }
   const status = <>
     {message && <div className="notice" role="alert">{message}</div>}
-    {busy && doing && <Progress label={`正在${doing}……`} />}
-    {failed.current && <button className="quiet" disabled={busy} onClick={() => void run(failed.current!)}>接续原操作</button>}
+    {busy && doing && <Progress label={`${doing}…`} />}
+    {failed.current && <button className="quiet" disabled={busy} onClick={() => void run(failed.current!)}>Try the same action again</button>}
   </>
   return { busy, run, setMessage, status }
 }
 
 export function Rows({ rows }: { rows: [string, unknown][] }) {
   return <dl className="rows">{rows.map(([label, value], index) =>
-    <div key={index}><dt>{label}</dt><dd>{value == null || value === '' ? '无' : show(value)}</dd></div>)}</dl>
+    <div key={index}><dt>{label}</dt><dd>{value == null || value === '' ? 'None' : show(value)}</dd></div>)}</dl>
 }
 
 /** A wait the student can see: the bar fills when the amount is known, otherwise it keeps moving. */

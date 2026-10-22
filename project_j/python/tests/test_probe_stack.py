@@ -48,6 +48,6 @@ def test_offline_preflight_lists_adapters_without_private_config_or_network():
     from project_j.probe import preflight
 
     result = preflight()
-    assert result["mode"] == "offline_preflight" and result["actual_api"] == "未验证"
+    assert result["mode"] == "offline_preflight" and result["actual_api"] == "unverified"
     assert {item["adapter"] for item in result["adapters"]} == {"simulated", "codex"}
     assert result["live_probe"] == "project-j-init probe"

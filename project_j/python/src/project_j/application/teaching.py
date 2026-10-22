@@ -38,18 +38,20 @@ class Teaching:
         course = CourseBody.model_validate(self.store.read(course_ref, learner_id).body)
         offscreen = any(task.purpose == "offscreen" for task in course.tasks)
         if offscreen and not materials_ready:
-            raise Conflict("这节课用到实物：备好后勾选“实物已备好”再开始。")
+            raise Conflict(
+                'This lesson uses real things. Get them ready, tick "Things are ready", then start.'
+            )
         if self.verification.get("result") != "pass":  # start() would refuse after resources
             log.info("start refused reason=unchecked_build")
-            raise Conflict("当前版本还没有通过登记检查：运行统一检查后再开课。")
+            raise Conflict("This version has not passed the checks. Run the checks, then start.")
         self.confirm(f"{request_id}:confirm", learner_id, course_ref)
         failed = await ready_resources(self, learner_id, course_ref, on_progress)
         if failed:
-            raise Conflict(f"资源未就绪：{'、'.join(failed)}。可以重试。")
+            raise Conflict(f"Resources not ready: {', '.join(failed)}. You can try again.")
         result = self.start(f"{request_id}:start", learner_id, course_ref, materials_ready)
         if result["decision"] != f"allow_{self.store.realm}":
-            reason = result.get("reason") or "、".join(result.get("missing", ()))
-            raise Conflict(f"本次不能开课：{reason}")
+            reason = result.get("reason") or ", ".join(result.get("missing", ()))
+            raise Conflict(f"The class cannot start: {reason}")
         return result
 
     def start(
@@ -94,12 +96,14 @@ class Teaching:
             reasons := self.scorer.reasons()
         ):
             raise ScorerNotReady(
-                "发音评分未就绪：" + "；".join(reasons) + "。请运行 project-j-scorer-init probe。"
+                "Pronunciation scoring is not ready: "
+                + "; ".join(reasons)
+                + ". Run project-j-scorer-init probe."
             )
         # Every class delivers Jane by voice; there is no text-only class mode yet.
         if reasons := self.synthesizer.reasons():
             raise SynthesizerNotReady(
-                "语音合成未就绪：" + "；".join(reasons) + "。请运行 project-j-tts-init probe。"
+                "Speech is not ready: " + "; ".join(reasons) + ". Run project-j-tts-init probe."
             )
         # Materials are asked for only when the course uses them; nobody is asked to accompany.
         if any(task.purpose == "offscreen" for task in data.tasks) and not materials_ready:
@@ -148,12 +152,13 @@ class Teaching:
         )
         if confirmed is None:
             log.info("start refused reason=unconfirmed")
-            raise Conflict("课程未确认：请先在本课安排里确认课程，确认后才能开始。")
+            raise Conflict("Confirm the lesson first; then the class can start.")
         recorded, visuals, missing, skipped = adopted(self, confirmed)
         if missing:
             log.info("start refused reason=resources_missing count=%d", len(missing))
             raise Conflict(
-                f"资源未就绪：{'、'.join(missing)}。请在本课安排里生成、查看并采用后再开始。"
+                f"Resources not ready: {', '.join(missing)}. Make, check and adopt them in the "
+                "lesson plan, then start."
             )
         operation = self.request(
             request_id,
@@ -178,7 +183,7 @@ class Teaching:
             {
                 "status": "checked",
                 "mode": "text_and_reading_recording",
-                "actual_voice": "未验证",
+                "actual_voice": "unverified",
                 "real_recording": "disabled" if self.scorer.simulated else "enabled",
             },
         )
@@ -338,7 +343,7 @@ class Teaching:
                 key,
                 core.learner_id,
                 [fact],
-                (publication(fact, "结束事实结构核对；无模型评价"),),
+                (publication(fact, "Sealed fact checked for structure; no model evaluation"),),
             )
         self.pending_seals.pop(core.activity_id, None)
         log.info(
@@ -425,5 +430,9 @@ class Teaching:
             key,
             core.learner_id,
             [updated],
-            (publication(updated, "后到技术交付回执追加修订；不重开教学"),),
+            (
+                publication(
+                    updated, "Late delivery receipt added as a revision; teaching not reopened"
+                ),
+            ),
         )

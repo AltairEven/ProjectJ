@@ -4,7 +4,7 @@ import { answerMode, emptyAnswer, fillParts, fillWord, ready, setBlank, tapCard,
 
 const choice = { type: 'choice', version: 1, variant: 'single', options: ['a', 'b', 'c'] }
 const order = { type: 'order', version: 1, variant: 'events', items: ['B', 'A', 'C'] }
-const match = { type: 'match', version: 1, left: ['bends', 'folds', 'smiles'], right: ['折', '掉下来', '弯了', '微笑'] }
+const match = { type: 'match', version: 1, left: ['bends', 'folds', 'smiles'], right: ['makes a crease', 'falls down', 'is not straight', 'looks happy'] }
 const bank = { type: 'fill', version: 1, variant: 'word_bank', text: 'She ___ her car on the ___.', blanks: 2, bank: ['paper', 'folds', 'puts'] }
 const free = { type: 'fill', version: 1, variant: 'free', text: 'She ___ her car.', blanks: 1, bank: null }
 

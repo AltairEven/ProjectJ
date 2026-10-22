@@ -26,7 +26,8 @@ def elapsed_ms(started: float) -> int:
 
 class LocalProcess:
     kind = ""  # Log name: scorer, synthesizer.
-    noun = ""  # 评分, 合成: what the student and the logs read.
+    noun = ""  # Scorer, Speech: what the student and the logs read.
+    cli_noun = ""  # 评分, 合成: what the terminal commands print.
     init_command = ""  # project-j-scorer-init, project-j-tts-init.
     models = init = binary = Path()
     identity_keys: tuple[str, ...] = ()
@@ -71,20 +72,23 @@ class LocalProcess:
         try:
             return json.loads(path.read_text())
         except OSError, ValueError:
-            return {"passed": False, "reasons": ["初始化记录无法读取"]}
+            return {"passed": False, "reasons": ["the setup record cannot be read"]}
 
     @classmethod
     def file_reasons(cls, root: Path) -> list[str]:
         manifest = root / cls.models / "manifest.json"
         if not manifest.is_file():
-            return [f"{cls.noun}模型未下载，请运行 {cls.init_command} download"]
+            return [f"{cls.noun} model not downloaded; run {cls.init_command} download"]
         record = cls.read_init(root)
         if record is None:
-            return [f"{cls.noun}器尚未探测，请运行 {cls.init_command} probe"]
+            return [f"{cls.noun} not probed yet; run {cls.init_command} probe"]
         if not record.get("passed"):
-            return [f"{cls.noun}探针未通过：" + "；".join(record.get("reasons") or ["原因未记录"])]
+            return [
+                f"{cls.noun} probe failed: "
+                + "; ".join(record.get("reasons") or ["no reason recorded"])
+            ]
         if record.get("manifest_sha256") != hashlib.sha256(manifest.read_bytes()).hexdigest():
-            return [f"{cls.noun}模型已改动，请重新运行 {cls.init_command} probe"]
+            return [f"{cls.noun} model changed; run {cls.init_command} probe again"]
         return []
 
     @classmethod
@@ -118,7 +122,9 @@ class LocalProcess:
                 start_new_session=True,
             )
         except OSError as error:
-            raise self.Unavailable(f"{self.noun}进程无法启动：{type(error).__name__}") from error
+            raise self.Unavailable(
+                f"{self.noun} process cannot start: {type(error).__name__}"
+            ) from error
         try:
             line = await asyncio.wait_for(self.process.stdout.readline(), self.start_timeout)
             ready = json.loads(line) if line else {"ready": False, "error": "exited"}
@@ -129,14 +135,14 @@ class LocalProcess:
         if not isinstance(ready, dict) or not ready.get("ready"):
             await self.close_process()
             ready = ready if isinstance(ready, dict) else {"error": "invalid_ready_line"}
-            detail = f"（{ready['detail']}）" if ready.get("detail") else ""
+            detail = f" ({ready['detail']})" if ready.get("detail") else ""
             log.warning(
                 "%s not ready error=%s detail=%s",
                 self.kind,
                 ready.get("error"),
                 ready.get("detail"),
             )
-            raise self.Unavailable(f"{self.noun}进程未就绪：{ready.get('error')}{detail}")
+            raise self.Unavailable(f"{self.noun} process not ready: {ready.get('error')}{detail}")
         self.ready, self.exited = ready, False
         self.model = f"{ready['model']}@{ready['revision']}"
         name, value = self.adopt(ready)
@@ -171,17 +177,17 @@ class LocalProcess:
     def reasons(self) -> list[str]:
         reasons = self.file_reasons(self.root)
         if self.ready is None:
-            reasons.append(f"{self.noun}进程未启动")
+            reasons.append(f"{self.noun} process not started")
         elif self.reviving and not self.reviving.done():
-            reasons.append(f"{self.noun}进程正在重新启动，请稍候")
+            reasons.append(f"{self.noun} process is restarting; please wait")
         elif self.exited or self.process is None or self.process.returncode is not None:
-            reasons.append(f"{self.noun}进程已退出")
+            reasons.append(f"{self.noun} process has stopped")
         else:
             record = self.read_init(self.root) or {}
             if record.get("identity") and record["identity"] != self.identity(self.ready):
                 reasons.append(
-                    f"{self.noun}器{self.identity_words}与探针记录不一致，"
-                    f"请重新运行 {self.init_command} probe"
+                    f"{self.noun}: the {self.identity_words} no longer matches the probe record; "
+                    f"run {self.init_command} probe again"
                 )
         return reasons
 
@@ -238,7 +244,7 @@ def init_main(
         binary = root / local.binary
         if not binary.exists():
             print(
-                f"{local.noun}子工程未安装，请先运行 "
+                f"{local.cli_noun}子工程未安装，请先运行 "
                 f"project_j/scripts/uv.sh sync --locked --project project_j/{subproject}"
             )
             return 1
@@ -252,16 +258,18 @@ def init_main(
         return code
     if args.command == "probe":
         record = asyncio.run(probe(root, local(root, command, inherit_stderr=True)))
-        print(f"{local.noun}探针通过。" if record["passed"] else f"{local.noun}探针未通过。")
+        print(
+            f"{local.cli_noun}探针通过。" if record["passed"] else f"{local.cli_noun}探针未通过。"
+        )
         show(record)
         return 0 if record["passed"] else 1
     if args.command == "status":
         if reasons := local.file_reasons(root):
-            print(f"{local.noun}器未就绪。")
+            print(f"{local.cli_noun}器未就绪。")
             for reason in reasons:
                 print(f"- {reason}")
             return 1
-        print(f"{local.noun}器已就绪。")
+        print(f"{local.cli_noun}器已就绪。")
         show(local.read_init(root))
         return 0
     return asyncio.run(run(root, command, args))

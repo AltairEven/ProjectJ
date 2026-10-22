@@ -204,11 +204,11 @@ export type Dashboard = {
     /**
      * Actual Api
      */
-    actual_api?: '未验证';
+    actual_api?: 'unverified';
     /**
      * Actual Voice
      */
-    actual_voice?: '未验证';
+    actual_voice?: 'unverified';
     /**
      * Verification
      */
@@ -976,11 +976,11 @@ export type Snapshot = {
     /**
      * Actual Api
      */
-    actual_api: '未验证';
+    actual_api: 'unverified';
     /**
      * Actual Voice
      */
-    actual_voice: '未验证';
+    actual_voice: 'unverified';
     /**
      * Recording
      */

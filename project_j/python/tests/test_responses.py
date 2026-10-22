@@ -70,7 +70,7 @@ def test_match_and_choice_and_fill_judging():
     right = positions_of(view["right"], ("弯了", "折", "微笑"))
     assert judge(match, {"pairs": right})
     assert not judge(match, {"pairs": [right[1], right[0], right[2]]})
-    assert describe(match, {"pairs": right}) == "bends = 弯了；folds = 折；smiles = 微笑"
+    assert describe(match, {"pairs": right}) == "bends = 弯了; folds = 折; smiles = 微笑"
 
     bank = fill_task().model_copy(
         update={
@@ -122,7 +122,7 @@ def test_fill_ignores_case_spacing_and_end_punctuation_only():
     ],
 )
 def test_malformed_responses_are_refused(make, response):
-    with pytest.raises(ValueError, match="作答格式不对"):
+    with pytest.raises(ValueError, match="doesn't fit this question"):
         judge(make(), response)
 
 

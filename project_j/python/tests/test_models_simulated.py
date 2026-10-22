@@ -24,10 +24,12 @@ def task(purpose="answer"):
         acceptable_simulated=("a bridge",),
         incorrect_simulated=("a car",),
         supports=(
-            Support(text="看看第二句。", help={"english.reading.facts": "light_prompt"}),
-            Support(text="她想要的是一座桥。", help={"english.reading.facts": "full_model"}),
+            Support(
+                text="Look at the second sentence.", help={"english.reading.facts": "light_prompt"}
+            ),
+            Support(text="She wants a bridge.", help={"english.reading.facts": "full_model"}),
         ),
-        exit_text="我们先跳过这一题。",
+        exit_text="Let's skip this one for now.",
     )
 
 
@@ -47,15 +49,16 @@ def test_answers_follow_the_fixed_simulated_sets(text, expected):
 
 
 def test_help_follows_support_order_then_exit_text():
-    assert judge("帮我", 0, True).text == "看看第二句。"
-    assert judge("帮我", 1, True).text == "她想要的是一座桥。"
-    assert judge("帮我", 2, True).text == "我们先跳过这一题。"
+    assert judge("Help me", 0, True).text == "Look at the second sentence."
+    assert judge("Help me", 1, True).text == "She wants a bridge."
+    assert judge("Help me", 2, True).text == "Let's skip this one for now."
     assert judge("帮我", 0, True).judgment == "help"
 
 
 def test_point_and_offscreen_reports_are_reported():
-    assert judge("我指了纸", purpose="point").judgment == "reported"
-    assert judge("折好了", purpose="offscreen").judgment == "reported"
+    assert judge("I pointed to the paper.", purpose="point").judgment == "reported"
+    assert judge("I folded it.", purpose="offscreen").judgment == "reported"
+    assert judge("我指了纸", purpose="point").judgment == "unclear"
 
 
 def test_classroom_request_carries_task_data_jane_method_and_goals_only():
@@ -126,7 +129,7 @@ def test_judgment_instructions_carry_the_reference_set_fixes():
     request = judgment_request(task(), "a car", 0, False, 10)
     assert "不说出evidence中能直接回答本题的词" in request.instructions
     assert "不再要求学生重说" in request.instructions
-    assert "不出现“依据”" in request.instructions
+    assert "不出现evidence、reference answer这类说法" in request.instructions
 
 
 def test_started_class_binds_the_course_jane_version(application):
@@ -195,3 +198,21 @@ def test_simulates_follows_the_purpose_binding():
     assert service.simulates("preparation") and service.simulates("evaluation")
     del service.bindings["evaluation"]
     assert not service.simulates("evaluation")  # no binding is never taken for a simulation
+
+
+def test_simulated_judgment_asks_for_english():
+    from project_j.english import ENGLISH_ONLY
+
+    for text in ("她想做一座桥", "She wants a 桥."):
+        reply = SimulatedAdapter().respond(judgment_request(task(), text, 0, False, 10))
+        assert reply["judgment"] == "unclear" and ENGLISH_ONLY in reply["text"]
+    reply = SimulatedAdapter().respond(judgment_request(task(), "a bridge", 0, False, 10))
+    assert reply["judgment"] == "correct"
+
+
+def test_judgment_instructions_ask_for_english():
+    from project_j.classroom.judgment import INSTRUCTIONS, OPEN_INSTRUCTIONS
+
+    assert "英文" in INSTRUCTIONS and "简短中文回应" not in INSTRUCTIONS
+    assert "Please answer in English." in INSTRUCTIONS
+    assert "中文、英文或中英混合都可以" not in OPEN_INSTRUCTIONS

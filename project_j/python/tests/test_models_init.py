@@ -136,7 +136,7 @@ def test_probe_asks_each_adapter_for_the_tiers_its_bindings_use(root, monkeypatc
     assert cli("probe") == 1  # the simulated report has no tier item
     assert seen == [("fast",)]
     out = capsys.readouterr().out
-    assert "simulated:simulated-jane:low:fast" in out and "Fast层级：未探测" in out
+    assert "simulated:simulated-jane:low:fast" in out and "Fast tier: not probed" in out
 
 
 def test_probe_records_admission_without_secrets_and_changes_invalidate(root, capsys):
@@ -149,7 +149,7 @@ def test_probe_records_admission_without_secrets_and_changes_invalidate(root, ca
     service.require()
     assert cli("status") == 0
     cli("configure", "--default", "simulated:simulated-jane:medium")
-    assert "已改动" in load_service(ModelFiles(root)).reasons("evaluation")[0]
+    assert "changed" in load_service(ModelFiles(root)).reasons("evaluation")[0]
     assert cli("status") == 1
 
 
@@ -172,7 +172,7 @@ def test_corrupt_config_reports_reason(root, capsys):
     root.mkdir(parents=True)
     (root / "config.json").write_text("{not json")
     assert cli("status") == 1
-    assert "配置文件无法读取" in capsys.readouterr().out
+    assert "cannot be read" in capsys.readouterr().out
 
 
 def test_codex_is_built_with_its_own_home_and_needs_no_key(root, capsys):

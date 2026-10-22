@@ -3,6 +3,7 @@
 import asyncio
 from datetime import UTC, datetime
 
+from project_j.english import ENGLISH_ONLY, chinese, han
 from project_j.platform.models.contracts import (
     AdapterReply,
     Binding,
@@ -25,6 +26,11 @@ SIMULATED_SVG = (
 
 def normalized(text: str) -> str:
     return text.casefold().strip().rstrip(".!。！")
+
+
+def english(answer: str) -> str:
+    """A simulated profile keeps an English chat answer; it cannot translate a Chinese one."""
+    return "Simulated: written in English from your chat answer." if chinese(answer) else answer
 
 
 class SimulatedAdapter:
@@ -55,7 +61,7 @@ class SimulatedAdapter:
                         if any(v not in {"none", "unknown"} for v in attempt["help"].values())
                         else "unknown",
                         "external_help": "unknown",
-                        "explanation": "模拟评价：按封存事实整理。",
+                        "explanation": "Simulated evaluation from the class record.",
                     }
                     for attempt in context["attempts"]
                 ],
@@ -69,30 +75,36 @@ class SimulatedAdapter:
                             for a in attempts
                         )
                         else 6,
-                        "reason": "模拟评分",
+                        "reason": "Simulated score",
                     }
                     for task_id, attempts in tries.items()
                 ],
-                "summary": "模拟评价：按封存事实与反馈整理，未调用真实模型。",
+                "summary": "Simulated evaluation of the class record; no real model was called.",
                 "strongest": [],
-                "uncertain": ["独立条件、保持与迁移未观察。"],
-                "alignment": "按实际已发生范围整理。",
+                "uncertain": ["Working alone, recall and transfer were not observed."],
+                "alignment": "Only what happened.",
             }
         if request.purpose == "preparation":
             if context.get("kind") == "animation":
-                return {"svg": SIMULATED_SVG, "description": "模拟动画：一个圆变大又变小。"}
+                return {
+                    "svg": SIMULATED_SVG,
+                    "description": "Simulated animation: a circle grows and shrinks.",
+                }
             if "feedback" in context:  # A discussion round keeps the course unchanged.
-                note = "模拟：已记录意见，未调用真实模型，课程内容不变。"
+                note = (
+                    "Simulated: your feedback is noted; no real model was called; the lesson "
+                    "is unchanged."
+                )
                 return context["previous"] | {"note": note}
             # The simulated model only reproduces the fixed library template.
             return context["template"]
         if request.purpose == "planning" and "chat" in context:
             return {
-                "background": "模拟整理：按建档聊天原话整理的学习目的与英语使用情况。",
-                "interests": context["chat"][1]["answer"],
-                "weekly_time": context["chat"][2]["answer"],
-                "focus": context["chat"][3]["answer"],
-                "note": "模拟：资料用于选故事难度与题材。",
+                "background": "Simulated summary of why you learn English and how you use it.",
+                "interests": english(context["chat"][1]["answer"]),
+                "weekly_time": english(context["chat"][2]["answer"]),
+                "focus": english(context["chat"][3]["answer"]),
+                "note": "Simulated: the profile picks story level and topics.",
             }
         if request.purpose == "planning" and "demand" in context:
             from project_j.learning.fixtures import AUXILIARY_GOAL, PRIMARY_GOAL
@@ -106,7 +118,7 @@ class SimulatedAdapter:
                 goals = fixed
             return {
                 "suggestion_action": "adopt",
-                "suggestion_reason": "模拟规划：在既定目标与30分钟预算内采用候选建议。",
+                "suggestion_reason": "Simulated plan: the suggestion fits the goals and the time.",
                 "direction": "consolidate",
                 "primary_goal": goals[0],
                 "auxiliary_goal": goals[1],
@@ -115,33 +127,37 @@ class SimulatedAdapter:
                 "help_requirements": suggestion["help"],
                 "offscreen_requirements": demand["offscreen_requirements"],
                 "fallback": demand["fallback"],
-                "gaps": ["保持、迁移、外部帮助与真实声音条件仍待观察。"],
+                "gaps": ["Recall, transfer, outside help and real voice are still to observe."],
                 "plan_effect": "reused",
-                "plan_reason": "沿用当前周计划：既定目标与预算未发生必要变化。",
+                "plan_reason": "The week plan stays: goals and time did not need to change.",
                 "plan_patch": None,
-                "goal_reason": "模拟规划：沿用当前两个目标。",
+                "goal_reason": "Simulated plan: the two goals stay.",
                 # The simulated preparation only reproduces the library, so it offers that story.
                 "topic_suggestions": [
-                    {"title": suggestion["material"]["title"], "reason": "模拟：课程库的下一课。"}
+                    {
+                        "title": suggestion["material"]["title"],
+                        "reason": "Simulated: the next library lesson.",
+                    }
                 ],
                 "note": {
-                    "before": "当前需求与周计划。",
-                    "after": "模拟规划：沿用目标并采纳候选建议。",
-                    "why": "按已保存评价与候选建议，未调用真实模型。",
-                    "uncertain": ["独立条件、保持与迁移未观察。"],
+                    "before": "The current plan and week plan.",
+                    "after": "Simulated plan: goals kept, suggestion adopted.",
+                    "why": "From the saved evaluation and suggestion; no real model was called.",
+                    "uncertain": ["Working alone, recall and transfer were not observed."],
                     "expectation": suggestion["sampling"][0],
                 },
             }
         if request.purpose == "planning":
             return {
-                "conclusion": "只汇总已有范围；日期和课时不产生完成或掌握。",
-                "unknown": ["保持、迁移及学习负担仍未知。"],
-                "next_review_condition": "取得新日期、材料或重要家庭条件后再复核。",
+                "conclusion": "Only what exists is summed up; hours do not mean done or mastered.",
+                "unknown": ["Recall, transfer and workload are still unknown."],
+                "next_review_condition": "Review again after new dates, materials or important "
+                "conditions.",
                 "plan_effect": "reused",
                 "patch": None,
-                "reason": "模拟复盘：依据不足以调整。",
-                "impact": "保留既有有效安排。",
-                "alternatives": ["沿用原安排"],
+                "reason": "Simulated review: not enough evidence to change.",
+                "impact": "The current plan stays.",
+                "alternatives": ["Keep the current plan"],
             }
         evidence = context["evidence"]
         if context["core_decided_help"]:  # The core decides help; the model only words it.
@@ -154,39 +170,54 @@ class SimulatedAdapter:
                 return {
                     "judgment": "unclear",
                     "evidence": evidence,
-                    "text": "这次没有取得评分，请再读一遍这一段。",
+                    "text": "No score came through. Please read this part again.",
                 }
             weak = [word["word"] for word in score["words"] if word["error"] != "none"]
             if not weak:
                 return {
                     "judgment": "correct",
                     "evidence": evidence,
-                    "text": "读得清楚完整，我们继续。",
+                    "text": "Clear and complete. Let's go on.",
                 }
             return {
                 "judgment": "incorrect",
                 "evidence": evidence,
-                "text": "这几个词再读一遍：" + "、".join(weak[:5]),
+                "text": "Read these words again: " + ", ".join(weak[:5]),
             }
+        if han(context["answer"]):  # The student answers in English only (ADR-0021).
+            return {"judgment": "unclear", "evidence": evidence, "text": ENGLISH_ONLY}
         answer = normalized(context["answer"])
         if context["task_purpose"] == "open":  # No single answer: three words or more will do.
             if len(context["answer"].split()) >= 3:
-                return {"judgment": "correct", "evidence": evidence, "text": "说得清楚，我们继续。"}
+                return {
+                    "judgment": "correct",
+                    "evidence": evidence,
+                    "text": "Clearly said. Let's go on.",
+                }
             return {
                 "judgment": "unclear",
                 "evidence": evidence,
-                "text": "再多说一点：" + context["guidance"],
+                "text": "Say a little more: " + context["guidance"],
             }
         if context["task_purpose"] in {"point", "offscreen"}:
             judgment = "reported"
-            text = "我收到这段报告；只按已报告条件记录，未观察的部分保留未知。"
+            text = (
+                "Thanks for the report. Only what you reported is recorded; anything not "
+                "seen stays unknown."
+            )
         elif answer in {normalized(item) for item in context["reference_answers"]}:
-            judgment, text = "correct", "这与本题的文本依据对应。我们继续下一项。"
+            judgment, text = "correct", "That matches the words in the story. Let's go on."
         elif answer in {normalized(item) for item in context["known_incorrect"]}:
             judgment = "incorrect"
-            text = "这个回答对应的对象或顺序与本题不一致。请回到题目的要求，再试一次。"
+            text = (
+                "That answer points to a different thing or order. Read the question again "
+                "and try once more."
+            )
         else:
-            judgment, text = "unclear", "我还不能确认你的意思，请补充你指的对象或依据。"
+            judgment, text = (
+                "unclear",
+                "I can't tell what you mean yet. Please say which thing or which words you mean.",
+            )
         return {"judgment": judgment, "evidence": evidence, "text": text}
 
     async def invoke(self, request: ModelRequest, binding: Binding) -> AdapterReply:
@@ -196,7 +227,7 @@ class SimulatedAdapter:
             return AdapterReply(data=None, failure="unavailable")
         media = ()
         if request.media == "image":
-            data = {"description": "模拟图片：一块纯色方块，未调用真实模型。"}
+            data = {"description": "Simulated picture: one plain square; no real model was called."}
             media = (solid_png(),)
         else:
             data = self.respond(request)
@@ -216,11 +247,13 @@ class SimulatedAdapter:
         )
 
     def report(self, model: str, efforts: tuple[Effort, ...]) -> CapabilityReport:
-        verified = ProbeItem(status="verified", detail="模拟")
+        verified = ProbeItem(status="verified", detail="simulated")
         items = {name: verified for name in ("auth", "model", "structured_output", "cancellation")}
         items |= {f"effort:{effort}": verified for effort in efforts}
-        items["image_input"] = ProbeItem(status="unsupported", detail="模拟适配器不处理图片")
-        items["audio"] = ProbeItem(status="not_probed", detail="语音另行设计")
+        items["image_input"] = ProbeItem(
+            status="unsupported", detail="the simulated adapter takes no pictures"
+        )
+        items["audio"] = ProbeItem(status="not_probed", detail="voice is designed separately")
         return CapabilityReport(
             adapter=self.adapter_id,
             adapter_version=self.version,

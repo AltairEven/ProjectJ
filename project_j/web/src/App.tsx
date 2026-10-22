@@ -39,12 +39,12 @@ function Shell({ token, page, detail }: { token: string, page: Page, detail?: st
     location.hash = params.toString()
   }
   if (classroom) return <Classroom token={token} onLeave={() => { if (active) left.current.add(active); setClassroom(false); go('home') }} />
-  if (!dashboard) return <main><p>{error || '正在读取……'}</p></main>
+  if (!dashboard) return <main><p>{error || 'Loading…'}</p></main>
   const onboarding = inOnboarding(dashboard)
   const shown: Page | 'onboarding' = onboarding ? 'onboarding' : page
   const View = views[shown]
   return <div className="shell">
-    <nav aria-label="栏目"><span className="brand">Project J<span className="tag">{dashboard.realm === 'study' ? '正式学习' : '模拟'}</span></span>
+    <nav aria-label="Sections"><span className="brand">Project J<span className="tag">{dashboard.realm === 'study' ? 'Study' : 'Simulation'}</span></span>
       {pages.map(([key, label]) => <button key={key} className={key === shown ? '' : 'quiet'} disabled={onboarding}
         aria-current={key === shown ? 'page' : undefined} onClick={() => go(key)}>{label}</button>)}</nav>
     <main>{error && <div className="notice" role="alert">{error}</div>}
@@ -63,5 +63,5 @@ export default function App() {
   const token = params.get('token')
   const page = pages.some(([key]) => key === params.get('page')) ? params.get('page') as Page : 'home'
   return token ? <Shell token={token} page={page} detail={params.get('detail') ?? undefined} />
-    : <main><h1>Project J</h1><p>请使用本机启动入口给出的链接。</p></main>
+    : <main><h1>Project J</h1><p>Please open the link the start command printed.</p></main>
 }

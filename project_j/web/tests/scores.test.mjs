@@ -3,8 +3,8 @@ import test from 'node:test'
 import { recentLine, scoreRows } from '../src/scores.ts'
 
 const objects = [
-  { object_id: 'c1', kind: 'course', body: { parent_preview: { story: 'The Paper Bridge（首课）' } } },
-  { object_id: 'cap', kind: 'capability', body: { dimension_id: 'english.reading.facts', name: '阅读事实与顺序' } },
+  { object_id: 'c1', kind: 'course', body: { parent_preview: { story: 'The Paper Bridge (first lesson)' } } },
+  { object_id: 'cap', kind: 'capability', body: { dimension_id: 'english.reading.facts', name: 'Reading facts and order' } },
 ]
 const lesson = (activity_id, occurred_at, by_type, by_dimension, unknown = 0) =>
   ({ activity_id, course_ref: { object_id: 'c1', revision: 1 }, occurred_at, by_type, by_dimension, unknown })
@@ -14,18 +14,18 @@ const scores = [
     { 'english.reading.facts': { average: 8, count: 5 } }, 1),
 ]
 
-test('each lesson reads newest first with Chinese type names, its story and unknowns apart', () => {
+test('each lesson reads newest first with type names, its story and unknowns apart', () => {
   const rows = scoreRows(scores, objects)
   assert.deepEqual(rows.map(row => row.key), ['a2', 'a1'])
-  assert.equal(rows[0].title, 'The Paper Bridge（首课）')
-  assert.equal(rows[0].types, '选择 9.0（3题）、精确问答 6.5（2题）；1题未知')
-  assert.equal(rows[0].dimensions, '阅读事实与顺序 8.0（5题）')
-  assert.equal(rows[1].types, '没有已知分数；2题未知')  // Never 0.
-  assert.match(rows[0].date, /^10月2[01]日$/)
+  assert.equal(rows[0].title, 'The Paper Bridge (first lesson)')
+  assert.equal(rows[0].types, 'Choose 9.0 (3 questions), Short answer 6.5 (2 questions); 1 question unknown')
+  assert.equal(rows[0].dimensions, 'Reading facts and order 8.0 (5 questions)')
+  assert.equal(rows[1].types, 'No known scores; 2 questions unknown')  // Never 0.
+  assert.match(rows[0].date, /^Oct 2[01], 2026$/)
 })
 
 test('the recent line pools the last five lessons by ability, question by question', () => {
   const more = [...scores, lesson('a3', '2026-10-22T12:00:00Z', {}, { 'english.reading.facts': { average: 5, count: 1 } })]
-  assert.equal(recentLine(more, objects), '最近3节课：阅读事实与顺序 7.5（6题）')
-  assert.equal(recentLine(scores.slice(0, 1), objects), '最近1节课：没有已知分数')
+  assert.equal(recentLine(more, objects), 'Last 3 lessons: Reading facts and order 7.5 (6 questions)')
+  assert.equal(recentLine(scores.slice(0, 1), objects), 'Last 1 lesson: No known scores')
 })

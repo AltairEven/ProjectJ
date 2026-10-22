@@ -29,11 +29,11 @@ def test_first_question_accepts_the_filled_sentence_frame_after_help(application
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
         await answer(application, "a car")
         assert core.task_index == 0 and core.attempts[0]["judgment"] == "incorrect"
-        await answer(application, "帮我一下", "help")
-        await answer(application, "还是不懂，帮我一下", "help")
+        await answer(application, "Help me", "help")
+        await answer(application, "I still don't understand. Help me.", "help")
         await answer(application, text)
         assert core.task_index == 1
         assert core.attempts[-1]["judgment"] == "correct"
@@ -51,18 +51,20 @@ def test_all_template_sentence_frames_and_saved_c2_follow_the_corrected_flow(app
     async def scenario():
         core = await start(app)
         deliver_all(core)
-        await answer(app, "收到", "confirmation")
+        await answer(app, "Got it.", "confirmation")
         await answer(app, "that thing")
         assert core.task_index == 0 and core.attempts[-1]["judgment"] == "unclear"
         await answer(app, "she wants a bridge")
         await answer(app, "She folded a new piece of paper.")
         assert core.task_index == 2
-        await answer(app, "我指的是折过的纸。", "report")
+        await answer(app, "I pointed to the folded paper.", "report")
         core.control("returned", "return")
         deliver_all(core)
-        await answer(app, "同一本书和同一辆车，纸折后车没有掉。", "report")
+        await answer(
+            app, "Same book and car; with the folded paper the car did not fall.", "report"
+        )
         await read_aloud_all(app)
-        await answer(app, "收到小结", "confirmation")
+        await answer(app, "Got it, the summary.", "confirmation")
         assert core.mode == "ended"
         fact = app.seal()
         app.feedback("feedback", LEARNER, core.activity_id, "明确模拟：无额外补充")
@@ -77,7 +79,7 @@ def test_all_template_sentence_frames_and_saved_c2_follow_the_corrected_flow(app
         )
         next_core = app.core
         deliver_all(next_core)
-        await answer(app, "收到", "confirmation")
+        await answer(app, "Got it.", "confirmation")
         await answer(app, "He first tries the small bus.")
         await answer(app, "The paper bends and the big bus falls.")
         assert next_core.task_index == 2
@@ -95,10 +97,10 @@ def test_wrong_phase_confirmation_is_not_an_attempt_and_cannot_cancel_judgment(a
     async def scenario():
         core = await start(app)
         deliver_all(core)
-        await answer(app, "收到", "confirmation")
+        await answer(app, "Got it.", "confirmation")
         revision, epoch, events = core.revision, core.epoch, len(core.events)
-        with pytest.raises(ValueError, match="当前不需要确认"):
-            await app.adapter.text("unexpected", "听到了，收到当前说明。", "confirmation")
+        with pytest.raises(ValueError, match="Nothing to confirm now"):
+            await app.adapter.text("unexpected", "Yes, I heard the plan.", "confirmation")
         assert not core.attempts and not judgments(app)
         assert (core.revision, core.epoch, len(core.events)) == (revision, epoch, events)
         assert "unexpected" not in core.inputs
@@ -107,8 +109,10 @@ def test_wrong_phase_confirmation_is_not_an_attempt_and_cannot_cancel_judgment(a
         await asyncio.sleep(0.005)
         assert core.mode == "judging"
         epoch = core.epoch
-        with pytest.raises(ValueError, match="当前不需要确认"):
-            await app.adapter.text("bad-supplement", "收到", "confirmation", "supplement", "answer")
+        with pytest.raises(ValueError, match="Nothing to confirm now"):
+            await app.adapter.text(
+                "bad-supplement", "Got it.", "confirmation", "supplement", "answer"
+            )
         assert core.epoch == epoch and core.mode == "judging"
         assert (await pending)["ack"] == "accepted"
         deliver_all(core)
@@ -125,15 +129,15 @@ def test_legal_confirmation_replays_and_closes_without_learning_attempts(applica
     async def scenario():
         core = await start(app)
         deliver_all(core)
-        await app.adapter.text("goal-receipt", "听到了，收到当前说明。", "confirmation")
+        await app.adapter.text("goal-receipt", "Yes, I heard the plan.", "confirmation")
         deliver_all(core)
-        assert (await app.adapter.text("goal-receipt", "听到了，收到当前说明。", "confirmation"))[
+        assert (await app.adapter.text("goal-receipt", "Yes, I heard the plan.", "confirmation"))[
             "ack"
         ] == "replayed"
         assert core.task_index == 0 and not core.attempts and not judgments(app)
         core.control("close", "close")
         deliver_all(core)
-        await app.adapter.text("closing-receipt", "收到小结", "confirmation")
+        await app.adapter.text("closing-receipt", "Got it, the summary.", "confirmation")
         assert core.mode == "ended" and core.end["reason"] == "normal"
         assert not core.attempts and not judgments(app)
         assert app.seal().body["attempts"] == []
@@ -169,7 +173,7 @@ def test_api_rejects_confirmation_at_answer_wait_without_a_model_call(applicatio
             json={"event_id": "wrong", "text": "收到", "intent": "confirmation"},
         )
         assert wrong.status_code == 400
-        assert "当前不需要确认" in wrong.json()["message"]
+        assert "Nothing to confirm now" in wrong.json()["message"]
         assert not app.core.attempts and not judgments(app)
         assert (
             client.post(
@@ -226,13 +230,13 @@ def test_api_accepts_a_base64_recording_only_on_a_reading_segment(application):
 
         deliver_all(core)
         assert recording("too-early", encoded("a bridge")).status_code in {400, 409, 422}
-        say("goal", "收到", "confirmation")
+        say("goal", "Got it.", "confirmation")
         say("q1", "a bridge")
         say("q2", "She folded it.")
-        say("point", "我指的是折过的纸。", "report")
+        say("point", "I pointed to the folded paper.", "report")
         core.control("return", "return")
         deliver_all(core)
-        say("offscreen", "第二次纸折了，车没有掉。", "report")
+        say("offscreen", "The second time the paper was folded and the car did not fall.", "report")
         asyncio.run(answer_clicked(app))
         reference = core.reading_task().reference_text
         silent = recording("silent", "")  # Ended without reading: an unknown score, not an error.

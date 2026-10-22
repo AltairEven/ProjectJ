@@ -21,7 +21,10 @@ def adopt_state(current: LearningState, evaluation: Document) -> StateBody:
         if previous and previous.observed_at and previous.observed_at > evaluation.occurred_at:
             # Re-reviewing an older lesson's corrected source never overwrites newer evidence.
             activity = evaluation.body["activity_id"]
-            note = f"较早活动{activity}的来源已更正并重审，本维度仍以较新证据为准。"
+            note = (
+                f"An earlier class ({activity}) was corrected and checked again; "
+                "newer evidence counts."
+            )
             if note not in previous.limitations:
                 previous = previous.model_copy(
                     update={"limitations": (*previous.limitations, note)}
@@ -42,21 +45,21 @@ def adopt_state(current: LearningState, evaluation: Document) -> StateBody:
         level = (
             max(known, key=HELP_ORDER.index) if known and len(known) == len(levels) else "unknown"
         )
-        names = "、".join(sorted({task["task_id"] for task in tasks}))
+        names = ", ".join(sorted({task["task_id"] for task in tasks}))
         # The stored state carries the partition; a just-made evaluation is not labelled yet.
-        source = "" if current.realm == "study" else "模拟"
+        source = "" if current.realm == "study" else "simulated "
         dimensions[dimension_id] = DimensionState(
             dimension_id=dimension_id,
-            task_scope=f"{source}任务{names}及当前材料条件",
+            task_scope=f"{source}tasks {names} with the current material",
             judgment=judgment,
             evidence_refs=(evaluation.ref,),
             help=level,
-            material_condition=f"当时课程的{source}使用条件",
+            material_condition=f"the {source}conditions of that lesson",
             observed_at=evaluation.occurred_at,
             retention=previous.retention if previous else None,
             transfer=previous.transfer if previous else None,
             limitations=tuple(sorted({item for task in tasks for item in task["limitations"]}))
-            + ("不因当堂正确填独立或长期掌握。",),
+            + ("Right in one class does not mean done alone or learned for good.",),
         )
     return StateBody(status="checked", dimensions=tuple(dimensions.values()))
 
@@ -71,7 +74,7 @@ def review_due(plans: list[Document], now: datetime) -> list[dict]:
                     "plan_ref": plan.ref.model_dump(),
                     "level": plan.body["level"],
                     "state": "due",
-                    "reason": "到期只形成待复盘事项，不是完成或能力进度。",
+                    "reason": "A due date only means a review is due, not that anything is done.",
                 }
             )
     return result

@@ -184,7 +184,7 @@ def test_reused_state_retry_keeps_newer_evidence_and_rechecks_demand(application
         )
         second = app.core
         deliver_all(second)
-        await answer(app, "收到", "confirmation")
+        await answer(app, "Got it.", "confirmation")
         await answer(app, second.course.tasks[second.task_index].acceptable_simulated[0])
         second.control("second-stop", "stop")
         app.seal()

@@ -34,7 +34,7 @@ def test_the_class_view_says_which_task_of_how_many(application):
         view = application.student_view(core)
         assert (view["task_index"], view["task_count"]) == (-1, total)  # the goal comes first
         deliver_all(core)
-        await answer(application, "听到了，先读故事。", "confirmation")
+        await answer(application, "Yes, I heard. Read the story first.", "confirmation")
         assert application.student_view(core)["task_index"] == 0
 
     asyncio.run(scenario())
@@ -130,7 +130,7 @@ def test_E2E03_stop_during_model_does_not_wait_or_deliver_late_result(applicatio
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
         application.models.adapters["simulated"].delay_seconds = 5
         work = asyncio.create_task(application.adapter.text("answer1", "a bridge"))
         await asyncio.sleep(0)
@@ -166,7 +166,7 @@ def test_parent_skip_works_while_the_model_is_slow_and_while_offscreen(applicati
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
         first = core.task_instance_id
         application.models.adapters["simulated"].delay_seconds = 5
         work = asyncio.create_task(application.adapter.text("slow-answer", "a bridge"))
@@ -179,10 +179,10 @@ def test_parent_skip_works_while_the_model_is_slow_and_while_offscreen(applicati
         application.models.adapters["simulated"].delay_seconds = 0
         deliver_all(core)
         await answer(application, "She folded it.")
-        await answer(application, "我指的是折过的纸。")
+        await answer(application, "I pointed to the folded paper.")
         assert core.mode == "offscreen"
         # The offscreen action names its own budget and the way back.
-        assert "约7分钟" in core.snapshot()["presented_action"]["text"]
+        assert "about 7 minutes" in core.snapshot()["presented_action"]["text"]
         core.control("skip-offscreen", "skip")
         deliver_all(core)
         await read_aloud_all(application)
@@ -196,14 +196,13 @@ def test_parent_skip_works_while_the_model_is_slow_and_while_offscreen(applicati
 @pytest.mark.parametrize(
     ("text", "plea"),
     [
-        ("还是不懂，帮我一下", True),
-        ("我需要帮助", True),
-        ("能帮我吗？", True),
+        ("Help me, please.", True),
         ("I need help.", True),
         ("Can you help me?", True),
-        ("妈妈帮我扶了书。", False),
-        ("不知道", False),
-        ("第二次纸折了，车没掉。", False),
+        ("Could you help me?", True),
+        ("Mom helped me hold the book.", False),
+        ("I don't know", False),
+        ("The second time the paper was folded and the car did not fall.", False),
     ],
 )
 def test_report_tasks_treat_only_a_bare_plea_as_help(text, plea):
@@ -214,17 +213,19 @@ def test_a_typed_report_mentioning_help_is_a_report_and_a_bare_plea_is_help(appl
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "听到了。", "confirmation")
+        await answer(application, "Yes, I heard.", "confirmation")
         await answer(application, "a bridge")
         await answer(application, "She folded it.")
         assert core.course.tasks[core.task_index].task_id == "point-paper"
-        await answer(application, "还是不懂，帮我一下")
+        await answer(application, "Help me, please.")
         assert core.help_count[core.task_instance_id] == 1
-        await answer(application, "妈妈帮我指了那张折过的纸。")
+        await answer(application, "Mom helped me point to the folded paper.")
         assert core.course.tasks[core.task_index].task_id == "paper-experiment"
         core.control("return1", "return")
         deliver_all(core)
-        await answer(application, "第二次纸折了，车没掉，妈妈帮我扶了书。")
+        await answer(
+            application, "The second time the paper was folded; Mom helped me hold the book."
+        )
         await read_aloud_all(application)
         assert core.wait_kind == "closing_confirmation"
         reports = [a["judgment"] for a in core.attempts if a["purpose"] in {"point", "offscreen"}]
@@ -344,7 +345,7 @@ def test_supplement_before_delivery_keeps_one_attempt_and_invalidates_old_action
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
         first = await application.adapter.text("first", "that thing")
         old_action = core.pending
         await application.adapter.text(
@@ -362,7 +363,7 @@ def test_student_view_shows_the_story_without_adult_material_metadata(applicatio
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
         [text] = application.student_view(core)["materials"].values()
         assert text.startswith("The Paper Bridge\n\nMia has a toy car.\n")
         assert "素材版本" not in text and "Lexile" not in text
@@ -375,7 +376,7 @@ def test_reopened_student_page_can_show_the_last_presented_action(application):
         core = await start(application)
         assert core.snapshot()["presented_action"] is None
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
         # The prompt was already delivered to the old page; a reopened page has no pending action.
         snapshot = core.snapshot()
         assert snapshot["pending_action"] is None
@@ -388,7 +389,7 @@ def test_supplement_after_delivered_response_is_ruled_a_new_attempt(application)
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
         await application.adapter.text("first", "that thing")
         deliver_all(core)
         # The clarification was delivered, so the child's "supplement" cannot join the first answer.
@@ -399,7 +400,9 @@ def test_supplement_after_delivered_response_is_ruled_a_new_attempt(application)
         assert [len(attempt["inputs"]) for attempt in core.attempts] == [1, 1]
         assert core.attempts[-1]["judgment"] == "correct"
         ruled = [event["payload"] for event in core.events if event["kind"] == "relation_ruled"]
-        assert ruled == [{"event_id": "late", "relation": "new", "reason": "原回应已交付"}]
+        assert ruled == [
+            {"event_id": "late", "relation": "new", "reason": "original response delivered"}
+        ]
         replay = await application.adapter.text(
             "late", "a bridge", relation="supplement", related="first"
         )
@@ -412,7 +415,7 @@ def test_two_same_answers_are_two_attempts_but_transport_replay_is_one(applicati
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
         await application.adapter.text("answer1", "a car")
         assert (await application.adapter.text("answer1", "a car"))["ack"] == "replayed"
         assert len(core.attempts) == 1
@@ -561,13 +564,13 @@ def test_completed_requests_replay_after_later_effective_versions_without_new_ca
 async def reach_reading(app):
     core = await start(app)
     deliver_all(core)
-    await answer(app, "收到", "confirmation")
+    await answer(app, "Got it.", "confirmation")
     await answer(app, "a bridge")
     await answer(app, "She folded it.")
-    await answer(app, "我指的是折过的纸。", "report")
+    await answer(app, "I pointed to the folded paper.", "report")
     core.control(str(uuid4()), "return")
     deliver_all(core)
-    await answer(app, "第二次纸折了，车没有掉。", "report")
+    await answer(app, "The second time the paper was folded and the car did not fall.", "report")
     await answer_clicked(app)
     assert core.reading_task().task_id == "read-aloud-1"
     return core
@@ -611,7 +614,7 @@ def test_a_recording_on_a_question_is_rejected(application):
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "收到", "confirmation")
+        await answer(application, "Got it.", "confirmation")
         with pytest.raises(ValueError):
             await read(application, "not-reading", "a bridge")
         assert not core.attempts
@@ -622,7 +625,7 @@ def test_a_recording_on_a_question_is_rejected(application):
 def test_help_still_works_on_a_reading_segment(application):
     async def scenario():
         core = await reach_reading(application)
-        await answer(application, "帮我一下", "help")
+        await answer(application, "Help me", "help")
         assert core.help_count[core.task_instance_id] == 1
         assert core.reading_task().task_id == "read-aloud-1"
 
@@ -660,9 +663,9 @@ def test_asking_for_help_after_the_last_support_moves_on(application):
         core = await reach_reading(application)
         task, instance = core.reading_task(), core.task_instance_id
         for _ in task.supports:
-            await answer(application, "帮我一下", "help")
+            await answer(application, "Help me", "help")
             assert core.task_instance_id == instance
-        await answer(application, "帮我一下", "help")
+        await answer(application, "Help me", "help")
         assert core.task_instance_id != instance
         assert task.exit_text in [action.text for action in core.actions.values()]
 
@@ -685,7 +688,7 @@ def test_a_reading_whose_judgment_fails_is_answered_from_its_score(application, 
         assert "bridge" in action.text and task.supports[0].text in action.text
         attempt = core.attempts[-1]
         assert attempt["judgment"] == "incorrect" and attempt["evidence"] == task.evidence
-        assert any("固定规则" in note for note in attempt["limitations"])
+        assert any("fixed rules" in note for note in attempt["limitations"])
         assert f"event_id=misread task_instance_id={instance} judgment=incorrect" in caplog.text
         deliver_all(core)
         model.fail_next = True
@@ -698,7 +701,7 @@ def test_a_reading_whose_judgment_fails_is_answered_from_its_score(application, 
         model.fail_next = True
         await read(application, "silent", "")
         action = core.actions[core.pending]
-        assert action.after_delivery == "clarification" and "不算读错" in action.text
+        assert action.after_delivery == "clarification" and "not counted as wrong" in action.text
         assert core.attempts[-1]["judgment"] == "unclear"
 
     asyncio.run(scenario())

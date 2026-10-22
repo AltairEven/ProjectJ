@@ -4,7 +4,7 @@ from pydantic import Field
 
 from project_j.classroom.judgment import method_context
 from project_j.contracts import Contract, Document
-from project_j.evaluation.scoring import AWAITING, model_score, score_entries
+from project_j.evaluation.scoring import AWAITING, CORRECTED, model_score, score_entries
 from project_j.platform.models.contracts import ModelRequest
 from project_j.preparation.task_types import CONTENT_TYPES
 
@@ -60,15 +60,18 @@ def interpret(
         # Out of 10 per question (ADR-0020); model-scored ones are filled by apply_draft.
         "scores": score_entries(fact.body, corrections),
         "alignment": {
-            "goals_scope": "按实际已发生范围，未做任务不补造。",
+            "goals_scope": "Only what happened; tasks not done are not made up.",
             "tasks_materials": fact.body["course_ref"],
-            "help_difficulty": "帮助与任务条件分维度，外部帮助未知。",
+            "help_difficulty": "Help and task conditions are kept apart; outside help is unknown.",
             "process": fact.body["end"],
-            "time_burden": "按实际已发生范围；30分钟节奏与学习负担另评。",
+            "time_burden": "Only what happened; pace and workload are judged elsewhere.",
         },
-        "limitations": ["技术或模拟来源不转为学习证据。", "保持、迁移与独立条件未观察。"],
-        "actual_api": "未验证",
-        "actual_voice": "未验证",
+        "limitations": [
+            "Technical or simulated sources are not learning evidence.",
+            "Recall, transfer and working alone were not observed.",
+        ],
+        "actual_api": "unverified",
+        "actual_voice": "unverified",
     }
 
 
@@ -76,29 +79,39 @@ def next_suggestion(evaluation: Document, material: dict) -> dict:
     """material names the next fixed story; an already-read story is review, not new material."""
     title, focus = material["title"], material["focus"]
     if material["familiar"]:
-        direction, change = "已读材料复习及英语支架巩固", "已读材料与首次新材料分开取样"
+        direction, change = (
+            "Review a story read before and practise English frames",
+            "Read-before and new material are sampled apart",
+        )
         first = (
-            f"复习已读的{title}，观察{focus}的文本依据；熟悉条件下的回答不作首次新材料观察或迁移。"
+            f"Review {title}, read before: {focus}. Answers in a familiar story are not a first "
+            "look at new material or transfer."
         )
     else:
-        direction, change = "新材料短观察及英语支架巩固", "新材料与实际条件分别取样"
-        first = f"用{title}观察{focus}的文本依据。"
+        direction, change = (
+            "Short observation with new material and English frames",
+            "New material and real conditions are sampled apart",
+        )
+        first = f"Use {title}: {focus}."
     return {
         "status": "checked",
         "evaluation_ref": evaluation.ref.model_dump(),
         "direction": direction,
         "primary_change": change,
         "material": material,
-        "sampling": [first, "初答与帮助后再试分开。"],
-        "help": ["保留英语短报告句框，科学条件可先用中文报告。"],
-        "exit": "原30分钟预算内，挑战替换；允许跳过、暂停、停止。",
-        "review": "保持与迁移需要后续新日期和新条件证据。",
-        "limitations": ["候选建议，须learning采用并保存需求后才能备课。"],
+        "sampling": [first, "First answers and tries after help are kept apart."],
+        "help": ["Keep short English report frames."],
+        "exit": "A challenge only replaces an activity; skip, pause and stop are allowed.",
+        "review": "Recall and transfer need evidence from later dates and new conditions.",
+        "limitations": ["A suggestion only; planning must adopt it before a lesson is made."],
     }
 
 
 EVALUATION_INSTRUCTIONS = (
     "你是Jane的课后评价助手。只依据上下文里的封存事实、课程题目和学生补记，为学生整理本课；"
+    "写给学生的summary、strongest、uncertain、alignment、explanation与scores的reason一律用简单英文，"
+    "不夹中文字或中文标点，用词和句长不超过reading_level（学生的蓝思值；为null时按初学者写短句、常用词）；"
+    "help_quote照原样逐字引用学生补记，不翻译。学生用中文作答的那次尝试按“没答”看待，不当作答错。"
     "不补造未观察的表现、保持或迁移，不重评发音，不改课堂判断，不给总分或等级；"
     "scores只给tasks里purpose为answer或open的题各一项（task_id）：看这题全部attempts的作答、judgment"
     "与帮助综合给0到10的整数分，有judgment为incorrect的不能给10分，reason用一句话说明。"
@@ -107,7 +120,7 @@ EVALUATION_INSTRUCTIONS = (
     "tasks必须覆盖attempts里的每个attempt_id，每个只出现一次。"
     "working_judgment：single_independent只用于初答judgment为correct、help里没有任何帮助、"
     "且学生补记明确说没有额外帮助的尝试；needs_help用于课中有帮助、学生补记了帮助，或答错的尝试；"
-    "其余为unknown。“无额外补充”“没观察到”都不等于没有帮助。"
+    "其余为unknown。“无额外补充”“Nothing to add”“没观察到”都不等于没有帮助。"
     "attempts的visuals是作答前学生页实际显示过的图片或动画：stage为question属于题目材料，"
     "为help属于帮助、随help说明；没列出的不能当作学生看到了。"
     "external_help：学生补记明确说没有别人帮忙为none，明确说有人帮了为reported，否则unknown；"
@@ -148,7 +161,11 @@ class EvaluationDraft(Contract):
 
 
 def evaluation_request(
-    fact: dict, course: dict, feedbacks: list[dict], jane: dict | None
+    fact: dict,
+    course: dict,
+    feedbacks: list[dict],
+    jane: dict | None,
+    level: str | None = None,
 ) -> ModelRequest:
     # Task data only: no learner identity, profile or full input signatures.
     end = fact["end"]
@@ -195,6 +212,8 @@ def evaluation_request(
                 for feedback in feedbacks
             ],
             "jane_method": method_context(jane),
+            # The student's reading level (their Lexile) for the English they read here.
+            "reading_level": level,
             "limitations": fact["limitations"],
             # What the student ticked to train, as the course mapped it.
             "skill_focus": [
@@ -217,7 +236,7 @@ def apply_draft(base: dict, draft: EvaluationDraft, feedbacks: list[dict]) -> di
     readings = {reading.attempt_id: reading for reading in draft.tasks}
     attempts = {task["attempt_id"] for task in base["tasks"]}
     if len(readings) != len(draft.tasks) or set(readings) != attempts:
-        raise DraftMismatch("评价草稿与封存事实的尝试不一致")
+        raise DraftMismatch("the draft does not match the tries in the class record")
     said = [feedback["text"] for feedback in feedbacks]
     tasks, checks = [], []
     for task in base["tasks"]:
@@ -226,24 +245,24 @@ def apply_draft(base: dict, draft: EvaluationDraft, feedbacks: list[dict]) -> di
         external, quote = reading.external_help, reading.help_quote.strip()
         if external != "unknown" and not (quote and any(quote in text for text in said)):
             external = "unknown"
-            reasons.append("外部帮助未逐字引用学生补记，按未知处理")
+            reasons.append("Outside help was not quoted word for word from your notes; unknown")
         helped = any(level not in {"none", "unknown"} for level in task["help"].values())
         judgment = reading.working_judgment
         if task["corrections"]:
             if judgment != "unknown":
-                reasons.append("受学生更正影响，待复核")
+                reasons.append(CORRECTED)
             judgment = "unknown"
         elif judgment == "single_independent" and not (
             task["task_judgment"] == "correct"
             and all(level == "none" for level in task["help"].values())
             and external == "none"
         ):
-            reasons.append("单次独立的条件不足")
+            reasons.append("Not enough to call it done alone")
             judgment = "unknown"
         elif judgment == "needs_help" and not (
             helped or external == "reported" or task["task_judgment"] == "incorrect"
         ):
-            reasons.append("需要帮助缺少依据")
+            reasons.append("No evidence that help was needed")
             judgment = "unknown"
         help_map = dict(task["help"])
         if judgment == "single_independent":
@@ -323,7 +342,7 @@ def applied_scores(base: dict, draft: EvaluationDraft) -> tuple[list[dict], list
             "task_id": task_id,
             "proposed": reading.score,
             "applied": None,
-            "reason": "不是需要打分的题",
+            "reason": "Not a scored question",
         }
         for task_id, reading in given.items()
         if task_id not in waiting
@@ -332,11 +351,12 @@ def applied_scores(base: dict, draft: EvaluationDraft) -> tuple[list[dict], list
 
 
 FAILURE_TEXT = {
-    "timeout": "超时",
-    "invalid_output": "结构不完整",
-    "unavailable": "模型暂不可用",
-    "not_initialized": "模型未初始化",
-    "config_mismatch": "实际配置不符",
+    "timeout": "it took too long",
+    "invalid_output": "the reply was incomplete",
+    "unavailable": "the model is not available now",
+    "not_initialized": "the model is not set up",
+    "config_mismatch": "the model setup does not match",
+    "language": "the reply was not in English",
 }
 
 
@@ -345,4 +365,7 @@ class EvaluationUnavailable(Exception):
 
     def __init__(self, reason: str):
         text = FAILURE_TEXT.get(reason, reason)
-        super().__init__(f"课后评价未取得（{text}）。事实与反馈已保存，可以重试。")
+        super().__init__(
+            f"The evaluation could not be made ({text}). The class record and your notes "
+            "are saved; you can try again."
+        )

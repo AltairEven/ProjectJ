@@ -125,7 +125,9 @@ def test_simulated_preparation_replies(application):
     discussion = discussion_request(first, first.context["template"], "意见", [])
     reply = asyncio.run(adapter.invoke(discussion, binding))
     assert reply.data["tasks"] == first.context["template"]["tasks"]
-    assert reply.data["note"] == "模拟：已记录意见，未调用真实模型，课程内容不变。"
+    assert reply.data["note"] == (
+        "Simulated: your feedback is noted; no real model was called; the lesson is unchanged."
+    )
     reply = asyncio.run(adapter.invoke(build(application, template=False), binding))
     assert reply.data is None and reply.failure == "unavailable"
 
@@ -196,7 +198,7 @@ def test_template_draft_checks_into_the_fixed_course(demand, draft):
     assert 20 <= sum(checked.course.budget.values()) <= 40
     assert checked.course.lesson_type == "observation"
     assert checked.source == FIRST and checked.story == STORY
-    assert checked.course.limitations[-1].startswith("课程由备课模型编写")
+    assert checked.course.limitations[-1].startswith("Written by the preparation model")
 
 
 def test_evidence_must_quote_the_story(demand, draft):
@@ -289,12 +291,12 @@ def test_resources_are_planned_only(demand, draft):
     resource = {
         "resource_id": "bridge-picture",
         "kind": "image",
-        "purpose": "展示纸桥",
-        "content": "一张纸搭在两本书之间。",
+        "purpose": "Show the paper bridge",
+        "content": "A piece of paper between two books.",
         "task_ids": ["reading-fact"],
         "audience": "student",
         "required": True,
-        "fallback": "只看文字。",
+        "fallback": "Just read the text.",
         "stage": "question",
     }
     draft["resources"] = [resource, resource]
@@ -340,7 +342,9 @@ def test_new_story_rules(demand, draft):
 def test_read_story_becomes_review(demand, draft):
     checked = check(demand, draft, read={FIRST})
     assert checked.course.lesson_type == "review"
-    assert any(item.startswith("已读材料复习") for item in checked.course.limitations)
+    assert any(
+        item.startswith("Review of a story read before") for item in checked.course.limitations
+    )
 
 
 def test_reserved_and_duplicate_task_ids(demand, draft):
@@ -352,11 +356,14 @@ def test_reserved_and_duplicate_task_ids(demand, draft):
 
 def test_unavailable_messages():
     assert (
-        str(PreparationUnavailable("timeout")) == "课程未取得（超时）。下节需求已保存，可以重试。"
+        str(PreparationUnavailable("timeout"))
+        == "The lesson could not be made (it took too long). The next lesson's plan is saved; "
+        "you can try again."
     )
     assert (
-        str(PreparationUnavailable("timeout", "修改"))
-        == "修改未取得（超时）。原课程版本不变，可以重试。"
+        str(PreparationUnavailable("timeout", "change"))
+        == "The change could not be made (it took too long). The earlier lesson version stays; "
+        "you can try again."
     )
 
 
@@ -416,7 +423,10 @@ def test_no_offscreen_task_without_materials(application):
             catalog_ids=CATALOG,
             offscreen_allowed=False,
         )
-    assert ("offscreen", "学习资料里没有可用实物，不能安排离屏任务") in error.value.problems
+    assert (
+        "offscreen",
+        "The profile lists no things to use, so no offscreen task",
+    ) in error.value.problems
 
 
 def test_instructions_write_the_chosen_topic_and_train_the_chosen_skills():
@@ -454,15 +464,18 @@ def new_task(task_id, purpose, content, **fields):
             "known_incorrect": [],
             "supports": [
                 {
-                    "text": "回到原文。",
+                    "text": "Go back to the story.",
                     "help": [{"dimension_id": READING, "level": "light_prompt"}],
                 },
-                {"text": "看第二段。", "help": [{"dimension_id": READING, "level": "scaffold"}]},
+                {
+                    "text": "Look at part two.",
+                    "help": [{"dimension_id": READING, "level": "scaffold"}],
+                },
             ],
-            "exit_text": "先到这里。",
+            "exit_text": "Let's stop here.",
             "optional": False,
             "minutes": None,
-            "correct_text": None if purpose == "open" else "对了。",
+            "correct_text": None if purpose == "open" else "Right.",
         }
         | NULL_CONTENT
         | {purpose: content}
@@ -473,11 +486,11 @@ def new_task(task_id, purpose, content, **fields):
 @pytest.mark.parametrize(
     ("task_id", "change"),
     [
-        ("choice-first-try", {"variant": "true_false"}),  # Options are not 对、错.
+        ("choice-first-try", {"variant": "true_false"}),  # Options are not True, False.
         ("choice-first-try", {"correct": 3}),
         ("order-bridge", {"items": ["The paper bends.", "Mia smiles."]}),
         ("order-bridge", {"variant": "words"}),  # The cards do not join into a story sentence.
-        ("match-words", {"right": ["弯了", "折"]}),
+        ("match-words", {"right": ["curves down", "doubles it over"]}),
         ("fill-puts", {"answers": [["puts"], ["car"]]}),
         ("fill-puts", {"answers": [["drives"]]}),  # Filled back it is not in the story.
         ("fill-puts", {"distractors": []}),  # A word bank needs distractors.
@@ -541,11 +554,14 @@ def test_evidence_of_new_types_quotes_the_story(demand, draft):
 def test_not_given_answers_say_they_cannot_be_quoted(demand, draft):
     sample(draft, "choice-first-try")["choice"] = {
         "variant": "true_false_not_given",
-        "options": ["对", "错", "文中没提"],
+        "options": ["True", "False", "Not given"],
         "correct": 2,
     }
     limitations = check(demand, draft).course.limitations
-    assert "choice-first-try的“文中没提”无法逐字核对原文。" in limitations
+    assert (
+        "choice-first-try: 'Not given' cannot be checked word for word against the story."
+        in limitations
+    )
 
 
 def test_the_primary_goal_is_not_proved_by_clicking_alone(demand, draft):
@@ -600,7 +616,7 @@ def test_open_tasks_check_their_points_and_evidence(demand, draft):
     retell["evidence"] = "Mia flies away."
     assert rejected(demand, draft) == {"evidence"}
     retell["evidence"] = "She folds a new piece of paper."
-    for change in ({"correct_text": "对了。"}, {"acceptable_answers": ["x"]}):
+    for change in ({"correct_text": "Right."}, {"acceptable_answers": ["x"]}):
         broken = template_draft(demand, FIRST, STORY)
         sample(broken, "retell-bridge").update(change)
         assert rejected(demand, broken) == {"content"}
@@ -636,7 +652,10 @@ def test_study_preparation_refuses_open_until_the_reference_set_passes(demand, d
             catalog_ids=CATALOG,
             open_allowed=False,
         )
-    assert ("open", "开放问答的课堂判断尚未通过参考题集，正式学习暂不使用") in error.value.problems
+    assert (
+        "open",
+        "Open questions wait until classroom judgment passes the reference set",
+    ) in error.value.problems
 
 
 def test_instructions_register_every_type_and_its_ladder():
@@ -654,3 +673,41 @@ def test_instructions_register_every_type_and_its_ladder():
     ):
         assert words in PREPARATION_INSTRUCTIONS
     assert "budget从" not in PREPARATION_INSTRUCTIONS
+
+
+def test_a_draft_with_chinese_is_sent_back(demand, draft):
+    draft["tasks"][0]["prompt"] = "她想要什么？"
+    assert "language" in rejected(demand, draft)
+
+
+def test_a_chinese_topic_from_the_student_does_not_block_preparation(demand):
+    chosen = demand.model_copy(update={"topic": "纸桥"})
+    checked = check(chosen, template_draft(chosen, FIRST, STORY))
+    topic = next(item for item in checked.course.demand_mapping if item.field == "topic")
+    assert topic.requirement == "纸桥"
+
+
+def test_preparation_instructions_ask_for_english_at_the_student_level():
+    from project_j.preparation.drafting import PREPARATION_INSTRUCTIONS
+
+    assert "英文" in PREPARATION_INSTRUCTIONS and "不超过故事" in PREPARATION_INSTRUCTIONS
+    assert "可含中文" not in PREPARATION_INSTRUCTIONS
+
+
+def test_rule_problems_limitations_and_failures_are_english(demand, draft):
+    from project_j.english import chinese
+
+    broken = json.loads(json.dumps(draft))
+    broken["tasks"][0]["prompt"] = "她想要什么？"
+    broken["tasks"][0]["evidence"] = "Not a sentence of the story."
+    broken["tasks"][1]["task_id"] = broken["tasks"][0]["task_id"]
+    broken["demand_mapping"] = broken["demand_mapping"][1:]
+    choice = next(task for task in broken["tasks"] if task["purpose"] == "choice")
+    choice["choice"] = {"variant": "true_false", "options": ["Yes", "No"], "correct": 0}
+    with pytest.raises(DraftRejected) as error:
+        check(demand, broken)
+    assert len(error.value.problems) >= 4
+    assert not chinese([text for _, text in error.value.problems])
+    assert not chinese(list(check(demand, draft).course.limitations))
+    for subject in ("lesson", "change", "resource"):
+        assert not chinese(str(PreparationUnavailable("timeout", subject)))

@@ -43,7 +43,9 @@ def document(
         supersedes=RevisionRef(object_id=object_id, revision=revision - 1)
         if revision > 1
         else None,
-        limitations=("明确隔离模拟；真实API、声音、儿童及教学效果未验证。",),
+        limitations=(
+            "Simulation only; the real API, voice and teaching results are not verified.",
+        ),
         body=body.model_dump(mode="json") if isinstance(body, BaseModel) else deepcopy(body),
     )
 

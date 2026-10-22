@@ -93,7 +93,7 @@ def test_skill_focus_is_checked_and_becomes_requirements():
     from project_j.preparation.contracts import demand_requirements
 
     assert len(SKILLS) == 13 and MAX_FOCUS == 3
-    assert {group for group, _, _ in SKILLS.values()} == {"词类", "时态", "句型"}
+    assert {group for group, _, _ in SKILLS.values()} == {"Word types", "Tenses", "Sentences"}
     demand = initial_records()[3].body
     before = demand_requirements(demand)
     assert demand.skill_focus is None and demand.focus_suggestions == ()  # older demands read
@@ -111,7 +111,7 @@ def test_skill_focus_is_checked_and_becomes_requirements():
         base | {"skill_focus": ["past_simple"], "skill_note": "多练不规则动词"}
     )
     added = demand_requirements(chosen)[len(before) :]
-    assert added[0][0] == "skill_focus" and added[0][1].startswith("一般过去时：")
+    assert added[0][0] == "skill_focus" and added[0][1].startswith("Past simple: ")
     assert added[1] == ("skill_note", "多练不规则动词")
     assert demand_requirements(DemandBody.model_validate(base | {"skill_focus": []})) == before
 

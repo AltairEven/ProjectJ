@@ -16,12 +16,10 @@ from project_j.platform.tts.local import (
 )
 
 SAMPLES = {
-    "zh": "小朋友，今天我们一起读一个关于小桥的故事。",
-    "en": "Mia has a toy car. She wants a bridge for her car.",
-    "mixed": "这个单词是 bridge，意思是桥。我们一起读：bridge。",
+    "story": "Mia has a toy car. She wants a bridge for her car.",
+    "task": "Which bus did Ben try first? Tap your answer.",
 }
-SAMPLE_LABELS = {"zh": "中文", "en": "英文", "mixed": "中英混读"}
-CANCEL_TEXT = SAMPLES["zh"] * 8
+CANCEL_TEXT = SAMPLES["story"] * 8
 CANCEL_LIMIT_MS = 2000
 SEED = 7
 MIN_AUDIO_SECONDS = 0.5
@@ -63,18 +61,17 @@ async def synthesize(
 def judge(record: dict) -> list[str]:
     reasons = []
     for name, sample in record["samples"].items():
-        label = SAMPLE_LABELS[name]
         if sample["status"] != "ok":
-            reasons.append(f"{label}合成失败：{sample['status']}")
+            reasons.append(f"the {name} sample failed: {sample['status']}")
         elif sample["audio_seconds"] < MIN_AUDIO_SECONDS or sample["peak"] < AUDIBLE_PEAK:
-            reasons.append(f"{label}合成结果无声或过短")
+            reasons.append(f"the {name} sample is silent or too short")
     stop = record["cancel"]["stop_ms"]
     if stop is None:
-        reasons.append("中途取消未确认停止")
+        reasons.append("the cancel was not confirmed")
     elif stop > CANCEL_LIMIT_MS:
-        reasons.append(f"中途取消后停止生成用时{stop}毫秒，超过{CANCEL_LIMIT_MS}毫秒")
+        reasons.append(f"stopping after the cancel took {stop} ms, over {CANCEL_LIMIT_MS} ms")
     if not record["recovered"]:
-        reasons.append("取消后合成进程未恢复服务")
+        reasons.append("the process did not recover after the cancel")
     return reasons
 
 
@@ -101,7 +98,7 @@ async def probe(root: Path, synthesizer: LocalSynthesizer | None = None) -> dict
     try:
         ready = await synthesizer.start()
     except SynthesizerUnavailable as error:
-        record["reasons"] = [f"合成进程无法启动：{error}"]
+        record["reasons"] = [f"the speech process cannot start: {error}"]
         LocalSynthesizer.save_init(root, record)
         return record
     record |= {
@@ -118,8 +115,8 @@ async def probe(root: Path, synthesizer: LocalSynthesizer | None = None) -> dict
         await synthesize(synthesizer, CANCEL_TEXT, limit=1)
         record["cancel"] = {"stop_ms": synthesizer.last_stats.get("cancel_ms")}
         # Recorded only: whether a fixed seed repeats is input for presynthesis (ADR-0016 §7).
-        first, first_pcm = await synthesize(synthesizer, SAMPLES["en"], seed=SEED)
-        second, second_pcm = await synthesize(synthesizer, SAMPLES["en"], seed=SEED)
+        first, first_pcm = await synthesize(synthesizer, SAMPLES["story"], seed=SEED)
+        second, second_pcm = await synthesize(synthesizer, SAMPLES["story"], seed=SEED)
         record["recovered"] = first["status"] == "ok"
         if first["status"] == second["status"] == "ok":
             record["seed_repeatable"] = first_pcm == second_pcm
@@ -142,7 +139,7 @@ def show(record: dict):
     for name, sample in record["samples"].items():
         slow = "（慢于实时，边生成边播放会断续）" if (sample["rtf"] or 0) > 1 else ""
         print(
-            f"- {SAMPLE_LABELS[name]}：{sample['status']}，时长 {sample['audio_seconds']} 秒，"
+            f"- {name}：{sample['status']}，时长 {sample['audio_seconds']} 秒，"
             f"首段 {sample['first_chunk_ms']} 毫秒，RTF {sample['rtf']}{slow}"
         )
     stop = record["cancel"]["stop_ms"]

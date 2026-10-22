@@ -27,7 +27,7 @@ class ModelFiles:
         try:
             return json.loads(path.read_text())
         except (OSError, ValueError) as error:
-            raise ValueError(f"配置文件无法读取：{relative}") from error
+            raise ValueError(f"The setup file cannot be read: {relative}") from error
 
     def write(self, relative: str, data: dict):
         content = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
@@ -46,7 +46,7 @@ class ModelFiles:
                 for purpose in PURPOSES
             }
         except (KeyError, ValueError) as error:
-            raise ValueError("配置文件无法读取：config.json") from error
+            raise ValueError("The setup file cannot be read: config.json") from error
 
     def configure(self, default: Binding, purposes: dict[Purpose, Binding]):
         self.write(

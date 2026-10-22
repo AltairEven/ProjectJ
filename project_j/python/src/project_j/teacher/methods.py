@@ -2,10 +2,16 @@ JANE = {
     "status": "enabled",
     "identity": "Jane",
     "name": "Jane",
-    "rules": ["只解释已取得范围", "未知不转成错误或独立", "停止优先", "先保留未提示初答"],
+    "rules": [
+        "Explain only what was actually observed",
+        "Unknown is never turned into wrong or independent",
+        "Stopping comes first",
+        "Keep the first answer given without help",
+    ],
     "strategies": {
-        "english": "定位依据→换表征→句框→新尝试",
-        "science": "报告条件与实际结果分开，不从故事推断实物定律",
+        "english": "find the place in the text → say it another way → sentence frame → new try",
+        "science": "report the conditions and the real result apart; never infer real "
+        "laws from the story",
     },
-    "limitations": ["唯一教师；方法启用不证明教学效果。"],
+    "limitations": ["The only teacher; using this method does not prove it teaches well."],
 }

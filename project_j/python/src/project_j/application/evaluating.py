@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from project_j.application.documents import document, identity, publication
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.corrections import affected
+from project_j.english import chinese
 from project_j.evaluation.assessment import (
     DraftMismatch,
     EvaluationDraft,
@@ -23,6 +24,12 @@ from project_j.platform.storage import (
 )
 
 log = logging.getLogger(__name__)
+# Feedback that adds nothing lets the checked draft be reused; the old Chinese words still count.
+NOTHING_TO_ADD = {"nothing to add", "nothing more to add", "无额外补充"}
+
+
+def nothing_to_add(text: str) -> bool:
+    return text.strip().rstrip(".!。！").casefold() in NOTHING_TO_ADD
 
 
 class Evaluating:
@@ -85,7 +92,7 @@ class Evaluating:
                     "occurred_at": None,
                     "reported_at": datetime.now(UTC).isoformat(),
                     "corrections": list(corrections),
-                    "limitations": ["无额外补充不等于独立。"],
+                    "limitations": ["Nothing to add does not mean done alone."],
                 },
                 refs=(fact.ref,),
                 sources=tuple(fb.ref for fb in old),
@@ -97,7 +104,7 @@ class Evaluating:
                 "feedback",
                 [obj],
                 source_revision=obj.source_revision,
-                publications=(publication(obj, "追加原活动来源，不制造新活动或尝试"),),
+                publications=(publication(obj, "Adds to the class source; no new class or try"),),
             )
         log.info(
             "feedback saved activity=%s objection=%s",
@@ -110,7 +117,10 @@ class Evaluating:
             for doc in [evaluation, *affected(self, evaluation.ref, learner_id)]:
                 if self.uses_corrected_source(learner_id, doc, activity_id):
                     self.restrict(
-                        operation, learner_id, doc, "新更正影响旧解释，待同活动来源复核。"
+                        operation,
+                        learner_id,
+                        doc,
+                        "A new correction affects the old reading; to be checked again.",
                     )
         return self.ledger.finish(
             operation,
@@ -157,7 +167,8 @@ class Evaluating:
                     "reported_at": datetime.now(UTC).isoformat(),
                     "gap": lost["state"],
                     "limitations": [
-                        "学生的补报是新的实际来源；不补造原话、不重复计样本，不自动进入评价。"
+                        "Your later report is a new real source; nothing is made up or counted "
+                        "twice, and it does not enter the evaluation by itself."
                     ],
                 },
                 refs=(start_ref,),
@@ -167,7 +178,7 @@ class Evaluating:
                 learner_id,
                 "parent-report",
                 [obj],
-                publications=(publication(obj, "只保存学生补报，缺口保留"),),
+                publications=(publication(obj, "Only your later report is saved; gaps stay"),),
             )
         return self.ledger.finish(operation, learner_id, {"report_ref": report[0].ref.model_dump()})
 
@@ -207,9 +218,12 @@ class Evaluating:
             return completed
         current = self.store.current(identity(activity_id, "evaluation"), learner_id)
         if current is None or current.ref != evaluation_ref:
-            raise Conflict("评价已更新，请查看新版本后再认可。", current.ref if current else None)
+            raise Conflict(
+                "The evaluation was updated. Read the new version, then acknowledge it.",
+                current.ref if current else None,
+            )
         if current.source_revision != self.source_revision(activity_id, learner_id)[0]:
-            raise Conflict("评价已更新，请查看新版本后再认可。")
+            raise Conflict("The evaluation was updated. Read the new version, then acknowledge it.")
         operation = self.request(
             request_id, learner_id, "acknowledge", signature, sources=(current.ref,)
         )
@@ -234,7 +248,9 @@ class Evaluating:
                 learner_id,
                 "acknowledgement",
                 [obj],
-                publications=(publication(obj, "学生认可这一评价版本"),),
+                publications=(
+                    publication(obj, "The student acknowledged this evaluation version"),
+                ),
             )
         log.info("evaluation acknowledged activity=%s revision=%d", activity_id, current.revision)
         return self.ledger.finish(
@@ -282,7 +298,7 @@ class Evaluating:
                 bool(feedbacks)
                 and same_fact
                 and all(
-                    fb.body["text"].strip() == "无额外补充" and not fb.body["corrections"]
+                    nothing_to_add(fb.body["text"]) and not fb.body["corrections"]
                     for fb in feedbacks
                 )
             )
@@ -299,14 +315,23 @@ class Evaluating:
                 jane = self.store.read(
                     RevisionRef.model_validate(course.body["jane_ref"]), learner_id
                 )
+                profiles = self.store.list_current(learner_id, "profile")
                 result = await self.models.run(
                     evaluation_request(
-                        fact.body, course.body, [fb.body for fb in feedbacks], jane.body
+                        fact.body,
+                        course.body,
+                        [fb.body for fb in feedbacks],
+                        jane.body,
+                        profiles[0].body.get("lexile") if profiles else None,
                     )
                 )
                 if not result.ok:
                     log.warning("evaluation activity=%s failure=%s", activity_id, result.failure)
                     raise EvaluationUnavailable(result.failure)
+                # The student reads it in English; their own notes quoted verbatim may be Chinese.
+                if chinese(result.output.model_dump(), skip=frozenset({"help_quote"})):
+                    log.warning("evaluation activity=%s failure=language", activity_id)
+                    raise EvaluationUnavailable("language")
                 draft = result.output
             else:
                 log.info("evaluation activity=%s reused the checked draft", activity_id)
@@ -371,8 +396,8 @@ class Evaluating:
                 [obj, suggestion],
                 source_revision=source_revision,
                 publications=(
-                    publication(obj, "当前来源的限定范围解释"),
-                    publication(suggestion, "候选建议，不能直接成为需求"),
+                    publication(obj, "Reading limited to the current sources"),
+                    publication(suggestion, "A suggestion; it cannot become the plan by itself"),
                 ),
             )
             self.evaluation_calls.append(

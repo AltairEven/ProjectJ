@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
+import { dateText } from '../dates'
 import { byNewest } from '../learning'
 import { focusError, initialFocus, nextStepView } from '../next-step'
 import { endLabels } from '../report'
@@ -26,25 +27,25 @@ function FocusPicker({ token, learner, refresh, subject }: Pick<PageProps, 'toke
   const toggle = (id: string, on: boolean) => setPicked(current => on ? [...current, id] : current.filter(item => item !== id))
   const send = () => {
     const body = { request_id: uid(), learner_id: learner, demand_ref: subject.demand_ref, topic, skills: picked, note: note.trim() || null }
-    void run(async () => { await api(token, 'focus', body) }, '保存选择')
+    void run(async () => { await api(token, 'focus', body) }, 'Saving your choice')
   }
   return <>
-    <p>{topics.length ? 'Jane 按你的兴趣想了几个题材，也列出了可以练的知识点。' : '写下这节课想读的题材，再勾选想练的知识点。'}选好交给 Jane，她才开始备课。</p>
-    <fieldset className="skills"><legend>{topics.length ? '题材（选一个）' : '题材'}</legend>
+    <p>{topics.length ? 'Jane found some topics from your interests and listed things you can practise. ' : 'Write a topic for this lesson, then tick what you want to practise. '}When you send it, Jane starts making the lesson.</p>
+    <fieldset className="skills"><legend>{topics.length ? 'Topic (choose one)' : 'Topic'}</legend>
       {topics.map((item, index) => <label key={index} className="check">
         <input type="radio" name="topic" checked={choice === index} onChange={() => setChoice(index)} />
         {item.title}<span className="tag">{item.reason}</span></label>)}
-      {topics.length > 0 && <label className="check"><input type="radio" name="topic" checked={choice === 'own'} onChange={() => setChoice('own')} />我想读别的：</label>}
-      <input aria-label="我想读的题材" placeholder="写一句你想读的内容" value={own} onFocus={() => setChoice('own')} onChange={event => setOwn(event.target.value)} /></fieldset>
-    <p className="hint">知识点（最多 3 项，可以不选）</p>
+      {topics.length > 0 && <label className="check"><input type="radio" name="topic" checked={choice === 'own'} onChange={() => setChoice('own')} />Something else:</label>}
+      <input aria-label="My own topic" placeholder="Write what you want to read about" value={own} onFocus={() => setChoice('own')} onChange={event => setOwn(event.target.value)} /></fieldset>
+    <p className="hint">Things to practise (up to 3, or none)</p>
     {[...new Set(options.map(item => item.group))].map(group => <fieldset key={group} className="skills"><legend>{group}</legend>
       {options.filter(item => item.group === group).map(item => <label key={item.skill_id} className="check">
         <input type="checkbox" checked={picked.includes(item.skill_id)} onChange={event => toggle(item.skill_id, event.target.checked)} />
-        {item.label}{reasons.has(item.skill_id) && <span className="tag">Jane建议：{reasons.get(item.skill_id)}</span>}</label>)}</fieldset>)}
-    <label>其他想练的（可选）<input value={note} onChange={event => setNote(event.target.value)} /></label>
+        {item.label}{reasons.has(item.skill_id) && <span className="tag">Jane suggests: {reasons.get(item.skill_id)}</span>}</label>)}</fieldset>)}
+    <label>Something else to practise (optional)<input value={note} onChange={event => setNote(event.target.value)} /></label>
     {error && <p className={topic ? 'notice' : 'hint'}>{error}</p>}
     {status}
-    <div className="row"><button disabled={busy || error !== null} onClick={send}>交给 Jane，开始备课</button></div>
+    <div className="row"><button disabled={busy || error !== null} onClick={send}>Send to Jane</button></div>
   </>
 }
 
@@ -60,28 +61,28 @@ export default function Home({ token, dashboard, learner, go, refresh }: PagePro
   const week = objects.find(doc => doc.kind === 'plan' && doc.body.level === 'week')
   const retry = (name: string) => run(async () => { await api(token, 'jobs/retry', { learner_id: learner, name }) })
   return <>
-    <section className="next"><h2>下一步</h2><p className="next-title">{view.title}</p>
+    <section className="next"><h2>Next</h2><p className="next-title">{view.title}</p>
       {(view.action || view.also) && <div className="row">
         {view.action && <button onClick={() => go(view.page, view.detail)}>{view.action}</button>}
         {view.also && <button className="quiet" onClick={() => go(view.also!.page, view.also!.detail)}>{view.also.action}</button>}</div>}
       {dashboard.next?.kind === 'focus' && <FocusPicker token={token} learner={learner} refresh={refresh} subject={dashboard.next.subject ?? {}} />}</section>
     {status}
-    <section><h2>后台进行中</h2>
+    <section><h2>Working now</h2>
       {jobs.length ? <ul className="list jobs">{jobs.map(job => <li key={job.name}><JobLine job={job} />
         {/* A failed confirm or start is retried from its course page. */}
         {job.state === 'failed' && !job.name.startsWith('start:') && !job.name.startsWith('confirm:') &&
-          <button className="quiet" disabled={busy} onClick={() => void retry(job.name)}>重试</button>}</li>)}</ul>
-        : <p>没有正在进行的事。</p>}</section>
-    <section><h2>最近一课</h2>{fact ? <>
+          <button className="quiet" disabled={busy} onClick={() => void retry(job.name)}>Try again</button>}</li>)}</ul>
+        : <p>Nothing is running.</p>}</section>
+    <section><h2>Last lesson</h2>{fact ? <>
       <Rows rows={[
-        ['课程', (course?.body.parent_preview as Record<string, string> | undefined)?.story],
-        ['结束', endLabels[String((fact.body.end as Record<string, unknown>)?.reason)] ?? '未知'],
-        ['评价', (evaluation?.body.report as Record<string, string> | undefined)?.summary ?? '评价中或尚未生成'],
+        ['Lesson', (course?.body.parent_preview as Record<string, string> | undefined)?.story],
+        ['Ended', endLabels[String((fact.body.end as Record<string, unknown>)?.reason)] ?? 'Unknown'],
+        ['Evaluation', (evaluation?.body.report as Record<string, string> | undefined)?.summary ?? 'Being written'],
       ]} />
-      <button className="quiet" onClick={() => go('evaluations', activity)}>查看评价</button></> : <p>还没有上过课。</p>}</section>
-    <section><h2>本周计划</h2>{week ? <Rows rows={[
-      ['主要目标', (week.body.main_goal as Record<string, string>).description],
-      ['下次复盘', week.body.review_at ? new Date(String(week.body.review_at)).toLocaleDateString() : '未定'],
-    ]} /> : <p>还没有学习计划。</p>}</section>
+      <button className="quiet" onClick={() => go('evaluations', activity)}>Read the evaluation</button></> : <p>No lessons yet.</p>}</section>
+    <section><h2>This week</h2>{week ? <Rows rows={[
+      ['Main goal', (week.body.main_goal as Record<string, string>).description],
+      ['Next review', week.body.review_at ? dateText(String(week.body.review_at)) : 'Not set'],
+    ]} /> : <p>No plan yet.</p>}</section>
   </>
 }

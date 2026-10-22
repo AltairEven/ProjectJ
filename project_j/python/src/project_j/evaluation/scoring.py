@@ -20,15 +20,15 @@ SCORING: dict[str, Literal["rule", "model", "pronunciation"] | None] = {
 }
 # Right at once, after 1 wrong answer, after 2; after 3 or more it is 0 (user, 2026-10-21).
 RULE_POINTS = (10, 7, 4)
-HINT_PENALTY = 1  # Per "给我提示".
+HINT_PENALTY = 1  # Per "Hint".
 MISREAD_PENALTY = 1  # Per earlier misread segment.
-UNCALIBRATED = "发音评分门槛未校准。"
-NO_ANSWER = "没有作答"
-UNFINISHED = "停课时这题还没完成"
-CORRECTED = "受学生更正影响，待复核"
-AWAITING = "等待课后评价模型打分"
-NO_MODEL_SCORE = "评价模型没有给这题打分"
-EARLIER_DRAFT = "评价草稿早于计分"
+UNCALIBRATED = "The pronunciation score limits are not calibrated."
+NO_ANSWER = "No answer"
+UNFINISHED = "Not finished when the class stopped"
+CORRECTED = "Your correction affects it; to be checked again"
+AWAITING = "Waiting for the evaluation to score it"
+NO_MODEL_SCORE = "The evaluation gave no score for it"
+EARLIER_DRAFT = "The evaluation was written before scores existed"
 
 
 class Question(NamedTuple):
@@ -79,6 +79,12 @@ def finished(question: Question) -> bool:
     )
 
 
+def count(n: int, noun: str) -> str:
+    """1 wrong try, 2 wrong tries, 3 hints."""
+    plural = noun[:-1] + "ies" if noun.endswith("y") else noun + "s"
+    return f"{n} {noun if n == 1 else plural}"
+
+
 def rule_score(question: Question) -> tuple[int | None, str]:
     if not question.attempts:
         return None, NO_ANSWER
@@ -86,14 +92,14 @@ def rule_score(question: Question) -> tuple[int | None, str]:
     if "correct" in judgments:
         wrong = judgments[: judgments.index("correct")].count("incorrect")
         points = RULE_POINTS[wrong] if wrong < len(RULE_POINTS) else 0
-        reason = "一次答对" if not wrong else f"错{wrong}次后答对"
+        reason = "Right the first time" if not wrong else f"Right after {count(wrong, 'wrong try')}"
         if question.hints:
-            reason += f"，用了{question.hints}次提示"
+            reason += f", {count(question.hints, 'hint')} used"
         return max(0, points - HINT_PENALTY * question.hints), reason
     if question.exited:
-        return 0, "帮助用完仍没答对"
+        return 0, "Not right after all the help"
     if question.skipped:
-        return 0, "答过后跳过，没有答对"
+        return 0, "Skipped after trying, not right"
     return None, UNFINISHED  # Still current when the class stopped or closed.
 
 
@@ -105,13 +111,15 @@ def pronunciation_score(question: Question) -> tuple[float | None, str]:
         if (attempt.get("pronunciation") or {}).get("status") == "scored"
     ]
     if not scored:
-        return None, "没有取得朗读评分"
+        return None, "No reading score"
     if not finished(question):
         return None, UNFINISHED
     last = question.attempts[scored[-1]]["pronunciation"]
     misread = [a["judgment"] for a in question.attempts[: scored[-1]]].count("incorrect")
     score = round(last["accuracy"] / 10 * last["completeness"] / 100, 1)
-    reason = "按最后一次有分的朗读" + (f"，之前读错{misread}次" if misread else "")
+    reason = "From the last scored reading" + (
+        f", {count(misread, 'misread')} before" if misread else ""
+    )
     return max(0.0, round(score - MISREAD_PENALTY * misread, 1)), reason
 
 
@@ -155,9 +163,9 @@ def model_score(given, wrong: bool, drafted: bool) -> tuple[int | None, str, str
     if given is None:
         return None, NO_MODEL_SCORE if drafted else EARLIER_DRAFT, ""
     if not 0 <= given.score <= 10:
-        return None, "评价模型给分越界", "评价模型给分越界，按未知处理"
+        return None, "Score out of range", "The score was out of range, so it stays unknown"
     if wrong and given.score == 10:
-        return None, "有答错记录不能给10分", "有答错记录不能给10分，按未知处理"
+        return None, "No 10 after a wrong try", "A 10 after a wrong try is not allowed; unknown"
     return given.score, given.reason, ""
 
 

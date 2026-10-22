@@ -221,7 +221,9 @@ class Coordinator(Preparing, Teaching, Evaluating, Adopting):
                         "save": save,
                         "failure": failure,
                         "next_step": step.step_id,
-                        "required_input": ("用同一request_id重发；成功步骤不重做。",),
+                        "required_input": (
+                            "Send again with the same request_id; saved steps are not redone.",
+                        ),
                     }
                 ),
                 replace_unfinished=True,
@@ -251,7 +253,7 @@ class Coordinator(Preparing, Teaching, Evaluating, Adopting):
                 "target_ref": target.ref.model_dump(),
                 "reason": reason,
                 "owner": target.owner,
-                "release": "主责复核确切版本及当前依据后解除。",
+                "release": "Lifted after the owner checks the exact version and current evidence.",
             },
             refs=(target.ref,),
         )
@@ -260,7 +262,7 @@ class Coordinator(Preparing, Teaching, Evaluating, Adopting):
             learner_id,
             label,
             [obj],
-            publications=(publication(obj, "有范围的影响限制"),),
+            publications=(publication(obj, "Scoped impact restriction"),),
         )
         return obj
 
@@ -275,8 +277,8 @@ class Coordinator(Preparing, Teaching, Evaluating, Adopting):
             "next": next_step(self, learner_id),
             "jobs": jobs(self),
             "qualification": "not_granted",
-            "actual_api": "未验证",
-            "actual_voice": "未验证",
+            "actual_api": "unverified",
+            "actual_voice": "unverified",
             "verification": self.verification,
             "objects": [doc.model_dump(mode="json") for doc in documents],
             # The version each rewritten evaluation replaced, for the before/after view.
@@ -313,7 +315,8 @@ class Coordinator(Preparing, Teaching, Evaluating, Adopting):
                 "start_ref": start.ref.model_dump(),
                 "course_ref": start.body["course_ref"],
                 "requested_at": start.created_at.isoformat(),
-                "state": "进程丢失：实际发生与结束未知，未保存的课堂内容不可恢复。",
+                "state": "The program stopped: what happened and how the class ended are unknown; "
+                "unsaved class content cannot be restored.",
                 "reports": [
                     {"text": doc.body["text"], "reported_at": doc.body["reported_at"]}
                     for doc in reports

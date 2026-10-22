@@ -20,12 +20,15 @@ from project_j.learning.planning import (
 )
 from project_j.platform.storage import Conflict
 
-SCIENCE = {"dimension_id": "science.observation.report", "description": "实际观察报告"}
-LISTENING = {"dimension_id": "english.listening.gist", "description": "听懂短对话大意"}
+SCIENCE = {"dimension_id": "science.observation.report", "description": "Report a real observation"}
+LISTENING = {
+    "dimension_id": "english.listening.gist",
+    "description": "Get the main idea of a short talk",
+}
 NEW = {
     "dimension_id": "english.listening.gist",
-    "name": "听力大意",
-    "definition": "听短对话说出大意。",
+    "name": "Listening for the main idea",
+    "definition": "Listen to a short talk and say the main idea.",
 }
 
 
@@ -42,7 +45,7 @@ def planning_replies(application, monkeypatch, primary, new=(), keep_on_reject=T
                 return reply
             reply |= {
                 "primary_goal": primary,
-                "goal_reason": "模型理由：阅读两题都需要提示，换个方向观察。",
+                "goal_reason": "Model reason: reading needed hints; observe another way.",
                 "new_capabilities": list(new),
             }
         return reply
@@ -83,9 +86,9 @@ def test_changed_goal_waits_for_the_student(application, monkeypatch):
         step = next_step(application, LEARNER)
         assert step["kind"] == "goal"
         assert step["subject"]["demand_ref"] == demand.ref.model_dump()
-        assert step["subject"]["goal_reason"].startswith("模型理由")
+        assert step["subject"]["goal_reason"].startswith("Model reason")
         assert advance(application, LEARNER) is None
-        with pytest.raises(Conflict, match="新目标等你确认"):
+        with pytest.raises(Conflict, match="Confirm the new goal first"):
             await application.prepare("p-early", LEARNER)
 
     asyncio.run(scenario())
@@ -139,7 +142,7 @@ def test_rejecting_replans_with_the_old_goals(application, monkeypatch):
 def test_rejected_replan_that_changes_goals_again_is_refused(application, monkeypatch):
     planning_replies(application, monkeypatch, SCIENCE, keep_on_reject=False)
     demand = asyncio.run(acknowledged_lesson(application))
-    with pytest.raises(PlanningUnavailable, match="没有沿用原目标"):
+    with pytest.raises(PlanningUnavailable, match="the goals were not kept"):
         asyncio.run(application.decide_goal("goal1", LEARNER, demand.ref, "reject"))
     assert application.current(LEARNER, "demand").ref == demand.ref
 
@@ -148,26 +151,26 @@ def test_new_capability_must_be_new_and_english(application):
     current = DemandBody.model_validate(application.current(LEARNER, "demand").body)
     base = {
         "suggestion_action": "adopt",
-        "suggestion_reason": "理由",
+        "suggestion_reason": "Reason",
         "direction": "observe",
         "auxiliary_goal": current.auxiliary_goal.model_dump(),
         "prerequisites": [],
-        "sampling_requirements": ["初答"],
-        "help_requirements": ["换方法"],
-        "offscreen_requirements": "无",
-        "fallback": "无",
+        "sampling_requirements": ["First answers"],
+        "help_requirements": ["Change the way"],
+        "offscreen_requirements": "None",
+        "fallback": "None",
         "gaps": [],
         "plan_effect": "reused",
-        "plan_reason": "沿用",
+        "plan_reason": "Kept",
         "plan_patch": None,
-        "goal_reason": "理由",
+        "goal_reason": "Reason",
         "note": {"before": "a", "after": "b", "why": "c", "uncertain": [], "expectation": "d"},
     }
     known = {"english.reading.facts", "english.speaking.report"}
     ref = RevisionRef(object_id="x", revision=1)
     for proposed in (
-        {"dimension_id": "english.reading.facts", "name": "重复", "definition": "已有"},
-        {"dimension_id": "math.counting", "name": "数数", "definition": "不是英语"},
+        {"dimension_id": "english.reading.facts", "name": "Repeat", "definition": "Already there"},
+        {"dimension_id": "math.counting", "name": "Counting", "definition": "Not English"},
     ):
         draft = DemandDraft.model_validate(
             base
@@ -176,13 +179,13 @@ def test_new_capability_must_be_new_and_english(application):
                 "new_capabilities": [proposed],
             }
         )
-        with pytest.raises(PlanningUnavailable, match="新能力条目不合规"):
+        with pytest.raises(PlanningUnavailable, match="a new skill entry is not valid"):
             apply_demand_draft(draft, current, known, ref, ref, ref, plan_adjusted=False)
     placement = current.model_copy(update={"purpose": "placement"})
     same = current.model_copy(update={"goal_confirmation": None})
     assert needs_goal_confirmation(placement, same)
     assert not needs_goal_confirmation(current, same)
-    assert ProposedCapability.model_validate(NEW).name == "听力大意"
+    assert ProposedCapability.model_validate(NEW).name == "Listening for the main idea"
     assert Goal.model_validate(LISTENING).dimension_id == "english.listening.gist"
 
 
@@ -192,4 +195,4 @@ def test_goal_decision_logs_choice_only(application, monkeypatch, caplog):
     caplog.set_level(logging.INFO, logger="project_j")
     asyncio.run(application.decide_goal("goal1", LEARNER, demand.ref, "accept"))
     assert "goal decided choice=accept new=1" in caplog.text
-    assert "听力大意" not in caplog.text
+    assert "Listening for the main idea" not in caplog.text

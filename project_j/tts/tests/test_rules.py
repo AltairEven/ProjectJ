@@ -8,8 +8,11 @@ def test_generation_is_capped_by_text_length():
 
 
 def test_voice_and_model_are_versioned_and_pinned():
-    assert (rules.VOICE, rules.SPEAKER, rules.LANGUAGE) == ("teacher-1", "serena", "auto")
-    assert rules.INSTRUCT == "语气温柔亲切，像给小学生上课的老师，吐字清楚，语速稍慢。"
+    assert (rules.VOICE, rules.SPEAKER, rules.LANGUAGE) == ("teacher-2", "serena", "english")
+    assert rules.INSTRUCT == (
+        "Warm and kind, like a teacher reading to a young learner; clear and a little slow."
+    )
+    assert rules.INSTRUCT.isascii()
     assert len(rules.MODEL_FILES) == 12
     assert "speech_tokenizer/model.safetensors" in rules.MODEL_FILES
     assert rules.SAMPLE_RATE == 24000

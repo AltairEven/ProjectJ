@@ -74,7 +74,7 @@ def test_acknowledging_a_stale_evaluation_is_refused(application):
         application.feedback("note1", LEARNER, activity, "补记：读第二遍时看了提示。")
         advance(application, LEARNER)
         await wait_jobs(application)
-        with pytest.raises(Conflict, match="请查看新版本"):
+        with pytest.raises(Conflict, match="Read the new version"):
             application.acknowledge("ack-old", LEARNER, activity, old.ref)
         assert next_step(application, LEARNER)["kind"] == "evaluation"
 

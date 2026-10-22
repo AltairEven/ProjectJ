@@ -103,7 +103,7 @@ def test_a_process_that_dies_mid_stream_fails_fast(tmp_path):
 
     local, (chunks, reason), again = asyncio.run(go())
     assert chunks == [pattern("x" * 30)] and reason == "failed"
-    assert again == ([], "not_ready") and "合成进程已退出" in local.reasons()
+    assert again == ([], "not_ready") and "Speech process has stopped" in local.reasons()
 
 
 def test_truncated_and_refused_text_raise_after_what_was_delivered(tmp_path):
@@ -139,7 +139,7 @@ def test_a_cancel_that_is_never_acknowledged_kills_and_restarts_the_process(tmp_
 
     elapsed, killed, reasons, alive = asyncio.run(go())
     assert elapsed < 2 and killed and alive
-    assert "合成进程正在重新启动，请稍候" in reasons
+    assert "Speech process is restarting; please wait" in reasons
 
 
 def test_a_dead_process_comes_back_in_the_background(tmp_path, caplog):
@@ -177,7 +177,8 @@ def test_the_child_process_gets_no_api_key(tmp_path, monkeypatch):
 
 def test_a_not_ready_process_raises_unavailable(tmp_path):
     with pytest.raises(
-        SynthesizerUnavailable, match="合成进程未就绪：digest_mismatch（model.safetensors）"
+        SynthesizerUnavailable,
+        match=r"Speech process not ready: digest_mismatch \(model.safetensors\)",
     ):
         asyncio.run(synth(tmp_path, "not_ready").start())
 
@@ -185,17 +186,17 @@ def test_a_not_ready_process_raises_unavailable(tmp_path):
 def test_reasons_follow_models_probe_record_and_identity(tmp_path):
     local = synth(tmp_path)
     assert local.reasons() == [
-        "合成模型未下载，请运行 project-j-tts-init download",
-        "合成进程未启动",
+        "Speech model not downloaded; run project-j-tts-init download",
+        "Speech process not started",
     ]
     manifest = tmp_path / MODELS / "manifest.json"
     manifest.parent.mkdir(parents=True)
     manifest.write_text("{}")
-    assert local.reasons()[0] == "合成器尚未探测，请运行 project-j-tts-init probe"
-    write_init(tmp_path, passed=False, reasons=["中文合成失败：failed"])
-    assert local.reasons()[0] == "合成探针未通过：中文合成失败：failed"
+    assert local.reasons()[0] == "Speech not probed yet; run project-j-tts-init probe"
+    write_init(tmp_path, passed=False, reasons=["the story sample failed: failed"])
+    assert local.reasons()[0] == "Speech probe failed: the story sample failed: failed"
     write_init(tmp_path, manifest_sha256="0" * 64)
-    assert local.reasons()[0] == "合成模型已改动，请重新运行 project-j-tts-init probe"
+    assert local.reasons()[0] == "Speech model changed; run project-j-tts-init probe again"
 
     async def running(revision):
         write_init(tmp_path, revision=revision)
@@ -206,7 +207,8 @@ def test_reasons_follow_models_probe_record_and_identity(tmp_path):
             await local.aclose()
 
     assert asyncio.run(running("r2")) == [
-        "合成器版本、声音配置或模型与探针记录不一致，请重新运行 project-j-tts-init probe"
+        "Speech: the version, voice setup or model no longer matches the probe record; "
+        "run project-j-tts-init probe again"
     ]
     assert asyncio.run(running("r1")) == []
 

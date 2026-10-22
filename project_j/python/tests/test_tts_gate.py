@@ -10,13 +10,15 @@ from project_j.platform.tts.simulated import SimulatedSynthesizer
 
 class NotReady(SimulatedSynthesizer):
     def reasons(self):
-        return ["合成进程未启动"]
+        return ["Speech process not started"]
 
 
 def test_a_class_needs_a_ready_synthesizer(application):
     prepared = asyncio.run(application.prepare("prepare1", LEARNER))
     application.synthesizer = NotReady()
-    with pytest.raises(SynthesizerNotReady, match="语音合成未就绪：合成进程未启动"):
+    with pytest.raises(
+        SynthesizerNotReady, match="Speech is not ready: Speech process not started"
+    ):
         application.start(
             "start1",
             LEARNER,

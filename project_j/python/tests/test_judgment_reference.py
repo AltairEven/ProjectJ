@@ -50,13 +50,14 @@ def test_course_tasks_match_the_prepared_course(application):
     ("text", "intent", "purpose", "expected"),
     [
         ("a car", "answer", "answer", False),
-        ("帮我一下", "answer", "answer", True),
-        ("还是不懂", "answer", "answer", True),
+        ("Help me", "answer", "answer", True),
+        ("I still don't understand", "answer", "answer", True),
         ("I need help", "answer", "answer", True),
-        ("我不知道", "answer", "answer", False),
+        ("I don't know", "answer", "answer", False),
+        ("帮我一下", "answer", "answer", False),
         ("", "help", "answer", True),
-        ("帮我", "answer", "offscreen", True),
-        ("帮我先用中文说，纸折了", "answer", "offscreen", False),
+        ("help me", "answer", "offscreen", True),
+        ("Mom helped me; the paper was folded", "answer", "offscreen", False),
     ],
 )
 def test_is_help_request(application, text, intent, purpose, expected):
@@ -69,14 +70,45 @@ def test_is_help_request(application, text, intent, purpose, expected):
 def test_reference_set_is_valid_against_the_course():
     reference, digest = load_reference(ROOT)
     assert validate(reference, reference_tasks(ROOT)) == []
-    assert len(digest) == 64 and len(reference.cases) == 50
-    assert reference.version == "1.1.0"
+    assert len(digest) == 64 and len(reference.cases) == 54
+    assert reference.version == "2.0.0"
 
 
-def test_the_open_cases_were_added_without_changing_the_first_37():
+def test_reference_set_two_is_english():
+    from project_j.english import chinese, han
+
+    reference, _ = load_reference(ROOT)
+    chinese_cases = {"chinese", "mixed"}
+    for case in reference.cases:
+        if case.category in chinese_cases or case.case_id == "P1-chinese-report":
+            assert han(case.answer), case.case_id
+        else:
+            assert not han(case.answer), case.case_id
+        assert not chinese((case.forbidden, case.required_any)), case.case_id
+    asking = [c for c in reference.cases if c.category in chinese_cases]
+    assert len(asking) == 12
+    assert all(c.expected == "unclear" and c.required_any == ("English",) for c in asking)
+    added = {c.case_id: (c.category, c.expected) for c in reference.cases[50:]}
+    assert added == {
+        "F1-typo": ("variant", "correct"),
+        "F1-dont-understand": ("help", "help"),
+        "P1-report": ("report", "reported"),
+        "P1-chinese-report": ("report", "unclear"),
+    }
+
+
+def test_grade_fails_a_reply_with_chinese():
+    reference, _ = load_reference(ROOT)
+    case = reference.cases[0]
+    task = reference_tasks(ROOT)[case.source, case.task_id]
+    reply = ClassroomJudgment(judgment=case.expected, evidence=task.evidence, text="Good, 很好")
+    assert "chinese" in grade(case, task, reply, None)
+
+
+def test_the_open_cases_follow_the_first_37():
     reference, _ = load_reference(ROOT)
     tasks = reference_tasks(ROOT)
-    added = reference.cases[37:]
+    added = reference.cases[37:50]
     assert {case.case_id for case in added} == {
         *(f"O1-{n}" for n in ("correct", "variant", "chinese", "mixed", "incorrect", "short")),
         *(f"O1-{n}" for n in ("unclear", "help", "after-help")),
@@ -113,7 +145,7 @@ def test_validate_reports_broken_cases():
         update={
             "cases": (
                 first.model_copy(update={"task_id": "missing"}),
-                first.model_copy(update={"case_id": "x1", "answer": "帮我一下"}),  # help rule
+                first.model_copy(update={"case_id": "x1", "answer": "Help me"}),  # help rule
                 first.model_copy(update={"case_id": "x2", "forbidden": ("bridge",)}),  # own answer
                 first.model_copy(
                     update={
@@ -154,7 +186,9 @@ def case_and_task(case_id):
 async def captured_classroom_request(application, text):
     core = await start(application)
     deliver_all(core)
-    await answer(application, "听到了，先读故事再试纸桥。", "confirmation")  # now at reading-fact
+    await answer(
+        application, "Yes, I heard. Read first, then try the paper bridge.", "confirmation"
+    )  # now at reading-fact
     seen, original = [], core.models.run
 
     async def record(request):
@@ -181,13 +215,14 @@ def test_reference_request_equals_the_classroom_request(application):
     ("output", "failure", "reasons"),
     [
         (None, "timeout", ["model_failure:timeout"]),
-        ({"judgment": "incorrect", "text": "回到第二句再找找。"}, None, []),
-        ({"judgment": "correct", "text": "对。"}, None, ["judgment:correct"]),
-        ({"judgment": "incorrect", "text": "她想要一座桥。"}, None, ["leak:桥"]),
+        ({"judgment": "incorrect", "text": "Go back to the second sentence."}, None, []),
+        ({"judgment": "correct", "text": "Right."}, None, ["judgment:correct"]),
+        ({"judgment": "incorrect", "text": "She wants a bridge."}, None, ["leak:bridge"]),
+        ({"judgment": "incorrect", "text": "再找找。"}, None, ["chinese"]),
         ({"judgment": "incorrect", "text": "She wants a BRIDGE."}, None, ["leak:bridge"]),
-        ({"judgment": "incorrect", "text": "你说的是 a car，再看看。"}, None, []),
+        ({"judgment": "incorrect", "text": "You said a car. Look again."}, None, []),
         (
-            {"judgment": "incorrect", "text": "再找找。", "evidence": "别的依据"},
+            {"judgment": "incorrect", "text": "Look again.", "evidence": "other words"},
             None,
             ["evidence_changed"],
         ),
@@ -201,7 +236,7 @@ def test_grade_reasons(output, failure, reasons):
 
 def test_grade_requires_the_prepared_support():
     case, task = case_and_task("F1-help-2")
-    judged = ClassroomJudgment(judgment="help", evidence=task.evidence, text="想想她要什么。")
+    judged = ClassroomJudgment(judgment="help", evidence=task.evidence, text="Think about it.")
     assert grade(case, task, judged, None) == ["missing_required"]
 
 
@@ -216,7 +251,7 @@ def scripted_service(slow=(), invalid=()):
     cases = {
         key(reference_request(c, tasks[c.source, c.task_id]).context): c for c in reference.cases
     }
-    assert len(cases) == 50
+    assert len(cases) == 54
     service = ModelService.simulated()
 
     async def invoke(request, binding):
@@ -225,7 +260,7 @@ def scripted_service(slow=(), invalid=()):
             await asyncio.sleep(1)
         if case.case_id in invalid:
             return AdapterReply(data={"other": 1})
-        text = case.required_any[0] if case.required_any else "再看看原文。"
+        text = case.required_any[0] if case.required_any else "Look at the story again."
         data = {"judgment": case.expected, "evidence": request.context["evidence"], "text": text}
         return AdapterReply(data=data)
 
@@ -237,7 +272,7 @@ def test_run_reference_counts_failures(monkeypatch):
     monkeypatch.setattr(reference_module, "DEADLINE_SECONDS", 0.2)
     service = scripted_service(slow={"F1-variant-1"}, invalid={"B2-variant"})
     report = asyncio.run(run_reference(service, ROOT, repeats=2))
-    assert report["summary"]["total"] == 100 and report["summary"]["failed"] == 4
+    assert report["summary"]["total"] == 108 and report["summary"]["failed"] == 4
     assert report["summary"]["failed_cases"] == ["B2-variant", "F1-variant-1"]
     assert report["summary"]["all_passed"] is False
     failures = {r["failure"] for r in report["results"] if not r["passed"]}
@@ -264,7 +299,7 @@ def test_cli_writes_the_report(tmp_path, monkeypatch):
     monkeypatch.setattr(reference_module, "load_service", lambda files: scripted_service())
     assert main(["--run-id", "ref1", "--root", str(tmp_path)]) == 0
     saved = json.loads(report_path(tmp_path).read_text())
-    assert saved["summary"]["all_passed"] and saved["reference"]["cases"] == 50
+    assert saved["summary"]["all_passed"] and saved["reference"]["cases"] == 54
 
 
 def test_cli_refuses_existing_report(tmp_path, monkeypatch):
