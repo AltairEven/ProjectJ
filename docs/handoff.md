@@ -926,7 +926,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## EN 全英文
 
-- 状态：程序实现、模拟自测与真实核对完成，未提交（2026年10月22日）。用户确认设计（docs/superpowers/specs/2026-10-22-all-english-design.md）与计划（docs/superpowers/plans/2026-10-22-all-english.md，10个任务），在main上按计划内联实施；真实核对前停下问过用户一次，用户同意三项都做。等用户在沙盒确认界面、说“提交”后本地提交。
+- 状态：程序实现、模拟自测与真实核对完成，用户试听en-voice.wav并在沙盒确认界面后要求提交，已本地提交2915d09（2026年10月22日）。用户确认设计（docs/superpowers/specs/2026-10-22-all-english-design.md）与计划（docs/superpowers/plans/2026-10-22-all-english.md，10个任务），在main上按计划内联实施；真实核对前停下问过用户一次，用户同意三项都做。等用户在沙盒确认界面、说“提交”后本地提交。
 - 负责人/集成：Claude Opus。审查由主会话自做，未派审查子代理。
 - 范围：软件全英文（[ADR-0021](../decisions/ADR-0021.md)）：页面、Jane的话与预合成语音、模型写给学生的内容一律英文，按学生蓝思值写（未填按初学者）；作答一律英文，中文作答判含糊并提醒“Please answer in English.”，不算答错、不扣分、不用掉帮助；不提供查词或翻译；不计分的自由文字（建档聊天、资料修改、课后补记与异议、课程修改意见、自写题材）任何语言都接受。
 - 文件边界：以计划各任务的Files为准；另改docs/technology.md与design/interface/student-classroom.md、input-submission.md、design/classroom/interaction-harness.md（按钮与台词名称）。
@@ -936,4 +936,4 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 真实核对（用户同意后运行；细节记本机project_j/test/records/en-reference-20261022.md与en-format-check-20261022.md）：合成器探针重跑通过（两句英文有声，首段264/285毫秒，RTF约0.77，取消237毫秒），试听样例project_j/test/output/en-voice.wav待用户试听；参考题集2.0.0（54题，sha256 bf7fb21a71724e88447d1bb5c9a93ae78a4bf3d7974401d0ea69f6e1d2971eb5）用codex:gpt-6.1-sol:low:fast跑1遍54/54通过，判断耗时中位4171毫秒、95分位5410毫秒，工程摘要21cc214b1b9cb8b80cbb0051dd49c3d236cd537a183942820f92750c4be7a40c（其后只改了核心求助判定与文档），人工阅读全部回应：全英文、没有说出答案词、没有“evidence”类说法；格式核对（运行编号en-format-check，codex:gpt-6.1-sol:xhigh）：评价83秒、9题都有分、无规则调整，中文作答那次未记成答错，中文补记逐字引用未导致失败；资料整理25秒，中英混合聊天整理成英文；规划155秒，需求与4个题材建议英文；周复盘50秒英文并调整了周计划；复核需求后备课376秒、第一稿即过规则（练习课9题6种题型、预计25分钟），课程与课程详情无中文。两个运行编号已用project-j-reset清空，未写入me。
 - 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check含主工程666、评分39、合成15项pytest，前端72、文档1，UTC 2026-10-22T00:39:48.903183+00:00，工程摘要0ddbd61ea163d5f54d1a59179b9ad9642f475dfa990bd10ce7293b5359cef473，检查戳actual_api为unverified。收尾小问题（用户要求一并改）：发布理由与台账文字改英文；合成器身份不一致的提示改为“Speech: the version, voice setup or model no longer matches the probe record”（测试先失败后通过）；合成规则注释改为探针实测的英文语速（约0.09秒/字符）；两个前端测试的中文测试数据改英文；design/interface/main-page.md的历史事件注明按钮现名“Hear Jane ask”。沙盒主页快照变大（73 KB→174 KB）核实为真实变化：旧快照是QT批次前的课程（6题、4种题型、9个资源），新快照对应现行模拟课程（11题、9种题型、38个资源），不裁剪。之后统一check再次通过（720项测试），UTC 2026-10-22T01:15:12.733111+00:00，工程摘要bc7dc2d0fb3800d1c94f8bd60dfcde296aff5e1d9ae4caafd6e7d8e8cce7314c。
 - 未验证：学生实际上课时英文难度是否合适、中文作答提醒的体验；真实课堂里Jane现场回应的英文语音（只试听了一句样例）；参考题集只跑1遍；真实备课只核对1次，未见朗读题与配对题；旧的模拟运行数据仍是中文，照原样显示。
-- 继续条件：参考题集2.0.0已真实跑通过，这一版的课堂判断可用于正式学习；请用户试听en-voice.wav并在沙盒（课堂各场景与/app.html）确认界面；用户说“提交”后本地提交。
+- 继续条件：参考题集2.0.0已真实跑通过，这一版的课堂判断可用于正式学习；用户已试听en-voice.wav、在沙盒确认界面，已本地提交2915d09。
