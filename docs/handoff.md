@@ -953,7 +953,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## LVL 文章难度档位
 
-- 状态：程序实现、模拟自测与两次真实备课核对完成，用户读过第一篇认可难度；用户在沙盒里发现选题材白屏（原有问题，已修）后要求提交，已本地提交（2026年10月22日）。用户确认设计（docs/superpowers/specs/2026-10-22-story-difficulty-design.md）与计划（docs/superpowers/plans/2026-10-22-story-difficulty.md，6个任务），选择在当前会话内联实施。
+- 状态：程序实现、模拟自测与两次真实备课核对完成，用户读过第一篇认可难度；用户在沙盒里发现选题材白屏（原有问题，已修）后要求提交，已本地提交1a0d95d（2026年10月22日）。用户确认设计（docs/superpowers/specs/2026-10-22-story-difficulty-design.md）与计划（docs/superpowers/plans/2026-10-22-story-difficulty.md，6个任务），选择在当前会话内联实施。
 - 负责人/集成：Claude Opus。审查由主会话自做，未派审查子代理。
 - 范围：故事按“学生蓝思值+档位”的目标值写、词数按目标值区间；档位存在学习资料里，选题材与学习资料表单可改；学生认可评价时评“太难/正好/太简单”自动调档；长故事只朗读一段（[ADR-0023](../decisions/ADR-0023.md)）。课堂判断请求、Jane的评价与规划不变。
 - 文件边界：以计划各任务的Files为准；另生成web/schema/openapi.json与web/src/client/types.gen.ts。
