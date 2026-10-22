@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from project_j.contracts import Contract, RevisionRef
-from project_j.learning.contracts import SKILLS, DemandBody, Goal, Help
+from project_j.learning.contracts import SKILLS, Challenge, DemandBody, Goal, Help
 from project_j.preparation.reading import MAX_SEGMENT_WORDS, sentences, words
 from project_j.preparation.task_types import (
     CONTENT_TYPES,
@@ -145,6 +145,15 @@ class ResourceSpec(Contract):
         return self
 
 
+class StoryLevel(Contract):
+    """The Lexile a story aims at and its word range; a target, never a measurement."""
+
+    lexile: str
+    challenge: Challenge | None  # None: the placement lesson adds no step.
+    target: str
+    words: tuple[int, int]
+
+
 class CourseBody(Contract):
     status: Literal["checked"] = "checked"
     demand_ref: RevisionRef
@@ -162,6 +171,7 @@ class CourseBody(Contract):
     parent_preview: dict[str, str]
     # Jane's opening reading tip (ADR-0022); courses saved before it have none.
     reading_focus: str | None = None
+    story_level: StoryLevel | None = None  # None: no Lexile, or an older course.
     limitations: tuple[str, ...]
     resources: tuple[ResourceSpec, ...] = ()
 

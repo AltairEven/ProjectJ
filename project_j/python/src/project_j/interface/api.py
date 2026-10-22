@@ -37,6 +37,7 @@ from project_j.application.progress import advance, jobs, next_step, retry, run
 from project_j.classroom.harness import AllowedAction, DeliveryFeedback, Harness
 from project_j.contracts import Contract, Document, RevisionRef
 from project_j.evaluation.assessment import EvaluationUnavailable
+from project_j.learning.contracts import Challenge, Rating
 from project_j.learning.fixtures import initialize
 from project_j.learning.maintenance import decide, review, revise_demand_after_plan
 from project_j.learning.onboarding import (
@@ -108,6 +109,7 @@ class LostReportRequest(ActivityRequest):
 
 class AcknowledgeRequest(ActivityRequest):
     evaluation_ref: RevisionRef
+    rating: Rating | None = None  # How the story felt; moves the story step.
 
 
 class LexileRequest(ParentRequest):
@@ -132,6 +134,7 @@ class FocusRequest(ParentRequest):
     topic: str
     skills: list[str]
     note: str | None = None
+    challenge: Challenge | None = None
 
 
 class ReviewRequest(ParentRequest):
@@ -775,12 +778,17 @@ def create_app(
             request.topic,
             request.skills,
             request.note,
+            request.challenge,
         )
 
     @app.post("/api/evaluation/acknowledge", dependencies=[Depends(operator)])
     async def acknowledge(request: AcknowledgeRequest):
         return controller().acknowledge(
-            request.request_id, request.learner_id, request.activity_id, request.evaluation_ref
+            request.request_id,
+            request.learner_id,
+            request.activity_id,
+            request.evaluation_ref,
+            request.rating,
         )
 
     @app.post("/api/lost-report", dependencies=[Depends(operator)])

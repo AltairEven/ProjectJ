@@ -62,6 +62,12 @@ export function inOnboarding(dashboard: { next?: { kind: string } | null, object
 export const initialFocus = (suggestions: { skill_id: string }[]): string[] => suggestions.map(item => item.skill_id)
 
 /** Mirrors the server: a topic of 1–100 characters, at most three skills and a short note. */
+/** The chosen topic by its place in the list; the list may change while the page is open. */
+export function chosenTopic(choice: number | 'own' | null, topics: { title: string }[], own: string): string {
+  if (choice === 'own') return own.trim()
+  return choice === null ? '' : topics[choice]?.title ?? ''
+}
+
 export function focusError(count: number, note: string, topic: string): string | null {
   if (!topic.trim()) return 'Choose a topic, or write what you want to read about.'
   if (topic.trim().length > 100) return 'A topic can have at most 100 characters.'

@@ -572,6 +572,7 @@ def template_draft(
             if task.purpose != "read_aloud"
         ],
         "read_aloud": True,
+        "read_aloud_passage": None,  # The library stories are short enough to read whole.
         "demand_mapping": [
             {"index": index, "implementation": item.implementation, "task_ids": ids(item.task_ids)}
             for index, item in enumerate(mapping)

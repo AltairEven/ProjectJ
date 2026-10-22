@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { api, fileUrl, show, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
-import { courseRows, latestFact, needsMaterials, previewLabels, previewOf, previewRank, retakeOffered } from '../courses'
+import { courseRows, latestFact, needsMaterials, previewLabels, previewOf, previewRank, retakeOffered, storyLevelLine } from '../courses'
 import { discussionLines, resourceLines } from '../report'
 import { JobLine, Rows, useRun, type PageProps } from '../ui'
 
@@ -53,6 +53,7 @@ function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & 
     <section className="preview"><h2>{String(content?.story ?? 'Lesson details')}</h2><p>Status: {state} (version {course.revision})</p>
       {content ? <Rows rows={Object.entries(content).sort(([a], [b]) => previewRank(a) - previewRank(b)).map(([key, value]) => [previewLabels[key] ?? key, show(value)])} />
         : <p>The details are not here yet.</p>}
+      {storyLevelLine(course) && <Rows rows={[['Story level', storyLevelLine(course)]]} />}
       {preview?.body.note ? <p>Note: {String(preview.body.note)}</p> : null}
       {preview && <Rows rows={discussionLines(preview.body)} />}</section>
     {status}

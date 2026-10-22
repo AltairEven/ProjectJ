@@ -12,8 +12,15 @@ from project_j.curriculum.corrections import release_rechecked
 from project_j.english import chinese
 from project_j.learning.adoption import adopt_state
 from project_j.learning.catalog import Capability, define
-from project_j.learning.contracts import DemandBody, LearningState
+from project_j.learning.contracts import (
+    Challenge,
+    DemandBody,
+    LearningState,
+    ProfileBody,
+    challenge_of,
+)
 from project_j.learning.maintenance import LEVELS
+from project_j.learning.onboarding import revised
 from project_j.learning.planning import (
     PlanningUnavailable,
     apply_demand_draft,
@@ -406,14 +413,16 @@ class Adopting:
         topic: str,
         skills: list[str],
         note: str | None,
+        challenge: Challenge | None = None,
     ) -> dict:
         """The student's topic and ticks for the next lesson, a new demand revision; preparation
-        waits for it."""
+        waits for it. A changed story step is a new profile revision in the same step."""
         signature = {
             "demand_ref": demand_ref.model_dump(),
             "topic": topic,
             "skills": list(skills),
             "note": note,
+            "challenge": challenge,
         }
         completed = self.ledger.completed_request(request_id, learner_id, "focus", signature)
         if completed:
@@ -429,13 +438,16 @@ class Adopting:
                 "skill_note": (note or "").strip() or None,
             }
         )
+        profile = self.current(learner_id, "profile")
+        changed = challenge is not None and challenge != challenge_of(profile.body)
+        baselines = (demand.ref, profile.ref) if changed else (demand.ref,)
         operation = self.request(
             request_id,
             learner_id,
             "focus",
             signature,
             sources=(demand.ref,),
-            baselines=(demand.ref,),
+            baselines=baselines,
         )
         result = self.ledger.result(operation, learner_id)
         if result:
@@ -450,22 +462,33 @@ class Adopting:
                 sources=demand.source_refs,
                 occurred_at=demand.occurred_at,
             )
+            objects = [obj]
+            publications = [
+                publication(obj, "The student chose the topic and skills for this lesson")
+            ]
+            if changed:
+                body = ProfileBody.model_validate(profile.body)
+                step = revised(
+                    operation, learner_id, profile, body.model_copy(update={"challenge": challenge})
+                )
+                objects.append(step)
+                publications.append(publication(step, "The student chose how hard stories are"))
             saved = self.save_step(
                 operation,
                 learner_id,
                 "demand",
-                [obj],
-                publications=(
-                    publication(obj, "The student chose the topic and skills for this lesson"),
-                ),
-                baselines=(demand.ref,),
+                objects,
+                publications=tuple(publications),
+                baselines=baselines,
             )
         listed = chosen.topic in {item.title for item in chosen.topic_suggestions}
         log.info(
-            "focus chosen topic=%s skills=%d note=%s",
+            "focus chosen topic=%s skills=%d note=%s challenge=%s changed=%s",
             "suggested" if listed else "own",
             len(skills),
             chosen.skill_note is not None,
+            challenge or "kept",
+            "true" if changed else "false",
         )
         return self.ledger.finish(operation, learner_id, {"demand_ref": saved[0].ref.model_dump()})
 

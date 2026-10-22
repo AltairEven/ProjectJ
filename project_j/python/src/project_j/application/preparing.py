@@ -15,7 +15,8 @@ from project_j.platform.storage import (
     Conflict,
     digest,
 )
-from project_j.preparation.contracts import CourseBody
+from project_j.preparation.contracts import CourseBody, StoryLevel
+from project_j.preparation.difficulty import story_level
 from project_j.preparation.drafting import (
     OPEN_IN_STUDY,
     DraftRejected,
@@ -205,6 +206,7 @@ class Preparing:
                 self.recent_titles(learner_id),
                 lesson_score_summary(self, learner_id, "preparation"),
                 self.open_allowed(),
+                level=story_level(profile.body, body.purpose == "placement"),
             )
             refs = {
                 "course": RevisionRef(object_id=identity(operation, "course"), revision=1),
@@ -314,6 +316,7 @@ class Preparing:
                 self.recent_titles(learner_id),
                 lesson_score_summary(self, learner_id, "preparation"),
                 self.open_allowed(),
+                level=story_level(profile.body, body.purpose == "placement"),
             )
             request = discussion_request(
                 base, preview.body["draft"], feedback, preview.body["discussion"]
@@ -462,6 +465,17 @@ class Preparing:
             for doc in self.store.list_current(demand.learner_id, "capability")
         }
         factors = self.calibration(demand.learner_id)
+        level = request.context["story_level"]
+        level = StoryLevel.model_validate(level) if level else None
+        if level:
+            log.info(
+                "preparation story level challenge=%s target=%s words=%d-%d",
+                level.challenge or "none",
+                level.target,
+                *level.words,
+            )
+        else:
+            log.info("preparation story level none")
         for attempt in (1, 2):
             reply = await self.models.run(request)
             if not reply.ok:
@@ -482,6 +496,7 @@ class Preparing:
                     offscreen_allowed=bool(request.context["profile"].get("materials")),
                     open_allowed=request.context["open_allowed"],
                     factors=factors,
+                    level=level,
                 )
             except DraftRejected as rejected:
                 codes = ",".join(dict.fromkeys(code for code, _ in rejected.problems))

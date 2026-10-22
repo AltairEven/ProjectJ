@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api, uid } from '../api'
 import { decodePcm16, encodeWav } from '../audio'
 import type { Document as Doc, JobRow, RevisionRef as Ref } from '../client/types.gen'
+import { CHALLENGES, challengeOption } from '../learning'
 import { chatComplete, lexileError } from '../onboarding'
 import { evaluationLines } from '../report'
 import { JobLine, Progress, Rows, useRun, type PageProps } from '../ui'
@@ -91,15 +92,18 @@ export function ProfileForm({ token, learner, refresh, profile, evaluation, obje
   const [draft, setDraft] = useState<Record<string, string>>(() => Object.fromEntries(keys.map(key => [key, body[key] ?? ''])))
   const edit = (key: string) => (event: { target: { value: string } }) => setDraft(current => ({ ...current, [key]: event.target.value }))
   const lexile = lexileError(draft.lexile)
+  const [challenge, setChallenge] = useState(String(body.challenge ?? 'challenge'))
   return <section><h2>{title}</h2><p>{intro}</p>
     <label>Lexile<input value={draft.lexile} onChange={edit('lexile')} /></label>
     {lexile && <p className="notice">{lexile}</p>}
+    <label>Story difficulty<select value={challenge} onChange={event => setChallenge(event.target.value)}>
+      {CHALLENGES.map(([name, , step]) => <option key={name} value={name}>{challengeOption(name, step ? `+${step}L` : undefined)}</option>)}</select></label>
     {fields.map(([key, label]) => <label key={key}>{label}<textarea value={draft[key]} onChange={edit(key)} /></label>)}
     <label>Things you have at hand (optional; without them, lessons have no tasks away from the screen)<textarea value={draft.materials} onChange={edit('materials')} /></label>
     {evaluation && <><h3>First lesson evaluation</h3><Rows rows={evaluationLines(evaluation, objects)} /><p>Confirming your profile also acknowledges this evaluation.</p></>}
     {status}
     <button disabled={busy || lexile !== null || fields.some(([key]) => !draft[key].trim())} onClick={() => { const requestId = uid(); void run(async () => {
-      await api(token, 'profile', { request_id: requestId, learner_id: learner, ...draft, materials: draft.materials.trim() || null })
+      await api(token, 'profile', { request_id: requestId, learner_id: learner, ...draft, materials: draft.materials.trim() || null, challenge })
       setMessage('Your profile is saved.')
     }, 'Saving your profile') }}>{action}</button></section>
 }

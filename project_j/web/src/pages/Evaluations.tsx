@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
-import { evaluationRows } from '../learning'
+import { canRate, evaluationRows, RATINGS, ratingHint, ratingOf } from '../learning'
 import { endLabels, evaluationLines, readingLine, revisionChanges } from '../report'
 import { Rows, useRun, type PageProps } from '../ui'
 
@@ -23,10 +23,14 @@ function attemptRows(fact: Doc): [string, string][] {
 function Detail({ token, dashboard, learner, go, refresh, fact }: PageProps & { fact: Doc }) {
   const { busy, run, setMessage, status } = useRun(refresh)
   const [note, setNote] = useState('')
+  const [rating, setRating] = useState<string | null>(null)
   const objects = dashboard.objects ?? []
   const activity = String(fact.body.activity_id)
   const reading = readingLine((fact.body.events ?? []) as { kind: string, payload: Record<string, unknown> }[])
   const row = evaluationRows(objects).find(item => item.activity_id === activity)
+  const rated = ratingOf(activity, objects)
+  const challenge = String(objects.find(doc => doc.kind === 'profile')?.body.challenge ?? 'challenge')
+  const hint = rating ? ratingHint(challenge, rating) : null
   const evaluation = objects.find(doc => doc.kind === 'evaluation' && doc.body.activity_id === activity)
   const previous = (dashboard.previous_evaluations ?? []).find(doc => doc.object_id === evaluation?.object_id)
   const notes = objects.filter(doc => doc.kind === 'feedback' && doc.body.activity_id === activity)
@@ -37,7 +41,7 @@ function Detail({ token, dashboard, learner, go, refresh, fact }: PageProps & { 
     <button className="quiet" onClick={() => go('evaluations')}>← All evaluations</button>
     <section><h2>{storyOf(fact, objects)}</h2>
       <Rows rows={[['Status', row?.state], ['Ended', endLabels[String((fact.body.end as Record<string, unknown>)?.reason)] ?? 'Unknown'],
-        ...(reading ? [['Reading', reading] as [string, string]] : [])]} />
+        ...(reading ? [['Reading', reading] as [string, string]] : []), ...(rated ? [['Your rating', rated] as [string, string]] : [])]} />
       <h3>Your answers and help</h3><Rows rows={attemptRows(fact)} />
       {row?.state !== 'Evaluating' && evaluation ? <><h3>Evaluation</h3><Rows rows={evaluationLines(evaluation, objects)} /></> : <p>The evaluation is being written; this page updates by itself.</p>}
       {row?.state !== 'Evaluating' && evaluation && previous && <><h3>Compared with the last version (version {previous.revision} → version {evaluation.revision})</h3>
@@ -48,9 +52,13 @@ function Detail({ token, dashboard, learner, go, refresh, fact }: PageProps & { 
     {status}
     {row && row.state !== 'Acknowledged' && <section><h2>Add a note or object</h2>
       <label>Help that was not recorded, what happened away from the screen, or what you disagree with<textarea value={note} onChange={event => setNote(event.target.value)} /></label>
+      {row.evaluation_ref && canRate(fact, objects) && <fieldset className="skills"><legend>How was this story?</legend>
+        {RATINGS.map(([key, label]) => <label key={key} className="check">
+          <input type="radio" name="rating" checked={rating === key} onChange={() => setRating(key)} />{label}</label>)}</fieldset>}
+      {hint && <p className="hint">{hint}</p>}
       <div className="row"><button className="quiet" disabled={busy || !note.trim()} onClick={() => send(false)}>Add a note</button>
         <button className="quiet" disabled={busy || !note.trim()} onClick={() => send(true)}>Object</button>
-        {row.evaluation_ref && <button disabled={busy} onClick={() => { const body = { request_id: uid(), learner_id: learner, activity_id: activity, evaluation_ref: row.evaluation_ref }
+        {row.evaluation_ref && <button disabled={busy} onClick={() => { const body = { request_id: uid(), learner_id: learner, activity_id: activity, evaluation_ref: row.evaluation_ref, rating: canRate(fact, objects) ? rating : null }
           void run(async () => { await api(token, 'evaluation/acknowledge', body) }, 'Acknowledging') }}>Acknowledge</button>}</div></section>}
     {row?.state === 'Acknowledged' && evaluation && <section><h2>Correct something</h2>
       <p>Found a mistake? Add a correction. Jane evaluates again with it, and you acknowledge the new version; the old evaluation and record stay.</p>

@@ -55,3 +55,35 @@ export function goalCard(demand: Shape, catalog: Shape[]) {
     newCapabilities: proposed.map(item => `${item.name}: ${item.definition}`),
   }
 }
+
+/** The story steps above the student's Lexile (ADR-0023): name, label, Lexile added. */
+export const CHALLENGES: [string, string, number][] = [
+  ['same', 'Same as my level', 0], ['little', 'A little harder', 50], ['challenge', 'Challenge', 100], ['harder', 'Harder', 150],
+]
+export const RATINGS: [string, string][] = [['too_hard', 'Too hard'], ['just_right', 'Just right'], ['too_easy', 'Too easy']]
+
+export function challengeOption(name: string, extra?: string) {
+  const label = CHALLENGES.find(([key]) => key === name)?.[1] ?? name
+  return extra ? `${label} (${extra})` : label
+}
+
+/** Only a first reading of a story written at a step, before any acknowledgement (server rule). */
+export function canRate(fact: Shape, objects: Shape[]) {
+  const activity = fact.body.activity_id
+  const course = objects.find(doc => doc.kind === 'course' && doc.object_id === fact.body.course_ref?.object_id && doc.revision === fact.body.course_ref?.revision)
+  const first = ((fact.body.events ?? []) as Body[]).some(event => ['reading_finished', 'reading_unfinished'].includes(event.kind) && event.payload?.first_reading)
+  const acknowledged = objects.some(doc => doc.kind === 'report' && doc.body.activity_id === activity && doc.body.acknowledged_ref)
+  return Boolean(course?.body.story_level?.challenge) && first && !acknowledged
+}
+
+export function ratingOf(activity: string, objects: Shape[]) {
+  const rating = objects.find(doc => doc.kind === 'report' && doc.body.activity_id === activity && doc.body.story_rating)?.body.story_rating
+  return RATINGS.find(([key]) => key === rating)?.[1] ?? null
+}
+
+export function ratingHint(challenge: string, rating: string) {
+  const where = 'update your Lexile measure in Your profile on the Progress page.'
+  if (challenge === 'harder' && rating === 'too_easy') return `You are already at the hardest setting. If stories feel easy, ${where}`
+  if (challenge === 'same' && rating === 'too_hard') return `You are already at the easiest setting. If stories feel hard, ${where}`
+  return null
+}

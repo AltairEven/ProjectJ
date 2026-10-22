@@ -19,6 +19,8 @@ from project_j.evaluation.assessment import (
     next_suggestion,
 )
 from project_j.evaluation.scoring import scoring_counts
+from project_j.learning.contracts import ProfileBody, Rating, challenge_of, rated
+from project_j.learning.onboarding import revised
 from project_j.platform.storage import (
     Conflict,
 )
@@ -30,6 +32,17 @@ NOTHING_TO_ADD = {"nothing to add", "nothing more to add", "无额外补充"}
 
 def nothing_to_add(text: str) -> bool:
     return text.strip().rstrip(".!。！").casefold() in NOTHING_TO_ADD
+
+
+def story_rateable(course: dict, events: list[dict]) -> bool:
+    """Only a first reading of a story written at a chosen step can move the step (ADR-0023):
+    not a review, a retake, the placement lesson or a course from before the steps."""
+    level = course.get("story_level")
+    return bool(level and level.get("challenge")) and any(
+        event["kind"] in {"reading_finished", "reading_unfinished"}
+        and event["payload"].get("first_reading")
+        for event in events
+    )
 
 
 class Evaluating:
@@ -208,11 +221,28 @@ class Evaluating:
             return mark
         return None
 
+    def rateable(self, learner_id: str, activity_id: str) -> bool:
+        fact = self.store.current(identity(activity_id, "fact"), learner_id)
+        if fact is None:
+            return False
+        course = self.store.read(RevisionRef.model_validate(fact.body["course_ref"]), learner_id)
+        return story_rateable(course.body, fact.body.get("events", []))
+
     def acknowledge(
-        self, request_id: str, learner_id: str, activity_id: str, evaluation_ref: RevisionRef
+        self,
+        request_id: str,
+        learner_id: str,
+        activity_id: str,
+        evaluation_ref: RevisionRef,
+        rating: Rating | None = None,
     ) -> dict:
-        """The student accepts one exact evaluation version; adoption may then go on."""
-        signature = {"activity_id": activity_id, "evaluation_ref": evaluation_ref.model_dump()}
+        """The student accepts one exact evaluation version; adoption may then go on. A rating
+        of the story moves the story step in the same saving step (ADR-0023)."""
+        signature = {
+            "activity_id": activity_id,
+            "evaluation_ref": evaluation_ref.model_dump(),
+            "rating": rating,
+        }
         completed = self.ledger.completed_request(request_id, learner_id, "acknowledge", signature)
         if completed:
             return completed
@@ -224,12 +254,24 @@ class Evaluating:
             )
         if current.source_revision != self.source_revision(activity_id, learner_id)[0]:
             raise Conflict("The evaluation was updated. Read the new version, then acknowledge it.")
+        prior = self.store.current(identity(activity_id, "acknowledgement"), learner_id)
+        profile = self.current(learner_id, "profile")
+        before = after = challenge_of(profile.body)
+        if rating is not None:
+            if prior is not None or not self.rateable(learner_id, activity_id):
+                raise ValueError("This story cannot be rated.")
+            after = rated(before, rating)
+        baselines = (profile.ref,) if after != before else ()
         operation = self.request(
-            request_id, learner_id, "acknowledge", signature, sources=(current.ref,)
+            request_id,
+            learner_id,
+            "acknowledge",
+            signature,
+            sources=(current.ref,),
+            baselines=baselines,
         )
         saved = self.saved_step(operation, learner_id, "acknowledgement")
         if saved is None:
-            prior = self.store.current(identity(activity_id, "acknowledgement"), learner_id)
             obj = document(
                 "report",
                 identity(activity_id, "acknowledgement"),
@@ -239,20 +281,36 @@ class Evaluating:
                     "status": "checked",
                     "activity_id": activity_id,
                     "acknowledged_ref": current.ref.model_dump(),
-                },
+                }
+                | ({"story_rating": rating} if rating else {}),
                 refs=(current.ref,),
                 revision=prior.revision + 1 if prior else 1,
             )
+            objects = [obj]
+            publications = [publication(obj, "The student acknowledged this evaluation version")]
+            if after != before:
+                body = ProfileBody.model_validate(profile.body)
+                step = revised(
+                    operation, learner_id, profile, body.model_copy(update={"challenge": after})
+                )
+                objects.append(step)
+                publications.append(publication(step, "The student's rating moved the story step"))
             saved = self.save_step(
                 operation,
                 learner_id,
                 "acknowledgement",
-                [obj],
-                publications=(
-                    publication(obj, "The student acknowledged this evaluation version"),
-                ),
+                objects,
+                publications=tuple(publications),
+                baselines=baselines,
             )
-        log.info("evaluation acknowledged activity=%s revision=%d", activity_id, current.revision)
+        log.info(
+            "evaluation acknowledged activity=%s revision=%d rating=%s challenge=%s->%s",
+            activity_id,
+            current.revision,
+            rating or "none",
+            before,
+            after,
+        )
         return self.ledger.finish(
             operation,
             learner_id,

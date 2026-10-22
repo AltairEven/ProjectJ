@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { api, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
 import { dateText } from '../dates'
-import { byNewest } from '../learning'
-import { focusError, initialFocus, nextStepView } from '../next-step'
+import { byNewest, CHALLENGES, challengeOption } from '../learning'
+import { chosenTopic, focusError, initialFocus, nextStepView } from '../next-step'
 import { endLabels } from '../report'
 import { JobLine, Rows, useRun, type PageProps } from '../ui'
 
@@ -21,12 +21,14 @@ function FocusPicker({ token, learner, refresh, subject }: Pick<PageProps, 'toke
   const [own, setOwn] = useState('')
   const [picked, setPicked] = useState(() => initialFocus(suggestions))
   const [note, setNote] = useState('')
-  const topic = choice === 'own' ? own.trim() : choice === null ? '' : topics[choice].title
+  const [challenge, setChallenge] = useState<string>(subject.challenge ?? 'challenge')
+  const targets: Record<string, string> = subject.targets ?? {}
+  const topic = chosenTopic(choice, topics, own)
   const error = focusError(picked.length, note, topic)
   const reasons = new Map(suggestions.map(item => [item.skill_id, item.reason]))
   const toggle = (id: string, on: boolean) => setPicked(current => on ? [...current, id] : current.filter(item => item !== id))
   const send = () => {
-    const body = { request_id: uid(), learner_id: learner, demand_ref: subject.demand_ref, topic, skills: picked, note: note.trim() || null }
+    const body = { request_id: uid(), learner_id: learner, demand_ref: subject.demand_ref, topic, skills: picked, note: note.trim() || null, challenge }
     void run(async () => { await api(token, 'focus', body) }, 'Saving your choice')
   }
   return <>
@@ -37,6 +39,10 @@ function FocusPicker({ token, learner, refresh, subject }: Pick<PageProps, 'toke
         {item.title}<span className="tag">{item.reason}</span></label>)}
       {topics.length > 0 && <label className="check"><input type="radio" name="topic" checked={choice === 'own'} onChange={() => setChoice('own')} />Something else:</label>}
       <input aria-label="My own topic" placeholder="Write what you want to read about" value={own} onFocus={() => setChoice('own')} onChange={event => setOwn(event.target.value)} /></fieldset>
+    <fieldset className="skills"><legend>Story difficulty</legend>
+      {CHALLENGES.map(([name]) => <label key={name} className="check">
+        <input type="radio" name="challenge" checked={challenge === name} onChange={() => setChallenge(name)} />
+        {challengeOption(name, targets[name])}</label>)}</fieldset>
     <p className="hint">Things to practise (up to 3, or none)</p>
     {[...new Set(options.map(item => item.group))].map(group => <fieldset key={group} className="skills"><legend>{group}</legend>
       {options.filter(item => item.group === group).map(item => <label key={item.skill_id} className="check">

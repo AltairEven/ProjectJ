@@ -19,7 +19,9 @@ SCIENCE = "science.observation.report"
 NEW_STORY = (
     "Sam has a red cup. He fills it with water. The cup is heavy now. "
     "Sam pours the water into a bowl. The cup is light again. "
-    "Sam smiles and puts the cup on the table."
+    "Sam smiles and puts the cup on the table. "
+    # The simulated profile is 500L at the default step, so a written story has 250-450 words.
+    + " ".join(["The kitchen is quiet and the sun is warm today."] * 22)
 )
 KINDS = ("course", "material", "brief", "preview", "content_check")
 
@@ -94,6 +96,7 @@ def science_draft(context, evidence="He fills it with water."):
             },
         ],
         "read_aloud": False,
+        "read_aloud_passage": None,
         "demand_mapping": [
             {
                 "index": item["index"],

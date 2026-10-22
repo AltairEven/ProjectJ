@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { focusError, inOnboarding, initialFocus, jobLines, nextStepView, pages } from '../src/next-step.ts'
+import { chosenTopic, focusError, inOnboarding, initialFocus, jobLines, nextStepView, pages } from '../src/next-step.ts'
 
 const kinds = ['lexile', 'chat', 'placement', 'profile', 'class', 'interrupted', 'decision', 'evaluation',
   'goal', 'focus', 'course', 'resources', 'waiting', 'none']
@@ -95,4 +95,12 @@ test('a stopped class can be acknowledged as it is or taken again', () => {
 test('an evaluation written again after the student\'s correction asks to be acknowledged again', () => {
   const view = nextStepView({ kind: 'evaluation', subject: { ...subjects.evaluation, corrected: true } })
   assert.deepEqual([view.title, view.action, view.detail], ['The evaluation was rewritten after your correction. Please acknowledge it again.', 'Read and acknowledge', 'a1'])
+})
+
+test('a chosen topic that is no longer listed is no topic, not a crash', () => {
+  const topics = [{ title: 'Boats' }, { title: 'Bridges' }]
+  assert.equal(chosenTopic(1, topics, ''), 'Bridges')
+  assert.equal(chosenTopic(1, [], ''), '')  // Jane listed other topics while the page was open.
+  assert.equal(chosenTopic('own', [], '  Trains '), 'Trains')
+  assert.equal(chosenTopic(null, topics, ''), '')
 })

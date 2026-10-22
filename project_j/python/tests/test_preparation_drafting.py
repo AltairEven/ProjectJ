@@ -11,8 +11,10 @@ from project_j.curriculum.content import check_content
 from project_j.learning.contracts import DemandBody, Goal
 from project_j.platform.models.contracts import Binding
 from project_j.platform.models.simulated import SimulatedAdapter
-from project_j.preparation.contracts import demand_requirements
+from project_j.preparation import reading
+from project_j.preparation.contracts import StoryLevel, demand_requirements
 from project_j.preparation.drafting import (
+    PREPARATION_INSTRUCTIONS,
     CourseDraft,
     DraftRejected,
     PreparationUnavailable,
@@ -48,7 +50,7 @@ def initial(application):
     }
 
 
-def build(application, template=True):
+def build(application, template=True, level=None):
     demand, data = initial(application)
     library = [
         library_entry(source, story_text((ROOT / source).read_text()), False) for source in COURSES
@@ -63,6 +65,7 @@ def build(application, template=True):
         FIRST,
         template_draft(demand, FIRST, STORY) if template else None,
         [],
+        level=level,
     )
 
 
@@ -82,7 +85,7 @@ def test_preparation_request_carries_no_identity(application):
         text = json.dumps(request.context, ensure_ascii=False)
         for word in ("fictional-L1", "learner_id", "object_id", "provider"):
             assert word not in text
-        assert request.purpose == "preparation" and request.deadline_seconds == 600
+        assert request.purpose == "preparation" and request.deadline_seconds == 1200
     assert len(first.context["requirements"]) == len(demand_requirements(demand))
     assert first.context["connected_kinds"] == ["image", "animation"]
 
@@ -155,7 +158,7 @@ def library():
     }
 
 
-def check(demand, draft, read=frozenset()):
+def check(demand, draft, read=frozenset(), level=None):
     return checked_course(
         CourseDraft.model_validate(draft),
         demand,
@@ -163,12 +166,13 @@ def check(demand, draft, read=frozenset()):
         library=library(),
         read=set(read),
         catalog_ids=CATALOG,
+        level=level,
     )
 
 
-def rejected(demand, draft, read=frozenset()):
+def rejected(demand, draft, read=frozenset(), level=None):
     with pytest.raises(DraftRejected) as error:
-        check(demand, draft, read)
+        check(demand, draft, read, level)
     return {code for code, _ in error.value.problems}
 
 
@@ -734,3 +738,54 @@ def test_rule_problems_limitations_and_failures_are_english(demand, draft):
     assert not chinese(list(check(demand, draft).course.limitations))
     for subject in ("lesson", "change", "resource"):
         assert not chinese(str(PreparationUnavailable("timeout", subject)))
+
+
+LEVEL = StoryLevel(lexile="550L", challenge="challenge", target="650L", words=(250, 450))
+FILLER = "Mia looked at the paper bridge one more time today."  # 10 words
+LONG = STORY + " " + " ".join([FILLER] * 16)
+
+
+def written(draft, story, passage):
+    return draft | {
+        "material_id": None,
+        "title": "The Long Bridge",
+        "story": story,
+        "read_aloud_passage": passage,
+    }
+
+
+def aloud(checked):
+    return [task.reference_text for task in checked.course.tasks if task.purpose == "read_aloud"]
+
+
+def test_a_long_story_reads_aloud_only_its_passage(demand, draft):
+    assert 250 <= len(reading.words(LONG)) <= 450
+    checked = check(demand, written(draft, LONG, STORY), level=LEVEL)
+    assert reading.words(" ".join(aloud(checked))) == reading.words(STORY)
+    assert checked.course.story_level == LEVEL
+
+
+def test_a_story_outside_its_band_is_rejected(demand, draft):
+    assert "story" in rejected(demand, written(draft, STORY, None), level=LEVEL)
+    assert "story" in rejected(demand, written(draft, LONG, STORY))  # no level: 30 to 250
+
+
+@pytest.mark.parametrize(
+    "passage",
+    [None, "Mia smiled at the bridge.", reading.sentences(STORY)[0] + " " + FILLER, LONG],
+)
+def test_a_bad_passage_is_rejected(demand, draft, passage):
+    assert "read_aloud" in rejected(demand, written(draft, LONG, passage), level=LEVEL)
+
+
+def test_a_short_story_reads_aloud_whole(demand, draft):
+    checked = check(demand, written(draft, STORY, "Not in the story."))
+    assert reading.words(" ".join(aloud(checked))) == reading.words(STORY)
+    assert checked.course.story_level is None
+
+
+def test_the_request_carries_the_story_level(application):
+    assert build(application, level=LEVEL).context["story_level"] == LEVEL.model_dump(mode="json")
+    assert build(application).context["story_level"] is None
+    assert "story_level" in PREPARATION_INSTRUCTIONS
+    assert "故事难度按profile.lexile" not in PREPARATION_INSTRUCTIONS

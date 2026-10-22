@@ -11,6 +11,7 @@ from project_j.application.documents import document, identity, publication
 from project_j.contracts import Contract, Document, RevisionRef
 from project_j.english import chinese
 from project_j.learning.contracts import (
+    Challenge,
     ChatTurn,
     DemandBody,
     Goal,
@@ -59,6 +60,7 @@ class ProfileEdit(Contract):
     focus: Text
     materials: Text | None = None
     lexile: Text | None = None
+    challenge: Challenge | None = None  # None keeps the saved step.
 
 
 def profile(app, learner_id: str) -> Document | None:
@@ -268,8 +270,10 @@ def confirm_profile(app, request_id: str, learner_id: str, edit: ProfileEdit) ->
     saved = app.saved_step(operation, learner_id, "profile")
     if saved is None:
         base = ProfileBody.model_validate(prior.body)
-        update = edit.model_dump(exclude={"lexile"}) | {"confirmed": True}
-        body = base.model_copy(update=update | ({"lexile": lexile} if lexile else {}))
+        update = edit.model_dump(exclude={"lexile", "challenge"}) | {"confirmed": True}
+        update |= {"lexile": lexile} if lexile else {}
+        update |= {"challenge": edit.challenge} if edit.challenge else {}
+        body = base.model_copy(update=update)
         obj = revised(operation, learner_id, prior, body)
         saved = app.save_step(
             operation,
@@ -281,8 +285,13 @@ def confirm_profile(app, request_id: str, learner_id: str, edit: ProfileEdit) ->
     placed = placement_activity(app, learner_id)
     if placed and placed[1] is not None and app.acknowledged(learner_id, placed[0]) is None:
         app.acknowledge(f"{request_id}:placement", learner_id, placed[0], placed[1].ref)
-    edited = any(
-        prior.body.get(key) != value for key, value in edit.model_dump(exclude={"lexile"}).items()
-    ) or (lexile is not None and lexile != prior.body.get("lexile"))
+    edited = (
+        any(
+            prior.body.get(key) != value
+            for key, value in edit.model_dump(exclude={"lexile", "challenge"}).items()
+        )
+        or (lexile is not None and lexile != prior.body.get("lexile"))
+        or (edit.challenge is not None and edit.challenge != prior.body.get("challenge"))
+    )
     log.info("profile confirmed edited=%s", "true" if edited else "false")
     return app.ledger.finish(operation, learner_id, {"profile_ref": saved[0].ref.model_dump()})

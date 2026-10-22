@@ -17,7 +17,7 @@ from project_j.contracts import RevisionRef
 from project_j.curriculum.corrections import active_restrictions, correction_restrictions
 from project_j.evaluation.scoring import recent_scores
 from project_j.learning.adoption import review_due
-from project_j.learning.contracts import SKILLS
+from project_j.learning.contracts import SKILLS, challenge_of
 from project_j.learning.maintenance import review
 from project_j.learning.onboarding import (
     QUESTIONS,
@@ -25,6 +25,7 @@ from project_j.learning.onboarding import (
     profile,
     summarize_profile,
 )
+from project_j.preparation.difficulty import targets
 
 log = logging.getLogger(__name__)
 Job = tuple[str, Callable[[], Awaitable]]
@@ -324,6 +325,8 @@ def next_step(app, learner_id: str) -> dict:
             },
         }
     if focus_needed(demand) and lesson(app, learner_id) is None:
+        account = app.store.current(identity(learner_id, "profile"), learner_id)
+        account = account.body if account else {}
         return {
             "kind": "focus",
             "subject": {
@@ -334,6 +337,8 @@ def next_step(app, learner_id: str) -> dict:
                 ],
                 "suggestions": list(demand.body.get("focus_suggestions", [])),
                 "topics": list(demand.body.get("topic_suggestions", [])),
+                "challenge": challenge_of(account),  # How hard the story is (ADR-0023).
+                "targets": targets(account.get("lexile")),
             },
         }
     starting = [row for row in jobs(app) if row["name"].startswith(("confirm:", "start:"))]

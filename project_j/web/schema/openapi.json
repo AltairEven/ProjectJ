@@ -1985,6 +1985,22 @@
           },
           "evaluation_ref": {
             "$ref": "#/components/schemas/RevisionRef"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "too_hard",
+                  "just_right",
+                  "too_easy"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
           }
         },
         "additionalProperties": false,
@@ -2827,6 +2843,23 @@
               }
             ],
             "title": "Note"
+          },
+          "challenge": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "same",
+                  "little",
+                  "challenge",
+                  "harder"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challenge"
           }
         },
         "additionalProperties": false,
@@ -3276,6 +3309,23 @@
               }
             ],
             "title": "Lexile"
+          },
+          "challenge": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "same",
+                  "little",
+                  "challenge",
+                  "harder"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challenge"
           },
           "request_id": {
             "type": "string",

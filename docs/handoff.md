@@ -950,3 +950,18 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check含主工程685、评分39、合成15项pytest，前端74、文档1，UTC 2026-10-22T02:32:31.574515+00:00，工程摘要63e0ad65357040a0433fd420818778610f168719077308711e50ab68407effe5，检查戳actual_api为unverified（自审后修复“开场未送达时跳过会绕过课文”后重跑统一check）。
 - 未验证：真实备课模型能否稳定写出合规提醒；学生实际读课文时的体验与用时是否合理；正式课里开场语音的长度。
 - 继续条件：真实备课核对仍需用户同意后运行；在用户于沙盒走一遍新流程、在正式课评价页看到阅读用时之前，开场提醒与阅读计时只有模拟证据。
+
+## LVL 文章难度档位
+
+- 状态：程序实现、模拟自测与两次真实备课核对完成，用户读过第一篇认可难度；用户在沙盒里发现选题材白屏（原有问题，已修）后要求提交，已本地提交（2026年10月22日）。用户确认设计（docs/superpowers/specs/2026-10-22-story-difficulty-design.md）与计划（docs/superpowers/plans/2026-10-22-story-difficulty.md，6个任务），选择在当前会话内联实施。
+- 负责人/集成：Claude Opus。审查由主会话自做，未派审查子代理。
+- 范围：故事按“学生蓝思值+档位”的目标值写、词数按目标值区间；档位存在学习资料里，选题材与学习资料表单可改；学生认可评价时评“太难/正好/太简单”自动调档；长故事只朗读一段（[ADR-0023](../decisions/ADR-0023.md)）。课堂判断请求、Jane的评价与规划不变。
+- 文件边界：以计划各任务的Files为准；另生成web/schema/openapi.json与web/src/client/types.gen.ts。
+- 验收条件：计划的Global Constraints与各任务测试；10项登记检查；真实备课一次写出词数合规的故事与合规朗读段、用户读过认可难度；用户在沙盒看选题材、评价页与课程页。
+- 实际改动：learning：`Challenge`四档与`CHALLENGE_STEPS`、`rated`、`challenge_of`，`ProfileBody.challenge`，学习资料表单可改档位。preparation：新模块`difficulty.py`（蓝思值换算、词数区间、`story_level`、`targets`），`StoryLevel`与`CourseBody.story_level`；备课指令改为按`story_level`写并给词数区间，草稿新增`read_aloud_passage`，规则按区间核对自编故事、核对朗读段为原文连续整句且不超过150词，长故事只把这一段切成朗读题；备课与重新备课按当时学习资料算目标值并记日志。application：`choose_focus`带档位、变了就与需求同一步存学习资料新修订；选题材一步给出当前档位与各档目标值；`acknowledge`带评分，按`story_rateable`（课程有目标值且档位非空、阅读事件为初读）和“这节课还没有认可记录”放行，认可记录写`story_rating`，档位变了同一步存学习资料新修订；接口`FocusRequest.challenge`、`AcknowledgeRequest.rating`。页面：选题材“Story difficulty”单选、评价页“How was this story?”与到头提示及“Your rating”、学习资料表单下拉、课程页“Story level”一行。沙盒快照与两个选题材场景加档位。设计同步：learning profile、README，preparation README、course-package、verification，interface main-page、feedback-reports，evaluation inputs-feedback，docs/acceptance。
+- 我的取舍（未逐条请用户确认，详见设计说明“我替用户定的”与执行账本）：档位存学习资料；建档小测不加档位；词数对照表；只核对词数；课程页写“Aimed at about …; not measured”（模拟复用课程库故事时也说得通）；复用课程库故事不核对词数；评分随认可提交、只对第一次读的按档位写的文章开放；朗读段指令保留“整篇故事逐段切开”“不能只选一句”；测试里模型写的样例故事加长到默认区间。
+- 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check含主工程726、评分39、合成15项pytest，前端79、文档1，UTC 2026-10-22T13:30:38.786743+00:00，工程摘要ad2b948100750b57a471d8aec88c414d5c78fc862f849177c43e5104d29b69e3，检查戳actual_api为unverified。放宽备课期限与修复选题材白屏后统一check再次通过（主工程726、评分39、合成15，前端80、文档1），UTC 2026-10-22T14:25:28.961606+00:00，工程摘要a2d5e55118c3f42727025ee024684aae6c817bef191e39310938a5844c45c164。
+- 真实核对（用户同意后运行；细节记本机project_j/test/records/lvl-format-check-20261022.md）：运行编号lvl-format-check，模拟学习者蓝思值改为850L、默认档位，目标950L、区间350–550词；codex:gpt-6.1-sol:xhigh备课522.5秒，第一稿即过规则，故事415词、平均每句14.3词（课程库故事6.2词），观察课8题6种题型、预计30分钟，课程无中文；本课目标不含发音，模型没有安排朗读，朗读段规则未被真实模型触发。用户读过认可难度，并决定把备课期限从600秒放宽到1200秒（只改课程备课，动画素材请求仍600秒）。第二次（运行编号lvl-aloud-check）给需求写一个只用于核对的修订，把辅助目标改为发音：备课503.0秒，第一稿即过规则，故事437词、平均每句14.1词，朗读段107词（故事开头连续8句，切成2段），10题7种题型、预计35分钟，课程无中文。两个运行编号都已用project-j-reset清空，未写入me。
+- 沙盒发现并修复（原有问题，非本批引入）：选题材时先选了Jane列的某个题材，题材列表随后变少或清空（沙盒切到“Jane listed no topics”，正式页面里是页面开着时需求重新列了题材），页面按旧序号取题材而白屏；改为`next-step.ts`的`chosenTopic`，序号不在列表里时视为没选（前端测试先失败后通过，浏览器按原步骤复现不再白屏）。
+- 未验证：长故事在课堂上的实际用时；长故事在40分钟内的实际用时；学生的难易评分是否能把难度调到合适。
+- 继续条件：已提交；正式学习从下一节课起按档位备课（现有学习资料没有档位，按“挑战（+100L）”）。用正式入口上课后在评价页评一次难易，确认档位随之改变。现有学习资料没有档位，下一节课会按“挑战（+100L）”备课。

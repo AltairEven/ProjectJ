@@ -1,5 +1,5 @@
 import type { Document as Doc, RevisionRef as Ref } from './client'
-import { byNewest } from './learning.ts'
+import { byNewest, CHALLENGES } from './learning.ts'
 
 export type CourseState = 'Being made' | 'Waiting for you' | 'Ready' | 'Taken' | 'Evaluated'
 type Shape = Pick<Doc, 'object_id' | 'revision' | 'kind' | 'body'> & { created_at?: string }
@@ -40,3 +40,11 @@ export function courseRows(objects: Shape[]) {
 /** The class asks for things away from the screen only when a task goes offscreen (server rule). */
 export const needsMaterials = (course: Pick<Doc, 'body'>) =>
   ((course.body.tasks ?? []) as { purpose?: string }[]).some(task => task.purpose === 'offscreen')
+
+/** The Lexile the story aimed at; a target, never a measurement (ADR-0023). */
+export function storyLevelLine(course: Pick<Shape, 'body'>) {
+  const level = course.body.story_level as { lexile: string, challenge: string | null, target: string } | null | undefined
+  if (!level) return null
+  const step = CHALLENGES.find(([name]) => name === level.challenge)?.[2] ?? 0
+  return `Aimed at about ${level.target} (your level ${level.lexile}${step ? ` + ${step}L` : ''}); not measured`
+}

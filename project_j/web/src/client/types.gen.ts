@@ -21,6 +21,10 @@ export type AcknowledgeRequest = {
      */
     activity_id: string;
     evaluation_ref: RevisionRef;
+    /**
+     * Rating
+     */
+    rating?: 'too_hard' | 'just_right' | 'too_easy' | null;
 };
 
 /**
@@ -494,6 +498,10 @@ export type FocusRequest = {
      * Note
      */
     note?: string | null;
+    /**
+     * Challenge
+     */
+    challenge?: 'same' | 'little' | 'challenge' | 'harder' | null;
 };
 
 /**
@@ -741,6 +749,10 @@ export type ProfileRequest = {
      * Lexile
      */
     lexile?: string | null;
+    /**
+     * Challenge
+     */
+    challenge?: 'same' | 'little' | 'challenge' | 'harder' | null;
     /**
      * Request Id
      */

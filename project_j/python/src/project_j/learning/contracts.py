@@ -191,6 +191,24 @@ def normalize_lexile(raw: str) -> str:
     return value
 
 
+# How far above the student's Lexile stories are written (ADR-0023).
+Challenge = Literal["same", "little", "challenge", "harder"]
+CHALLENGE_STEPS: dict[str, int] = {"same": 0, "little": 50, "challenge": 100, "harder": 150}
+DEFAULT_CHALLENGE: Challenge = "challenge"
+Rating = Literal["too_hard", "just_right", "too_easy"]
+
+
+def rated(challenge: Challenge, rating: Rating) -> Challenge:
+    """One step down, none or one step up; the ends stay where they are."""
+    names = list(CHALLENGE_STEPS)
+    move = {"too_hard": -1, "just_right": 0, "too_easy": 1}[rating]
+    return names[min(max(names.index(challenge) + move, 0), len(names) - 1)]
+
+
+def challenge_of(profile: dict) -> Challenge:
+    return profile.get("challenge") or DEFAULT_CHALLENGE
+
+
 class ChatTurn(Contract):
     question: Text
     answer: Text
@@ -202,6 +220,7 @@ class ProfileBody(Contract):
     status: Literal["checked"] = "checked"
     confirmed: bool = False  # The student confirmed it (onboarding ends there).
     lexile: Text | None = None
+    challenge: Challenge | None = None  # None: the default step.
     chat: tuple[ChatTurn, ...] = ()
     background: Text | None = None
     interests: Text | None = None
