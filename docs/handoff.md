@@ -940,7 +940,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## READ 先自读、后答题
 
-- 状态：程序实现与模拟自测完成；用户说“先不管这些，提交”，未做真实备课核对，也未在沙盒与正式课上确认，按要求本地提交（2026年10月22日）。用户确认设计（docs/superpowers/specs/2026-10-22-self-paced-reading-design.md）与计划（docs/superpowers/plans/2026-10-22-self-paced-reading.md，7个任务），选择在当前会话内联实施。
+- 状态：程序实现与模拟自测完成；用户说“先不管这些，提交”，未做真实备课核对，也未在沙盒与正式课上确认，按要求已本地提交3882563（2026年10月22日）。用户确认设计（docs/superpowers/specs/2026-10-22-self-paced-reading-design.md）与计划（docs/superpowers/plans/2026-10-22-self-paced-reading.md，7个任务），选择在当前会话内联实施。
 - 负责人/集成：Claude Opus。审查由主会话自做，未派审查子代理。
 - 范围：开场只说备课写好的阅读提醒；学生按“Start reading”后文章出现并计时（暂停不计），按“I've finished reading”后才出第一题；阅读用时记进课堂记录，课后评价页显示用时、词数与每分钟词数（[ADR-0022](../decisions/ADR-0022.md)）。课程页、课堂判断请求与课时预算算法不变。
 - 文件边界：以计划各任务的Files为准；另生成web/schema/openapi.json与web/src/client/types.gen.ts。
