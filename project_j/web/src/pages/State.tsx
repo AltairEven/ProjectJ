@@ -1,5 +1,5 @@
 import { dimensionLines } from '../learning'
-import { recentLine, scoreRows, type LessonScore } from '../scores'
+import { recentLine, scoreRows, type LessonScore, type RecentScores } from '../scores'
 import type { PageProps } from '../ui'
 import { ProfileForm } from './Onboarding'
 
@@ -13,7 +13,7 @@ export default function State({ token, dashboard, learner, refresh }: PageProps)
     <section><h2>How you are doing</h2>{state ? <dl className="rows">{dimensionLines(state, catalog).map(line =>
       <div key={line.name}><dt>{line.name}</dt><dd><strong>{line.judgment}</strong> {line.basis}</dd></div>)}</dl> : <p>No progress yet.</p>}</section>
     <section><h2>Scores</h2>{scores.length ? <>
-      <p>{recentLine(scores, catalog)} (out of 10; unknown scores are left out)</p>
+      <p>{recentLine(dashboard.recent_scores as unknown as RecentScores, catalog)} (out of 10; unknown scores are left out)</p>
       <dl className="rows">{scoreRows(scores, objects).map(row =>
         <div key={row.key}><dt>{row.date} · {row.title}</dt><dd>{row.types}<br />{row.dimensions}</dd></div>)}</dl>
     </> : <p>No scores yet. They come after a lesson and its evaluation.</p>}</section>

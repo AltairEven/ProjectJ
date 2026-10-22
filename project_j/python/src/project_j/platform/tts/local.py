@@ -43,9 +43,8 @@ class LocalSynthesizer(LocalProcess):
         start_timeout: float = 180.0,
         chunk_timeout: float = 30.0,
         cancel_timeout: float = 3.0,
-        inherit_stderr: bool = True,
     ):
-        super().__init__(root, command, start_timeout=start_timeout, inherit_stderr=inherit_stderr)
+        super().__init__(root, command, start_timeout=start_timeout)
         self.chunk_timeout, self.cancel_timeout = chunk_timeout, cancel_timeout
         self.service, self.version, self.voice = "local-qwen3-tts", "unknown", "unknown"
         self.sample_rate = 24000

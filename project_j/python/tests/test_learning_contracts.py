@@ -4,26 +4,34 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from project_j.learning.contracts import record_adapter
+from project_j.contracts import Document
+from project_j.learning.contracts import DemandBody, PlanBody, ProfileBody, StateBody
 
 FIXTURE = Path(__file__).parent / "fixtures/p1a_initial.json"
+BODIES = {"profile": ProfileBody, "state": StateBody, "plan": PlanBody, "demand": DemandBody}
+
+
+def stored(item: dict) -> tuple[Document, object]:
+    """A learning record as storage checks its envelope and its owner checks its body."""
+    document = Document.model_validate(item)
+    return document, BODIES[document.kind].model_validate(document.body)
 
 
 def initial_records():
-    return [record_adapter.validate_python(item) for item in json.loads(FIXTURE.read_text())]
+    return [stored(item) for item in json.loads(FIXTURE.read_text())]
 
 
 def test_initial_state_and_demand_keep_unknown_dimensions_and_exact_references():
-    profile, state, plan, demand = initial_records()
-    assert profile.learner_id == state.learner_id and profile.body.lexile == "500L"
+    (profile, profile_body), (state, state_body), (plan, _), (_, demand) = initial_records()
+    assert profile.learner_id == state.learner_id and profile_body.lexile == "500L"
     assert all(
-        item.judgment == "unknown" and item.help == "unknown" for item in state.body.dimensions
+        item.judgment == "unknown" and item.help == "unknown" for item in state_body.dimensions
     )
-    assert all(item.retention is None and item.transfer is None for item in state.body.dimensions)
-    assert demand.body.state_ref == state.ref
-    assert demand.body.plan_ref == plan.ref
-    assert demand.body.profile_ref == profile.ref
-    assert demand.body.budget_minutes == 30
+    assert all(item.retention is None and item.transfer is None for item in state_body.dimensions)
+    assert demand.state_ref == state.ref
+    assert demand.plan_ref == plan.ref
+    assert demand.profile_ref == profile.ref
+    assert demand.budget_minutes == 30
 
 
 @pytest.mark.parametrize(
@@ -39,14 +47,14 @@ def test_initial_state_and_demand_keep_unknown_dimensions_and_exact_references()
     ],
 )
 def test_learning_objects_reject_non_simulation_and_incomplete_identity(change):
-    state = initial_records()[1].model_dump(mode="json")
+    state = initial_records()[1][0].model_dump(mode="json")
     with pytest.raises(ValidationError):
-        record_adapter.validate_python(state | change)
+        stored(state | change)
 
 
 def test_learning_objects_accept_the_study_realm():
-    state = initial_records()[1].model_dump(mode="json")
-    study = record_adapter.validate_python(state | {"realm": "study", "source_type": "student"})
+    state = initial_records()[1][0].model_dump(mode="json")
+    study, _ = stored(state | {"realm": "study", "source_type": "student"})
     assert (study.realm, study.source_type) == ("study", "student")
 
 
@@ -63,29 +71,29 @@ def test_learning_objects_accept_the_study_realm():
     ],
 )
 def test_unknown_or_helped_performance_cannot_be_relabelled_independent(change):
-    state = initial_records()[1].model_dump(mode="json")
+    state = initial_records()[1][0].model_dump(mode="json")
     state["body"]["dimensions"][0].update(change)
     with pytest.raises(ValidationError):
-        record_adapter.validate_python(state)
+        stored(state)
 
 
 def test_revision_retains_predecessor_and_body_does_not_accept_extra_score():
-    state = initial_records()[1].model_dump(mode="json")
-    revised = record_adapter.validate_python(
+    state = initial_records()[1][0].model_dump(mode="json")
+    revised, _ = stored(
         state | {"revision": 2, "supersedes": {"object_id": state["object_id"], "revision": 1}}
     )
-    assert revised.supersedes == initial_records()[1].ref
+    assert revised.supersedes == initial_records()[1][0].ref
     state["body"]["dimensions"][0]["score"] = 0
     with pytest.raises(ValidationError):
-        record_adapter.validate_python(state)
+        stored(state)
 
 
 @pytest.mark.parametrize("change", [{"budget_minutes": 31}, {"status": "active"}])
 def test_demand_does_not_change_budget_or_claim_activation_in_its_body(change):
-    demand = initial_records()[3].model_dump(mode="json")
+    demand = initial_records()[3][0].model_dump(mode="json")
     demand["body"].update(change)
     with pytest.raises(ValidationError):
-        record_adapter.validate_python(demand)
+        stored(demand)
 
 
 def test_skill_focus_is_checked_and_becomes_requirements():
@@ -94,7 +102,7 @@ def test_skill_focus_is_checked_and_becomes_requirements():
 
     assert len(SKILLS) == 13 and MAX_FOCUS == 3
     assert {group for group, _, _ in SKILLS.values()} == {"Word types", "Tenses", "Sentences"}
-    demand = initial_records()[3].body
+    demand = initial_records()[3][1]
     before = demand_requirements(demand)
     assert demand.skill_focus is None and demand.focus_suggestions == ()  # older demands read
     base = demand.model_dump(mode="json")
@@ -120,7 +128,7 @@ def test_topic_is_checked_and_becomes_a_requirement():
     from project_j.learning.contracts import DemandBody
     from project_j.preparation.contracts import demand_requirements
 
-    demand = initial_records()[3].body
+    demand = initial_records()[3][1]
     before = demand_requirements(demand)
     assert demand.topic is None and demand.topic_suggestions == ()  # older demands read
     base = demand.model_dump(mode="json")

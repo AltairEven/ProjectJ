@@ -2433,6 +2433,14 @@
             "title": "Scores",
             "default": []
           },
+          "recent_scores": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Recent Scores",
+            "default": {}
+          },
           "active": {
             "anyOf": [
               {

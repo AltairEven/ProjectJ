@@ -668,23 +668,6 @@ def test_reading_comes_before_the_first_open_task(demand, draft):
     assert check(demand, draft).course.tasks[-1].task_id.startswith("read-aloud-")
 
 
-def test_study_preparation_refuses_open_until_the_reference_set_passes(demand, draft):
-    with pytest.raises(DraftRejected) as error:
-        checked_course(
-            CourseDraft.model_validate(draft),
-            demand,
-            **REFS,
-            library=library(),
-            read=set(),
-            catalog_ids=CATALOG,
-            open_allowed=False,
-        )
-    assert (
-        "open",
-        "Open questions wait until classroom judgment passes the reference set",
-    ) in error.value.problems
-
-
 def test_instructions_register_every_type_and_its_ladder():
     from project_j.preparation.drafting import PREPARATION_INSTRUCTIONS
     from project_j.preparation.task_types import LADDERS, PROGRAM_INSTRUCTIONS, TYPE_INSTRUCTIONS

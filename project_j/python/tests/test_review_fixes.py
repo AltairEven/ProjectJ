@@ -30,7 +30,7 @@ from project_j.contracts import RevisionRef
 from project_j.curriculum.content import check_content
 from project_j.interface.api import create_app
 from project_j.learning.adoption import adopt_state
-from project_j.learning.contracts import DemandBody, LearningState
+from project_j.learning.contracts import DemandBody
 from project_j.learning.maintenance import review
 from project_j.platform.storage import Conflict
 from project_j.preparation.contracts import CourseBody
@@ -113,7 +113,7 @@ def test_state_merges_all_tasks_of_a_dimension_independent_of_order(application)
         core, _ = await complete_story(app, helped=True)
         app.feedback("feedback", LEARNER, core.activity_id, "无额外补充")
         evaluation = await app.evaluate("evaluate", LEARNER, core.activity_id, "final_feedback")
-        current = LearningState.model_validate(app.current(LEARNER, "state").model_dump())
+        current = app.current(LEARNER, "state")
         merged = adopt_state(current, evaluation)
         reversed_evaluation = evaluation.model_copy(
             update={"body": evaluation.body | {"tasks": evaluation.body["tasks"][::-1]}}

@@ -1,13 +1,15 @@
 from datetime import datetime
 
 from project_j.contracts import Document
-from project_j.learning.contracts import DimensionState, LearningState, StateBody
+from project_j.learning.contracts import DimensionState, StateBody
 
 HELP_ORDER = ("none", "light_prompt", "scaffold", "full_model")
 
 
-def adopt_state(current: LearningState, evaluation: Document) -> StateBody:
-    dimensions = {item.dimension_id: item for item in current.body.dimensions}
+def adopt_state(current: Document, evaluation: Document) -> StateBody:
+    """current: the stored state document; its body is checked as a StateBody here."""
+    body = StateBody.model_validate(current.body)
+    dimensions = {item.dimension_id: item for item in body.dimensions}
     observed: dict[str, list[dict]] = {}
     for task in evaluation.body["tasks"]:
         # Actual help names every dimension it affected (an English sentence frame on a reading

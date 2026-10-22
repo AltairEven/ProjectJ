@@ -267,6 +267,12 @@ export type Dashboard = {
     scores?: Array<{
         [key: string]: JsonValue;
     }>;
+    /**
+     * Recent Scores
+     */
+    recent_scores?: {
+        [key: string]: JsonValue;
+    };
     active?: Snapshot | null;
     /**
      * Note

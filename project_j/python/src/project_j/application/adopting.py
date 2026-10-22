@@ -15,7 +15,6 @@ from project_j.learning.catalog import Capability, define
 from project_j.learning.contracts import (
     Challenge,
     DemandBody,
-    LearningState,
     ProfileBody,
     challenge_of,
 )
@@ -210,7 +209,7 @@ class Adopting:
         state = self.saved_step(operation, learner_id, "state", current_revision)
         if state is None:
             old = self.current(learner_id, "state")
-            next_body = adopt_state(LearningState.model_validate(old.model_dump()), evaluation)
+            next_body = adopt_state(old, evaluation)
             if canonical(next_body) == canonical(old.body):
                 state = [old]
                 self.ledger.checkpoint(

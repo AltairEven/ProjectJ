@@ -3,9 +3,9 @@
 import re
 from typing import Annotated, Literal, Self
 
-from pydantic import AwareDatetime, Field, TypeAdapter, model_validator
+from pydantic import AwareDatetime, Field, model_validator
 
-from project_j.contracts import Contract, ObjectEnvelope, RevisionRef
+from project_j.contracts import Contract, RevisionRef
 
 Text = Annotated[str, Field(min_length=1)]
 Help = Literal["none", "light_prompt", "scaffold", "full_model", "unknown"]
@@ -235,77 +235,3 @@ class ProfileBody(Contract):
         if self.lexile is not None and normalize_lexile(self.lexile) != self.lexile:
             raise ValueError("lexile must be stored in its normal form")
         return self
-
-
-class SimulationRecord(ObjectEnvelope):
-    # ObjectEnvelope keeps realm and source paired.
-    realm: Literal["simulation", "study"] = "simulation"
-    source_type: Literal["simulated", "student"] = "simulated"
-    owner: Literal["learning"] = "learning"
-    received_at: AwareDatetime
-
-    @model_validator(mode="after")
-    def previous_revision(self) -> Self:
-        expected = (
-            RevisionRef(object_id=self.object_id, revision=self.revision - 1)
-            if self.revision > 1
-            else None
-        )
-        if self.supersedes != expected:
-            raise ValueError("a revision must retain its exact predecessor")
-        return self
-
-    @property
-    def references(self) -> tuple[RevisionRef, ...]:
-        refs = self.dependency_refs + self.source_refs
-        if self.supersedes:
-            refs += (self.supersedes,)
-        return refs
-
-
-class LearningState(SimulationRecord):
-    kind: Literal["state"] = "state"
-    body: StateBody
-
-    @property
-    def references(self) -> tuple[RevisionRef, ...]:
-        return super().references + tuple(
-            ref for dimension in self.body.dimensions for ref in dimension.evidence_refs
-        )
-
-
-class LearningPlan(SimulationRecord):
-    kind: Literal["plan"] = "plan"
-    body: PlanBody
-
-    @property
-    def references(self) -> tuple[RevisionRef, ...]:
-        return (
-            super().references
-            + self.body.basis_refs
-            + tuple(ref for ref in (self.body.parent_ref, self.body.decision_ref) if ref)
-        )
-
-
-class LearningDemand(SimulationRecord):
-    kind: Literal["demand"] = "demand"
-    body: DemandBody
-
-    @property
-    def references(self) -> tuple[RevisionRef, ...]:
-        return (
-            super().references
-            + (self.body.state_ref, self.body.plan_ref, self.body.profile_ref)
-            + tuple(choice.suggestion_ref for choice in self.body.suggestion_choices)
-        )
-
-
-class LearnerProfile(SimulationRecord):
-    kind: Literal["profile"] = "profile"
-    body: ProfileBody
-
-
-StoredRecord = Annotated[
-    LearningState | LearningPlan | LearningDemand | LearnerProfile, Field(discriminator="kind")
-]
-record_adapter = TypeAdapter(StoredRecord)

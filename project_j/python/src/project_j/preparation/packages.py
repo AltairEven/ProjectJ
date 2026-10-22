@@ -504,7 +504,6 @@ def template_draft(
     story: str,
     familiar: bool = False,
     offscreen: bool = True,
-    open_allowed: bool = True,
 ) -> dict:
     """The fixed paper-bridge course written as a course draft the model may reuse or adapt.
 
@@ -518,8 +517,6 @@ def template_draft(
         tasks = tuple(task for task in tasks if task.purpose in {"answer", "read_aloud"})
     elif screen_only:
         tasks = tuple(task for task in tasks if task.purpose not in {"point", "offscreen"})
-    if not open_allowed:  # Study lessons wait for the reference set (QT-3).
-        tasks = tuple(task for task in tasks if task.purpose != "open")
     title = COURSES[source]["title"]
     practice = uses_new_material(demand)
     choice = (

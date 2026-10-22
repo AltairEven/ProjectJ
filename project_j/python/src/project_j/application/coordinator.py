@@ -20,7 +20,7 @@ from project_j.application.progress import advance, jobs, lesson_evaluations, ne
 from project_j.application.teaching import Teaching
 from project_j.classroom.harness import Harness
 from project_j.contracts import Document, RevisionRef
-from project_j.evaluation.scoring import lesson_scores
+from project_j.evaluation.scoring import lesson_scores, recent_scores
 from project_j.interface.submission import InputAdapter
 from project_j.learning.adoption import review_due
 from project_j.learning.fixtures import initialize
@@ -271,6 +271,7 @@ class Coordinator(Preparing, Teaching, Evaluating, Adopting):
         initialize(self, learner_id)
         documents = self.store.list_current(learner_id)
         advance(self, learner_id)
+        evaluations = lesson_evaluations(self, learner_id)
         return {
             "realm": self.store.realm,
             "learner_id": learner_id,
@@ -299,9 +300,12 @@ class Coordinator(Preparing, Teaching, Evaluating, Adopting):
             # Each lesson's averages by task type and ability, oldest lesson first (ADR-0020).
             "scores": [
                 lesson_scores(doc.body) | {"occurred_at": doc.occurred_at.isoformat()}
-                for doc in lesson_evaluations(self, learner_id)
+                for doc in evaluations
                 if doc.occurred_at
             ],
+            # The last five lessons pooled question by question, as planning and preparation
+            # read them (application/progress.py lesson_score_summary).
+            "recent_scores": recent_scores([doc.body for doc in evaluations]),
         }
 
     def lost_activities(self, learner_id: str, documents: list[Document]) -> list[dict]:

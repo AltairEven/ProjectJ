@@ -419,6 +419,8 @@ def test_two_same_answers_are_two_attempts_but_transport_replay_is_one(applicati
         read_story(application.core)
         await application.adapter.text("answer1", "a car")
         assert (await application.adapter.text("answer1", "a car"))["ack"] == "replayed"
+        with pytest.raises(ValueError, match="different content"):
+            await application.adapter.text("answer1", "a bus")
         assert len(core.attempts) == 1
         deliver_all(core)
         await application.adapter.text("answer2", "a car")

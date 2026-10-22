@@ -42,7 +42,6 @@ class LocalProcess:
         command: Sequence[str] | None = None,
         *,
         start_timeout: float,
-        inherit_stderr: bool = True,  # Child errors land in the service log.
     ):
         self.root = root
         self.command = (
@@ -50,7 +49,7 @@ class LocalProcess:
             if command
             else [str(root / self.binary), "serve", "--models", str(root / self.models)]
         )
-        self.start_timeout, self.inherit_stderr = start_timeout, inherit_stderr
+        self.start_timeout = start_timeout
         self.model: str | None = None
         self.ready: dict | None = None
         self.last_stats: dict = {}
@@ -114,7 +113,7 @@ class LocalProcess:
                 *self.command,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=None if self.inherit_stderr else asyncio.subprocess.DEVNULL,
+                stderr=None,  # Child errors land in the service log.
                 env=env,
                 limit=self.stream_limit,
                 # Own group: Ctrl+C or closing the terminal reaches only the server, which then
@@ -257,7 +256,7 @@ def init_main(
             print(f"请运行 {local.init_command} probe。")
         return code
     if args.command == "probe":
-        record = asyncio.run(probe(root, local(root, command, inherit_stderr=True)))
+        record = asyncio.run(probe(root, local(root, command)))
         print(
             f"{local.cli_noun}探针通过。" if record["passed"] else f"{local.cli_noun}探针未通过。"
         )

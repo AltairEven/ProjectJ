@@ -57,9 +57,8 @@ class LocalScorer(LocalProcess):
         *,
         start_timeout: float = 120.0,
         score_timeout: float = 30.0,
-        inherit_stderr: bool = True,
     ):
-        super().__init__(root, command, start_timeout=start_timeout, inherit_stderr=inherit_stderr)
+        super().__init__(root, command, start_timeout=start_timeout)
         self.score_timeout = score_timeout
         self.service, self.version = "local-gop", "unknown"
         self.thresholds: str | None = None

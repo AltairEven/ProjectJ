@@ -1,8 +1,8 @@
 import type { Document as Doc, RevisionRef as Ref } from './client'
 import { byNewest, CHALLENGES } from './learning.ts'
+import type { Shape } from './report.ts'
 
 export type CourseState = 'Being made' | 'Waiting for you' | 'Ready' | 'Taken' | 'Evaluated'
-type Shape = Pick<Doc, 'object_id' | 'revision' | 'kind' | 'body'> & { created_at?: string }
 
 export const previewLabels: Record<string, string> = { story: 'Story', why: 'Why this lesson', materials: 'Things to get ready', help: 'Help', exit: 'Time and stopping' }
 export const previewRank = (key: string) => key in previewLabels ? Object.keys(previewLabels).indexOf(key) : 99

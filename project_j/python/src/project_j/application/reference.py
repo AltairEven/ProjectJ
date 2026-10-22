@@ -323,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("运行编号只能含字母、数字、-、_，最长64字符")
     partition = args.root / "project_j/private/study"
     partition.mkdir(mode=0o700, parents=True, exist_ok=True)
-    path = check_path(partition, f"{args.run_id}/judgment-reference.json", "study")
+    path = check_path(partition, f"{args.run_id}/judgment-reference.json")
     if path.exists():
         print("该运行编号已有参考题集报告，换一个运行编号。")
         return 2

@@ -151,13 +151,19 @@ def test_a_whole_class_scores_through_the_evaluation(application):
 def test_the_dashboard_lists_each_lessons_scores(application):
     from support import LEARNER
 
-    assert application.dashboard(LEARNER)["scores"] == []  # A new student: nothing yet.
+    from project_j.application.progress import lesson_score_summary
+
+    empty = application.dashboard(LEARNER)  # A new student: nothing yet.
+    assert empty["scores"] == [] and empty["recent_scores"]["lessons"] == 0
     _, fact = asyncio.run(complete_story(application))
     activity = fact.body["activity_id"]
     application.feedback("fb1", LEARNER, activity, "无额外补充", [])
     asyncio.run(application.evaluate("e1", LEARNER, activity, "after_class"))
-    first = application.dashboard(LEARNER)["scores"]
+    board = application.dashboard(LEARNER)
+    first = board["scores"]
     assert len(first) == 1 and first[0]["activity_id"] == activity
+    # The page's recent line reads the very numbers planning and preparation get.
+    assert board["recent_scores"] == lesson_score_summary(application, LEARNER, "test")
     assert first[0]["by_type"]["choice"] == {"average": 10.0, "count": 1}
     assert first[0]["occurred_at"] and first[0]["course_ref"] == fact.body["course_ref"]
     # A correction rewrites the evaluation: the lesson still shows once, from the new version.

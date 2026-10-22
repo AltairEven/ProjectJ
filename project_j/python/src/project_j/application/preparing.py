@@ -18,7 +18,6 @@ from project_j.platform.storage import (
 from project_j.preparation.contracts import CourseBody, StoryLevel
 from project_j.preparation.difficulty import story_level
 from project_j.preparation.drafting import (
-    OPEN_IN_STUDY,
     DraftRejected,
     PreparationUnavailable,
     checked_course,
@@ -83,10 +82,6 @@ class Preparing:
             if material.body.get("title"):
                 titles.append(material.body["title"])
         return titles
-
-    def open_allowed(self) -> bool:
-        """Open questions only after real judgment passed the reference set (QT-3)."""
-        return self.store.realm == "simulation" or OPEN_IN_STUDY
 
     def calibration(self, learner_id: str) -> dict[str, float]:
         """Per task type, how long sealed classes actually took against the estimate."""
@@ -189,7 +184,6 @@ class Preparing:
                     library[source]["story"],
                     familiar,
                     offscreen,
-                    self.open_allowed(),
                 )
                 if fits
                 else None
@@ -205,7 +199,6 @@ class Preparing:
                 template,
                 self.recent_titles(learner_id),
                 lesson_score_summary(self, learner_id, "preparation"),
-                self.open_allowed(),
                 level=story_level(profile.body, body.purpose == "placement"),
             )
             refs = {
@@ -315,7 +308,6 @@ class Preparing:
                 None,
                 self.recent_titles(learner_id),
                 lesson_score_summary(self, learner_id, "preparation"),
-                self.open_allowed(),
                 level=story_level(profile.body, body.purpose == "placement"),
             )
             request = discussion_request(
@@ -494,7 +486,6 @@ class Preparing:
                     read,
                     catalog,
                     offscreen_allowed=bool(request.context["profile"].get("materials")),
-                    open_allowed=request.context["open_allowed"],
                     factors=factors,
                     level=level,
                 )

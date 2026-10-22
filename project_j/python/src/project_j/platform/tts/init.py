@@ -76,7 +76,7 @@ def judge(record: dict) -> list[str]:
 
 
 async def probe(root: Path, synthesizer: LocalSynthesizer | None = None) -> dict:
-    synthesizer = synthesizer or LocalSynthesizer(root, inherit_stderr=True)
+    synthesizer = synthesizer or LocalSynthesizer(root)
     manifest = root / MODELS / "manifest.json"
     record = {
         "captured_at": datetime.now(UTC).isoformat(),
@@ -155,7 +155,7 @@ async def speak(root: Path, command: Sequence[str] | None, text: str, out: Path)
     if out.exists():
         print(f"{out} 已存在，不覆盖。")
         return 1
-    synthesizer = LocalSynthesizer(root, command, inherit_stderr=True)
+    synthesizer = LocalSynthesizer(root, command)
     try:
         await synthesizer.start()
     except SynthesizerUnavailable as error:

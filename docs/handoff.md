@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.48.0；更新：2026年10月22日。
+版本：1.49.0；更新：2026年10月22日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -965,3 +965,20 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 沙盒发现并修复（原有问题，非本批引入）：选题材时先选了Jane列的某个题材，题材列表随后变少或清空（沙盒切到“Jane listed no topics”，正式页面里是页面开着时需求重新列了题材），页面按旧序号取题材而白屏；改为`next-step.ts`的`chosenTopic`，序号不在列表里时视为没选（前端测试先失败后通过，浏览器按原步骤复现不再白屏）。
 - 未验证：长故事在课堂上的实际用时；长故事在40分钟内的实际用时；学生的难易评分是否能把难度调到合适。
 - 继续条件：已提交；正式学习从下一节课起按档位备课（现有学习资料没有档位，按“挑战（+100L）”）。用正式入口上课后在评价页评一次难易，确认档位随之改变。现有学习资料没有档位，下一节课会按“挑战（+100L）”备课。
+
+## LEAN-2 精简五项（ponytail全仓审查后续）
+
+- 状态：实现与自测完成，用户要求提交，已本地提交（2026年10月22日）。用户先要求“使用ponytail技能重新review当前项目”，再要求“评估刚刚扫出来的这份修改建议”；评估把21条分为可直接做、代价被低估与应撤回三组后，用户要求“先做4、10、11、16、20五条”。
+- 负责人/集成：Claude Opus。审查由主会话自做，未派审查子代理。
+- 范围（除第4项的看板新字段外行为不变）：
+  1. 第4条：删除`learning/contracts.py`中只供测试使用的`SimulationRecord`及四个带信封的学习记录类型和`record_adapter`。存储一直只按`Document`校验信封；`adopt_state`改为接收存储的状态文档、在内部按`StateBody`校验正文。原测试的信封规则改用`Document`、正文规则改用各自正文模型，断言不变。
+  2. 第10条：删除恒为真的`OPEN_IN_STUDY`与层层下传的`open_allowed`（备课、讨论、模板课程、规则核对），以及备课指令里“open_allowed为false时不写open题”一句和请求上下文的同名字段。开放问答的实际使用不变；删去只测这个开关的两项测试。design/preparation/README.md 2.6.1同步：课堂判断再变化须先重跑参考题集，重跑未通过时再加回开关。改的是备课请求，不是课堂判断请求，不需重跑参考题集。
+  3. 第11条：`InputAdapter`的文字、点选与录音三条提交共用`new_input`（绑定当前等待、递增序号）与`replayed`（重发时取首次正文、内容不同则拒绝）。保留文字提交先构造再查重放的原顺序，序号与报错行为不变；补一条“同一事件改了文字被拒”的断言，改前改后都通过。
+  4. 第16条：前端四处按能力编号找名称合为`report.ts`的`capabilityName`，`Body`/`Shape`类型统一从这里导出。学习状态页“最近几课”一行改读看板新字段`recent_scores`，即服务端给规划与备课的同一份逐题汇总；以前页面拿每课已四舍五入的平均再加权，个别情况下末位可能差0.1。看板由已有访问日志记录，每3秒轮询，不另加日志行。
+  5. 第20条：删除恒为真的`inherit_stderr`参数及其丢弃输出分支；`check_path`去掉只校验自身的`realm`参数，未知数据空间仍由存储构造时拒绝。
+- 文件边界：project_j/python/src/project_j/{learning/{contracts,adoption}.py,application/{adopting,coordinator,preparing,reference}.py,preparation/{drafting,packages}.py,interface/{api,submission}.py,paths.py,platform/{files,storage,local_process}.py,platform/{speech,tts}/{local,init}.py}；tests/{test_learning_contracts,test_review_fixes,test_preparation_drafting,test_preparation_model,test_runtime,test_scoring,test_probe_stack}.py；project_j/web/src/{report,learning,courses,scores}.ts、pages/State.tsx、tests/scores.test.mjs、sandbox/dashboard.json（只加`recent_scores`，数值由服务端同一函数从快照内评价算出）；重新导出web/schema/openapi.json与web/src/client/types.gen.ts；design/preparation/README.md。
+- 验收条件：五项删减后统一check与其余9项登记命令通过；看板`recent_scores`与`lesson_score_summary`相同的新断言先失败后通过。
+- 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check含主工程724（删2项开关测试）、评分39、合成15项pytest，前端80、文档1，UTC 2026-10-22T15:03:32.472341+00:00，工程摘要e275fea2a5efe17848ae3ca6a416cb90ada772534c2650d3f677bd41b675554a，检查戳actual_api为unverified。
+- 未验证：没有启动沙盒或模拟服务看学习状态页的显示；真实模型与正式学习下的运行。
+- 净变化：Python源码+81/−190行，测试+47/−62行，前端源码+23/−28行；依赖不变。
+- 继续条件：已提交。评估中列为“可直接做”的其余五条（第8、13、14、18、21条）与“代价被低估”的七条未动，需用户另行决定。

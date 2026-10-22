@@ -1,7 +1,13 @@
 import type { Document as Doc, RevisionRef as Ref } from './client'
 import { dateTimeText } from './dates.ts'
 
-type Body = Record<string, any>
+export type Body = Record<string, any>
+/** A saved document as the pages read it; the server owns the shape of its body. */
+export type Shape = Pick<Doc, 'object_id' | 'revision' | 'kind'> & { body: Body, created_at?: string, source_revision?: number }
+
+/** A skill's name from the catalog documents, by its dimension id. */
+export const capabilityName = (docs: Shape[], id: string) =>
+  docs.find(doc => doc.kind === 'capability' && doc.body.dimension_id === id)?.body.name as string | undefined
 
 const keyLabels: Record<string, string> = {
   report_ref: 'Report', evaluation_ref: 'Evaluation', course_ref: 'Lesson', preview_ref: 'Lesson details', check_ref: 'Content check', preparation: 'Lesson making',
@@ -37,7 +43,7 @@ const text = (value: unknown): string => Array.isArray(value) ? value.map(text).
 
 function summary(doc: Doc, docs: Doc[]): string | undefined {
   const body = doc.body as Body
-  const name = (id: string) => (docs.find(item => item.kind === 'capability' && item.body.dimension_id === id)?.body.name as string) ?? id
+  const name = (id: string) => capabilityName(docs, id) ?? id
   switch (doc.kind) {
     case 'course': return body.parent_preview?.story
     case 'evaluation': return body.report?.summary
@@ -84,8 +90,7 @@ export function describe(value: unknown, docs: Doc[]): [string, string][] {
   })
 }
 
-const taskName = (task: Body, docs: Doc[]) => `${(docs.find(item => item.kind === 'capability' && item.body.dimension_id === task.dimension_id)
-  ?.body.name as string) ?? task.dimension_id} · ${task.task_id}`
+const taskName = (task: Body, docs: Doc[]) => `${capabilityName(docs, task.dimension_id) ?? task.dimension_id} · ${task.task_id}`
 const judgment = (task: Body) => judgmentLabels[task.working_judgment] ?? task.working_judgment
 
 /** A model-drafted evaluation as rows: summary first, then each attempt and any rule changes. */

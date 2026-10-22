@@ -76,7 +76,7 @@ PREPARATION_INSTRUCTIONS = (
     + PROGRAM_INSTRUCTIONS
     + "".join(TYPE_INSTRUCTIONS.values())
     + CONTENT_FIELDS_INSTRUCTION
-    + "open_allowed为false时不写open题。不要写其他题型。"
+    + "不要写其他题型。"
     "每节课用哪些题型、各几道由你按本课目标决定：先易后难，从原文里直接找到的事实到自己表达，"
     "点选类放前面确认读懂；复习课以选择、排序、配对、填空和复述为主；"
     "主要目标至少一道answer、open、point、offscreen或朗读；练习课至少3种题型（朗读算一种），"
@@ -215,7 +215,6 @@ def preparation_request(
     template: dict | None,
     recent_titles: list[str],
     scores: dict | None = None,
-    open_allowed: bool = True,
     level: StoryLevel | None = None,
 ) -> ModelRequest:
     """Learning data only: no learner, provider or object identity reaches the model."""
@@ -258,7 +257,6 @@ def preparation_request(
             "template": template,
             "connected_kinds": list(CONNECTED_KINDS),
             "scores": scores or {},
-            "open_allowed": open_allowed,
             "story_level": level.model_dump(mode="json") if level else None,
         },
         CourseDraft,
@@ -296,10 +294,6 @@ ALLOWED = {
     "offscreen": {SCIENCE},
     "open": {READING, REPORT},
 } | dict.fromkeys(PROGRAM_JUDGED, {READING})
-# Study lessons use open tasks only after real classroom judgment passed the reference set's
-# open cases; reference set 1.1.0 passed 50/50 on 2026-10-21 (QT-3). Rerun it before relying on
-# this again after a judgment change.
-OPEN_IN_STUDY = True
 QUOTED = {"answer", "open"} | PROGRAM_JUDGED  # Whose evidence must quote the story.
 STORY_WORDS = (30, 250)  # Without a Lexile; otherwise the band of the target (ADR-0023).
 READ_ALOUD_WORDS = 150  # A longer story is read aloud only in one passage.
@@ -404,7 +398,6 @@ def checked_course(
     read: set[str],
     catalog_ids: set[str],
     offscreen_allowed: bool = True,
-    open_allowed: bool = True,
     factors: dict[str, float] | None = None,
     level: StoryLevel | None = None,
 ) -> Checked:
@@ -416,10 +409,6 @@ def checked_course(
     purposes = {task.purpose for task in draft.tasks}
     if not offscreen_allowed and "offscreen" in purposes:
         problems.append(("offscreen", "The profile lists no things to use, so no offscreen task"))
-    if not open_allowed and "open" in purposes:
-        problems.append(
-            ("open", "Open questions wait until classroom judgment passes the reference set")
-        )
     if demand.purpose == "placement" and purposes & CONTENT_TYPES:
         problems.append(("placement", "The placement lesson uses no new task types"))
     source, title, story = None, draft.title, draft.story

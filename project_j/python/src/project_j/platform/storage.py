@@ -121,12 +121,12 @@ class SimulationStore:
             root.parent.chmod(0o700)
         root.chmod(0o700)
         self.root = root.resolve(strict=True)
-        self.run = check_path(self.root, run_id, realm)
+        self.run = check_path(self.root, run_id)
         if (self.root / run_id).is_symlink():
             raise ValueError("symlink run directory is not allowed")
         self.run.mkdir(mode=0o700, exist_ok=True)
         self.run.chmod(0o700)
-        self.path = check_path(self.root, f"{run_id}/project_j.sqlite3", realm)
+        self.path = check_path(self.root, f"{run_id}/project_j.sqlite3")
         if self.path.is_symlink() or (self.run / "project_j.sqlite3").is_symlink():
             raise ValueError("symlink database is not allowed")
         if not self.path.exists():

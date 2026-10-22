@@ -34,14 +34,12 @@ def test_sqlalchemy_sqlite_transaction_rollback_in_explicit_temporary_directory(
 def test_explicit_temporary_paths_reject_traversal_and_symlink_escape(tmp_path):
     from project_j.paths import check_path
 
-    assert check_path(tmp_path, "simulation/mock.sqlite3", "simulation").is_relative_to(tmp_path)
+    assert check_path(tmp_path, "simulation/mock.sqlite3").is_relative_to(tmp_path)
     with pytest.raises(ValueError, match="escapes"):
-        check_path(tmp_path, "../family.sqlite3", "simulation")
+        check_path(tmp_path, "../family.sqlite3")
     (tmp_path / "escape").symlink_to(tmp_path.parent, target_is_directory=True)
     with pytest.raises(ValueError, match="escapes"):
-        check_path(tmp_path, "escape/file", "study")
-    with pytest.raises(ValueError, match="unknown data space"):
-        check_path(tmp_path, "family.sqlite3", "family")
+        check_path(tmp_path, "escape/file")
 
 
 def test_offline_preflight_lists_adapters_without_private_config_or_network():

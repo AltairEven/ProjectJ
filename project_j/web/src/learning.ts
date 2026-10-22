@@ -1,8 +1,6 @@
-import type { Document as Doc, RevisionRef as Ref } from './client'
-import { judgmentLabels } from './report.ts'
+import type { RevisionRef as Ref } from './client'
+import { capabilityName, judgmentLabels, type Body, type Shape } from './report.ts'
 
-type Body = Record<string, any>
-type Shape = Pick<Doc, 'object_id' | 'revision' | 'kind'> & { body: Body, created_at?: string, source_revision?: number }
 export type EvaluationState = 'Evaluating' | 'Waiting for you' | 'Acknowledged' | 'Disputed'
 
 const helpLabels: Record<string, string> = { none: 'no help', light_prompt: 'a small hint', scaffold: 'a frame', full_model: 'a full model', unknown: 'help unknown' }
@@ -10,7 +8,6 @@ const ref = (doc: Shape): Ref => ({ object_id: doc.object_id, revision: doc.revi
 
 /** For sort(): the newest saved document first; one without a time last. */
 export const byNewest = (a: { created_at?: string }, b: { created_at?: string }) => (b.created_at ?? '').localeCompare(a.created_at ?? '')
-const nameOf = (catalog: Shape[], id: string) => catalog.find(doc => doc.kind === 'capability' && doc.body.dimension_id === id)?.body.name as string | undefined
 
 /** One line per dimension; without evidence the judgment is unknown, never a score (design/learning). */
 export function dimensionLines(state: Shape, catalog: Shape[]) {
@@ -18,7 +15,7 @@ export function dimensionLines(state: Shape, catalog: Shape[]) {
     const evidence = (item.evidence_refs ?? []) as Ref[]
     const limits = ((item.limitations ?? []) as string[]).join('')  // whole sentences
     return {
-      name: nameOf(catalog, item.dimension_id) ?? item.dimension_id,
+      name: capabilityName(catalog, item.dimension_id) ?? item.dimension_id,
       judgment: evidence.length ? judgmentLabels[item.judgment] ?? item.judgment : 'Unknown',
       basis: evidence.length
         ? `From ${evidence.length} class record${evidence.length === 1 ? '' : 's'}, ${helpLabels[item.help] ?? item.help}, material: ${item.material_condition}. ${limits}`
@@ -47,7 +44,7 @@ export function evaluationRows(objects: Shape[]) {
 
 export function goalCard(demand: Shape, catalog: Shape[]) {
   const proposed = (demand.body.proposed_capabilities ?? []) as Body[]
-  const name = (id: string) => nameOf(catalog, id) ?? proposed.find(item => item.dimension_id === id)?.name ?? id
+  const name = (id: string) => capabilityName(catalog, id) ?? proposed.find(item => item.dimension_id === id)?.name ?? id
   const goal = (item: Body) => `${name(item.dimension_id)}: ${item.description}`
   return {
     primary: goal(demand.body.primary_goal), auxiliary: goal(demand.body.auxiliary_goal),

@@ -76,7 +76,7 @@ async def probe(
     scorer: LocalScorer | None = None,
     synth: Callable[[str], bytes] = synthesize,
 ) -> dict:
-    scorer = scorer or LocalScorer(root, inherit_stderr=True)
+    scorer = scorer or LocalScorer(root)
     manifest = root / MODELS / "manifest.json"
     record = {
         "captured_at": datetime.now(UTC).isoformat(),
@@ -148,7 +148,7 @@ def show(record: dict):
 
 async def adult_score(root: Path, command: Sequence[str] | None, audio: bytes, text: str) -> int:
     """Adult self-check: print one recording's scores; nothing is saved."""
-    scorer = LocalScorer(root, command, inherit_stderr=True)
+    scorer = LocalScorer(root, command)
     try:
         await scorer.start()
     except ScorerUnavailable as error:

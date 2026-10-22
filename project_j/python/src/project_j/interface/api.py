@@ -293,6 +293,8 @@ class Dashboard(Contract):
     lost_activities: list[dict[str, JsonValue]] = []
     # Each lesson's averages by task type and ability, oldest first (ADR-0020).
     scores: list[dict[str, JsonValue]] = []
+    # The last five lessons pooled question by question, the numbers planning sees.
+    recent_scores: dict[str, JsonValue] = {}
     active: Snapshot | None = None
     note: str | None = None
 
@@ -843,7 +845,7 @@ def create_app(
         app_controller.store.ensure_idle()
         if not path.startswith("exports/") or not path.endswith(".json"):
             raise ValueError("only the explicit simulation export can be downloaded")
-        file = check_path(app_controller.store.run, path, "simulation")
+        file = check_path(app_controller.store.run, path)
         return Response(
             file.read_bytes(),
             media_type="application/json",

@@ -438,18 +438,6 @@ def reading_draft(context, skip=()):
     return draft
 
 
-def test_study_preparation_allows_open_after_the_reference_set_passed(tmp_path):
-    """Real classroom judgment passed reference set 1.1.0 (QT-3, run qt3-reference-b)."""
-    from conftest import ROOT
-
-    from project_j.application.coordinator import Coordinator
-    from project_j.platform.storage import SimulationStore
-
-    store = SimulationStore(tmp_path / "private/study", "a1", realm="study")
-    app = Coordinator(store, ROOT, verification={"result": "pass"}, onboarding=False)
-    assert app.open_allowed()
-
-
 def test_study_preparation_writes_by_interests_and_maps_the_chosen_skill(
     tmp_path, monkeypatch, caplog
 ):

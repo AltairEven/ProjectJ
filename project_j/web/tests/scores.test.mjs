@@ -24,8 +24,8 @@ test('each lesson reads newest first with type names, its story and unknowns apa
   assert.match(rows[0].date, /^Oct 2[01], 2026$/)
 })
 
-test('the recent line pools the last five lessons by ability, question by question', () => {
-  const more = [...scores, lesson('a3', '2026-10-22T12:00:00Z', {}, { 'english.reading.facts': { average: 5, count: 1 } })]
-  assert.equal(recentLine(more, objects), 'Last 3 lessons: Reading facts and order 7.5 (6 questions)')
-  assert.equal(recentLine(scores.slice(0, 1), objects), 'Last 1 lesson: No known scores')
+test('the recent line words the lessons the server pooled for planning, by ability', () => {
+  const recent = (lessons, average, count) => ({ lessons, by_type: {}, by_dimension: { 'english.reading.facts': { average, count } } })
+  assert.equal(recentLine(recent(3, 7.5, 6), objects), 'Last 3 lessons: Reading facts and order 7.5 (6 questions)')
+  assert.equal(recentLine(recent(1, null, 0), objects), 'Last 1 lesson: No known scores')  // Never 0.
 })

@@ -36,7 +36,7 @@ class PrivateFiles:
         self.store.ensure_idle()
         checksum = digest(text)
         relative = f"assets/{checksum}.txt"
-        path = check_path(self.store.run, relative, self.store.realm)
+        path = check_path(self.store.run, relative)
         if path.exists():
             if digest(path.read_text()) != checksum:
                 raise ValueError("fixed material integrity failure")
@@ -46,7 +46,7 @@ class PrivateFiles:
 
     def read_asset(self, manifest: dict) -> str:
         self.store.ensure_idle()
-        path = check_path(self.store.run, manifest["path"], self.store.realm)
+        path = check_path(self.store.run, manifest["path"])
         text = path.read_text()
         if digest(text) != manifest["sha256"] or len(text.encode()) != manifest["bytes"]:
             raise ValueError("material missing or corrupted")
@@ -57,7 +57,7 @@ class PrivateFiles:
         self.store.ensure_idle()
         checksum = hashlib.sha256(content).hexdigest()
         relative = f"assets/{checksum}.{suffix}"
-        path = check_path(self.store.run, relative, self.store.realm)
+        path = check_path(self.store.run, relative)
         if path.exists():
             if hashlib.sha256(path.read_bytes()).hexdigest() != checksum:
                 raise ValueError("fixed material integrity failure")
@@ -67,7 +67,7 @@ class PrivateFiles:
 
     def read_binary(self, manifest: dict) -> bytes:
         self.store.ensure_idle()
-        path = check_path(self.store.run, manifest["path"], self.store.realm)
+        path = check_path(self.store.run, manifest["path"])
         try:
             content = path.read_bytes()
         except FileNotFoundError:
@@ -87,7 +87,7 @@ class PrivateFiles:
         documents = [doc for doc in documents if doc.learner_id in {None, learner_id}]
         for doc in documents:
             self.store.boundary(doc, learner_id)
-        target = check_path(self.store.run, f"exports/{uuid4()}.json", self.store.realm)
+        target = check_path(self.store.run, f"exports/{uuid4()}.json")
         private_write(
             target,
             canonical(
@@ -103,7 +103,7 @@ class PrivateFiles:
 
     def backup(self) -> Path:
         self.store.ensure_idle()
-        target = check_path(self.store.run, f"backups/{uuid4()}", self.store.realm)
+        target = check_path(self.store.run, f"backups/{uuid4()}")
         target.mkdir(mode=0o700, parents=True)
         destination = target / "project_j.sqlite3"
         destination.touch(mode=0o600)
@@ -122,7 +122,7 @@ class PrivateFiles:
                     for version in item.get("versions", ()):
                         manifests[version["asset"]["path"]] = version["asset"]
         for manifest in manifests.values():
-            copied = check_path(target, manifest["path"], self.store.realm)
+            copied = check_path(target, manifest["path"])
             private_write(copied, self.read_binary(manifest))
         manifests = list(manifests.values())
         private_write(
@@ -156,8 +156,8 @@ class PrivateFiles:
         shutil.copyfile(backup / "project_j.sqlite3", store.path)
         store.path.chmod(0o600)
         for asset in manifest["assets"]:
-            source = check_path(backup, asset["path"], realm)
-            target = check_path(store.run, asset["path"], realm)
+            source = check_path(backup, asset["path"])
+            target = check_path(store.run, asset["path"])
             content = source.read_bytes()
             if (
                 hashlib.sha256(content).hexdigest() != asset["sha256"]
