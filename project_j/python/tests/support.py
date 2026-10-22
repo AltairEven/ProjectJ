@@ -48,6 +48,13 @@ def deliver_all(core):
         deliver(core)
 
 
+def read_story(core):
+    """Start reading the story, finish it, and hear the first question."""
+    core.control(str(uuid4()), "start_reading")
+    core.control(str(uuid4()), "finish_reading")
+    deliver_all(core)
+
+
 async def answer(app, text, intent="unknown"):
     result = await app.adapter.text(str(uuid4()), text, intent)
     deliver_all(app.core)
@@ -111,7 +118,7 @@ async def read_aloud_all(app):
 async def complete_story(app, helped=False, offscreen_report=True):
     core = await start(app)
     deliver_all(core)
-    await answer(app, "Yes, I heard. Read first, then try the paper bridge.", "confirmation")
+    read_story(core)
     if helped:
         await answer(app, "a car")
         await answer(app, "Help me", "help")
@@ -146,7 +153,7 @@ async def teach(app, request_id, course_ref, answers):
     assert result["decision"] == "allow_simulation"
     core = app.core
     deliver_all(core)
-    await answer(app, "Yes, I heard.", "confirmation")
+    read_story(core)
     for text in answers:
         await answer(app, text)
     await answer(app, "I pointed to the folded paper.", "report")

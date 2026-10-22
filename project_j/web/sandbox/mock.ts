@@ -89,11 +89,16 @@ const base = (realm: Snapshot['realm']): Snapshot => ({
   materials: { 'passage': passage },
 })
 
+const opening = "I'm Jane. As you read, notice how Mia finds out that the app counts too few. Press Start reading when you are ready."
+
 export const scenes: Record<string, (realm: Snapshot['realm']) => void> = {
-  'Opening (waiting to confirm)': realm => {
+  'Opening (before reading)': realm => {
     snapshot = { ...base(realm), task_index: -1, materials: {} }
-    say(action('goal', 'Today we read a short story about a trail sensor. We find reasons in the story, tell what happened, and read a part aloud. When you are ready, press "Yes, I heard".', 'input'),
-      { wait_kind: 'goal_confirmation' })
+    say(action('goal', opening, 'input'), { wait_kind: 'reading_start' })
+  },
+  'Reading (timing)': realm => {
+    snapshot = { ...base(realm), task_index: -1, wait_kind: 'reading' }
+    snapshot.presented_action = action('goal', opening, 'input')
   },
   'Question (story and picture)': realm => { snapshot = base(realm); ask(0) },
   'Read aloud': realm => { snapshot = base(realm); ask(1) },
@@ -149,7 +154,6 @@ async function answered(body: Body) {
   set({ mode: 'judging' }); push()
   await wait()
   const intent = body.intent as string
-  if (intent === 'confirmation' && snapshot.wait_kind === 'goal_confirmation') { set({ materials: { passage } }); return ask(0) }
   if (intent === 'confirmation' && snapshot.wait_kind === 'closing_confirmation')
     return set({ mode: 'ended', activity_state: 'ended', end: { reason: 'normal' }, recording: null })
   if (intent === 'help') return say(action('help', 'Hint: look at the last two sentences of paragraph 2. How far apart are the app and her own count?', 'input'))
@@ -172,8 +176,11 @@ async function responded(body: Body) {
 
 async function controlled(command: string) {
   switch (command) {
-    case 'pause': return set({ mode: 'paused', activity_state: 'paused', pending_action: null })
-    case 'resume': return set({ mode: 'waiting_input', activity_state: 'running' })
+    // Like the core: a paused reading hides the story, and the story shows once reading starts.
+    case 'pause': return set({ mode: 'paused', activity_state: 'paused', pending_action: null, ...(snapshot.wait_kind === 'reading' ? { materials: {} } : {}) })
+    case 'resume': return set({ mode: 'waiting_input', activity_state: 'running', ...(snapshot.wait_kind === 'reading' ? { materials: { passage } } : {}) })
+    case 'start_reading': return set({ wait_kind: 'reading', materials: { passage } })
+    case 'finish_reading': return ask(0)
     case 'stop': return set({ mode: 'ended', activity_state: 'ended', pending_action: null, recording: null, end: { reason: 'stop' } })
     case 'skip': return ask(snapshot.task_index + 1)
     case 'close': return ask(tasks.length)

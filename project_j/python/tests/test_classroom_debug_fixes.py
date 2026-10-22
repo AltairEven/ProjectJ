@@ -15,6 +15,7 @@ from support import (
     next_course,
     prepare_course,
     read_aloud_all,
+    read_story,
     ready,
     start,
 )
@@ -29,7 +30,7 @@ def test_first_question_accepts_the_filled_sentence_frame_after_help(application
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
         await answer(application, "a car")
         assert core.task_index == 0 and core.attempts[0]["judgment"] == "incorrect"
         await answer(application, "Help me", "help")
@@ -51,7 +52,7 @@ def test_all_template_sentence_frames_and_saved_c2_follow_the_corrected_flow(app
     async def scenario():
         core = await start(app)
         deliver_all(core)
-        await answer(app, "Got it.", "confirmation")
+        read_story(app.core)
         await answer(app, "that thing")
         assert core.task_index == 0 and core.attempts[-1]["judgment"] == "unclear"
         await answer(app, "she wants a bridge")
@@ -79,7 +80,7 @@ def test_all_template_sentence_frames_and_saved_c2_follow_the_corrected_flow(app
         )
         next_core = app.core
         deliver_all(next_core)
-        await answer(app, "Got it.", "confirmation")
+        read_story(next_core)
         await answer(app, "He first tries the small bus.")
         await answer(app, "The paper bends and the big bus falls.")
         assert next_core.task_index == 2
@@ -97,7 +98,7 @@ def test_wrong_phase_confirmation_is_not_an_attempt_and_cannot_cancel_judgment(a
     async def scenario():
         core = await start(app)
         deliver_all(core)
-        await answer(app, "Got it.", "confirmation")
+        read_story(core)
         revision, epoch, events = core.revision, core.epoch, len(core.events)
         with pytest.raises(ValueError, match="Nothing to confirm now"):
             await app.adapter.text("unexpected", "Yes, I heard the plan.", "confirmation")
@@ -129,16 +130,14 @@ def test_legal_confirmation_replays_and_closes_without_learning_attempts(applica
     async def scenario():
         core = await start(app)
         deliver_all(core)
-        await app.adapter.text("goal-receipt", "Yes, I heard the plan.", "confirmation")
-        deliver_all(core)
-        assert (await app.adapter.text("goal-receipt", "Yes, I heard the plan.", "confirmation"))[
-            "ack"
-        ] == "replayed"
+        read_story(core)
         assert core.task_index == 0 and not core.attempts and not judgments(app)
         core.control("close", "close")
         deliver_all(core)
         await app.adapter.text("closing-receipt", "Got it, the summary.", "confirmation")
         assert core.mode == "ended" and core.end["reason"] == "normal"
+        replayed = await app.adapter.text("closing-receipt", "Got it, the summary.", "confirmation")
+        assert replayed["ack"] == "replayed"
         assert not core.attempts and not judgments(app)
         assert app.seal().body["attempts"] == []
 
@@ -158,15 +157,7 @@ def test_api_rejects_confirmation_at_answer_wait_without_a_model_call(applicatio
         )
         student = {"Authorization": f"Bearer {app.token}"}
         deliver_all(app.core)
-        assert (
-            client.post(
-                "/api/class/input",
-                headers=student,
-                json={"event_id": "goal", "text": "收到", "intent": "confirmation"},
-            ).status_code
-            == 200
-        )
-        deliver_all(app.core)
+        read_story(app.core)
         wrong = client.post(
             "/api/class/input",
             headers=student,
@@ -230,7 +221,7 @@ def test_api_accepts_a_base64_recording_only_on_a_reading_segment(application):
 
         deliver_all(core)
         assert recording("too-early", encoded("a bridge")).status_code in {400, 409, 422}
-        say("goal", "Got it.", "confirmation")
+        read_story(core)
         say("q1", "a bridge")
         say("q2", "She folded it.")
         say("point", "I pointed to the folded paper.", "report")

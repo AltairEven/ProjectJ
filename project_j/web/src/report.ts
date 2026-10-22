@@ -131,6 +131,19 @@ export function resourceLines(preview: Body): string[] {
   })
 }
 
+/** How long the student read the story in class (ADR-0022), from the sealed class events. */
+export function readingLine(events: { kind: string, payload: Record<string, unknown> }[]): string | undefined {
+  const event = events.find(item => item.kind === 'reading_finished' || item.kind === 'reading_unfinished')
+  if (!event) return undefined
+  const ms = Number(event.payload.reading_ms), words = Number(event.payload.word_count)
+  const seconds = Math.round(ms / 1000), minutes = Math.floor(seconds / 60)
+  const time = minutes ? `${minutes} min ${seconds % 60} s` : `${seconds} s`
+  const again = event.payload.first_reading ? '' : ' (read before)'
+  if (event.kind === 'reading_unfinished') return `Not finished (read for ${time})${again}`
+  const speed = ms > 0 ? `, about ${Math.round(words * 60000 / ms)} words a minute` : ''
+  return `${time}, ${words} words${speed}${again}`
+}
+
 /** Each discussion round as the student's feedback and the model's note, then the confirmation. */
 export function discussionLines(preview: Body): [string, string][] {
   const rounds = (preview.discussion ?? []).flatMap((item: Body, index: number): [string, string][] => [

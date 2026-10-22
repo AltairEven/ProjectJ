@@ -31,6 +31,8 @@ COURSES = {
     FIRST: {
         "title": "The Paper Bridge",
         "focus": "What Mia wants and how the new paper changes",
+        "reading_focus": "As you read, notice what Mia wants to make "
+        "and what she does to the new paper.",
         "next": TRANSFER,
         "tasks": [
             (
@@ -146,6 +148,8 @@ COURSES = {
     TRANSFER: {
         "title": "Ben’s Bridge",
         "focus": "Small bus then big bus, and what really happened",
+        "reading_focus": "As you read, notice which bus Ben tries first "
+        "and what happens to each bus.",
         "next": FIRST,
         "tasks": [
             (
@@ -534,6 +538,7 @@ def template_draft(
         "material_id": source,
         "title": None,
         "story": None,
+        "reading_focus": COURSES[source]["reading_focus"],
         "lesson_type": "practice" if practice else "observation",
         "tasks": [
             {

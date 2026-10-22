@@ -41,6 +41,7 @@ def science_draft(context, evidence="He fills it with water."):
         "material_id": None,
         "title": "Sam's Cup",
         "story": NEW_STORY,
+        "reading_focus": "As you read, notice how the cup changes.",
         "lesson_type": "observation",
         "tasks": [
             {

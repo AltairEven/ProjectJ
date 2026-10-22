@@ -20,7 +20,7 @@ from project_j.preparation.contracts import (
     demand_requirements,
 )
 from project_j.preparation.packages import reading_tasks
-from project_j.preparation.reading import flat, segment_reading, words
+from project_j.preparation.reading import flat, segment_reading, sentences, words
 from project_j.preparation.task_types import (
     CONTENT_FIELDS_INSTRUCTION,
     CONTENT_TYPES,
@@ -102,6 +102,8 @@ PREPARATION_INSTRUCTIONS = (
     "学生看的资源不能含本题或后续题的答案；图片与动画由多模态模型生成，"
     "kind不在connected_kinds里的资源required必须为false，课程在没有这些资源时也要能上，fallback写替代办法；"
     "Jane的题目语音与朗读示范由规则生成，不要列音频。"
+    "reading_focus是Jane开场说的阅读提醒：1到2句、合计不超过30个英文单词，告诉学生读的时候留意哪些信息"
+    "（与本课题目考的内容对应），不说出任何答案，不介绍标题与大意，观察课不说出要观察的结果。"
     "preview给学生：story本课故事，why为什么上，materials要准备的实物，help帮助方式，exit时长与退出。"
     "brief给Jane：history相关历史（没有学习历史就写无历史分支），"
     "adjustments允许的挑战、降阶、跳过、暂停与停止，closing正常小结与停止时的简短结束。"
@@ -186,6 +188,7 @@ class CourseDraft(Contract):
     material_id: str | None
     title: Text | None
     story: Text | None
+    reading_focus: Text
     lesson_type: Literal["observation", "practice"]
     tasks: tuple[TaskDraft, ...] = Field(min_length=1)
     read_aloud: bool
@@ -292,6 +295,7 @@ ALLOWED = {
 OPEN_IN_STUDY = True
 QUOTED = {"answer", "open"} | PROGRAM_JUDGED  # Whose evidence must quote the story.
 STORY_WORDS = (30, 250)
+FOCUS_WORDS = 30  # Jane's opening reading tip stays short (ADR-0022).
 RULE_LIMITATION = (
     "Written by the preparation model; the rules check structure, goals, story evidence and "
     "estimated time. Question quality, voice and teaching effect are unverified."
@@ -415,6 +419,7 @@ def checked_course(
     if draft.lesson_type == "practice" and not familiar:
         problems += variety_problems(draft)
     problems += leak_problems(draft)
+    problems += focus_problems(draft)
 
     requirements = demand_requirements(demand)
     known = set(ids) | ({"read_aloud"} if draft.read_aloud else set())
@@ -517,6 +522,7 @@ def checked_course(
             for index, (field, requirement) in enumerate(requirements)
         ),
         parent_preview=draft.preview.model_dump(),
+        reading_focus=draft.reading_focus,
         limitations=(*draft.limitations, *not_given, RULE_LIMITATION)
         + ((REVIEW_LIMITATION,) if familiar else ()),
         resources=tuple(
@@ -594,4 +600,34 @@ def leak_problems(draft: CourseDraft) -> list[tuple[str, str]]:
                 problems.append(
                     ("leak", f"{task.task_id} shows the answer of the later {later.task_id}")
                 )
+    return problems
+
+
+def focus_problems(draft: CourseDraft) -> list[tuple[str, str]]:
+    """The reading tip is one or two short sentences and gives away no answer."""
+    focus = draft.reading_focus
+    problems = []
+    if (count := len(words(focus))) > FOCUS_WORDS:
+        problems.append(
+            ("focus", f"Keep the reading tip to {FOCUS_WORDS} words or fewer; it has {count}")
+        )
+    try:
+        too_many = len(sentences(focus)) > 2
+    except ValueError:
+        too_many = True
+    if too_many:
+        problems.append(
+            ("focus", "Keep the reading tip to one or two sentences, each ending with . ! or ?")
+        )
+    said = f" {plain(focus)} "
+    for task in draft.tasks:
+        answers = [*task.acceptable_answers]
+        if task.choice and 0 <= task.choice.correct < len(task.choice.options):
+            answers.append(task.choice.options[task.choice.correct])
+        for answer in map(plain, answers):
+            if len(answer.split()) >= 2 and f" {answer} " in said:
+                problems.append(
+                    ("leak", f"The reading tip gives away the answer of {task.task_id}")
+                )
+                break
     return problems

@@ -160,6 +160,8 @@ class CourseBody(Contract):
     tasks: tuple[TaskDefinition, ...] = Field(min_length=1)
     demand_mapping: tuple[RequirementMapping, ...] = Field(min_length=1)
     parent_preview: dict[str, str]
+    # Jane's opening reading tip (ADR-0022); courses saved before it have none.
+    reading_focus: str | None = None
     limitations: tuple[str, ...]
     resources: tuple[ResourceSpec, ...] = ()
 

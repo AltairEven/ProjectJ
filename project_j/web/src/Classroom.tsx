@@ -257,7 +257,7 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
             : <button className="quiet" disabled={halted} onClick={() => void control('pause')}>Pause</button>}
           <button className="danger" onClick={() => void control('stop')}>Stop now</button>
           <details className="more"><summary>More</summary><div className="row">
-            <button className="quiet" disabled={halted} onClick={() => void control('skip')}>Skip this question</button>
+            <button className="quiet" disabled={halted || (snapshot?.task_index ?? -1) < 0} onClick={() => void control('skip')}>Skip this question</button>
             <button className="quiet" disabled={halted} onClick={() => void control('close')}>Wrap up</button></div></details></div>}</div>
     </header>
     <div className="stage">
@@ -271,7 +271,7 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
           {!localCancelled && !voicing && (busy || snapshot?.mode === 'judging') && <Progress label="Jane is reading your answer…" />}
           {voiced && locked && <button onClick={() => void speaker.current?.resume().then(() => setLocked(false))}>Turn on sound</button>}
           {snapshot && snapshot.mode !== 'offscreen' && snapshot.mode !== 'ended' && <div className="row">
-            {mode !== 'task' && <button className="quiet" disabled={busy || halted} onClick={() => void input('Help me, please.', 'help')}>Help me</button>}
+            {mode !== 'task' && mode !== 'story' && <button className="quiet" disabled={busy || halted} onClick={() => void input('Help me, please.', 'help')}>Help me</button>}
             <button className="quiet" disabled={halted} onClick={() => void control('repeat')}>Say it again</button></div>}</div></section>
       </div>
       <div className="side book">
@@ -285,7 +285,7 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
           return <section key={id} className="reading">{title && <h2>{title}</h2>}
             <ol>{paragraphs.map((text, index) => <li key={index}>{text}</li>)}</ol></section>
         })}
-        {!Object.keys(snapshot?.materials ?? {}).length && <p className="hint">The story shows here.</p>}
+        {!Object.keys(snapshot?.materials ?? {}).length && <p className="hint">{snapshot?.wait_kind === 'reading_start' ? 'The story shows when you press Start reading.' : 'The story shows here.'}</p>}
       </div>
       <div className="side notebook">
         {message && <div className="notice" role="alert">{message}</div>}
@@ -314,6 +314,12 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
           </div></section>}
         {mode === 'task' && snapshot ? <TaskInput key={snapshot.task_instance_id} task={snapshot.task as TaskView} disabled={busy || halted}
           onSubmit={response => void respond({ intent: 'answer', response })} onHint={() => void respond({ intent: 'help' })} /> :
+          // Reading the story alone, timed by the class (ADR-0022); no seconds are shown.
+          mode === 'story' && snapshot ? (snapshot.wait_kind === 'reading_start'
+            ? <section className="story-reading"><p>Read the story on your own. Take your time.</p>
+              <button disabled={snapshot.mode !== 'waiting_input' || busy || halted} onClick={() => void control('start_reading')}>Start reading</button></section>
+            : <section className="story-reading"><p>{snapshot.mode === 'paused' ? 'Reading paused.' : 'Timing your reading.'}</p>
+              <button disabled={halted} onClick={() => void control('finish_reading')}>I've finished reading</button></section>) :
           snapshot?.mode === 'offscreen' ? <section><p>Nothing is recorded while you are away. When you come back, tell Jane what you did and what happened; coming back alone does not finish it.</p><button onClick={() => void control('return')}>I'm back: report</button></section> :
           snapshot?.mode !== 'ended' && <section><label>{voiced ? 'Your answer or report' : 'Your answer or report (simulation)'}<textarea value={text} onChange={event => setText(event.target.value)} disabled={localCancelled} /></label>
             <div className="row"><button disabled={busy || !text.trim() || halted || Boolean(reading)} onClick={() => void input(text)}>Submit</button>
@@ -325,7 +331,7 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     </div>
     {/* Closed by the page while the confirmation is being sent; by the student (button or Esc) to set it aside. */}
     <dialog ref={confirmBox} className="confirm-box" onClose={() => { if (!busy) setSetAside(confirming) }}>
-      <h2>{snapshot?.wait_kind === 'closing_confirmation' ? 'Summary' : 'About this lesson'}</h2>
+      <h2>Summary</h2>
       <p>{snapshot?.presented_action?.text}</p>
       {message && <div className="notice" role="alert">{message}</div>}
       <div className="row"><button onClick={confirm}>Yes, I heard</button>

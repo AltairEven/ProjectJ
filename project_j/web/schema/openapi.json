@@ -2203,7 +2203,9 @@
               "skip",
               "repeat",
               "close",
-              "end_unconfirmed"
+              "end_unconfirmed",
+              "start_reading",
+              "finish_reading"
             ],
             "title": "Command"
           }

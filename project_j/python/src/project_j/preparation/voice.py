@@ -15,7 +15,7 @@ __all__ = [
     "MAX_AUDIO_CHARS",
     "WRONG_TEXT",
     "audio_resources",
-    "goal_text",
+    "opening_text",
     "question_speech",
     "question_text",
 ]
@@ -23,21 +23,11 @@ __all__ = [
 WRONG_TEXT = "Not yet."
 
 
-def goal_text(course: CourseBody) -> str:
-    reading = (
-        "First we review a story you have read"
-        if course.lesson_type == "review"
-        else "First we read a story"
-    )
-    observe = (
-        ", then do a short observation away from the screen"
-        if any(task.purpose == "offscreen" for task in course.tasks)
-        else ""
-    )
-    return (
-        f"I'm Jane. {reading} and find the words that show the answers{observe}. "
-        "You can pause or stop at any time. Did you hear the plan?"
-    )
+def opening_text(course: CourseBody) -> str:
+    """Jane's opening: what to notice while reading, then how to start (ADR-0022)."""
+    again = " You have read this story before." if course.lesson_type == "review" else ""
+    focus = course.reading_focus or "Read the story on your own."
+    return f"I'm Jane.{again} {focus} Press Start reading when you are ready."
 
 
 def question_text(task: TaskDefinition, budget: dict[str, int]) -> str:
@@ -74,7 +64,7 @@ def audio_resources(course: CourseBody) -> tuple[ResourceSpec, ...]:
             text=text,
         )
 
-    resources = [statement("voice:goal", "Jane's fixed line: opening", goal_text(course))]
+    resources = [statement("voice:goal", "Jane's fixed line: opening", opening_text(course))]
     for task in course.tasks:
         # Too long for one synthesis request: nothing to prepare; live speech says so in class.
         if len(question_speech(task, course.budget)) > MAX_AUDIO_CHARS:

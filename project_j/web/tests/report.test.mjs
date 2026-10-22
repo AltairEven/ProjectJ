@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { describe, discussionLines, evaluationLines, modelLines, resourceLines, revisionChanges } from '../src/report.ts'
+import { describe, discussionLines, evaluationLines, modelLines, readingLine, resourceLines, revisionChanges } from '../src/report.ts'
 
 const doc = (object_id, revision, kind, body) => ({ object_id, revision, kind, body })
 const docs = [
@@ -191,4 +191,15 @@ test("an evaluation lists each question's score and reason", async () => {
   assert.equal(scoreText({ score: 0, basis: 'rule', reason: 'Not right after all the help' }), '0/10 (Not right after all the help)')
   const old = { ...evaluation, body: { ...evaluation.body, scores: undefined } }
   assert.ok(!evaluationLines(old, docs).some(([label]) => label.startsWith('Score')))
+})
+
+const ev = (kind, payload) => ({ kind, payload })
+test('the reading row shows time, words and speed, or that it was not finished', () => {
+  assert.equal(readingLine([ev('reading_finished', { reading_ms: 200000, word_count: 180, first_reading: true, pauses: 1 })]),
+    '3 min 20 s, 180 words, about 54 words a minute')
+  assert.equal(readingLine([ev('reading_finished', { reading_ms: 45000, word_count: 90, first_reading: false, pauses: 0 })]),
+    '45 s, 90 words, about 120 words a minute (read before)')
+  assert.equal(readingLine([ev('reading_unfinished', { reading_ms: 200000, word_count: 180, first_reading: true, pauses: 0 })]),
+    'Not finished (read for 3 min 20 s)')
+  assert.equal(readingLine([ev('task_started', {})]), undefined)
 })

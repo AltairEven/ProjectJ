@@ -10,12 +10,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 from support import (
     LEARNER,
-    answer,
     complete_story,
     confirmed,
     deliver_all,
     next_course,
     prepare_course,
+    read_story,
     ready,
     start,
     teach,
@@ -86,7 +86,7 @@ def test_two_fixed_courses_alternate_and_label_familiar_material(application):
             fact = await teach(app, f"start{number}", course_ref, answers[prompt])
             opening = next(a.text for a in app.core.actions.values() if a.kind == "goal")
             # Jane does not present an already-read story as a first reading.
-            assert ("review" in opening) == (course["lesson_type"] == "review")
+            assert ("read this story before" in opening) == (course["lesson_type"] == "review")
             activity = fact.body["activity_id"]
             app.feedback(f"feedback{number}", LEARNER, activity, "无额外补充")
             result = await next_course(app, f"next{number}", LEARNER, activity)
@@ -275,7 +275,7 @@ def test_evaluation_reuse_requires_the_same_sealed_fact_revision(application):
     async def scenario():
         core = await start(app)
         deliver_all(core)
-        await answer(app, "Got it.", "confirmation")
+        read_story(app.core)
         await app.adapter.text("speech", "a car")
         unseen = core.actions[core.pending]  # The correction was never presented before stop.
         core.control("stop", "stop")

@@ -55,6 +55,7 @@ def test_a_simulated_journey_shows_no_chinese(tmp_path):
         deliver_all,
         onboarding_app,
         read_aloud_all,
+        read_story,
         ready,
         settle,
         wait_jobs,
@@ -93,7 +94,7 @@ def test_a_simulated_journey_shows_no_chinese(tmp_path):
         core = app.core
         deliver_all(core)
         jane()
-        await answer(app, "Yes, I heard.", "confirmation")
+        read_story(app.core)
         asked = clicked_wrong = False
         while (task := core.current_task()) and core.mode != "ended":
             if task.purpose == "answer" and not asked:

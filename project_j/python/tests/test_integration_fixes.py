@@ -11,6 +11,7 @@ from support import (
     confirmed,
     deliver_all,
     next_course,
+    read_story,
     ready,
 )
 
@@ -184,7 +185,7 @@ def test_reused_state_retry_keeps_newer_evidence_and_rechecks_demand(application
         )
         second = app.core
         deliver_all(second)
-        await answer(app, "Got it.", "confirmation")
+        read_story(app.core)
         await answer(app, second.course.tasks[second.task_index].acceptable_simulated[0])
         second.control("second-stop", "stop")
         app.seal()

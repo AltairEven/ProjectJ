@@ -7,7 +7,7 @@ from test_preparation_drafting import STORY, check, initial
 
 from project_j.preparation.contracts import ResourceSpec
 from project_j.preparation.packages import FIRST, template_draft
-from project_j.preparation.voice import goal_text, question_speech, question_text
+from project_j.preparation.voice import opening_text, question_speech, question_text
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def course(application):
 
 def test_audio_resources_follow_the_course_text(course):
     resources = {item.resource_id: item for item in course.resources}
-    assert resources["voice:goal"].text == goal_text(course)
+    assert resources["voice:goal"].text == opening_text(course)
     assert resources["voice:goal"].task_ids == ()
     for task in course.tasks:
         statement = resources[f"voice:{task.task_id}"]
@@ -66,14 +66,19 @@ def test_clicked_tasks_prepare_every_line_jane_may_say(course):
     assert not any(key.startswith(f"voice:{answer.task_id}:") for key in resources)
 
 
-def test_goal_mentions_observation_only_with_an_offscreen_task(course):
-    assert "away from the screen" in goal_text(course)
-    plain = course.model_copy(
-        update={"tasks": tuple(task for task in course.tasks if task.purpose != "offscreen")}
+def test_opening_is_the_reading_tip_and_how_to_start(course):
+    assert opening_text(course) == (
+        f"I'm Jane. {course.reading_focus} Press Start reading when you are ready."
     )
-    assert "paper bridge" not in goal_text(plain) and "away from" not in goal_text(plain)
     review = course.model_copy(update={"lesson_type": "review"})
-    assert goal_text(review).startswith("I'm Jane. First we review a story you have read")
+    assert opening_text(review) == (
+        f"I'm Jane. You have read this story before. {course.reading_focus} "
+        "Press Start reading when you are ready."
+    )
+    old = course.model_copy(update={"reading_focus": None})
+    assert opening_text(old) == (
+        "I'm Jane. Read the story on your own. Press Start reading when you are ready."
+    )
 
 
 def resource(**changes):
@@ -101,7 +106,7 @@ def test_audio_resource_needs_its_text():
 
 def test_harness_says_the_shared_texts(application):
     core = asyncio.run(start(application))
-    assert core.actions[core.pending].text == goal_text(core.course)
+    assert core.actions[core.pending].text == opening_text(core.course)
 
 
 def test_a_statement_over_the_synthesis_limit_is_left_to_live_speech(application):

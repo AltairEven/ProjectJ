@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 import pytest
-from support import answer, deliver_all, start
+from support import answer, deliver_all, read_story, start
 
 import project_j.application.reference as reference_module
 from project_j.application.reference import (
@@ -186,9 +186,7 @@ def case_and_task(case_id):
 async def captured_classroom_request(application, text):
     core = await start(application)
     deliver_all(core)
-    await answer(
-        application, "Yes, I heard. Read first, then try the paper bridge.", "confirmation"
-    )  # now at reading-fact
+    read_story(core)  # now at reading-fact
     seen, original = [], core.models.run
 
     async def record(request):

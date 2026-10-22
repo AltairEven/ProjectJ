@@ -80,9 +80,11 @@ export function setBlank(answer: Extract<Answer, { type: 'fill' }>, index: numbe
 /** The sentence around its blanks. */
 export const fillParts = (text: string) => text.split(BLANK)
 
-/** How the student answers now: on the task, by recording, by typing, or not at all. */
-export function answerMode(snapshot: { task?: unknown, wait_kind: string, recording?: unknown, mode: string } | undefined): 'task' | 'reading' | 'text' | 'none' {
+/** How the student answers now: on the task, by recording, with the story-reading buttons,
+ *  by typing, or not at all. */
+export function answerMode(snapshot: { task?: unknown, wait_kind: string, recording?: unknown, mode: string } | undefined): 'task' | 'reading' | 'story' | 'text' | 'none' {
   if (!snapshot || snapshot.mode === 'ended' || snapshot.mode === 'offscreen') return 'none'
+  if (snapshot.wait_kind === 'reading_start' || snapshot.wait_kind === 'reading') return 'story'
   const answering = ['answer', 'retry', 'clarification'].includes(snapshot.wait_kind)
   if (snapshot.task && answering) return 'task'
   if (snapshot.recording) return 'reading'

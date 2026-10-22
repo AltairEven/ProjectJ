@@ -143,7 +143,7 @@ export type Control = {
     /**
      * Command
      */
-    command: 'stop' | 'pause' | 'resume' | 'return' | 'skip' | 'repeat' | 'close' | 'end_unconfirmed';
+    command: 'stop' | 'pause' | 'resume' | 'return' | 'skip' | 'repeat' | 'close' | 'end_unconfirmed' | 'start_reading' | 'finish_reading';
 };
 
 /**

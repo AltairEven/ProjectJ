@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-from support import LEARNER, answer, complete_story, deliver_all, judgments, start
+from support import LEARNER, answer, complete_story, deliver_all, judgments, read_story, start
 
 from project_j.classroom.harness import DeliveryFeedback
 from project_j.classroom.judgment import ModelProposal
@@ -30,7 +30,7 @@ def test_delivery_partial_interruption_and_sequence_cannot_forge_receipt_or_unde
         occurred_at=datetime.now(UTC),
     )
     core.delivery(partial)
-    assert core.mode == "delivering" and core.wait_kind == "goal_confirmation"
+    assert core.mode == "delivering" and core.wait_kind == "reading_start"
     core.delivery(
         partial.model_copy(
             update={"delivery_event_id": "dl2", "sequence": 2, "status": "interrupted"}
@@ -41,14 +41,14 @@ def test_delivery_partial_interruption_and_sequence_cannot_forge_receipt_or_unde
         core.delivery(
             partial.model_copy(update={"delivery_event_id": "old-completed", "status": "completed"})
         )
-    assert not any(event["kind"] == "goal_received" for event in core.events)
+    assert not core.story_open
 
 
 def test_E2E11_out_of_bound_proposal_does_not_advance(application):
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
         before = core.task_index
         with pytest.raises(Conflict):
             core.approve(
@@ -75,7 +75,7 @@ def test_stale_input_after_next_question_is_not_scored(application):
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
         old = application.adapter.binding()
         await answer(application, "a bridge")
         event = SubmittedInput(
@@ -102,7 +102,7 @@ def test_model_failure_keeps_original_input_and_does_not_advance(application):
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
         application.models.adapters["simulated"].fail_next = True
         result = await application.adapter.text("failure-input", "a bridge")
         assert result["ack"] == "failed"
@@ -115,7 +115,7 @@ def test_the_class_continues_past_thirty_minutes(application):
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Yes, I heard.", "confirmation")
+        read_story(application.core)
         core.started_clock -= 31 * 60
         snapshot = core.snapshot()
         assert snapshot["activity_state"] == "running" and snapshot["elapsed_seconds"] > 30 * 60
@@ -224,7 +224,7 @@ def test_invalid_structured_proposal_retains_input_and_offers_clarification(
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
 
         monkeypatch.setattr(
             application.models.adapters["simulated"],

@@ -201,6 +201,29 @@ def test_template_draft_checks_into_the_fixed_course(demand, draft):
     assert checked.course.limitations[-1].startswith("Written by the preparation model")
 
 
+def test_template_draft_carries_the_reading_tip(demand, draft):
+    assert check(demand, draft).course.reading_focus == COURSES[FIRST]["reading_focus"]
+
+
+@pytest.mark.parametrize(
+    "focus",
+    [
+        " ".join(["word"] * 30) + " now.",  # 31 words
+        "Look at Mia. Look at the paper. Look at the car.",  # three sentences
+        "Notice what Mia wants",  # no end punctuation
+    ],
+)
+def test_a_long_or_unpunctuated_reading_tip_is_refused(demand, draft, focus):
+    assert "focus" in rejected(demand, {**draft, "reading_focus": focus})
+
+
+def test_a_reading_tip_with_an_answer_is_refused(demand, draft):
+    # "a bridge" is the first accepted answer of reading-fact.
+    assert "leak" in rejected(
+        demand, {**draft, "reading_focus": "As you read, notice why Mia wants a bridge."}
+    )
+
+
 def test_evidence_must_quote_the_story(demand, draft):
     draft["tasks"][0]["evidence"] = "She wants a boat."
     assert rejected(demand, draft) == {"evidence"}

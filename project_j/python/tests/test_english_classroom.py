@@ -4,7 +4,7 @@ import asyncio
 import logging
 
 import pytest
-from support import answer, deliver_all, start
+from support import deliver_all, read_story, start
 from test_task_types import definition, fill_task
 
 from project_j.classroom.harness import is_confirmation, is_help_request
@@ -68,7 +68,7 @@ def test_a_chinese_judgment_text_is_rejected_and_logged(application, monkeypatch
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Yes, I heard.", "confirmation")
+        read_story(application.core)
         evidence = core.current_task().evidence
         monkeypatch.setattr(
             application.models.adapters["simulated"],

@@ -15,6 +15,7 @@ from support import (
     judgments,
     prepare_course,
     read,
+    read_story,
     start,
 )
 
@@ -29,7 +30,7 @@ async def to_clicked(app):
     """Through the story questions and the reports to the first clicked task."""
     core = await start(app)
     deliver_all(core)
-    await answer(app, "Yes, I heard.", "confirmation")
+    read_story(app.core)
     await answer(app, "a bridge")
     await answer(app, "She folded it.")
     await answer(app, "I pointed to the folded paper.", "report")
@@ -123,11 +124,9 @@ def test_a_clicked_answer_elsewhere_is_refused(application):
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        with pytest.raises(
-            ValueError, match="not answered with buttons"
-        ):  # At the goal confirmation.
+        with pytest.raises(ValueError, match='Press "Start reading"'):  # Before the story.
             await application.adapter.response(str(uuid4()), {"choice": 0})
-        await answer(application, "Yes, I heard.", "confirmation")
+        read_story(core)
         assert core.snapshot()["task"] is None  # A story question has no page view.
         with pytest.raises(ValueError, match="not answered with buttons"):
             await application.adapter.response(str(uuid4()), {"choice": 0})
@@ -190,7 +189,7 @@ def test_the_http_route_and_snapshot_carry_the_task_view(application):
         assert view["task"] is None  # The goal, then a story question: nothing to click.
 
         async def walk():
-            await answer(app, "Yes, I heard.", "confirmation")
+            read_story(app.core)
             await answer(app, "a bridge")
             await answer(app, "She folded it.")
             await answer(app, "I pointed to the folded paper.", "report")

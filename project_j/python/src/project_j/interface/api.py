@@ -181,7 +181,16 @@ class Control(Contract):
     event_id: str
     activity_id: str | None = None
     command: Literal[
-        "stop", "pause", "resume", "return", "skip", "repeat", "close", "end_unconfirmed"
+        "stop",
+        "pause",
+        "resume",
+        "return",
+        "skip",
+        "repeat",
+        "close",
+        "end_unconfirmed",
+        "start_reading",
+        "finish_reading",
     ]
 
 

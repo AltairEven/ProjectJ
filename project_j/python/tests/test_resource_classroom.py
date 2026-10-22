@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from support import LEARNER, answer, answer_clicked, deliver_all, ready, start
+from support import LEARNER, answer, answer_clicked, deliver_all, read_story, ready, start
 from test_preparation_model import ref, science_draft, science_lesson
 
 from project_j.application.configuration import Settings
@@ -20,7 +20,7 @@ from project_j.preparation.resources import adopt_resource, generate_resource
 async def to_reading(app):
     core = await start(app)
     deliver_all(core)
-    await answer(app, "Yes, I heard.", "confirmation")
+    read_story(app.core)
     await answer(app, "a bridge")
     await answer(app, "She folded it.")
     await answer(app, "I pointed to the folded paper.", "report")
@@ -118,7 +118,7 @@ def visual_class(application, monkeypatch, client=None):
     result = application.start("visual", LEARNER, course_ref, materials_ready=True)
     core = application.core
     deliver_all(core)
-    asyncio.run(answer(application, "Yes, I heard.", "confirmation"))
+    read_story(application.core)
     return result, core
 
 

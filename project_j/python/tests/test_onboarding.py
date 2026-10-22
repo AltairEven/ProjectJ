@@ -12,6 +12,7 @@ from support import (
     deliver_all,
     onboarding_app,
     read_aloud_all,
+    read_story,
     ready,
     wait_jobs,
 )
@@ -49,7 +50,7 @@ async def placement_lesson(app):
     assert app.start("placement", LEARNER, course_ref)["decision"] == "allow_simulation"
     core = app.core
     deliver_all(core)
-    await answer(app, "Yes, I heard. Read the story first.", "confirmation")
+    read_story(app.core)
     await answer(app, "a bridge")
     await answer(app, "She folded it.")
     await read_aloud_all(app)

@@ -14,6 +14,7 @@ from support import (
     next_course,
     read,
     read_aloud_all,
+    read_story,
     start,
 )
 
@@ -34,7 +35,7 @@ def test_the_class_view_says_which_task_of_how_many(application):
         view = application.student_view(core)
         assert (view["task_index"], view["task_count"]) == (-1, total)  # the goal comes first
         deliver_all(core)
-        await answer(application, "Yes, I heard. Read the story first.", "confirmation")
+        read_story(application.core)
         assert application.student_view(core)["task_index"] == 0
 
     asyncio.run(scenario())
@@ -130,7 +131,7 @@ def test_E2E03_stop_during_model_does_not_wait_or_deliver_late_result(applicatio
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
         application.models.adapters["simulated"].delay_seconds = 5
         work = asyncio.create_task(application.adapter.text("answer1", "a bridge"))
         await asyncio.sleep(0)
@@ -166,7 +167,7 @@ def test_parent_skip_works_while_the_model_is_slow_and_while_offscreen(applicati
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
         first = core.task_instance_id
         application.models.adapters["simulated"].delay_seconds = 5
         work = asyncio.create_task(application.adapter.text("slow-answer", "a bridge"))
@@ -213,7 +214,7 @@ def test_a_typed_report_mentioning_help_is_a_report_and_a_bare_plea_is_help(appl
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Yes, I heard.", "confirmation")
+        read_story(application.core)
         await answer(application, "a bridge")
         await answer(application, "She folded it.")
         assert core.course.tasks[core.task_index].task_id == "point-paper"
@@ -345,7 +346,7 @@ def test_supplement_before_delivery_keeps_one_attempt_and_invalidates_old_action
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
         first = await application.adapter.text("first", "that thing")
         old_action = core.pending
         await application.adapter.text(
@@ -363,7 +364,7 @@ def test_student_view_shows_the_story_without_adult_material_metadata(applicatio
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
         [text] = application.student_view(core)["materials"].values()
         assert text.startswith("The Paper Bridge\n\nMia has a toy car.\n")
         assert "素材版本" not in text and "Lexile" not in text
@@ -376,7 +377,7 @@ def test_reopened_student_page_can_show_the_last_presented_action(application):
         core = await start(application)
         assert core.snapshot()["presented_action"] is None
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
         # The prompt was already delivered to the old page; a reopened page has no pending action.
         snapshot = core.snapshot()
         assert snapshot["pending_action"] is None
@@ -389,7 +390,7 @@ def test_supplement_after_delivered_response_is_ruled_a_new_attempt(application)
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
         await application.adapter.text("first", "that thing")
         deliver_all(core)
         # The clarification was delivered, so the child's "supplement" cannot join the first answer.
@@ -415,7 +416,7 @@ def test_two_same_answers_are_two_attempts_but_transport_replay_is_one(applicati
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
         await application.adapter.text("answer1", "a car")
         assert (await application.adapter.text("answer1", "a car"))["ack"] == "replayed"
         assert len(core.attempts) == 1
@@ -564,7 +565,7 @@ def test_completed_requests_replay_after_later_effective_versions_without_new_ca
 async def reach_reading(app):
     core = await start(app)
     deliver_all(core)
-    await answer(app, "Got it.", "confirmation")
+    read_story(app.core)
     await answer(app, "a bridge")
     await answer(app, "She folded it.")
     await answer(app, "I pointed to the folded paper.", "report")
@@ -614,7 +615,7 @@ def test_a_recording_on_a_question_is_rejected(application):
     async def scenario():
         core = await start(application)
         deliver_all(core)
-        await answer(application, "Got it.", "confirmation")
+        read_story(application.core)
         with pytest.raises(ValueError):
             await read(application, "not-reading", "a bridge")
         assert not core.attempts

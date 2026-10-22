@@ -1,8 +1,7 @@
 import type { Snapshot } from './client'
 
 export function canConfirm(snapshot?: Pick<Snapshot, 'mode' | 'wait_kind'>): boolean {
-  return snapshot?.mode === 'waiting_input' &&
-    (snapshot.wait_kind === 'goal_confirmation' || snapshot.wait_kind === 'closing_confirmation')
+  return snapshot?.mode === 'waiting_input' && snapshot.wait_kind === 'closing_confirmation'
 }
 
 /** Which confirmation the pop-up asks for: one per thing Jane said, so it asks again after she

@@ -19,7 +19,7 @@ from project_j.platform.speech.contracts import PronunciationResult, Pronunciati
 from project_j.platform.storage import REALMS, Conflict, canonical, digest
 from project_j.preparation.contracts import CourseBody, ResourceSpec, TaskDefinition
 from project_j.preparation.task_types import PROGRAM_JUDGED
-from project_j.preparation.voice import WRONG_TEXT, goal_text, question_speech, question_text
+from project_j.preparation.voice import WRONG_TEXT, opening_text, question_speech, question_text
 
 log = logging.getLogger(__name__)
 # Diagnostic logs carry identities, kinds and outcomes only, never what was said or shown.
@@ -28,8 +28,13 @@ LOGGED_FIELDS = (
     "after_delivery", "status", "modality", "intent", "relation", "completion_trigger",
     "recording_ms", "delivered_range", "failure", "deadline_seconds", "judgment", "call_id",
     "command", "reason", "unconfirmed", "unfinished_tasks", "elapsed_seconds", "type_version",
-    "wrong_count", "rule_ms", "level",
+    "wrong_count", "rule_ms", "level", "reading_ms", "word_count", "first_reading", "pauses",
 )  # fmt: skip
+# Reading the story before the questions (ADR-0022): what typing, help or skip gets meanwhile.
+READING_WAITS = {
+    "reading_start": 'Press "Start reading" to see the story.',
+    "reading": 'Press "I\'ve finished reading" when you are done.',
+}
 TRANSITIONS = {
     "delivering": {"waiting_input", "delivering", "offscreen", "paused", "ended"},
     "waiting_input": {"judging", "delivering", "paused", "ended"},
@@ -155,6 +160,8 @@ class Harness:
         jane: dict | None = None,
         voiced: frozenset[str] = frozenset(),
         visible: tuple[ResourceSpec, ...] = (),
+        story_words: int = 0,
+        first_reading: bool = True,
     ):
         self.activity_id, self.learner_id = activity_id, learner_id
         # Texts with an adopted recording; adopted student pictures and animations.
@@ -169,7 +176,12 @@ class Harness:
         )
         self.scorer = scorer
         self.mode = "delivering"
-        self.wait_kind = "goal_confirmation"
+        self.wait_kind = "reading_start"
+        # The story shows once the student starts reading; the timer runs on the core clock
+        # until "finished", excluding pauses (ms so far, running since, pause count).
+        self.story_words, self.first_reading = story_words, first_reading
+        self.story_open = False
+        self.story_timer: dict | None = None
         self.revision, self.epoch, self.task_index = 1, 0, -1
         self.task_instance_id, self.wait_id = str(uuid4()), str(uuid4())
         self.started_at, self.started_clock = datetime.now(UTC), time.monotonic()
@@ -196,7 +208,7 @@ class Harness:
         self.closing_clock: float | None = None
         self.task_started_ms: float | None = None
         # A review lesson must not present an already-read story as a first reading.
-        self.action("goal", goal_text(self.course), "input", visuals=self.shown((), "question"))
+        self.action("goal", opening_text(self.course), "input", visuals=self.shown((), "question"))
 
     def record(self, kind: str, payload: dict):
         self.events.append(
@@ -266,6 +278,25 @@ class Harness:
         self.pending = action.action_id
         self.record("allowed_action", action.model_dump(mode="json"))
         return action
+
+    def story_visible(self) -> bool:
+        """The story shows after "Start reading", except while reading is paused."""
+        return self.story_open and not (self.mode == "paused" and self.story_timer is not None)
+
+    def stop_story(self, kind: str):
+        """Record how long the student read (reading_finished or reading_unfinished)."""
+        timer = self.story_timer
+        running = self.class_ms() - timer["since"] if timer["since"] is not None else 0.0
+        self.story_timer = None
+        self.record(
+            kind,
+            {
+                "reading_ms": round(timer["ms"] + running),
+                "word_count": self.story_words,
+                "first_reading": self.first_reading,
+                "pauses": timer["pauses"],
+            },
+        )
 
     def current_task(self) -> TaskDefinition | None:
         if self.mode == "ended" or not 0 <= self.task_index < len(self.course.tasks):
@@ -375,7 +406,8 @@ class Harness:
         if feedback.status in {"failed", "cancelled", "interrupted", "unknown"}:
             self.pending = None
             self.move("waiting_input")
-            self.wait_kind = "delivery_recovery"
+            # A missed repeat while reading leaves the student reading, not recovering.
+            self.wait_kind = "reading" if self.story_timer is not None else "delivery_recovery"
             return self.snapshot()
         if feedback.status != "completed" or not feedback.delivered_range:
             return self.snapshot()
@@ -391,8 +423,9 @@ class Harness:
         elif action.after_delivery == "end_confirmation":
             self.wait_kind = "closing_confirmation"
         else:
+            before = "reading" if self.story_timer is not None else "reading_start"
             self.wait_kind = {"retry": "retry", "clarification": "clarification"}.get(
-                action.after_delivery, "goal_confirmation" if self.task_index < 0 else "answer"
+                action.after_delivery, before if self.task_index < 0 else "answer"
             )
             if self.reading_task() and hasattr(self.scorer, "warm"):
                 # After synthesis the scorer's first score took 8–28 s under memory pressure,
@@ -457,12 +490,20 @@ class Harness:
         elif command == "pause":
             if self.mode not in {"paused", "ended"}:
                 self.paused_from = self.mode
+                timer = self.story_timer
+                if timer is not None and timer["since"] is not None:
+                    timer["ms"] += self.class_ms() - timer["since"]
+                    timer["since"], timer["pauses"] = None, timer["pauses"] + 1
                 self.invalidate()
                 self.move("paused")
         elif command == "resume":
             if self.mode != "paused":
                 raise ValueError("only the original paused activity can resume")
             previous_mode = self.paused_from
+            if self.story_timer is not None:  # Back to reading; the opening is not said again.
+                self.move("waiting_input")
+                self.story_timer["since"] = self.class_ms()
+                return self.snapshot()
             self.move("offscreen" if previous_mode == "offscreen" else "delivering")
             if previous_mode != "offscreen":
                 last = next(reversed(self.actions.values()))
@@ -487,6 +528,10 @@ class Harness:
                 "input",
             )
         elif command == "skip":
+            if self.task_index < 0:  # No question yet: skipping would bypass the story.
+                raise ValueError(
+                    READING_WAITS.get(self.wait_kind, 'Press "Say it again" to hear Jane first.')
+                )
             # Skipping is the way out of a slow judgment or an offscreen task, not only of a wait.
             if self.mode in {"waiting_input", "delivering", "judging", "offscreen"}:
                 self.invalidate()
@@ -507,6 +552,8 @@ class Harness:
         elif command == "close":
             if self.mode not in {"ended", "paused"}:
                 self.invalidate()
+                if self.story_timer is not None:
+                    self.stop_story("reading_unfinished")
                 self.wait_kind = "closing_confirmation"
                 self.action(
                     "closing",
@@ -514,6 +561,23 @@ class Harness:
                     "Did you hear this summary?",
                     "end_confirmation",
                 )
+        elif command == "start_reading":
+            if self.mode != "waiting_input" or self.wait_kind != "reading_start":
+                raise ValueError("Start reading only after Jane's opening.")
+            self.story_open = True
+            self.story_timer = {"ms": 0.0, "since": self.class_ms(), "pauses": 0}
+            self.wait_kind = "reading"
+            self.revision += 1
+            self.record(
+                "reading_started",
+                {"word_count": self.story_words, "first_reading": self.first_reading},
+            )
+        elif command == "finish_reading":
+            if self.story_timer is None or self.mode not in {"waiting_input", "delivering"}:
+                raise ValueError("Nothing is being read now.")
+            self.invalidate()
+            self.stop_story("reading_finished")
+            self.next_task()
         elif command == "end_unconfirmed":
             if self.mode != "ended":
                 self.finish("unconfirmed")
@@ -522,6 +586,8 @@ class Harness:
         return self.snapshot()
 
     def finish(self, reason: str):
+        if self.story_timer is not None:  # Recorded before the end boundary is fixed.
+            self.stop_story("reading_unfinished")
         self.invalidate()
         self.move("ended")
         self.end = {
@@ -555,10 +621,9 @@ class Harness:
             if previous["signature"] != signature:
                 raise Conflict("same input identity has different content")
             return {"ack": "replayed", "event_id": submitted.event_id, "snapshot": self.snapshot()}
-        if submitted.intent == "confirmation" and self.wait_kind not in {
-            "goal_confirmation",
-            "closing_confirmation",
-        }:
+        if self.wait_kind in READING_WAITS:
+            raise ValueError(READING_WAITS[self.wait_kind])
+        if submitted.intent == "confirmation" and self.wait_kind != "closing_confirmation":
             raise ValueError("Nothing to confirm now. Please answer the current question.")
         supplement = submitted.relation == "supplement"
         if supplement:
@@ -612,19 +677,6 @@ class Harness:
                     "reason": "original response delivered",
                 },
             )
-        if self.wait_kind == "goal_confirmation":
-            if submitted.intent == "confirmation" or is_confirmation(submitted.text):
-                self.record(
-                    "goal_received", {"event_id": submitted.event_id, "understanding": "unknown"}
-                )
-                self.next_task()
-            else:
-                self.action(
-                    "clarification",
-                    "Did you hear today's plan? This is not a test question.",
-                    "input",
-                )
-            return {"ack": "accepted", "snapshot": self.snapshot()}
         if self.wait_kind == "closing_confirmation":
             if submitted.intent == "confirmation" or is_confirmation(submitted.text):
                 self.record("closing_received", {"event_id": submitted.event_id})

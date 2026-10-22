@@ -4,14 +4,14 @@ import { classProgress, jobProgress, taskMarks } from '../src/progress.ts'
 
 const at = (task_index, wait_kind = 'answer') => classProgress({ task_index, task_count: 4, wait_kind })
 
-test('the class bar names the goal, task n of N and the closing', () => {
-  assert.deepEqual(at(-1, 'goal_confirmation'), { label: 'Start', value: 0, max: 4 })
+test('the class bar names the reading, task n of N and the closing', () => {
+  assert.deepEqual(at(-1, 'reading_start'), { label: 'Reading', value: 0, max: 4 })
   assert.deepEqual(at(0), { label: 'Question 1 of 4', value: 1, max: 4 })
   assert.deepEqual(at(3, 'retry'), { label: 'Question 4 of 4', value: 4, max: 4 })
   assert.deepEqual(at(4, 'closing_confirmation'), { label: 'Wrap-up', value: 4, max: 4 })
   // Closing early keeps the bar where the class actually got to.
   assert.deepEqual(at(1, 'closing_confirmation'), { label: 'Wrap-up', value: 2, max: 4 })
-  assert.equal(classProgress({ task_index: -1, task_count: 0, wait_kind: 'goal_confirmation' }).max, 1)
+  assert.equal(classProgress({ task_index: -1, task_count: 0, wait_kind: 'reading_start' }).max, 1)
 })
 
 test('a job bar fills only when the job says how far it is', () => {

@@ -20,6 +20,7 @@ from project_j.platform.storage import (
 from project_j.platform.tts.contracts import SynthesizerNotReady
 from project_j.preparation.contracts import CourseBody
 from project_j.preparation.packages import student_text
+from project_j.preparation.reading import words
 from project_j.preparation.resources import adopted, ready_resources
 
 log = logging.getLogger(__name__)
@@ -261,6 +262,17 @@ class Teaching:
             )
             for ref in data.material_refs
         }
+        # The same course is taught again when the student retakes a stopped class.
+        attempt = 1 + sum(
+            fact.body["course_ref"] == course.ref.model_dump()
+            for fact in self.store.list_current(learner_id, "fact")
+        )
+        # A review or a retake is not a first reading of the story (ADR-0022).
+        first_reading = data.lesson_type != "review" and attempt == 1
+        # The student text's first line is the title; the story is counted like preparation.
+        story_words = sum(
+            len(words(text.partition("\n")[2])) for text in self.material_cache.values()
+        )
         bindings = {
             "course": course.ref.model_dump(),
             "demand": demand.ref.model_dump(),
@@ -285,20 +297,20 @@ class Teaching:
             jane=self.store.read(data.jane_ref, learner_id).body,
             voiced=frozenset(recorded),
             visible=tuple(item for item in data.resources if item.resource_id in visuals),
+            story_words=story_words,
+            first_reading=first_reading,
         )
         # Held in memory for the class; nothing is read from disk while teaching.
         self.recorded, self.visuals = recorded, visuals
-        # The same course is taught again when the student retakes a stopped class.
-        attempt = 1 + sum(
-            fact.body["course_ref"] == course.ref.model_dump()
-            for fact in self.store.list_current(learner_id, "fact")
-        )
         log.info(
-            "start resources recorded=%d visuals=%d skipped=%d attempt=%d",
+            "start resources recorded=%d visuals=%d skipped=%d attempt=%d "
+            "story_words=%d first_reading=%s",
             len(recorded),
             len(visuals),
             skipped,
             attempt,
+            story_words,
+            first_reading,
         )
         self.adapter = InputAdapter(self.core)
         self.store.active_activity_id = activity_id
@@ -315,15 +327,10 @@ class Teaching:
     def student_view(self, core: Harness):
         if core is not self.core:
             raise PermissionError("view is not bound to the current memory activity")
-        snapshot = core.snapshot()
-        allowed = {
-            ref.object_id
-            for action in core.actions.values()
-            if action.action_id in core.delivered or action.action_id == core.pending
-            for ref in action.material_refs
-        }
-        return snapshot | {
-            "materials": {identity: self.material_cache[identity] for identity in allowed}
+        # The story shows from "Start reading" on, except while reading is paused (ADR-0022).
+        shown = core.course.material_refs if core.story_visible() else ()
+        return core.snapshot() | {
+            "materials": {ref.object_id: self.material_cache[ref.object_id] for ref in shown}
         }
 
     def seal(self):

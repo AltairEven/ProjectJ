@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from support import answer, complete_story, deliver_all, next_course, start
+from support import answer, complete_story, deliver_all, next_course, read_story, start
 
 from project_j.application.configuration import Settings
 from project_j.application.coordinator import Coordinator
@@ -89,7 +89,8 @@ def test_study_class_takes_student_inputs_and_seals_student_facts(study):
     assert core.snapshot()["realm"] == "study"
     assert core.snapshot()["source_type"] == "student"
     deliver_all(core)
-    result = asyncio.run(answer(study, "Yes, I heard.", "confirmation"))
+    read_story(core)
+    result = asyncio.run(answer(study, "a bridge"))
     assert result["ack"] == "accepted"
     core.control("stop-1", "stop")
     sealed = study.seal()  # same call the API makes after an end

@@ -66,3 +66,9 @@ test('shows the task input only while answering a clicked task', () => {
   assert.equal(answerMode({ ...snapshot, mode: 'ended' }), 'none')
   assert.equal(answerMode(undefined), 'none')
 })
+
+test('reading the story is answered with the reading buttons only', () => {
+  for (const wait_kind of ['reading_start', 'reading'])
+    for (const mode of ['waiting_input', 'delivering', 'paused'])
+      assert.equal(answerMode({ mode, wait_kind, task: null, recording: null }), 'story')
+})

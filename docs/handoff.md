@@ -937,3 +937,16 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check含主工程666、评分39、合成15项pytest，前端72、文档1，UTC 2026-10-22T00:39:48.903183+00:00，工程摘要0ddbd61ea163d5f54d1a59179b9ad9642f475dfa990bd10ce7293b5359cef473，检查戳actual_api为unverified。收尾小问题（用户要求一并改）：发布理由与台账文字改英文；合成器身份不一致的提示改为“Speech: the version, voice setup or model no longer matches the probe record”（测试先失败后通过）；合成规则注释改为探针实测的英文语速（约0.09秒/字符）；两个前端测试的中文测试数据改英文；design/interface/main-page.md的历史事件注明按钮现名“Hear Jane ask”。沙盒主页快照变大（73 KB→174 KB）核实为真实变化：旧快照是QT批次前的课程（6题、4种题型、9个资源），新快照对应现行模拟课程（11题、9种题型、38个资源），不裁剪。之后统一check再次通过（720项测试），UTC 2026-10-22T01:15:12.733111+00:00，工程摘要bc7dc2d0fb3800d1c94f8bd60dfcde296aff5e1d9ae4caafd6e7d8e8cce7314c。
 - 未验证：学生实际上课时英文难度是否合适、中文作答提醒的体验；真实课堂里Jane现场回应的英文语音（只试听了一句样例）；参考题集只跑1遍；真实备课只核对1次，未见朗读题与配对题；旧的模拟运行数据仍是中文，照原样显示。
 - 继续条件：参考题集2.0.0已真实跑通过，这一版的课堂判断可用于正式学习；用户已试听en-voice.wav、在沙盒确认界面，已本地提交2915d09。
+
+## READ 先自读、后答题
+
+- 状态：程序实现与模拟自测完成；用户说“先不管这些，提交”，未做真实备课核对，也未在沙盒与正式课上确认，按要求本地提交（2026年10月22日）。用户确认设计（docs/superpowers/specs/2026-10-22-self-paced-reading-design.md）与计划（docs/superpowers/plans/2026-10-22-self-paced-reading.md，7个任务），选择在当前会话内联实施。
+- 负责人/集成：Claude Opus。审查由主会话自做，未派审查子代理。
+- 范围：开场只说备课写好的阅读提醒；学生按“Start reading”后文章出现并计时（暂停不计），按“I've finished reading”后才出第一题；阅读用时记进课堂记录，课后评价页显示用时、词数与每分钟词数（[ADR-0022](../decisions/ADR-0022.md)）。课程页、课堂判断请求与课时预算算法不变。
+- 文件边界：以计划各任务的Files为准；另生成web/schema/openapi.json与web/src/client/types.gen.ts。
+- 验收条件：计划的Global Constraints与各任务测试；10项登记检查；真实备课一次写出合规提醒；用户在沙盒与正式课上确认。
+- 实际改动：备课草稿新增必填`reading_focus`与指令一句，规则`focus_problems`核对30词、1到2句与防泄题（可接受答案或单选正确选项两个词以上原文）；`CourseBody.reading_focus`可空（旧课程用通用开场）；`goal_text`改为`opening_text`；题库两课各一条固定提醒。课堂核心新增等待类型`reading_start`/`reading`、控制命令`start_reading`/`finish_reading`、按核心时钟的阅读计时（暂停累计、继续不重放开场、阅读中重听失败不进交付恢复），读完、收尾、停课或中断记`reading_finished`/`reading_unfinished`（用时、词数、是否初读、暂停次数），阅读阶段打字、求助、点选与跳过拒收（第一题之前一律不能跳过，避免开场未送达时跳过而整节课不显示课文）；删除原“确认听到目标”分支与`goal_received`事件。开课时由应用算词数与是否初读（复习课或重上不是）；学生视图只在`story_visible()`时带本课素材。页面：阅读区按钮、进度条“Reading”、确认弹框只用于收尾；评价页“Reading”一行（`readingLine`）。沙盒假课堂改为新流程并加“Reading (timing)”场景，评价页示例两节课加阅读事件。设计同步：classroom README、interaction-harness、session-start、time-exceptions，interface student-classroom，preparation README、course-package，evaluation facts-evidence，teacher lesson-types，shared end-to-end-cases、business-contracts，docs/acceptance。
+- 我的取舍（未逐条请用户确认，详见设计说明“我替用户定的”与执行账本）：提醒由备课模型写、30词2句以内；开场去掉“随时可以暂停或停止”与离屏预告；计时以服务端为准、页面不显示走动的秒数；暂停时课文不显示；阅读阶段禁用作答框、求助与跳过；中途停课记“未读完”不算速度；复习课与重上标“(read before)”；AI评价与计划不用阅读用时。
+- 检查证据：10项登记命令全部通过（三份uv锁定sync、两份npm ci、两份audit各0项告警、统一check、离线probe、模拟measure：40样本、p95 4500毫秒、not_granted）；统一check含主工程685、评分39、合成15项pytest，前端74、文档1，UTC 2026-10-22T02:32:31.574515+00:00，工程摘要63e0ad65357040a0433fd420818778610f168719077308711e50ab68407effe5，检查戳actual_api为unverified（自审后修复“开场未送达时跳过会绕过课文”后重跑统一check）。
+- 未验证：真实备课模型能否稳定写出合规提醒；学生实际读课文时的体验与用时是否合理；正式课里开场语音的长度。
+- 继续条件：真实备课核对仍需用户同意后运行；在用户于沙盒走一遍新流程、在正式课评价页看到阅读用时之前，开场提醒与阅读计时只有模拟证据。

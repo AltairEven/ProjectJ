@@ -196,6 +196,7 @@ def test_a_stopped_class_can_be_taken_again_until_its_evaluation_is_acknowledged
     course_ref = science_lesson(application, monkeypatch, visual_draft)
     asyncio.run(application.confirm_and_start("go", LEARNER, course_ref, True))
     first = application.core.activity_id
+    assert application.core.first_reading
     end_class(application)  # the student stopped it
     asyncio.run(application.evaluate("stopped-eval", LEARNER, first, "after_class"))
     step = next_step(application, LEARNER)
@@ -204,6 +205,7 @@ def test_a_stopped_class_can_be_taken_again_until_its_evaluation_is_acknowledged
     asyncio.run(application.confirm_and_start("again", LEARNER, course_ref, True))
     assert application.core.activity_id != first and application.core.mode != "ended"
     assert "attempt=2" in caplog.text
+    assert application.core.first_reading is False
     end_class(application)
 
 

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { api, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
 import { evaluationRows } from '../learning'
-import { endLabels, evaluationLines, revisionChanges } from '../report'
+import { endLabels, evaluationLines, readingLine, revisionChanges } from '../report'
 import { Rows, useRun, type PageProps } from '../ui'
 
 const verdicts: Record<string, string> = { correct: 'right', incorrect: 'not right', unclear: 'unclear' }
@@ -25,6 +25,7 @@ function Detail({ token, dashboard, learner, go, refresh, fact }: PageProps & { 
   const [note, setNote] = useState('')
   const objects = dashboard.objects ?? []
   const activity = String(fact.body.activity_id)
+  const reading = readingLine((fact.body.events ?? []) as { kind: string, payload: Record<string, unknown> }[])
   const row = evaluationRows(objects).find(item => item.activity_id === activity)
   const evaluation = objects.find(doc => doc.kind === 'evaluation' && doc.body.activity_id === activity)
   const previous = (dashboard.previous_evaluations ?? []).find(doc => doc.object_id === evaluation?.object_id)
@@ -35,7 +36,8 @@ function Detail({ token, dashboard, learner, go, refresh, fact }: PageProps & { 
   return <>
     <button className="quiet" onClick={() => go('evaluations')}>← All evaluations</button>
     <section><h2>{storyOf(fact, objects)}</h2>
-      <Rows rows={[['Status', row?.state], ['Ended', endLabels[String((fact.body.end as Record<string, unknown>)?.reason)] ?? 'Unknown']]} />
+      <Rows rows={[['Status', row?.state], ['Ended', endLabels[String((fact.body.end as Record<string, unknown>)?.reason)] ?? 'Unknown'],
+        ...(reading ? [['Reading', reading] as [string, string]] : [])]} />
       <h3>Your answers and help</h3><Rows rows={attemptRows(fact)} />
       {row?.state !== 'Evaluating' && evaluation ? <><h3>Evaluation</h3><Rows rows={evaluationLines(evaluation, objects)} /></> : <p>The evaluation is being written; this page updates by itself.</p>}
       {row?.state !== 'Evaluating' && evaluation && previous && <><h3>Compared with the last version (version {previous.revision} → version {evaluation.revision})</h3>
