@@ -985,7 +985,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## LEAN-3 精简五项（ponytail全仓审查后续二）
 
-- 状态：实现与自测完成，用户要求提交，已本地提交（2026年10月22日）。LEAN-2提交后用户要求“继续做8、13、14、18、21五条”。
+- 状态：实现与自测完成，用户要求提交，已本地提交28bad4f（2026年10月22日）。LEAN-2提交后用户要求“继续做8、13、14、18、21五条”。
 - 负责人/集成：Claude Opus。审查由主会话自做，未派审查子代理。
 - 范围：
   1. 第8条：规划、备课、评价三个“不可用”异常改为共用基类`ModelStepUnavailable`（`evaluation/assessment.py`，统一拼“The X could not be made (原因). 已保存内容; you can try again.”），三个子类保留各自名字与已保存说明，日志和捕获处仍能分辨；接口三个503处理器合为一个，响应只留前端实际读取的`message`（去掉`planning`/`preparation`/`evaluation`: `failed`键）。消息原文不变。
