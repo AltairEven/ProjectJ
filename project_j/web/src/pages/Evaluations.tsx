@@ -4,6 +4,8 @@ import type { Document as Doc } from '../client/types.gen'
 import { canRate, evaluationRows, RATINGS, ratingHint, ratingOf } from '../learning'
 import { endLabels, evaluationLines, readingLine, revisionChanges } from '../report'
 import { Rows, useRun, type PageProps } from '../ui'
+import { VocabularyBox } from '../VocabularyBox'
+import { markedInLesson, type Entry } from '../vocabulary'
 
 const verdicts: Record<string, string> = { correct: 'right', incorrect: 'not right', unclear: 'unclear' }
 const helpNames: Record<string, string> = { light_prompt: 'a small hint', scaffold: 'a frame', full_model: 'a full model' }
@@ -26,7 +28,12 @@ function Detail({ token, dashboard, learner, go, refresh, fact }: PageProps & { 
   const [rating, setRating] = useState<string | null>(null)
   const objects = dashboard.objects ?? []
   const activity = String(fact.body.activity_id)
-  const reading = readingLine((fact.body.events ?? []) as { kind: string, payload: Record<string, unknown> }[])
+  const events = (fact.body.events ?? []) as { kind: string, payload: Record<string, unknown> }[]
+  const reading = readingLine(events)
+  // The words marked in this class, with the meanings the record holds now; words it mastered.
+  const words = (dashboard.vocabulary ?? []) as unknown as Entry[]
+  const marked = markedInLesson(events).map(surface => words.find(word => word.lemma === surface || (word.forms ?? []).includes(surface))).filter((word): word is Entry => word !== undefined)
+  const mastered = words.filter(word => word.mastered_activity === activity).map(word => word.lemma)
   const row = evaluationRows(objects).find(item => item.activity_id === activity)
   const rated = ratingOf(activity, objects)
   const challenge = String(objects.find(doc => doc.kind === 'profile')?.body.challenge ?? 'challenge')
@@ -42,6 +49,9 @@ function Detail({ token, dashboard, learner, go, refresh, fact }: PageProps & { 
     <section><h2>{storyOf(fact, objects)}</h2>
       <Rows rows={[['Status', row?.state], ['Ended', endLabels[String((fact.body.end as Record<string, unknown>)?.reason)] ?? 'Unknown'],
         ...(reading ? [['Reading', reading] as [string, string]] : []), ...(rated ? [['Your rating', rated] as [string, string]] : [])]} />
+      <VocabularyBox token={token} entries={marked} title="Words you marked" busy={busy} audioUrl={lemma => `/api/vocabulary/audio?lemma=${encodeURIComponent(lemma)}&learner_id=${encodeURIComponent(learner)}`}
+        onRegenerate={lemma => void run(async () => { await api(token, 'vocabulary/regenerate', { request_id: uid(), learner_id: learner, lemma }) }, `Looking up "${lemma}"`)} />
+      {mastered.length > 0 && <Rows rows={[['Mastered this lesson', mastered.join(', ')]]} />}
       <h3>Your answers and help</h3><Rows rows={attemptRows(fact)} />
       {row?.state !== 'Evaluating' && evaluation ? <><h3>Evaluation</h3><Rows rows={evaluationLines(evaluation, objects)} /></> : <p>The evaluation is being written; this page updates by itself.</p>}
       {row?.state !== 'Evaluating' && evaluation && previous && <><h3>Compared with the last version (version {previous.revision} → version {evaluation.revision})</h3>

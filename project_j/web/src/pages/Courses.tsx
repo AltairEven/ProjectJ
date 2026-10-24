@@ -54,6 +54,7 @@ function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & 
       {content ? <Rows rows={Object.entries(content).sort(([a], [b]) => previewRank(a) - previewRank(b)).map(([key, value]) => [previewLabels[key] ?? key, show(value)])} />
         : <p>The details are not here yet.</p>}
       {storyLevelLine(course) && <Rows rows={[['Story level', storyLevelLine(course)]]} />}
+      {((course.body.vocabulary_used as string[] | undefined) ?? []).length > 0 && <Rows rows={[['Review words', (course.body.vocabulary_used as string[]).join(', ')]]} />}
       {preview?.body.note ? <p>Note: {String(preview.body.note)}</p> : null}
       {preview && <Rows rows={discussionLines(preview.body)} />}</section>
     {status}

@@ -10,9 +10,9 @@ const subjects = {
   resources: { name: 'start:c1:2', state: 'running', reason: null, progress: '2/5' },
 }
 
-test('the navigation lists the six pages in order', () => {
-  assert.deepEqual(pages.map(([page]) => page), ['home', 'state', 'plan', 'courses', 'evaluations', 'settings'])
-  assert.deepEqual(pages.map(([, label]) => label), ['Home', 'Progress', 'Plan', 'Lessons', 'Evaluations', 'Settings'])
+test('the navigation lists the seven pages in order', () => {
+  assert.deepEqual(pages.map(([page]) => page), ['home', 'state', 'plan', 'courses', 'evaluations', 'vocabulary', 'settings'])
+  assert.deepEqual(pages.map(([, label]) => label), ['Home', 'Progress', 'Plan', 'Lessons', 'Evaluations', 'Vocabulary', 'Settings'])
 })
 
 test('every next step has a title and a page to go to', () => {

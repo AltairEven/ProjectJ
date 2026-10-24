@@ -1,17 +1,17 @@
 // The main page's one next step and background lines, from what the server computed (ADR-0018).
 
-export type Page = 'home' | 'state' | 'plan' | 'courses' | 'evaluations' | 'settings'
+export type Page = 'home' | 'state' | 'plan' | 'courses' | 'evaluations' | 'vocabulary' | 'settings'
 export type Target = Page | 'onboarding' | 'class'
 type Job = { name: string, state: string, reason?: string | null, progress?: string | null }
 type Subject = Record<string, any>
 
 export const pages: [Page, string][] = [
-  ['home', 'Home'], ['state', 'Progress'], ['plan', 'Plan'], ['courses', 'Lessons'], ['evaluations', 'Evaluations'], ['settings', 'Settings'],
+  ['home', 'Home'], ['state', 'Progress'], ['plan', 'Plan'], ['courses', 'Lessons'], ['evaluations', 'Evaluations'], ['vocabulary', 'Vocabulary'], ['settings', 'Settings'],
 ]
 
 const jobNames: Record<string, string> = {
   prepare: 'Making the lesson', evaluate: 'Evaluating', adopt: 'Updating progress and plan', summarize: 'Writing your profile', review: 'Reviewing the plan',
-  start: 'Getting resources and starting', confirm: 'Confirming the lesson and getting resources', recheck: 'Checking progress after your correction',
+  start: 'Getting resources and starting', confirm: 'Confirming the lesson and getting resources', recheck: 'Checking progress after your correction', vocabulary: 'Looking up a word',
 }
 
 function jobLine({ name, state, reason, progress }: Job): string {

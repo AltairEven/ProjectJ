@@ -772,3 +772,48 @@ def test_the_request_carries_the_story_level(application):
     assert build(application).context["story_level"] is None
     assert "story_level" in PREPARATION_INSTRUCTIONS
     assert "故事难度按profile.lexile" not in PREPARATION_INSTRUCTIONS
+
+
+def test_request_carries_vocabulary_candidates_and_instructions_say_how(application):
+    demand, data = initial(application)
+    offered = [
+        {
+            "lemma": "fold",
+            "part_of_speech": "verb",
+            "weight": 4,
+            "mark_count": 2,
+            "days_since_seen": 14,
+        }
+    ]
+    request = preparation_request(
+        demand, data["state"], data["profile"], data["catalog"], JANE, [], None, None, [],
+        vocabulary=offered,
+    )  # fmt: skip
+    assert request.context["vocabulary"] == offered
+    assert "vocabulary_used" in request.instructions and "不要为了用词" in request.instructions
+    assert build(application).context["vocabulary"] == []
+
+
+def test_vocabulary_used_keeps_only_words_in_the_story(demand, draft):
+    checked = check(demand, draft | {"vocabulary_used": ["bridge", "fold", "zebra"]})
+    assert checked.course.vocabulary_used == ("bridge", "fold")  # "folds" is in the story
+    assert any("1 review word" in line for line in checked.course.limitations)
+    assert check(demand, draft).course.vocabulary_used == ()
+    assert CourseDraft.model_validate(draft).vocabulary_used == ()
+
+
+def test_placement_and_review_lessons_offer_no_candidates(application):
+    from datetime import date
+
+    from project_j.learning.vocabulary import LookedUp, VocabularyBody, update_after_lesson
+
+    looked = LookedUp(
+        word="fold", sentence="s", lemma="fold", part_of_speech="verb", definition="to bend"
+    )
+    body, _ = update_after_lesson(VocabularyBody(), (looked,), "fold.", "L", date(2026, 10, 1))
+    today = date(2026, 10, 24)
+    offered = application.offered_vocabulary(body, placement=False, familiar=False, today=today)
+    assert offered[0]["lemma"] == "fold" and offered[0]["weight"] == 4
+    assert application.offered_vocabulary(body, placement=True, familiar=False, today=today) is None
+    assert application.offered_vocabulary(body, placement=False, familiar=True, today=today) is None
+    assert application.offered_vocabulary(None, placement=False, familiar=False, today=today) == []

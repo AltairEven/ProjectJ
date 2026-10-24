@@ -18,12 +18,14 @@ from project_j.application.ledger import Ledger, Request, Step
 from project_j.application.preparing import Preparing
 from project_j.application.progress import advance, jobs, lesson_evaluations, next_step
 from project_j.application.teaching import Teaching
+from project_j.application.vocabulary import Vocabulary
 from project_j.classroom.harness import Harness
 from project_j.contracts import Document, RevisionRef
 from project_j.evaluation.scoring import lesson_scores, recent_scores
 from project_j.interface.submission import InputAdapter
 from project_j.learning.adoption import review_due
 from project_j.learning.fixtures import initialize
+from project_j.learning.vocabulary import VocabularyBody, listing
 from project_j.platform.files import PrivateFiles
 from project_j.platform.models.service import ModelService
 from project_j.platform.speech.contracts import PronunciationScorer
@@ -41,7 +43,7 @@ from project_j.platform.tts.simulated import SimulatedSynthesizer
 log = logging.getLogger(__name__)
 
 
-class Coordinator(Preparing, Teaching, Evaluating, Adopting):
+class Coordinator(Preparing, Teaching, Vocabulary, Evaluating, Adopting):
     def __init__(
         self,
         store: SimulationStore,
@@ -72,6 +74,10 @@ class Coordinator(Preparing, Teaching, Evaluating, Adopting):
         self.material_cache: dict[str, str] = {}
         self.recorded: dict[str, bytes] = {}  # Adopted speech of the class, by exact text.
         self.visuals: dict[str, tuple[bytes, str]] = {}  # Adopted student visuals, by id.
+        # The learner's words as loaded at class start, their audio and the lookups under way.
+        self.vocabulary = VocabularyBody()
+        self.word_audio: dict[str, bytes] = {}
+        self.word_jobs: set[asyncio.Task] = set()
         self.evaluation_jobs: dict[tuple, asyncio.Task] = {}
         # Background AI work by name (application/progress.py); failures wait for a retry.
         self.jobs: dict[str, asyncio.Task] = {}
@@ -269,7 +275,8 @@ class Coordinator(Preparing, Teaching, Evaluating, Adopting):
     def dashboard(self, learner_id: str):
         self.store.ensure_idle()
         initialize(self, learner_id)
-        documents = self.store.list_current(learner_id)
+        # The word record is sent once, as the weighted listing below, not as a document too.
+        documents = [d for d in self.store.list_current(learner_id) if d.kind != "vocabulary"]
         advance(self, learner_id)
         evaluations = lesson_evaluations(self, learner_id)
         return {
@@ -306,6 +313,8 @@ class Coordinator(Preparing, Teaching, Evaluating, Adopting):
             # The last five lessons pooled question by question, as planning and preparation
             # read them (application/progress.py lesson_score_summary).
             "recent_scores": recent_scores([doc.body for doc in evaluations]),
+            # Every marked word with its rule-computed weight (design/learning/profile.md).
+            "vocabulary": listing(self.vocabulary_record(learner_id)[1], datetime.now(UTC).date()),
         }
 
     def lost_activities(self, learner_id: str, documents: list[Document]) -> list[dict]:

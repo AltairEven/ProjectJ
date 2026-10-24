@@ -273,6 +273,12 @@ export type Dashboard = {
     recent_scores?: {
         [key: string]: JsonValue;
     };
+    /**
+     * Vocabulary
+     */
+    vocabulary?: Array<{
+        [key: string]: JsonValue;
+    }>;
     active?: Snapshot | null;
     /**
      * Note
@@ -449,6 +455,24 @@ export type Document = {
     body: {
         [key: string]: JsonValue;
     };
+};
+
+/**
+ * EntryRegenerate
+ */
+export type EntryRegenerate = {
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id: string;
+    /**
+     * Lemma
+     */
+    lemma: string;
 };
 
 /**
@@ -1017,6 +1041,12 @@ export type Snapshot = {
     materials?: {
         [key: string]: string;
     };
+    /**
+     * Vocabulary
+     */
+    vocabulary?: Array<{
+        [key: string]: JsonValue;
+    }>;
 };
 
 /**
@@ -1071,6 +1101,40 @@ export type ValidationError = {
     ctx?: {
         [key: string]: unknown;
     };
+};
+
+/**
+ * WordMarkInput
+ *
+ * One story word marked or unmarked while reading (never scored).
+ */
+export type WordMarkInput = {
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Word
+     */
+    word: string;
+    /**
+     * Sentence
+     */
+    sentence: string;
+    /**
+     * Marked
+     */
+    marked: boolean;
+};
+
+/**
+ * WordRegenerate
+ */
+export type WordRegenerate = {
+    /**
+     * Surface
+     */
+    surface: string;
 };
 
 export type DashboardApiDashboardGetData = {
@@ -1279,6 +1343,73 @@ export type ResourceDownloadApiResourceFileGetResponses = {
      * Successful Response
      */
     200: unknown;
+};
+
+export type VocabularyAudioApiVocabularyAudioGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query: {
+        /**
+         * Lemma
+         */
+        lemma: string;
+        /**
+         * Learner Id
+         */
+        learner_id?: string | null;
+    };
+    url: '/api/vocabulary/audio';
+};
+
+export type VocabularyAudioApiVocabularyAudioGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type VocabularyAudioApiVocabularyAudioGetError = VocabularyAudioApiVocabularyAudioGetErrors[keyof VocabularyAudioApiVocabularyAudioGetErrors];
+
+export type VocabularyAudioApiVocabularyAudioGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type VocabularyRegenerateApiVocabularyRegeneratePostData = {
+    body: EntryRegenerate;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/vocabulary/regenerate';
+};
+
+export type VocabularyRegenerateApiVocabularyRegeneratePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type VocabularyRegenerateApiVocabularyRegeneratePostError = VocabularyRegenerateApiVocabularyRegeneratePostErrors[keyof VocabularyRegenerateApiVocabularyRegeneratePostErrors];
+
+export type VocabularyRegenerateApiVocabularyRegeneratePostResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
 };
 
 export type ConfirmCourseApiCourseConfirmPostData = {
@@ -2130,6 +2261,102 @@ export type ControlApiClassControlPostResponses = {
 };
 
 export type ControlApiClassControlPostResponse = ControlApiClassControlPostResponses[keyof ControlApiClassControlPostResponses];
+
+export type MarkWordApiClassWordPostData = {
+    body: WordMarkInput;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/class/word';
+};
+
+export type MarkWordApiClassWordPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type MarkWordApiClassWordPostError = MarkWordApiClassWordPostErrors[keyof MarkWordApiClassWordPostErrors];
+
+export type MarkWordApiClassWordPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: Snapshot;
+};
+
+export type MarkWordApiClassWordPostResponse = MarkWordApiClassWordPostResponses[keyof MarkWordApiClassWordPostResponses];
+
+export type RegenerateWordApiClassWordRegeneratePostData = {
+    body: WordRegenerate;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/class/word/regenerate';
+};
+
+export type RegenerateWordApiClassWordRegeneratePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RegenerateWordApiClassWordRegeneratePostError = RegenerateWordApiClassWordRegeneratePostErrors[keyof RegenerateWordApiClassWordRegeneratePostErrors];
+
+export type RegenerateWordApiClassWordRegeneratePostResponses = {
+    /**
+     * Successful Response
+     */
+    202: Snapshot;
+};
+
+export type RegenerateWordApiClassWordRegeneratePostResponse = RegenerateWordApiClassWordRegeneratePostResponses[keyof RegenerateWordApiClassWordRegeneratePostResponses];
+
+export type WordAudioApiClassWordAudioLemmaGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Lemma
+         */
+        lemma: string;
+    };
+    query?: never;
+    url: '/api/class/word-audio/{lemma}';
+};
+
+export type WordAudioApiClassWordAudioLemmaGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type WordAudioApiClassWordAudioLemmaGetError = WordAudioApiClassWordAudioLemmaGetErrors[keyof WordAudioApiClassWordAudioLemmaGetErrors];
+
+export type WordAudioApiClassWordAudioLemmaGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type WebpagePathGetData = {
     body?: never;

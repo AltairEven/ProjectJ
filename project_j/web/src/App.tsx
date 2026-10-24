@@ -10,10 +10,11 @@ import Onboarding from './pages/Onboarding'
 import Plan from './pages/Plan'
 import Settings from './pages/Settings'
 import State from './pages/State'
+import Vocabulary from './pages/Vocabulary'
 import type { PageProps } from './ui'
 
 const views: Record<Page | 'onboarding', (props: PageProps) => React.ReactNode> = {
-  home: Home, state: State, plan: Plan, courses: Courses, evaluations: Evaluations, settings: Settings, onboarding: Onboarding,
+  home: Home, state: State, plan: Plan, courses: Courses, evaluations: Evaluations, vocabulary: Vocabulary, settings: Settings, onboarding: Onboarding,
 }
 
 function Shell({ token, page, detail }: { token: string, page: Page, detail?: string }) {

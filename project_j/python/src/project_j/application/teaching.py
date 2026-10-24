@@ -12,6 +12,7 @@ from project_j.classroom.harness import Harness
 from project_j.contracts import RevisionRef
 from project_j.curriculum.corrections import active_restrictions
 from project_j.interface.submission import InputAdapter
+from project_j.learning.vocabulary import VocabularyBody, tokens
 from project_j.platform.speech.contracts import ScorerNotReady
 from project_j.platform.storage import (
     Conflict,
@@ -302,6 +303,18 @@ class Teaching:
         )
         # Held in memory for the class; nothing is read from disk while teaching.
         self.recorded, self.visuals = recorded, visuals
+        record = self.store.current(identity(learner_id, "vocabulary"), learner_id)
+        self.vocabulary = VocabularyBody.model_validate(record.body) if record else VocabularyBody()
+        # Recorded words this story contains may be marked again: their audio is read now, since
+        # nothing is read from disk while teaching; the rest stays on disk.
+        present = tokens("\n".join(self.material_cache.values()))
+        self.word_audio = {}
+        for entry in self.vocabulary.words:
+            if entry.audio and (entry.lemma in present or present.intersection(entry.forms)):
+                try:
+                    self.word_audio[entry.lemma] = self.files.read_binary(entry.audio)
+                except ValueError:
+                    pass  # Missing or corrupted: the box offers Regenerate instead.
         log.info(
             "start resources recorded=%d visuals=%d skipped=%d attempt=%d "
             "story_words=%d first_reading=%s",
@@ -353,6 +366,7 @@ class Teaching:
                 (publication(fact, "Sealed fact checked for structure; no model evaluation"),),
             )
         self.pending_seals.pop(core.activity_id, None)
+        self.record_vocabulary(core)  # The learner's words follow the sealed fact at once.
         log.info(
             "seal activity=%s events=%d attempts=%d end=%s receipt=%s",
             core.activity_id,

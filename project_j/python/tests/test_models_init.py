@@ -66,6 +66,7 @@ def test_configure_validates_adapter_effort_and_purpose(root):
         "preparation": "medium",
         "classroom_judgment": "low",
         "evaluation": "medium",
+        "vocabulary": "low",  # follows the classroom binding
     }
     assert "api_key" not in (root / "config.json").read_text()
 
@@ -90,6 +91,7 @@ def test_configure_accepts_a_fast_tier_only_where_the_adapter_offers_it(root):
         "preparation": "default",
         "classroom_judgment": "fast",
         "evaluation": "default",
+        "vocabulary": "fast",
     }
 
 
@@ -111,6 +113,7 @@ def test_extra_high_effort_is_offered_by_codex_only(root):
         "preparation": "xhigh",
         "classroom_judgment": "low",
         "evaluation": "xhigh",
+        "vocabulary": "low",
     }
 
 
@@ -222,8 +225,9 @@ def test_probe_closes_each_adapter(root, monkeypatch):
 
 
 def test_digest_of_an_existing_record_stays_valid(root):
-    """The study record of 2026-10-19 was made with this configuration; removing the API-key
-    adapter must not invalidate it."""
+    """The digest covers every purpose's binding. Adding the vocabulary purpose (2026-10-24)
+    changed it on purpose: an existing study record must be probed again (project-j-init
+    probe) before the new purpose is admitted; removing the API-key adapter did not change it."""
     from project_j.platform.models.contracts import Binding
 
     files = ModelFiles(root)
@@ -236,5 +240,5 @@ def test_digest_of_an_existing_record_stays_valid(root):
         },
     )
     assert files.digest({"codex": "3"}) == (
-        "51a671b7bf0581790b819d71c69270370c3a81d4f8b918f352ecd4c203bf0063"
+        "b41fc3e8b6748c85b320ce8fab0ed732b4fcce0b45a7ee39fd4058655077dfb6"
     )

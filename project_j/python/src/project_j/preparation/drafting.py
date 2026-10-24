@@ -1,5 +1,6 @@
 """The preparation model drafts a text course; rules decide whether it becomes a course."""
 
+import logging
 from dataclasses import replace
 from typing import Literal, NamedTuple
 
@@ -10,6 +11,7 @@ from project_j.english import chinese
 from project_j.evaluation.assessment import ModelStepUnavailable
 from project_j.learning.contracts import SKILLS, DemandBody, Text
 from project_j.learning.planning import learning_context, pick
+from project_j.learning.vocabulary import tokens
 from project_j.platform.models.contracts import ModelRequest
 from project_j.preparation.contracts import (
     CourseBody,
@@ -44,6 +46,8 @@ from project_j.preparation.task_types import (
     shown_text,
 )
 from project_j.preparation.voice import audio_resources
+
+log = logging.getLogger(__name__)
 
 # Model-listed kinds with a connected generator; only these may be required by a course.
 # Jane's voice is not listed by the model: the rules derive it (preparation/voice.py).
@@ -107,6 +111,9 @@ PREPARATION_INSTRUCTIONS = (
     "Jane的题目语音与朗读示范由规则生成，不要列音频。"
     "reading_focus是Jane开场说的阅读提醒：1到2句、合计不超过30个英文单词，告诉学生读的时候留意哪些信息"
     "（与本课题目考的内容对应），不说出任何答案，不介绍标题与大意，观察课不说出要观察的结果。"
+    "vocabulary是学生此前标记的生词（weight越高越优先：标记次数多、很久没见到）："
+    "尽量把合适的词自然地写进故事，用多少个自己决定，不要为了用词让故事不自然；"
+    "vocabulary_used列本课故事里实际用到的生词原形。"
     "preview给学生：story本课故事，why为什么上，materials要准备的实物，help帮助方式，exit时长与退出。"
     "brief给Jane：history相关历史（没有学习历史就写无历史分支），"
     "adjustments允许的挑战、降阶、跳过、暂停与停止，closing正常小结与停止时的简短结束。"
@@ -202,6 +209,7 @@ class CourseDraft(Contract):
     brief: BriefDraft
     note: Text
     limitations: tuple[Text, ...]
+    vocabulary_used: tuple[str, ...] = ()  # Offered words the story actually uses.
 
 
 def preparation_request(
@@ -216,6 +224,7 @@ def preparation_request(
     recent_titles: list[str],
     scores: dict | None = None,
     level: StoryLevel | None = None,
+    vocabulary: list[dict] | None = None,
 ) -> ModelRequest:
     """Learning data only: no learner, provider or object identity reaches the model."""
     learning = learning_context(state, {}, profile, catalog)
@@ -258,6 +267,7 @@ def preparation_request(
             "connected_kinds": list(CONNECTED_KINDS),
             "scores": scores or {},
             "story_level": level.model_dump(mode="json") if level else None,
+            "vocabulary": vocabulary or [],
         },
         CourseDraft,
         # Real xhigh drafts took 263-376 s, a 415-word story 522 s (2026-10-22): user chose 1200.
@@ -537,6 +547,9 @@ def checked_course(
         if task.choice and task.choice.options[task.choice.correct] == NOT_GIVEN
     )
     mapping = {item.index: item for item in draft.demand_mapping}
+    used, dropped = used_vocabulary(draft.vocabulary_used, story)
+    if dropped:
+        log.info("preparation vocabulary used=%d dropped=%d", len(used), dropped)
     course = CourseBody(
         demand_ref=demand_ref,
         state_ref=demand.state_ref,
@@ -562,7 +575,13 @@ def checked_course(
         reading_focus=draft.reading_focus,
         story_level=level,
         limitations=(*draft.limitations, *not_given, RULE_LIMITATION)
-        + ((REVIEW_LIMITATION,) if familiar else ()),
+        + ((REVIEW_LIMITATION,) if familiar else ())
+        + (
+            (f"{dropped} review word(s) listed but not found in the story were dropped",)
+            if dropped
+            else ()
+        ),
+        vocabulary_used=used,
         resources=tuple(
             ResourceSpec(**item.model_dump(exclude={"task_ids"}), task_ids=expand(item.task_ids))
             for item in draft.resources
@@ -571,6 +590,20 @@ def checked_course(
     # Jane's sentences follow the final tasks, budget and lesson type.
     course = course.model_copy(update={"resources": course.resources + audio_resources(course)})
     return Checked(course=course, source=source, title=title or "", story=story)
+
+
+def used_vocabulary(listed: tuple[str, ...], story: str) -> tuple[tuple[str, ...], int]:
+    """The listed lemmas the story really contains (as the lemma or a close longer form) and
+    how many were dropped; the count is not checked."""
+    found = tokens(story)
+    # ponytail: a form is the lemma plus up to three letters (folds, folded); real inflection
+    # analysis only if this proves too loose or too strict.
+    used = tuple(
+        lemma
+        for lemma in dict.fromkeys(item.lower() for item in listed)
+        if lemma in found or any(t.startswith(lemma) and len(t) - len(lemma) <= 3 for t in found)
+    )
+    return used, len(set(item.lower() for item in listed)) - len(used)
 
 
 def task_problems(task: TaskDraft, story: str, catalog_ids: set[str], goals: set[str]):

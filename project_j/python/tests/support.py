@@ -247,13 +247,32 @@ def onboarding_app(tmp_path):
     return Coordinator(store, ROOT, verification=verification, onboarding=True)
 
 
+def finish_reading(app, core):
+    """Press "I've finished reading" and wait for the box to be looked up."""
+
+    async def scenario():
+        core.control(str(uuid4()), "finish_reading")
+        app.after_control(core, "finish_reading")
+        await asyncio.gather(*app.word_jobs)
+
+    asyncio.run(scenario())
+
+
+def regenerate_word(app, surface):
+    async def scenario():
+        app.regenerate_word(surface)
+        await asyncio.gather(*app.word_jobs)
+
+    asyncio.run(scenario())
+
+
 def settle(app):
     """In TestClient tests: wait for the service thread's seal and background jobs, so the
     test thread does not write the database at the same time."""
     import time
 
     for _ in range(500):
-        if not app.jobs and not app.pending_seals:
+        if not app.jobs and not app.pending_seals and not app.word_jobs:
             return
         time.sleep(0.01)
     raise AssertionError("background work did not settle")

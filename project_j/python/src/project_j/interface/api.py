@@ -154,6 +154,26 @@ class TextInput(Contract):
     related_event_id: str | None = None
 
 
+class WordMarkInput(Contract):
+    """One story word marked or unmarked while reading (never scored)."""
+
+    event_id: str
+    # One story word: letters with an inner apostrophe, as the page tokenizes the text.
+    word: str = Field(max_length=40, pattern=r"^[A-Za-z]+(?:['’][A-Za-z]+)?$")
+    sentence: str = Field(max_length=400)
+    marked: bool
+
+
+class WordRegenerate(Contract):
+    surface: str = Field(min_length=1, max_length=40)
+
+
+class EntryRegenerate(Contract):
+    request_id: str
+    learner_id: str = Field(pattern=LEARNER_PATTERN)
+    lemma: str = Field(min_length=1, max_length=40)
+
+
 class ResponseInput(Contract):
     """A clicked task's answer by display position, or a plea for its next hint (ADR-0020)."""
 
@@ -238,6 +258,8 @@ class Snapshot(Contract):
     # A clicked task as the page shows it (options, cards, columns, blanks); never its answer.
     task: dict[str, JsonValue] | None = None
     materials: dict[str, str] = {}
+    # Words marked while reading, with their meanings once looked up (never scored).
+    vocabulary: list[dict[str, JsonValue]] = []
 
 
 class NextStep(Contract):
@@ -294,6 +316,8 @@ class Dashboard(Contract):
     scores: list[dict[str, JsonValue]] = []
     # The last five lessons pooled question by question, the numbers planning sees.
     recent_scores: dict[str, JsonValue] = {}
+    # Every marked word (active by weight, then mastered) for the vocabulary page.
+    vocabulary: list[dict[str, JsonValue]] = []
     active: Snapshot | None = None
     note: str | None = None
 
@@ -700,6 +724,24 @@ def create_app(
             run(app_controller, learner_id, name, lambda: work(progress))
         return {"job": name}
 
+    @app.get("/api/vocabulary/audio", dependencies=[Depends(operator)])
+    async def vocabulary_audio(
+        lemma: str, learner_id: Annotated[str | None, Query(pattern=LEARNER_PATTERN)] = None
+    ):
+        data = controller().word_asset(learner_id or controller().learner_id, lemma)
+        return Response(data, media_type="audio/wav", headers={"Cache-Control": "no-store"})
+
+    @app.post("/api/vocabulary/regenerate", dependencies=[Depends(operator)], status_code=202)
+    async def vocabulary_regenerate(request: EntryRegenerate):
+        app_controller = controller()
+        return background(
+            request.learner_id,
+            f"vocabulary:{request.lemma}",
+            lambda progress: app_controller.regenerate_entry(
+                request.request_id, request.learner_id, request.lemma
+            ),
+        )
+
     @app.post("/api/course/confirm", dependencies=[Depends(operator)], status_code=202)
     async def confirm_course(request: CourseConfirmRequest):
         """Confirm the version and make its resources; the class waits for the student."""
@@ -974,8 +1016,27 @@ def create_app(
         if request.activity_id is not None and request.activity_id != core.activity_id:
             raise Conflict("control names another activity than the current class")
         core.control(request.event_id, request.command)
+        controller().after_control(core, request.command)
         ended(core, background)
         return controller().student_view(core)
+
+    @app.post("/api/class/word", response_model=Snapshot)
+    async def mark_word(request: WordMarkInput, core: ClassCore):
+        core.mark_word(request.event_id, request.word, request.sentence, request.marked)
+        return controller().student_view(core)
+
+    @app.post("/api/class/word/regenerate", response_model=Snapshot, status_code=202)
+    async def regenerate_word(request: WordRegenerate, core: ClassCore):
+        controller().regenerate_word(request.surface)
+        return controller().student_view(core)
+
+    @app.get("/api/class/word-audio/{lemma}")
+    async def word_audio(lemma: str, core: ClassCore):
+        return Response(
+            controller().word_audio_of(lemma),
+            media_type="audio/wav",
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.websocket("/api/class/events")
     async def events(socket: WebSocket):
@@ -1007,6 +1068,7 @@ def create_app(
                 elif message["kind"] == "control":
                     request = Control.model_validate(message["payload"])
                     core.control(request.event_id, request.command)
+                    controller().after_control(core, request.command)
                 elif message["kind"] == "delivery":
                     feedback = DeliveryFeedback.model_validate(message["payload"])
                     core.delivery(feedback)

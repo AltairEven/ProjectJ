@@ -7,7 +7,9 @@ import { finishRecording, idle, pauseRecording, recordedMs, resumeRecording, sta
 import type { RequestFailure } from './request'
 import { Speaker, reportsFor, startedReport, visualReport } from './speaker'
 import { Microphone } from './microphone'
-import { passage } from './passage'
+import { passage, sentenceOf, wordTokens } from './passage'
+import { VocabularyBox } from './VocabularyBox'
+import type { Entry } from './vocabulary'
 import { classProgress, taskMarks } from './progress'
 import { Progress } from './ui'
 import { answerMode, type TaskView } from './tasks'
@@ -241,6 +243,30 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     await send('class/response', { event_id: uid(), ...payload })
   }
   const progress = snapshot && classProgress(snapshot)
+  // Words are tapped only while reading; marking is never scored (design/learning).
+  const vocabulary = (snapshot?.vocabulary ?? []) as unknown as Entry[]
+  const tapping = mode === 'story' && snapshot?.wait_kind === 'reading' && !halted
+  const markedWords = new Set(vocabulary.map(entry => String(entry.surface)))
+  const markWord = async (word: string, sentence: string) => {
+    setMessage('')
+    try { setCurrent(await api<Snapshot>(token, 'class/word', { event_id: uid(), word, sentence, marked: !markedWords.has(word.toLowerCase()) })) }
+    catch (error) { setMessage((error as RequestFailure).message) }
+  }
+  const regenerateWord = async (surface: string) => {
+    try { setCurrent(await api<Snapshot>(token, 'class/word/regenerate', { surface })) }
+    catch (error) { setMessage((error as RequestFailure).message) }
+  }
+  const tappable = (text: string) => {
+    let at = 0
+    return wordTokens(text).map((token, index) => {
+      const offset = at
+      at += token.text.length
+      if (!token.word) return token.text
+      const marked = markedWords.has(token.text.toLowerCase())
+      return <button key={index} type="button" className={marked ? 'word marked' : 'word'} aria-pressed={marked}
+        onClick={() => void markWord(token.text, sentenceOf(text, offset))}>{token.text}</button>
+    })
+  }
   const shown = !voiced ? snapshot?.pending_action ?? snapshot?.presented_action : locked || voicing ? undefined : snapshot?.presented_action
   // Jane's board left, the textbook page in the middle, the student's notebook right (1:2:1), each
   // scrolling on its own: no page scroll between her question, the story and the answer box.
@@ -272,6 +298,9 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
           {snapshot && snapshot.mode !== 'offscreen' && snapshot.mode !== 'ended' && <div className="row">
             {mode !== 'task' && mode !== 'story' && <button className="quiet" disabled={busy || halted} onClick={() => void input('Help me, please.', 'help')}>Help me</button>}
             <button className="quiet" disabled={halted} onClick={() => void control('repeat')}>Say it again</button></div>}</div></section>
+        {/* The words marked while reading, below Jane: meanings arrive after "I've finished reading". */}
+        {!localCancelled && snapshot && snapshot.task_index >= 0 && <VocabularyBox token={token} entries={vocabulary} busy={busy}
+          audioUrl={lemma => `/api/class/word-audio/${encodeURIComponent(lemma)}`} onRegenerate={surface => void regenerateWord(surface)} />}
       </div>
       <div className="side book">
         {!localCancelled && <Visuals token={token} action={shown ?? undefined} onShown={(action, shown) => {
@@ -282,7 +311,8 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
         {!localCancelled && Object.entries(snapshot?.materials ?? {}).map(([id, material]) => {
           const { title, paragraphs } = passage(material)
           return <section key={id} className="reading">{title && <h2>{title}</h2>}
-            <ol>{paragraphs.map((text, index) => <li key={index}>{text}</li>)}</ol></section>
+            {tapping && <p className="hint">Tap a word you do not know to put it in your vocabulary box.</p>}
+            <ol>{paragraphs.map((text, index) => <li key={index}>{tapping ? tappable(text) : text}</li>)}</ol></section>
         })}
         {!Object.keys(snapshot?.materials ?? {}).length && <p className="hint">{snapshot?.wait_kind === 'reading_start' ? 'The story shows when you press Start reading.' : 'The story shows here.'}</p>}
       </div>

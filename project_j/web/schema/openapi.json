@@ -386,6 +386,130 @@
         }
       }
     },
+    "/api/vocabulary/audio": {
+      "get": {
+        "summary": "Vocabulary Audio",
+        "operationId": "vocabulary_audio_api_vocabulary_audio_get",
+        "parameters": [
+          {
+            "name": "lemma",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Lemma"
+            }
+          },
+          {
+            "name": "learner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{1,64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Learner Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/vocabulary/regenerate": {
+      "post": {
+        "summary": "Vocabulary Regenerate",
+        "operationId": "vocabulary_regenerate_api_vocabulary_regenerate_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntryRegenerate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/course/confirm": {
       "post": {
         "summary": "Confirm Course",
@@ -1882,6 +2006,171 @@
         }
       }
     },
+    "/api/class/word": {
+      "post": {
+        "summary": "Mark Word",
+        "operationId": "mark_word_api_class_word_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WordMarkInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/class/word/regenerate": {
+      "post": {
+        "summary": "Regenerate Word",
+        "operationId": "regenerate_word_api_class_word_regenerate_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WordRegenerate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/class/word-audio/{lemma}": {
+      "get": {
+        "summary": "Word Audio",
+        "operationId": "word_audio_api_class_word_audio__lemma__get",
+        "parameters": [
+          {
+            "name": "lemma",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Lemma"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/{path}": {
       "get": {
         "summary": "Webpage",
@@ -2397,6 +2686,17 @@
             "title": "Recent Scores",
             "default": {}
           },
+          "vocabulary": {
+            "items": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Vocabulary",
+            "default": []
+          },
           "active": {
             "anyOf": [
               {
@@ -2731,6 +3031,33 @@
         ],
         "title": "Document",
         "description": "Physical storage envelope; business modules validate their own body contracts."
+      },
+      "EntryRegenerate": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Learner Id"
+          },
+          "lemma": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Lemma"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "learner_id",
+          "lemma"
+        ],
+        "title": "EntryRegenerate"
       },
       "FeedbackRequest": {
         "properties": {
@@ -3721,6 +4048,17 @@
             "type": "object",
             "title": "Materials",
             "default": {}
+          },
+          "vocabulary": {
+            "items": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Vocabulary",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -3840,6 +4178,55 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WordMarkInput": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "word": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[A-Za-z]+(?:['’][A-Za-z]+)?$",
+            "title": "Word"
+          },
+          "sentence": {
+            "type": "string",
+            "maxLength": 400,
+            "title": "Sentence"
+          },
+          "marked": {
+            "type": "boolean",
+            "title": "Marked"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "word",
+          "sentence",
+          "marked"
+        ],
+        "title": "WordMarkInput",
+        "description": "One story word marked or unmarked while reading (never scored)."
+      },
+      "WordRegenerate": {
+        "properties": {
+          "surface": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Surface"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "surface"
+        ],
+        "title": "WordRegenerate"
       }
     }
   }

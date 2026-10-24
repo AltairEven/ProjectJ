@@ -91,6 +91,38 @@ const base = (realm: Snapshot['realm']): Snapshot => ({
 
 const opening = "I'm Jane. As you read, notice how Mia finds out that the app counts too few. Press Start reading when you are ready."
 
+// The pretend vocabulary box: marked while reading, looked up after "I've finished reading".
+const entry = (word: string, sentence: string, status: string, extra: Record<string, unknown> = {}) => ({
+  surface: word.toLowerCase(), word, sentence, status, lemma: null, part_of_speech: null, definition: null, audio: false, ...extra,
+})
+const lookedUp = { sensor: { lemma: 'sensor', part_of_speech: 'noun', definition: 'a small thing that notices and measures something', audio: true },
+  volunteers: { lemma: 'volunteer', part_of_speech: 'verb', definition: 'to do work without being paid', audio: true } } as Record<string, Record<string, unknown>>
+const boxAfterReading = [
+  entry('sensor', 'Last spring the group fixed a sensor to a wooden post near the river crossing.', 'ready', lookedUp.sensor),
+  entry('crossing', 'Last spring the group fixed a sensor to a wooden post near the river crossing.', 'pending'),
+  entry('agreed', 'This time her notebook and the app agreed within two people.', 'failed'),
+]
+async function wordMarked(body: { word: string, marked: boolean }) {
+  const key = body.word.toLowerCase(), rest = (snapshot.vocabulary ?? []).filter(item => item.surface !== key)
+  return set({ vocabulary: body.marked ? [...rest, entry(body.word, 'A sentence from the story.', 'marked')] : rest })
+}
+async function wordRegenerated(surface: string) {
+  const pending = (snapshot.vocabulary ?? []).map(item => item.surface === surface ? { ...item, status: 'pending' } : item)
+  set({ vocabulary: pending }); push()
+  setTimeout(() => set({ vocabulary: (snapshot.vocabulary ?? []).map(item => item.surface === surface
+    ? { ...item, status: 'ready', ...(lookedUp[surface] ?? { lemma: surface, part_of_speech: 'noun', definition: 'a simulated meaning of this word', audio: true }) } : item) }) && push(), 1200)
+  return snapshot
+}
+// A fifth of a second of silence as a WAV, for the Listen buttons.
+function silentWav() {
+  const samples = 4800, data = new Uint8Array(44 + samples * 2), view = new DataView(data.buffer)
+  const ascii = (at: number, text: string) => [...text].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)))
+  ascii(0, 'RIFF'); view.setUint32(4, 36 + samples * 2, true); ascii(8, 'WAVEfmt '); view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, 24000, true); view.setUint32(28, 48000, true)
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true); ascii(36, 'data'); view.setUint32(40, samples * 2, true)
+  return new Response(data, { headers: { 'content-type': 'audio/wav' } })
+}
+
 export const scenes: Record<string, (realm: Snapshot['realm']) => void> = {
   'Opening (before reading)': realm => {
     snapshot = { ...base(realm), task_index: -1, materials: {} }
@@ -100,6 +132,11 @@ export const scenes: Record<string, (realm: Snapshot['realm']) => void> = {
     snapshot = { ...base(realm), task_index: -1, wait_kind: 'reading' }
     snapshot.presented_action = action('goal', opening, 'input')
   },
+  'Reading (marking words)': realm => {
+    snapshot = { ...base(realm), task_index: -1, wait_kind: 'reading', vocabulary: [entry('sensor', 'Last spring the group fixed a sensor to a wooden post.', 'marked'), entry('crossing', 'Near the river crossing.', 'marked')] }
+    snapshot.presented_action = action('goal', opening, 'input')
+  },
+  'Vocabulary box after reading': realm => { snapshot = { ...base(realm), vocabulary: boxAfterReading }; ask(0) },
   'Question (story and picture)': realm => { snapshot = base(realm); ask(0) },
   'Read aloud': realm => { snapshot = base(realm); ask(1) },
   'Jane reading the answer': realm => {
@@ -180,7 +217,14 @@ async function controlled(command: string) {
     case 'pause': return set({ mode: 'paused', activity_state: 'paused', pending_action: null, ...(snapshot.wait_kind === 'reading' ? { materials: {} } : {}) })
     case 'resume': return set({ mode: 'waiting_input', activity_state: 'running', ...(snapshot.wait_kind === 'reading' ? { materials: { passage } } : {}) })
     case 'start_reading': return set({ wait_kind: 'reading', materials: { passage } })
-    case 'finish_reading': return ask(0)
+    case 'finish_reading': {
+      // Like the server: the first question comes at once; the meanings follow a little later.
+      const marked = (snapshot.vocabulary ?? []).map(item => ({ ...item, status: 'pending' }))
+      setTimeout(() => set({ vocabulary: (snapshot.vocabulary ?? []).map(item => ({ ...item, status: 'ready',
+        ...(lookedUp[String(item.surface)] ?? { lemma: item.surface, part_of_speech: 'noun', definition: 'a simulated meaning of this word', audio: true }) })) }) && push(), 1500)
+      set({ vocabulary: marked })
+      return ask(0)
+    }
     case 'stop': return set({ mode: 'ended', activity_state: 'ended', pending_action: null, recording: null, end: { reason: 'stop' } })
     case 'skip': return ask(snapshot.task_index + 1)
     case 'close': return ask(tasks.length)
@@ -226,6 +270,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   }
   if (route === 'class/response') return json({ ack: 'accepted', snapshot: await responded(body), event_id: body.event_id })
   if (route === 'class/control') return json(await controlled(body.command))
+  if (route === 'class/word') return json(await wordMarked(body))
+  if (route === 'class/word/regenerate') return json(await wordRegenerated(body.surface))
+  if (route.startsWith('class/word-audio/')) return silentWav()
   if (route.startsWith('class/speech/')) {
     const id = decodeURIComponent(route.slice('class/speech/'.length))
     const said = [snapshot.pending_action, snapshot.presented_action].find(item => item?.action_id === id)

@@ -11,8 +11,14 @@ from pydantic import BaseModel, Field, JsonValue
 from project_j.contracts import Contract
 
 # Workflow order; planning and preparation have bindings and admission before they have callers.
-Purpose = Literal["planning", "preparation", "classroom_judgment", "evaluation"]
-PURPOSES: tuple[Purpose, ...] = ("planning", "preparation", "classroom_judgment", "evaluation")
+Purpose = Literal["planning", "preparation", "classroom_judgment", "evaluation", "vocabulary"]
+PURPOSES: tuple[Purpose, ...] = (
+    "planning",
+    "preparation",
+    "classroom_judgment",
+    "evaluation",
+    "vocabulary",
+)
 Effort = Literal["low", "medium", "high", "xhigh"]
 # Service tier; "fast" trades higher usage for speed where an adapter offers it.
 Tier = Literal["default", "fast"]
@@ -41,6 +47,7 @@ PURPOSE_LABELS = {
     "preparation": "Lesson making",
     "classroom_judgment": "Class judgment",
     "evaluation": "Evaluation",
+    "vocabulary": "Word meanings",
 }
 ITEM_LABELS = {
     "auth": "Sign-in",
@@ -61,6 +68,7 @@ REQUIRED: dict[Purpose, tuple[str, ...]] = {
     "preparation": ("auth", "model", "structured_output"),
     "classroom_judgment": ("auth", "model", "structured_output", "cancellation"),
     "evaluation": ("auth", "model", "structured_output"),
+    "vocabulary": ("auth", "model", "structured_output"),
 }
 
 

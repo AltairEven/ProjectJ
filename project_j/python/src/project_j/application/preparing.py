@@ -2,7 +2,7 @@
 confirming a course."""
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from project_j.application.documents import document, identity, publication, successor
 from project_j.application.progress import latest_facts, lesson_score_summary
@@ -11,6 +11,7 @@ from project_j.curriculum.content import check_content
 from project_j.curriculum.corrections import active_restrictions
 from project_j.learning.contracts import DemandBody
 from project_j.learning.fixtures import AUXILIARY_GOAL, PRIMARY_GOAL
+from project_j.learning.vocabulary import VocabularyBody, candidates
 from project_j.platform.storage import (
     Conflict,
     digest,
@@ -55,6 +56,15 @@ def publications(objects: list[Document]):
 
 
 class Preparing:
+    @staticmethod
+    def offered_vocabulary(
+        body: VocabularyBody | None, *, placement: bool, familiar: bool, today: date
+    ) -> list[dict] | None:
+        """Marked words for a new story; none for the placement test or a review of a read story."""
+        if placement or familiar:
+            return None
+        return candidates(body, today) if body else []
+
     def chosen_material(self, learner_id: str, demand: DemandBody) -> tuple[str, bool]:
         """Preparation follows the material named by the suggestion the demand adopted."""
         for choice in demand.suggestion_choices:
@@ -200,6 +210,12 @@ class Preparing:
                 self.recent_titles(learner_id),
                 lesson_score_summary(self, learner_id, "preparation"),
                 level=story_level(profile.body, body.purpose == "placement"),
+                vocabulary=self.offered_vocabulary(
+                    self.vocabulary_record(learner_id)[1],
+                    placement=body.purpose == "placement",
+                    familiar=familiar,
+                    today=datetime.now(UTC).date(),
+                ),
             )
             refs = {
                 "course": RevisionRef(object_id=identity(operation, "course"), revision=1),
@@ -295,6 +311,7 @@ class Preparing:
             jane = self.store.read(RevisionRef.model_validate(course.body["jane_ref"]), learner_id)
             read = self.read_sources(learner_id)
             library = self.library(read)
+            source, familiar = self.chosen_material(learner_id, body)
             base = preparation_request(
                 body,
                 state.body,
@@ -302,13 +319,17 @@ class Preparing:
                 [doc.body for doc in self.store.list_current(learner_id, "capability")],
                 jane.body,
                 list(library.values()) if self.models.simulates("preparation") else [],
-                self.chosen_material(learner_id, body)[0]
-                if self.models.simulates("preparation")
-                else None,
+                source if self.models.simulates("preparation") else None,
                 None,
                 self.recent_titles(learner_id),
                 lesson_score_summary(self, learner_id, "preparation"),
                 level=story_level(profile.body, body.purpose == "placement"),
+                vocabulary=self.offered_vocabulary(
+                    self.vocabulary_record(learner_id)[1],
+                    placement=body.purpose == "placement",
+                    familiar=familiar,
+                    today=datetime.now(UTC).date(),
+                ),
             )
             request = discussion_request(
                 base, preview.body["draft"], feedback, preview.body["discussion"]

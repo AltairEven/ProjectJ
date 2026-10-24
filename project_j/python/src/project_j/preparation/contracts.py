@@ -172,6 +172,7 @@ class CourseBody(Contract):
     # Jane's opening reading tip (ADR-0022); courses saved before it have none.
     reading_focus: str | None = None
     story_level: StoryLevel | None = None  # None: no Lexile, or an older course.
+    vocabulary_used: tuple[str, ...] = ()  # Marked words the story reviews (design/learning).
     limitations: tuple[str, ...]
     resources: tuple[ResourceSpec, ...] = ()
 

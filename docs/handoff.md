@@ -1000,3 +1000,25 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 诊断日志：503拒绝沿用`refused`行（记异常类名与消息前200字），新断言覆盖；其余四项不新增链路。
 - 未验证：没有启动沙盒或模拟服务实际录一次音、打开页面；真实模型与正式学习下的运行。
 - 继续条件：已提交。用户了解快照接口用途后决定“其他都不改了”：保留`GET /api/class/snapshot`，评估中“代价被低估”的七条（第1、2、3、6、7、9、19条）与结构问题都不做，ponytail审查后续到此结束。
+
+## VOC-1 生词盒、生词页与生词回流备课（ADR-0024）
+
+- 状态：实现、自测与沙盒走查完成；用户2026年10月24日审阅沙盒后要求提交（真实查词与真实备课各一次仍未跑，列为提交后首个验证项）。设计见docs/superpowers/specs/2026-10-24-vocabulary-box-design.md，实施计划docs/superpowers/plans/2026-10-24-vocabulary-box.md，决定[ADR-0024](../decisions/ADR-0024.md)（部分替代ADR-0021第3条：仍不翻译，但读完后可看自己标记的词的英文释义并有生词记录）。
+- 负责人/集成：Claude（本会话逐任务实现）。审查由主会话自做，未派审查子代理；审查后修两处：课中复用已记录词时不再读盘（开课前只预读本故事里出现的已记录词的音频，存储层课中禁读写），标记接口的`word`限定为一个英文词。
+- 范围：
+  1. 学习模块`learning/vocabulary.py`：生词记录合同（kind `vocabulary`，每学习者一份、每次更新一个修订）与纯规则：权重 = 标记次数 + 距上次见到整周数；封存后更新（标记加一并清退出，读完的故事里出现未标的词退出加一，到5转已掌握并记日期、课程与活动；再标回到生词）；候选按权重降序最多100；生词页列表。`learning/lookup.py`：模型用途`vocabulary`的请求与释义核对（中文、超20词、原形格式、含原词按词记失败）。
+  2. 平台：第五个模型用途`vocabulary`（`Purpose`/`PURPOSES`/`REQUIRED`/标签），未单独配置时跟随课堂判断绑定；模拟适配器分支；配置摘要因此改变（旧摘要测试改期望并注明须重新probe）。
+  3. 课堂核心：`mark_word`（只在阅读中、未暂停；同事件幂等；事件`word_marked`/`word_unmarked`）、`pending_words`、`set_word`（事件`word_lookup`只记状态）、快照`vocabulary`。协调层新文件`application/vocabulary.py`：读完后后台查词（已记录的直接复用，其余一次请求、逐词合成WAV），课中重新生成，封存后写记录（音频写assets），课外重新生成（后台任务`vocabulary:<lemma>`）、音频读取、主页`vocabulary`列表。开课时加载记录并预读本故事里出现的已记录词的音频。
+  4. 接口：`POST /api/class/word`、`POST /api/class/word/regenerate`（202）、`GET /api/class/word-audio/{lemma}`、`GET /api/vocabulary/audio`、`POST /api/vocabulary/regenerate`（202）；`Snapshot.vocabulary`、`Dashboard.vocabulary`；control路由与socket在`core.control`后调用`after_control`。
+  5. 备课：请求附候选（复习课与建档小测不附，`Preparing.offered_vocabulary`），指令加一句，草稿与课程包加`vocabulary_used`，`checked_course`去掉不在故事里的词并记进限制（前缀匹配，ponytail注释）。
+  6. 前端：阅读阶段逐词按钮与高亮（`passage.ts`的`wordTokens`/`sentenceOf`）、`VocabularyBox.tsx`（课堂、评价详情复用）、新页`pages/Vocabulary.tsx`与导航“Vocabulary”、课程详情“Review words”、评价详情“Words you marked”与“Mastered this lesson”、`vocabulary.ts`纯函数、样式；沙盒假课堂两个新场景与三条假路由，主页快照加生词记录、标记事件与`vocabulary`列表。
+  7. 文档：ADR-0024；classroom/interface/main-page/learning（README、profile、plans）/preparation/platform入口与shared端到端案例E2E20；docs/acceptance、technology、product；spec状态行。
+- 文件边界：project_j/python/src/project_j/{contracts.py,classroom/harness.py,application/{coordinator,teaching,preparing,vocabulary}.py,learning/{vocabulary,lookup}.py,platform/models/{contracts,config,service,simulated}.py,preparation/{contracts,drafting}.py,interface/api.py}；tests新增test_vocabulary_{rules,lookup,classroom,api,record}.py，改support、test_integration_fixes、test_models_init、test_models_service、test_preparation_drafting；project_j/web/{src/{App.tsx,Classroom.tsx,next-step.ts,passage.ts,report.ts,style.css,vocabulary.ts,VocabularyBox.tsx,pages/{Courses,Evaluations,Vocabulary}.tsx},tests/{passage,vocabulary,next-step}.test.mjs,sandbox/{mock.ts,dashboard.json},schema/openapi.json,src/client/*}；decisions/ADR-0024.md与上述设计、docs文件。
+- 验收条件：统一check通过；标记只在阅读中被接受、读完后第一题不等模型、复用词无模型调用、失败词可重新生成、封存后记录更新与第5次转已掌握、评价请求不含生词、备课候选与`vocabulary_used`核对、日志不含词（见五个新测试文件）。
+- 检查证据：提交前完整重跑登记检查：三份uv sync（锁定依赖未变）、两份npm ci与npm audit（0 vulnerabilities）、统一check通过（主工程751、评分39、合成15项pytest；前端84、文档1），UTC 2026-10-24T07:32:55.586180+00:00，工程摘要078a006b567ae13ef296bdec169e9dc71cd190ab44edcef78d84ea9d9307a732，actual_api为unverified；离线probe与模拟measure（40样本、p95 4500毫秒、not_granted）通过。
+- 净变化：Python源码改动+226/−9行，另新增三个模块；测试改动+57/−5行，另新增五个测试文件；前端手写代码与测试+380/−14行，另新增三个源文件与一个测试；新增文件合计约1180行；依赖不变。
+- 诊断日志：`event word_marked/word_unmarked`（只记`marked`）、`event word_lookup`（只记`status`）、`vocabulary lookup words= reused= requested= ok= failed= elapsed_ms=`、`vocabulary synth outcome= elapsed_ms=`、`vocabulary update new= marked= exits= mastered= total= saved=`、`vocabulary regenerate outcome=`、`preparation vocabulary used= dropped=`；日志测试断言词与句子不出现。
+- 沙盒走查（2026年10月24日，project_j/test/ui/sandbox/voc-box.mjs，记录在project_j/test/records/voc-sandbox-20261024.md）：两个课堂场景、Vocabulary页与评价详情全部按预期显示与交互，无页面错误；修一处样式（黑板上盒子标题改粉笔色）。
+- 未验证：真实模型释义一次（简单、全英文、原形正确）与真实备课一次（生词自然写进故事、清单准确）；正式入口上一课标记生词、看释义听发音，再上一课看到复用；正式安装须先`project-j-init probe`（摘要改变）。
+- 审查后精简（2026年10月24日，用户要求“按清单改”）：去掉记录字段`mastered_at`/`mastered_course`（掌握日期即`last_seen`，掌握课程即最后一次未标记出现）；内联`lemma_of`、`vocabulary_listing`、前端`vocabularyGroups`；`candidates`直接排活跃词；`lookup_words`不再重复置pending；`regenerate_entry`不返回值；`spawn`只在事件循环内建任务（测试改为在协程里等待`word_jobs`，support加`finish_reading`/`regenerate_word`）；`config.bindings`回落改为一个小函数；主页`objects`不再重复带`vocabulary`文档；课堂生词盒入口挪到Jane那一栏下方（用户定）。
+- 继续条件：提交后先跑真实查词与真实备课各一次并记录结果，再在正式入口上两课核对标记、复用与回流；正式安装先重新`project-j-init probe`。

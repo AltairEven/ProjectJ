@@ -14,6 +14,7 @@ from project_j.classroom.judgment import ModelProposal, judgment_request, method
 from project_j.classroom.responses import describe, judge, presentation
 from project_j.contracts import Contract, RevisionRef, SubmittedInput
 from project_j.english import chinese
+from project_j.learning.vocabulary import LookedUp
 from project_j.platform.models.service import ModelService
 from project_j.platform.speech.contracts import PronunciationResult, PronunciationScorer
 from project_j.platform.storage import REALMS, Conflict, canonical, digest
@@ -29,6 +30,7 @@ LOGGED_FIELDS = (
     "recording_ms", "delivered_range", "failure", "deadline_seconds", "judgment", "call_id",
     "command", "reason", "unconfirmed", "unfinished_tasks", "elapsed_seconds", "type_version",
     "wrong_count", "rule_ms", "level", "reading_ms", "word_count", "first_reading", "pauses",
+    "marked",
 )  # fmt: skip
 # Reading the story before the questions (ADR-0022): what typing, help or skip gets meanwhile.
 READING_WAITS = {
@@ -182,6 +184,8 @@ class Harness:
         self.story_words, self.first_reading = story_words, first_reading
         self.story_open = False
         self.story_timer: dict | None = None
+        # Words marked while reading, by lowercase surface form; filled in after reading.
+        self.box: dict[str, dict] = {}
         self.revision, self.epoch, self.task_index = 1, 0, -1
         self.task_instance_id, self.wait_id = str(uuid4()), str(uuid4())
         self.started_at, self.started_clock = datetime.now(UTC), time.monotonic()
@@ -298,6 +302,61 @@ class Harness:
             },
         )
 
+    def mark_word(self, event_id: str, word: str, sentence: str, marked: bool):
+        """Mark or unmark a story word; only while the story is being read (not paused)."""
+        signature = {"event_id": event_id, "word": word, "sentence": sentence, "marked": marked}
+        previous = self.inputs.get(event_id)
+        if previous:
+            if previous["signature"] != signature:
+                raise Conflict("same mark identity has different content")
+            return self.snapshot()
+        if self.story_timer is None or self.mode not in {"waiting_input", "delivering"}:
+            raise ValueError("Mark words while you read the story.")
+        self.inputs[event_id] = {"signature": signature, "attempt_id": None}
+        key = word.lower()
+        if marked:
+            self.box.setdefault(
+                key,
+                {
+                    "word": word,
+                    "sentence": sentence,
+                    "status": "marked",
+                    "lemma": None,
+                    "part_of_speech": None,
+                    "definition": None,
+                    "audio": False,
+                },
+            )
+        else:
+            self.box.pop(key, None)
+        self.revision += 1
+        self.record("word_marked" if marked else "word_unmarked", signature)
+        return self.snapshot()
+
+    def pending_words(self) -> list[dict]:
+        """Marked words still without a meaning: what the lookup after reading asks for."""
+        return [
+            {"word": value["word"], "sentence": value["sentence"]}
+            for value in self.box.values()
+            if value["status"] in {"marked", "pending"}
+        ]
+
+    def set_word(self, surface: str, looked: LookedUp | None, audio: bool):
+        """The lookup's outcome for one marked word; None means it failed (retry possible)."""
+        entry = self.box[surface]
+        if looked is None:
+            entry["status"] = "failed"
+        else:
+            entry.update(
+                status="ready",
+                lemma=looked.lemma,
+                part_of_speech=looked.part_of_speech,
+                definition=looked.definition,
+                audio=audio,
+            )
+        self.revision += 1
+        self.record("word_lookup", {"word": surface, "status": entry["status"]})
+
     def current_task(self) -> TaskDefinition | None:
         if self.mode == "ended" or not 0 <= self.task_index < len(self.course.tasks):
             return None
@@ -355,6 +414,7 @@ class Harness:
             else None,
             # A clicked task as the page shows it; never its answer.
             "task": presentation(clicked) if (clicked := self.clicked_task()) else None,
+            "vocabulary": [value | {"surface": key} for key, value in self.box.items()],
             "end": self.end,
             "actual_api": "unverified",
             "actual_voice": "unverified",

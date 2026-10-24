@@ -41,8 +41,15 @@ class ModelFiles:
         try:
             default = Binding.model_validate(data["default"])
             overrides = data.get("purposes", {})
+
+            # Word meanings are short, low-effort requests: unless bound on their own, they
+            # follow the classroom judgment binding rather than the (xhigh) default.
+            def fallback(purpose):
+                follow = "classroom_judgment" if purpose == "vocabulary" else purpose
+                return overrides.get(follow, default.model_dump())
+
             return {
-                purpose: Binding.model_validate(overrides.get(purpose, default.model_dump()))
+                purpose: Binding.model_validate(overrides.get(purpose, fallback(purpose)))
                 for purpose in PURPOSES
             }
         except (KeyError, ValueError) as error:

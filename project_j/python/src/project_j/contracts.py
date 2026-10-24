@@ -22,6 +22,7 @@ OWNERS = {
     "review": "learning",
     "decision": "learning",
     "capability": "learning",
+    "vocabulary": "learning",
     "preview": "preparation",
     "content_check": "preparation",
     "issue": "evaluation",
@@ -44,6 +45,7 @@ OWNERS = {
 }
 PERSONAL = {
     "profile",
+    "vocabulary",
     "state",
     "plan",
     "demand",

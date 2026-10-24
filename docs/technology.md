@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.20.2；更新：2026年10月22日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
+版本：1.21.0；更新：2026年10月24日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -40,6 +40,7 @@ SQLite适合当前本机、低写并发的范围。以后出现多服务器或�
 | --- | --- | --- |
 | 课堂判断与指导 | gpt-6.1-sol，reasoning.effort为low，Codex订阅Fast层级 | 实际配置、语义、允许动作、取消、用量与响应时间 |
 | 备课、评价、学习规划与复盘 | 同模型，reasoning.effort为xhigh（extra high） | 来源、结构、证据限制、内容核验及结果复用 |
+| 生词释义 | 未单独配置时跟随课堂判断的绑定（[ADR-0024](../decisions/ADR-0024.md)），一次请求整盒、期限60秒 | 全英文、不超过20词、不含原词的释义；原形正确；真实查词一次 |
 | 合成 | 本机Qwen3-TTS 1.7B CustomVoice（MLX），预设音色Serena加老师语气指令，独立子工程与后端子进程 | 英文、可懂度、流式首段与实际首播、打断与取消、GPU争用时的合成速度 |
 | 英语发音评分 | 本机评分器：wav2vec2-lv-60-espeak-cv-ft加GOP，独立子工程与后端子进程 | 读错、漏读、多读的标出与误报，评分耗时与内存，门槛未校准 |
 
@@ -99,7 +100,7 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python projec
 project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-init status
 ```
 
-四个用途（planning学习规划、preparation备课、classroom_judgment课堂判断、evaluation课后评价）先取默认绑定，再按`--purpose 用途=适配器:模型:档位[:fast]`逐项覆盖，可各绑不同适配器。末尾`:fast`选Fast层级，目前只有Codex适配器提供，对应订阅列表中的priority层级（标称2倍速度、额度消耗增加）；SDK不回报每轮实际层级，记未核实。OpenAI API直连适配器与`set-key`已删除（[ADR-0019](../decisions/ADR-0019.md)），只有Codex订阅与模拟两个适配器。
+五个用途（planning学习规划、preparation备课、classroom_judgment课堂判断、evaluation课后评价、vocabulary生词释义；vocabulary未单独配置时取课堂判断的绑定）先取默认绑定，再按`--purpose 用途=适配器:模型:档位[:fast]`逐项覆盖，可各绑不同适配器。末尾`:fast`选Fast层级，目前只有Codex适配器提供，对应订阅列表中的priority层级（标称2倍速度、额度消耗增加）；SDK不回报每轮实际层级，记未核实。OpenAI API直连适配器与`set-key`已删除（[ADR-0019](../decisions/ADR-0019.md)），只有Codex订阅与模拟两个适配器。
 
 Codex适配器使用官方Python SDK `openai-codex`（锁定0.163.0，随包附带codex运行时），在本机启动`codex app-server`；login打开ChatGPT浏览器登录，登录状态存于`project_j/private/models/codex-home/`，不读也不改家长全局的`~/.codex`。每次调用开一个不留存的新会话，空临时目录、只读沙箱、拒绝全部提权，以中性基础指令替换Codex自带的代理提示词，用途指令作开发者指令，按pydantic严格JSON结构输出，档位按绑定逐轮传入；配置覆盖关闭记忆、历史、项目说明文档、网页搜索、分析统计、shell工具、应用、插件、技能及环境/权限/应用/协作说明（后几项据真实运行实测：去掉插件与技能注入后输入不再逐次增长，剩余约1.1万token为运行时自带内容）。返回条目出现任何工具调用即记“工具”明确不符而失败。取消与超时会请求服务端中断该轮。SDK不回报每轮实际模型与档位，二者记未核实；探针以订阅模型列表核对模型与所声明的档位，记录鉴权、结构化输出、工具关闭、取消、图片输入与耗时。
 

@@ -254,3 +254,21 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
   button { transition: none; }
   progress:indeterminate { animation-duration: 8s; }
 }
+
+/* Story words tapped while reading: plain text until hovered; a marked word looks highlighted. */
+.word { font: inherit; display: inline; margin: 0; padding: 0 1px; border: 0; border-radius: 3px; background: none; color: inherit; box-shadow: none; cursor: pointer; }
+.word:hover:not(:disabled) { filter: none; background: var(--ink-wash); }
+.word:active:not(:disabled) { transform: none; box-shadow: none; }
+.word.marked { background: #f3d46ba6; }
+.vocabulary-box { margin: 0 0 18px; padding: 8px 14px 12px; border: 1px dashed var(--rule-strong); border-radius: 6px; font-family: var(--ui); }
+.vocabulary-box summary { font-size: 14px; }
+.vocabulary-box ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.vocabulary-box li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; padding: 6px 0; border-top: 1px solid var(--rule); font-size: 15px; }
+.vocabulary-box li .row { margin-left: auto; }
+.list.vocabulary li { display: block; }
+.list.vocabulary summary { font-size: 17px; }
+/* On Jane's board the box is written in chalk. */
+.board .vocabulary-box { border-color: var(--chalk-dim); }
+.board .vocabulary-box summary { color: var(--chalk); }
+.board .vocabulary-box em { color: var(--chalk-dim); }
+.board .vocabulary-box li { border-top-color: var(--board-deep); }

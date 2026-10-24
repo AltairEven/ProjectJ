@@ -84,6 +84,18 @@ class SimulatedAdapter:
                 "uncertain": ["Working alone, recall and transfer were not observed."],
                 "alignment": "Only what happened.",
             }
+        if request.purpose == "vocabulary":
+            return {
+                "words": [
+                    {
+                        "word": item["word"],
+                        "lemma": item["word"].lower(),
+                        "part_of_speech": "noun",
+                        "definition": "Simulated meaning of this word in the story.",
+                    }
+                    for item in context["words"]
+                ]
+            }
         if request.purpose == "preparation":
             if context.get("kind") == "animation":
                 return {
