@@ -1,6 +1,7 @@
 """Sealing a class writes the learner's word record; words can be looked up again outside class."""
 
 import asyncio
+import logging
 from uuid import uuid4
 
 from support import deliver_all, finish_reading, read_story, start
@@ -24,10 +25,13 @@ def mark_and_finish(app, word, sentence):
     return core
 
 
-def test_sealing_writes_the_record_and_a_second_lesson_counts_exits(application):
+def test_sealing_writes_the_record_and_a_second_lesson_counts_exits(application, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
     core = mark_and_finish(application, "bridge", "She wants a bridge for her car.")
     core.control(str(uuid4()), "stop")
     fact = application.seal()
+    assert "vocabulary update new=1 marked=1 exits=0 mastered=0 total=1 saved=true" in caplog.text
+    assert "She wants" not in caplog.text
     saved, body = record(application)
     (entry,) = body.words
     assert entry.lemma == "bridge" and entry.definition and entry.audio["path"].endswith(".wav")
@@ -41,6 +45,7 @@ def test_sealing_writes_the_record_and_a_second_lesson_counts_exits(application)
     read_story(core)
     core.control(str(uuid4()), "stop")
     application.seal()
+    assert "vocabulary update new=0 marked=0 exits=1 mastered=0 total=1 saved=true" in caplog.text
     saved, body = record(application)
     assert saved.revision == 2
     assert (body.words[0].exit_count, body.words[0].unmarked_appearances) == (
@@ -63,7 +68,8 @@ def test_a_stopped_class_with_pending_words_saves_them_without_a_definition(appl
     assert listed[0]["lemma"] == "bridge" and listed[0]["weight"] == 1
 
 
-def test_regenerate_outside_class_fills_the_definition(application):
+def test_regenerate_outside_class_fills_the_definition(application, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
     core = asyncio.run(start(application))
     deliver_all(core)
     core.control(str(uuid4()), "start_reading")
@@ -71,6 +77,7 @@ def test_regenerate_outside_class_fills_the_definition(application):
     core.control(str(uuid4()), "stop")
     application.seal()  # saved without a definition (never looked up)
     asyncio.run(application.regenerate_entry("r1", application.learner_id, "bridge"))
+    assert "vocabulary regenerate outcome=ok audio=true" in caplog.text
     saved, body = record(application)
     assert saved.revision == 2 and body.words[0].definition
     assert body.words[0].audio["path"].endswith(".wav")

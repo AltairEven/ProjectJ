@@ -1021,4 +1021,5 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 沙盒走查（2026年10月24日，project_j/test/ui/sandbox/voc-box.mjs，记录在project_j/test/records/voc-sandbox-20261024.md）：两个课堂场景、Vocabulary页与评价详情全部按预期显示与交互，无页面错误；修一处样式（黑板上盒子标题改粉笔色）。
 - 未验证：真实模型释义一次（简单、全英文、原形正确）与真实备课一次（生词自然写进故事、清单准确）；正式入口上一课标记生词、看释义听发音，再上一课看到复用；正式安装须先`project-j-init probe`（摘要改变）。
 - 审查后精简（2026年10月24日，用户要求“按清单改”）：去掉记录字段`mastered_at`/`mastered_course`（掌握日期即`last_seen`，掌握课程即最后一次未标记出现）；内联`lemma_of`、`vocabulary_listing`、前端`vocabularyGroups`；`candidates`直接排活跃词；`lookup_words`不再重复置pending；`regenerate_entry`不返回值；`spawn`只在事件循环内建任务（测试改为在协程里等待`word_jobs`，support加`finish_reading`/`regenerate_word`）；`config.bindings`回落改为一个小函数；主页`objects`不再重复带`vocabulary`文档；课堂生词盒入口挪到Jane那一栏下方（用户定）。
-- 继续条件：提交后先跑真实查词与真实备课各一次并记录结果，再在正式入口上两课核对标记、复用与回流；正式安装先重新`project-j-init probe`。
+- 提交后补记（2026年10月24日）：补三条日志测试（`preparation vocabulary used= dropped=`、`vocabulary update …`、`vocabulary regenerate outcome=`），断言只记计数不记词；本机`project-j-init probe`07:44:49Z通过，五个用途初始化，Word meanings为codex:gpt-6.1-sol:low:fast。正式入口按运行编号me启动后用户决定暂不上课，服务正常停止，未开课、学习数据未变；核对清单留在本机project_j/test/records/voc-study-20261024.md。
+- 继续条件：在正式入口上两课核对标记、复用与回流，并记录真实查词与真实备课各一次的结果（probe已完成，无需重跑）。

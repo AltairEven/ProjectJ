@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -794,10 +795,13 @@ def test_request_carries_vocabulary_candidates_and_instructions_say_how(applicat
     assert build(application).context["vocabulary"] == []
 
 
-def test_vocabulary_used_keeps_only_words_in_the_story(demand, draft):
+def test_vocabulary_used_keeps_only_words_in_the_story(demand, draft, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
     checked = check(demand, draft | {"vocabulary_used": ["bridge", "fold", "zebra"]})
     assert checked.course.vocabulary_used == ("bridge", "fold")  # "folds" is in the story
     assert any("1 review word" in line for line in checked.course.limitations)
+    assert "preparation vocabulary used=2 dropped=1" in caplog.text
+    assert "zebra" not in caplog.text  # counts only, never the words
     assert check(demand, draft).course.vocabulary_used == ()
     assert CourseDraft.model_validate(draft).vocabulary_used == ()
 
