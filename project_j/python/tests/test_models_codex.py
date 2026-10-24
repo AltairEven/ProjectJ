@@ -22,7 +22,11 @@ from project_j.platform.models.contracts import Binding, ImageNote, ModelRequest
 
 BINDING = Binding(adapter="codex", model="gpt-6.1-sol", effort="low")
 REQUEST = ModelRequest(
-    "classroom_judgment", "judge", {"evidence": "e", "answer": "a bridge"}, ClassroomJudgment
+    "classroom_judgment",
+    "judge",
+    {"evidence": "e", "answer": "a bridge"},
+    ClassroomJudgment,
+    deadline_seconds=10,
 )
 GOOD = json.dumps({"judgment": "correct", "evidence": "e", "text": "对"})
 PROBE_GOOD = json.dumps({"verdict": "correct", "evidence": "a bridge", "response": "Yes."})
@@ -320,7 +324,14 @@ def test_probe_flags_a_model_missing_from_the_subscription(tmp_path):
 def test_pictures_use_a_separate_runtime(tmp_path, caplog):
     caplog.set_level(logging.INFO, logger="project_j")
     text, drawing, launched = FakeCodex(), FakeCodex(), []
-    draw = ModelRequest("preparation", "draw", {"content": "a bridge"}, ImageNote, media="image")
+    draw = ModelRequest(
+        "preparation",
+        "draw",
+        {"content": "a bridge"},
+        ImageNote,
+        media="image",
+        deadline_seconds=10,
+    )
 
     def factory(workdir, image):
         launched.append(image)

@@ -122,19 +122,47 @@ def identity_keys(value) -> set[str]:
     return set()
 
 
+# How long each kind of call may wait, by the key config.json's "deadlines" section uses
+# (ADR-0025). The numbers here are the defaults a missing or invalid entry falls back to.
+DeadlineKey = Literal[
+    "classroom_judgment",
+    "vocabulary",
+    "evaluation",
+    "planning",
+    "preparation_drafting",
+    "preparation_image",
+    "preparation_animation",
+]
+DEFAULT_DEADLINES: dict[DeadlineKey, int] = {
+    "classroom_judgment": 10,
+    "vocabulary": 60,
+    "evaluation": 600,
+    "planning": 180,
+    "preparation_drafting": 1200,
+    "preparation_image": 300,
+    "preparation_animation": 600,
+}
+DEADLINE_RANGE = (1, 3600)
+
+
 @dataclass(frozen=True)
 class ModelRequest:
     purpose: Purpose
     instructions: str
     context: dict
     output: type[BaseModel]
-    deadline_seconds: float = 10.0
+    # Either the seconds left (the classroom's remaining answer time) or the configured key
+    # the service resolves at call time; exactly one of the two.
+    deadline_seconds: float | None = None
     # "image": the reply carries one generated picture besides the structured output.
     media: Literal["image"] | None = None
+    deadline_key: DeadlineKey | None = None
 
     def __post_init__(self):
         if self.purpose not in PURPOSES:
             raise ValueError(f"unknown model purpose: {self.purpose}")
+        if (self.deadline_seconds is None) == (self.deadline_key is None):
+            raise ValueError("a model request names a deadline key or carries its seconds")
         if not self.instructions.strip():
             raise ValueError("a model request needs instructions")
         if found := identity_keys(self.context):

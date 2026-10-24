@@ -30,9 +30,9 @@ def test_vocabulary_is_a_registered_purpose():
 
 def test_request_shape_and_deadline():
     request = lookup_request([{"word": "folds", "sentence": "Mia folds the paper."}])
-    assert (request.purpose, request.deadline_seconds, request.output) == (
+    assert (request.purpose, request.deadline_key, request.output) == (
         "vocabulary",
-        60,
+        "vocabulary",
         WordDefinitions,
     )
     assert request.context == {"words": [{"word": "folds", "sentence": "Mia folds the paper."}]}

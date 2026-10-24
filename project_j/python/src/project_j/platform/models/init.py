@@ -18,6 +18,7 @@ from project_j.platform.models.registry import (
     ADAPTERS,
     NEEDS_LOGIN,
     build,
+    check_binding,
     load_service,
     versions,
 )
@@ -28,13 +29,7 @@ def parse_binding(text: str) -> Binding:
     if len(parts) not in (3, 4):
         raise ValueError(f"绑定格式应为 适配器:模型:档位[:fast]，收到 {text}")
     adapter, model, effort, tier = (*parts, "default")[:4]
-    if adapter not in ADAPTERS:
-        raise ValueError(f"未知适配器：{adapter}")
-    if effort not in ADAPTERS[adapter].efforts:
-        raise ValueError(f"{adapter} 不支持档位 {effort}")
-    if tier not in ADAPTERS[adapter].tiers:
-        raise ValueError(f"{adapter} 不支持层级 {tier}")
-    return Binding(adapter=adapter, model=model, effort=effort, tier=tier)
+    return check_binding(Binding(adapter=adapter, model=model, effort=effort, tier=tier))
 
 
 async def probe_all(files: ModelFiles) -> dict:

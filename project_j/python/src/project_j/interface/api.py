@@ -29,12 +29,14 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.responses import JSONResponse, Response, StreamingResponse
-from pydantic import Field, JsonValue, ValidationError
+from pydantic import Field, JsonValue, ValidationError, model_validator
 from sqlalchemy.exc import SQLAlchemyError
 
 from project_j.application.configuration import Settings
 from project_j.application.coordinator import Coordinator
 from project_j.application.progress import advance, jobs, next_step, retry, run
+from project_j.application.settings import probe as probe_models
+from project_j.application.settings import save_bindings, save_deadlines
 from project_j.classroom.harness import AllowedAction, DeliveryFeedback, Harness
 from project_j.contracts import Contract, Document, RevisionRef
 from project_j.evaluation.assessment import ModelStepUnavailable
@@ -50,7 +52,15 @@ from project_j.learning.onboarding import (
 )
 from project_j.platform.files import PrivateFiles
 from project_j.platform.models.config import ModelFiles
-from project_j.platform.models.registry import load_service
+from project_j.platform.models.contracts import (
+    DEADLINE_RANGE,
+    DEFAULT_DEADLINES,
+    PURPOSES,
+    Binding,
+    DeadlineKey,
+    Purpose,
+)
+from project_j.platform.models.registry import check_binding, load_service
 from project_j.platform.speech.local import LocalScorer, ScorerUnavailable
 from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked, hold_run
 from project_j.platform.tts.contracts import SynthesisFailed
@@ -903,6 +913,41 @@ def create_app(
             "result": "restored_to_new_simulation",
             "qualification": "not_granted",
         }
+
+    class DeadlinesRequest(Contract):
+        deadlines: dict[DeadlineKey, int]
+
+        @model_validator(mode="after")
+        def every_key_in_range(self):
+            if set(self.deadlines) != set(DEFAULT_DEADLINES):
+                raise ValueError("every deadline key is set, and no other")
+            low, high = DEADLINE_RANGE
+            if any(not low <= value <= high for value in self.deadlines.values()):
+                raise ValueError(f"a deadline is {low} to {high} seconds")
+            return self
+
+    class BindingsRequest(Contract):
+        purposes: dict[Purpose, Binding]
+
+        @model_validator(mode="after")
+        def every_purpose_offered(self):
+            if set(self.purposes) != set(PURPOSES):
+                raise ValueError("every purpose is bound, and no other")
+            for binding in self.purposes.values():
+                check_binding(binding)
+            return self
+
+    @app.post("/api/settings/deadlines", dependencies=[Depends(operator)])
+    async def settings_deadlines(request: DeadlinesRequest):
+        return save_deadlines(controller(), request.deadlines)
+
+    @app.post("/api/settings/bindings", dependencies=[Depends(operator)])
+    async def settings_bindings(request: BindingsRequest):
+        return save_bindings(controller(), request.purposes)
+
+    @app.post("/api/settings/probe", dependencies=[Depends(operator)])
+    async def settings_probe():
+        return await probe_models(controller())
 
     @app.get("/api/class/snapshot", response_model=Snapshot)
     async def snapshot(core: ClassCore):

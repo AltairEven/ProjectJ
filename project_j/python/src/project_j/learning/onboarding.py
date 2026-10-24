@@ -208,7 +208,7 @@ def profile_request(body: ProfileBody, evaluation: dict) -> ModelRequest:
             "evaluation": evaluation_context(evaluation),
         },
         ProfileDraft,
-        180,
+        deadline_key="planning",
     )
 
 

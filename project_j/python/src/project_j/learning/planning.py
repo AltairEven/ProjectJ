@@ -205,7 +205,7 @@ def demand_request(
             ],
         },
         DemandDraft,
-        180,
+        deadline_key="planning",
     )
 
 
@@ -223,7 +223,7 @@ def review_request(
         learning_context(state, plans, profile, catalog)
         | {"level": level, "evaluations": [evaluation_context(body) for body in evaluations]},
         ReviewDraft,
-        180,
+        deadline_key="planning",
     )
 
 

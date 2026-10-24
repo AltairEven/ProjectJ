@@ -35,7 +35,7 @@ def test_evaluation_request_carries_task_data_only(application):
     request = evaluation_request(fact.body, course.body, feedback, JANE)
     context = request.context
     assert request.purpose == "evaluation" and request.output is EvaluationDraft
-    assert request.deadline_seconds == 600
+    assert request.deadline_key == "evaluation"
     assert {a["attempt_id"] for a in context["attempts"]} == {
         a["attempt_id"] for a in fact.body["attempts"]
     }

@@ -223,7 +223,7 @@ def evaluation_request(
             ],
         },
         output=EvaluationDraft,
-        deadline_seconds=600,
+        deadline_key="evaluation",
     )
 
 

@@ -86,7 +86,7 @@ def test_preparation_request_carries_no_identity(application):
         text = json.dumps(request.context, ensure_ascii=False)
         for word in ("fictional-L1", "learner_id", "object_id", "provider"):
             assert word not in text
-        assert request.purpose == "preparation" and request.deadline_seconds == 1200
+        assert request.purpose == "preparation" and request.deadline_key == "preparation_drafting"
     assert len(first.context["requirements"]) == len(demand_requirements(demand))
     assert first.context["connected_kinds"] == ["image", "animation"]
 

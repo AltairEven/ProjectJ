@@ -27,7 +27,14 @@ from project_j.platform.models.service import ModelService
 from project_j.platform.visuals import image_type
 
 BINDING = Binding(adapter="codex", model="gpt-6.1-sol", effort="xhigh")
-DRAW = ModelRequest("preparation", "draw", {"content": "a paper bridge"}, ImageNote, media="image")
+DRAW = ModelRequest(
+    "preparation",
+    "draw",
+    {"content": "a paper bridge"},
+    ImageNote,
+    media="image",
+    deadline_seconds=10,
+)
 NOTE = json.dumps({"description": "a paper bridge between two books"})
 
 
@@ -131,14 +138,14 @@ def test_codex_picture_refuses_other_mcp_calls(tmp_path, call):
 
 def test_codex_text_request_refuses_mcp_listing(tmp_path):
     fake = FakeCodex(events=[mcp("list_mcp_resources"), message(NOTE), completed()])
-    text = ModelRequest("preparation", "write", {"content": "x"}, ImageNote)
+    text = ModelRequest("preparation", "write", {"content": "x"}, ImageNote, deadline_seconds=10)
     reply = asyncio.run(adapter(fake, tmp_path).invoke(text, BINDING))
     assert reply.actual["tools"].status == "mismatch"
 
 
 def test_codex_text_request_still_refuses_drawing(tmp_path):
     fake = FakeCodex(events=[drawn(PNG), message(NOTE), completed()])
-    text = ModelRequest("preparation", "write", {"content": "x"}, ImageNote)
+    text = ModelRequest("preparation", "write", {"content": "x"}, ImageNote, deadline_seconds=10)
     reply = asyncio.run(adapter(fake, tmp_path).invoke(text, BINDING))
     assert reply.actual["tools"].status == "mismatch" and reply.media == ()
     assert fake.starts[0]["base_instructions"] == BASE_INSTRUCTIONS

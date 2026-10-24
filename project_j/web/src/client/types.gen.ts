@@ -115,6 +115,40 @@ export type AllowedAction = {
 };
 
 /**
+ * Binding
+ */
+export type Binding = {
+    /**
+     * Adapter
+     */
+    adapter: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Effort
+     */
+    effort: 'low' | 'medium' | 'high' | 'xhigh';
+    /**
+     * Tier
+     */
+    tier?: 'default' | 'fast';
+};
+
+/**
+ * BindingsRequest
+ */
+export type BindingsRequest = {
+    /**
+     * Purposes
+     */
+    purposes: {
+        [key: string]: Binding;
+    };
+};
+
+/**
  * ChatRequest
  */
 export type ChatRequest = {
@@ -284,6 +318,18 @@ export type Dashboard = {
      * Note
      */
     note?: string | null;
+};
+
+/**
+ * DeadlinesRequest
+ */
+export type DeadlinesRequest = {
+    /**
+     * Deadlines
+     */
+    deadlines: {
+        [key: string]: number;
+    };
 };
 
 /**
@@ -1933,6 +1979,93 @@ export type RestoreApiRestorePostErrors = {
 export type RestoreApiRestorePostError = RestoreApiRestorePostErrors[keyof RestoreApiRestorePostErrors];
 
 export type RestoreApiRestorePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type SettingsDeadlinesApiSettingsDeadlinesPostData = {
+    body: DeadlinesRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/settings/deadlines';
+};
+
+export type SettingsDeadlinesApiSettingsDeadlinesPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SettingsDeadlinesApiSettingsDeadlinesPostError = SettingsDeadlinesApiSettingsDeadlinesPostErrors[keyof SettingsDeadlinesApiSettingsDeadlinesPostErrors];
+
+export type SettingsDeadlinesApiSettingsDeadlinesPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type SettingsBindingsApiSettingsBindingsPostData = {
+    body: BindingsRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/settings/bindings';
+};
+
+export type SettingsBindingsApiSettingsBindingsPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SettingsBindingsApiSettingsBindingsPostError = SettingsBindingsApiSettingsBindingsPostErrors[keyof SettingsBindingsApiSettingsBindingsPostErrors];
+
+export type SettingsBindingsApiSettingsBindingsPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type SettingsProbeApiSettingsProbePostData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/settings/probe';
+};
+
+export type SettingsProbeApiSettingsProbePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SettingsProbeApiSettingsProbePostError = SettingsProbeApiSettingsProbePostErrors[keyof SettingsProbeApiSettingsProbePostErrors];
+
+export type SettingsProbeApiSettingsProbePostResponses = {
     /**
      * Successful Response
      */

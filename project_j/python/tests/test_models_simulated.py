@@ -177,7 +177,11 @@ def test_reading_judgment_follows_the_score_and_names_words_to_reread():
 
     def reply(pronunciation):
         request = ModelRequest(
-            "classroom_judgment", "judge", reading_context(pronunciation), ClassroomJudgment
+            "classroom_judgment",
+            "judge",
+            reading_context(pronunciation),
+            ClassroomJudgment,
+            deadline_seconds=10,
         )
         return adapter.respond(request)
 

@@ -44,7 +44,7 @@ def image_request(item: dict, course: CourseBody) -> ModelRequest:
         IMAGE_INSTRUCTIONS,
         material_context("image", item, course),
         ImageNote,
-        deadline_seconds=300,
+        deadline_key="preparation_image",
         media="image",
     )
 
@@ -55,5 +55,5 @@ def animation_request(item: dict, course: CourseBody) -> ModelRequest:
         ANIMATION_INSTRUCTIONS,
         material_context("animation", item, course),
         AnimationDraft,
-        deadline_seconds=600,
+        deadline_key="preparation_animation",
     )

@@ -26,19 +26,19 @@ def report(**items):
 
 def test_request_rejects_identity_fields():
     with pytest.raises(ValueError, match="identity"):
-        ModelRequest("classroom_judgment", "judge", {"name": "Ann"}, Out)
+        ModelRequest("classroom_judgment", "judge", {"name": "Ann"}, Out, deadline_seconds=10)
 
 
 def test_identity_fields_rejected_at_any_depth():
     with pytest.raises(ValueError, match="identity"):
-        ModelRequest("evaluation", "judge", {"items": [{"Age": 7}]}, Out)
+        ModelRequest("evaluation", "judge", {"items": [{"Age": 7}]}, Out, deadline_seconds=10)
 
 
 def test_request_rejects_unknown_purpose_and_empty_instructions():
     with pytest.raises(ValueError):
-        ModelRequest("chat", "judge", {}, Out)
+        ModelRequest("chat", "judge", {}, Out, deadline_seconds=10)
     with pytest.raises(ValueError):
-        ModelRequest("evaluation", "  ", {}, Out)
+        ModelRequest("evaluation", "  ", {}, Out, deadline_seconds=10)
 
 
 def test_a_fast_tier_binding_needs_its_tier_probed():
@@ -83,7 +83,7 @@ def test_planning_and_preparation_need_the_evaluation_capabilities(purpose):
         **{"effort:medium": "verified"},
     )
     assert admission(ok, purpose, "medium") == []
-    assert ModelRequest(purpose, "plan", {}, Out).purpose == purpose
+    assert ModelRequest(purpose, "plan", {}, Out, deadline_seconds=10).purpose == purpose
 
 
 def test_evaluation_does_not_require_cancellation():

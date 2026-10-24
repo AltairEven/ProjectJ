@@ -36,7 +36,7 @@ def lookup_request(requested: list[dict]) -> ModelRequest:
         VOCABULARY_INSTRUCTIONS,
         {"words": requested},
         WordDefinitions,
-        deadline_seconds=60,
+        deadline_key="vocabulary",
     )
 
 

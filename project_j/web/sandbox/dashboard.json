@@ -6997,6 +6997,15 @@
           "tier": "default"
         },
         "reasons": []
+      },
+      "vocabulary": {
+        "binding": {
+          "adapter": "simulated",
+          "model": "simulated-jane",
+          "effort": "low",
+          "tier": "default"
+        },
+        "reasons": []
       }
     },
     "reports": [
@@ -7042,7 +7051,26 @@
         },
         "calls": []
       }
-    ]
+    ],
+    "deadlines": {
+      "classroom_judgment": 10,
+      "vocabulary": 60,
+      "evaluation": 600,
+      "planning": 180,
+      "preparation_drafting": 1200,
+      "preparation_image": 300,
+      "preparation_animation": 600
+    },
+    "deadline_defaults": {
+      "classroom_judgment": 10,
+      "vocabulary": 60,
+      "evaluation": 600,
+      "planning": 180,
+      "preparation_drafting": 1200,
+      "preparation_image": 300,
+      "preparation_animation": 600
+    },
+    "configurable": true
   },
   "pending_seals": [],
   "lost_activities": [],

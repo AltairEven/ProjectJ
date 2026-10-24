@@ -3,17 +3,21 @@
 import asyncio
 import logging
 import time
+from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import uuid4
 
 from pydantic import ValidationError
 
+from project_j.platform.models.config import ModelFiles
 from project_j.platform.models.contracts import (
+    DEFAULT_DEADLINES,
     PURPOSE_LABELS,
     PURPOSES,
     AdapterReply,
     Binding,
     CapabilityReport,
+    DeadlineKey,
     ModelAdapter,
     ModelRequest,
     ModelResult,
@@ -38,9 +42,11 @@ class ModelService:
         bindings: dict[Purpose, Binding],
         reports: list[CapabilityReport],
         problem: str | None = None,
+        files: ModelFiles | None = None,
     ):
         self.adapters, self.bindings, self.reports = adapters, bindings, reports
         self.problem = problem
+        self.files = files  # The configuration read at each call; None for the simulation.
         self.calls: list[dict] = []
 
     @classmethod
@@ -57,6 +63,13 @@ class ModelService:
         }
         report = adapter.report(SIMULATED_MODEL, ("low", "medium"))
         return cls({"simulated": adapter}, bindings, [report])
+
+    def deadlines(self) -> dict[DeadlineKey, int]:
+        return self.files.deadlines() if self.files else dict(DEFAULT_DEADLINES)
+
+    def deadline(self, key: DeadlineKey) -> float:
+        """Seconds a call of this kind may wait, as configured right now (ADR-0025)."""
+        return self.deadlines()[key]
 
     def simulates(self, purpose: Purpose) -> bool:
         """Whether this purpose is bound to a simulated adapter (no binding: not simulated)."""
@@ -108,15 +121,20 @@ class ModelService:
             "request_id": None,
             "elapsed_ms": None,
         }
+        seconds = (
+            request.deadline_seconds
+            if request.deadline_seconds is not None
+            else self.deadline(request.deadline_key)
+        )
+        entry["deadline_seconds"] = seconds
+        request = replace(request, deadline_seconds=seconds, deadline_key=None)
         self.calls.append(entry)
         started = time.perf_counter()
         reply = AdapterReply(data=None, failure="not_initialized")
         try:
             if adapter and not self.reasons(request.purpose):
                 try:
-                    reply = await asyncio.wait_for(
-                        adapter.invoke(request, binding), request.deadline_seconds
-                    )
+                    reply = await asyncio.wait_for(adapter.invoke(request, binding), seconds)
                 except TimeoutError:
                     reply = AdapterReply(data=None, failure="timeout")
                 except Exception as error:  # Kind only; provider text may carry secrets.
@@ -196,4 +214,7 @@ class ModelService:
             "simulated": bool(used) and all(adapter.simulated for adapter in used),
             "purposes": purposes,
             "reports": [report.model_dump(mode="json") for report in self.reports],
+            "deadlines": self.deadlines(),
+            "deadline_defaults": dict(DEFAULT_DEADLINES),
+            "configurable": self.files is not None,
         }

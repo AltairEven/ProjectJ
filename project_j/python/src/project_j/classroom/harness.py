@@ -772,7 +772,9 @@ class Harness:
             cancellation_epoch=self.epoch,
             event_id=submitted.event_id,
         )
-        timeout = max(0, (deadline or time.monotonic() + 10) - time.monotonic())
+        # The configured answer deadline, read now so a change applies to the next submit.
+        allowed = self.models.deadline("classroom_judgment")
+        timeout = max(0, (deadline or time.monotonic() + allowed) - time.monotonic())
         help_count = self.help_count.get(self.task_instance_id, 0)
 
         async def judge():
@@ -783,7 +785,7 @@ class Harness:
                     pronunciation = await self.scorer.score(audio, task.reference_text)
                 except Exception:  # A scorer must not raise; treat it as an unknown score.
                     pronunciation = PronunciationResult.unknown("failed", self.scorer)
-                # Counts against the 10-second answer deadline, so it is kept with the attempt.
+                # Counts against the configured answer deadline, so it is kept with the attempt.
                 scoring_ms = round((time.perf_counter() - scoring) * 1000, 1)
                 log.info(
                     "pronunciation task=%s status=%s scoring_ms=%.0f reason=%s",
@@ -829,7 +831,7 @@ class Harness:
                     "model_failure",
                     {
                         "event_id": submitted.event_id,
-                        "deadline_seconds": 10,
+                        "deadline_seconds": round(timeout, 3),
                         "failure": result.failure if result else "timeout",
                     },
                 )

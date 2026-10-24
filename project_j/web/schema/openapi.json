@@ -1463,6 +1463,158 @@
         }
       }
     },
+    "/api/settings/deadlines": {
+      "post": {
+        "summary": "Settings Deadlines",
+        "operationId": "settings_deadlines_api_settings_deadlines_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeadlinesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/bindings": {
+      "post": {
+        "summary": "Settings Bindings",
+        "operationId": "settings_bindings_api_settings_bindings_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/probe": {
+      "post": {
+        "summary": "Settings Probe",
+        "operationId": "settings_probe_api_settings_probe_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/class/snapshot": {
       "get": {
         "summary": "Snapshot",
@@ -2406,6 +2558,73 @@
         ],
         "title": "AllowedAction"
       },
+      "Binding": {
+        "properties": {
+          "adapter": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Adapter"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Model"
+          },
+          "effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "title": "Effort"
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "default",
+              "fast"
+            ],
+            "title": "Tier",
+            "default": "default"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "adapter",
+          "model",
+          "effort"
+        ],
+        "title": "Binding"
+      },
+      "BindingsRequest": {
+        "properties": {
+          "purposes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Binding"
+            },
+            "propertyNames": {
+              "enum": [
+                "planning",
+                "preparation",
+                "classroom_judgment",
+                "evaluation",
+                "vocabulary"
+              ]
+            },
+            "type": "object",
+            "title": "Purposes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "purposes"
+        ],
+        "title": "BindingsRequest"
+      },
       "ChatRequest": {
         "properties": {
           "request_id": {
@@ -2722,6 +2941,34 @@
         "additionalProperties": false,
         "type": "object",
         "title": "Dashboard"
+      },
+      "DeadlinesRequest": {
+        "properties": {
+          "deadlines": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "classroom_judgment",
+                "vocabulary",
+                "evaluation",
+                "planning",
+                "preparation_drafting",
+                "preparation_image",
+                "preparation_animation"
+              ]
+            },
+            "type": "object",
+            "title": "Deadlines"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "deadlines"
+        ],
+        "title": "DeadlinesRequest"
       },
       "DecisionRequest": {
         "properties": {

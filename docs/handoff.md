@@ -1034,3 +1034,23 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 未验证：600秒期限下的真实评价调用；本次超时那堂课的评价重试（原课记录与补记已保存，可在评价页重试）。超时时的实际耗时只在服务进程内存里，未落盘。
 - 继续条件：重启正式服务后在评价页重试本次评价，观察日志中`evaluation`调用的毫秒数；若仍接近上限，再考虑更换档位而非继续放宽。
 - 状态：实现与自测完成，已本地提交917b220（2026年10月24日）。
+
+## SET-1 模型绑定与等待时长配置化、设置页修改（ADR-0025）
+
+- 负责人：Claude Fable（实现与集成）；参与者：无。发起：2026年10月24日正式学习空间评价与规划先后超时，用户决定所有模型绑定与各用途等待时长放进配置文件并可在设置页改；时长改完对下一次调用立即生效（含课中）、换模型须重新探测。设计docs/superpowers/specs/2026-10-24-runtime-settings-design.md（已确认），计划docs/superpowers/plans/2026-10-24-runtime-settings.md，决定ADR-0025。
+- 实际改动：
+  1. 平台：`contracts.py`加七个期限键、默认值与范围，`ModelRequest`改为“期限键或剩余秒数二选一”；`config.py`加`deadlines()`（缺项/非法/文件不可读回落默认并按键记一次日志）、`configure_deadlines()`、`default()`，`configure()`保留`deadlines`段；`service.py`持有配置根，每次调用读秒数写回请求再交适配器（适配器不改），调用记录加`deadline_seconds`，`status()`加`deadlines`/`deadline_defaults`/`configurable`；`registry.py`抽出`check_binding`并给四个分支传配置根；`init.parse_binding`改调它。
+  2. 八个请求构造点改为期限键（评价、规划三处、查词、备课起草、图片、动画）。
+  3. 课堂核心每次提交读课堂判断秒数，`model_failure`记实际期限。
+  4. 应用层新建`application/settings.py`（存时长、存绑定、探测并重载；模拟409、课中与后台任务进行中换模型409）；接口`POST /api/settings/{deadlines,bindings,probe}`；OpenAPI与前端类型重新生成。
+  5. 前端：`settings.ts`纯函数、设置页“Waiting time”与“Models”两块、`.settings-row`样式；沙盒快照加`deadlines`与查词绑定。
+  6. 文档：ADR-0025；design/platform/configuration-permissions.md 2.1.0、design/interface/main-page.md 2.8.0、design/classroom/README.md 1.10.0、docs/technology.md 1.22.0；spec状态行。
+- 文件边界：project_j/python/src/project_j/{platform/models/{contracts,config,service,registry,init}.py,classroom/harness.py,evaluation/assessment.py,learning/{planning,onboarding,lookup}.py,preparation/{drafting,materials}.py,application/settings.py,interface/api.py}；tests新增test_runtime_settings.py，改test_{evaluation_model,learning_planning,vocabulary_lookup,preparation_drafting,models_contracts,models_codex,models_simulated,model_images}.py；project_j/web/{src/{settings.ts,pages/Settings.tsx,style.css,client/*},tests/settings.test.mjs,sandbox/dashboard.json,schema/openapi.json}；decisions/ADR-0025.md与上述设计、docs文件。
+- 验收条件：统一check通过；非法/缺失/不可读配置回落默认并记日志；时长改后下一次调用生效（服务层与课堂各一条测试）；存绑定后未探测被拒且重启仍拒；探测失败状态保持且不泄露提供者文字；课中可改时长、不可改模型；模拟数据空间409（见test_runtime_settings.py 16条）。
+- 检查证据：完整重跑登记检查：三份uv sync（锁定依赖未变）、两份npm ci与npm audit（0 vulnerabilities）、统一check通过（主工程767、评分39、合成15项pytest；前端90、文档1），UTC 2026-10-24T15:48:26.565610+00:00，工程摘要42177582dea70cb0cfeda302bf669952bf15bdf5848a4e78f9ace54a4236cdaa，actual_api为unverified；离线probe与模拟measure通过。首轮检查在check:docs因technology.md的ADR链接层级写错失败，修正后重跑。
+- 诊断日志：`deadline key=<键> source=default reason=invalid`、`deadline source=default reason=unreadable`（各只记一次）；`settings deadlines saved changed=`；`settings bindings saved purposes=`（适配器:模型:档位:层级，不含密钥）；`settings probe outcome=pass|refused|fail reason_kind= elapsed_ms=`；模型调用记录加`deadline_seconds`；日志测试断言不含提供者异常文字。
+- 沙盒走查（2026年10月24日，project_j/test/ui/sandbox/settings.mjs，记录在project_j/test/records/settings-sandbox-20261024.md）：两块表单显示、保存与探测提示正常，无页面错误；首版模型行布局散乱已加样式修正。
+- 自审取舍（计划内记账）：缺`deadlines`段不记日志，只记非法值；主页数据不另带一份绑定，页面用`purposes[].binding`；沙盒不加设置假路由（主页沙盒对写请求返回空对象）；有后台AI任务时存绑定与探测返回409“AI work is running; change the model after it finishes.”（审查新增）。
+- 未验证：从设置页发起一次真实探测（Codex）；放宽后真实评价与规划各一次；课中改课堂判断期限在真实课堂里的表现。
+- 继续条件：重启正式服务（新接口与页面随服务加载），在设置页核对七个时长与五个绑定显示；需要时把规划期限改为600并重试规划。
+- 状态：实现与自测完成，未提交。

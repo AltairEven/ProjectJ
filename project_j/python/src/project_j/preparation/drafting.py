@@ -270,8 +270,7 @@ def preparation_request(
             "vocabulary": vocabulary or [],
         },
         CourseDraft,
-        # Real xhigh drafts took 263-376 s, a 415-word story 522 s (2026-10-22): user chose 1200.
-        deadline_seconds=1200,
+        deadline_key="preparation_drafting",
     )
 
 

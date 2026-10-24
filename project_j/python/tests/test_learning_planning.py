@@ -65,7 +65,7 @@ def test_demand_request_carries_learning_data(application):
     data, request, _ = requests(application, taught(application))
     context = request.context
     assert request.purpose == "planning" and request.output is DemandDraft
-    assert request.deadline_seconds == 180
+    assert request.deadline_key == "planning"
     assert {item["dimension_id"] for item in context["catalog"]} == {
         "english.reading.facts",
         "english.speaking.report",

@@ -2,10 +2,20 @@
 
 import hashlib
 import json
+import logging
 from pathlib import Path
 
 from project_j.platform.files import private_write
-from project_j.platform.models.contracts import PURPOSES, Binding, Purpose
+from project_j.platform.models.contracts import (
+    DEADLINE_RANGE,
+    DEFAULT_DEADLINES,
+    PURPOSES,
+    Binding,
+    DeadlineKey,
+    Purpose,
+)
+
+log = logging.getLogger(__name__)
 
 
 class ModelFiles:
@@ -13,6 +23,7 @@ class ModelFiles:
         self.root = root
         if root.is_symlink():
             raise ValueError("model configuration paths must not be symlinks")
+        self.warned: set[str] = set()  # Deadline keys already reported as invalid.
 
     def path(self, relative: str) -> Path:
         path = self.root / relative
@@ -55,16 +66,49 @@ class ModelFiles:
         except (KeyError, ValueError) as error:
             raise ValueError("The setup file cannot be read: config.json") from error
 
+    def default(self) -> Binding:
+        data = self.read("config.json")
+        if data is None or "default" not in data:
+            raise ValueError("No default model; run project-j-init configure")
+        return Binding.model_validate(data["default"])
+
     def configure(self, default: Binding, purposes: dict[Purpose, Binding]):
         self.write(
             "config.json",
-            {
+            (self.read("config.json") or {})
+            | {
                 "default": default.model_dump(),
                 "purposes": {
                     purpose: binding.model_dump() for purpose, binding in purposes.items()
                 },
             },
         )
+
+    def deadlines(self) -> dict[DeadlineKey, int]:
+        """Seconds each kind of call may wait; a missing or invalid entry is its default."""
+        values = dict(DEFAULT_DEADLINES)
+        try:
+            data = self.read("config.json") or {}
+        except ValueError:  # A broken file must not stop a class: defaults, reported once.
+            if "config.json" not in self.warned:
+                self.warned.add("config.json")
+                log.warning("deadline source=default reason=unreadable")
+            return values
+        section = data.get("deadlines") or {}
+        low, high = DEADLINE_RANGE
+        for key in DEFAULT_DEADLINES:
+            value = section.get(key)
+            if value is None:
+                continue
+            if isinstance(value, int) and not isinstance(value, bool) and low <= value <= high:
+                values[key] = value
+            elif key not in self.warned:
+                self.warned.add(key)
+                log.warning("deadline key=%s source=default reason=invalid", key)
+        return values
+
+    def configure_deadlines(self, values: dict[DeadlineKey, int]):
+        self.write("config.json", (self.read("config.json") or {}) | {"deadlines": dict(values)})
 
     def digest(self, versions: dict[str, str]) -> str:
         """Bindings and adapter versions; "keys" stays empty so records made while an API-key
