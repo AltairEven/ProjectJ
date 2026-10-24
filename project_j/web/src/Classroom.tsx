@@ -18,6 +18,24 @@ import type { AllowedAction, Snapshot, Control, DeliveryFeedback, TextInput, Inp
 
 const stateLabels: Record<string, string> = { running: 'In class', offscreen: 'Away from the screen', paused: 'Paused', closing: 'Wrapping up', ended: 'Finished' }
 
+// Class controls as icons (no icon library): the label is the tooltip and the accessible name.
+const iconPaths: Record<string, string> = {
+  pause: 'M6 4h4v16H6zM14 4h4v16h-4z',
+  play: 'M7 4l12 8-12 8z',
+  stop: 'M5 5h14v14H5z',
+  skip: 'M5 4l10 8-10 8zM17 4h3v16h-3z',
+  flag: 'M5 3h2v18H5zM7 4h11l-3 4 3 4H7z',
+}
+const questions = {
+  stop: ['Stop the class now?', 'The class ends here. Only what happened is kept, and your evaluation follows by itself.'],
+  skip: ['Skip this question?', 'It stays undone and Jane moves on to the next one.'],
+  close: ['Wrap up the class?', 'Jane sums up what happened; the class ends after you confirm her summary.'],
+} as const
+function IconButton({ icon, label, className = '', ...rest }: { icon: string, label: string } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return <button type="button" className={`icon-button ${className}`.trim()} aria-label={label} title={label} {...rest}>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d={iconPaths[icon]} /></svg></button>
+}
+
 // Pictures and animations the core approved with an action; shown as images only. Once each
 // has displayed or failed, onShown names the ones the student could see.
 function Visuals({ token, action, onShown }: { token: string, action?: AllowedAction, onShown: (action: AllowedAction, shown: string[]) => void }) {
@@ -227,6 +245,10 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
   }, [recorder, reading])
   // Confirming Jane's goal or closing words is asked in a pop-up. Set aside, it stays a plain button.
   const confirmBox = useRef<HTMLDialogElement>(null)
+  // Stop, skip and wrap up each ask once before the command goes out (2026-10-25).
+  const askBox = useRef<HTMLDialogElement>(null)
+  const [checking, setChecking] = useState<keyof typeof questions | null>(null)
+  const ask = (command: keyof typeof questions) => { setChecking(command); askBox.current?.showModal() }
   const [setAside, setSetAside] = useState('')
   const confirming = confirmationKey(snapshot)
   const asking = Boolean(confirming) && !halted && !busy && setAside !== confirming
@@ -272,18 +294,18 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
   // scrolling on its own: no page scroll between her question, the story and the answer box.
   return <main className="student classroom">
     <header className="class-bar">
+      {snapshot?.mode !== 'ended' && <div className="row class-controls">
+        <IconButton icon="stop" label="Stop now" className="danger" onClick={() => ask('stop')} />
+        {snapshot?.mode === 'paused' ? <IconButton icon="play" label="Resume" onClick={() => void control('resume')} />
+          : <IconButton icon="pause" label="Pause" className="quiet" disabled={halted} onClick={() => void control('pause')} />}</div>}
       <h1>Class with Jane{!voiced && <span className="tag">Simulation</span>}</h1>
       {progress && snapshot && <div className="class-progress"><span>{progress.label}</span>
         <progress className="sr-only" value={progress.value} max={progress.max} aria-label="Class progress" />
-        <span className="ticks" aria-hidden="true">{taskMarks(snapshot.task_index, snapshot.task_count).map((mark, index) => <i key={index} className={mark} />)}</span></div>}
-      <div className="controls"><span>{snapshot ? stateLabels[snapshot.activity_state] : 'Joining the class'}</span>
-        {snapshot?.mode !== 'ended' && <div className="row">
-          {snapshot?.mode === 'paused' ? <button onClick={() => void control('resume')}>Resume</button>
-            : <button className="quiet" disabled={halted} onClick={() => void control('pause')}>Pause</button>}
-          <button className="danger" onClick={() => void control('stop')}>Stop now</button>
-          <details className="more"><summary>More</summary><div className="row">
-            <button className="quiet" disabled={halted || (snapshot?.task_index ?? -1) < 0} onClick={() => void control('skip')}>Skip this question</button>
-            <button className="quiet" disabled={halted} onClick={() => void control('close')}>Wrap up</button></div></details></div>}</div>
+        <span className="ticks" aria-hidden="true">{taskMarks(snapshot.task_index, snapshot.task_count).map((mark, index) => <i key={index} className={mark} />)}</span>
+        {snapshot.mode !== 'ended' && <span className="row">
+          <IconButton icon="skip" label="Skip this question" className="quiet" disabled={halted || snapshot.task_index < 0} onClick={() => ask('skip')} />
+          <IconButton icon="flag" label="Wrap up" className="quiet" disabled={halted} onClick={() => ask('close')} /></span>}</div>}
+      <div className="controls"><span>{snapshot ? stateLabels[snapshot.activity_state] : 'Joining the class'}</span></div>
     </header>
     <div className="stage">
       <div className="side board">
@@ -350,7 +372,8 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
             : <section className="story-reading"><p>{snapshot.mode === 'paused' ? 'Reading paused.' : 'Timing your reading.'}</p>
               <button disabled={halted} onClick={() => void control('finish_reading')}>I've finished reading</button></section>) :
           snapshot?.mode === 'offscreen' ? <section><p>Nothing is recorded while you are away. When you come back, tell Jane what you did and what happened; coming back alone does not finish it.</p><button onClick={() => void control('return')}>I'm back: report</button></section> :
-          snapshot?.mode !== 'ended' && <section><label>{voiced ? 'Your answer or report' : 'Your answer or report (simulation)'}<textarea value={text} onChange={event => setText(event.target.value)} disabled={localCancelled} /></label>
+          // Free text only when the class waits for words; a read-aloud task has its recording section alone.
+          mode === 'text' && snapshot && <section><label>{voiced ? 'Your answer or report' : 'Your answer or report (simulation)'}<textarea value={text} onChange={event => setText(event.target.value)} disabled={localCancelled} /></label>
             <div className="row"><button disabled={busy || !text.trim() || halted || Boolean(reading)} onClick={() => void input(text)}>Submit</button>
               {canConfirm(snapshot) && setAside === confirming && <button className="quiet" disabled={busy || halted} onClick={confirm}>Yes, I heard</button>}
               <button className="quiet" disabled={!lastInput || !text.trim() || halted} onClick={() => void input(text, 'unknown', true)}>I'm not done: add more</button></div></section>}
@@ -358,6 +381,11 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
         <p className="hint">{voiced ? 'Listen to Jane first; her words show after she speaks. Reading aloud is scored on this computer and not saved.' : 'Text simulation; nothing is recorded or played.'}</p>
       </div>
     </div>
+    <dialog ref={askBox} className="confirm-box" onClose={() => setChecking(null)}>
+      {checking && <><h2>{questions[checking][0]}</h2><p>{questions[checking][1]}</p>
+        <div className="row"><button className={checking === 'stop' ? 'danger' : undefined} onClick={() => { const command = checking; askBox.current?.close(); void control(command) }}>Yes</button>
+          <button className="quiet" onClick={() => askBox.current?.close()}>No</button></div></>}
+    </dialog>
     {/* Closed by the page while the confirmation is being sent; by the student (button or Esc) to set it aside. */}
     <dialog ref={confirmBox} className="confirm-box" onClose={() => { if (!busy) setSetAside(confirming) }}>
       <h2>Summary</h2>

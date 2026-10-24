@@ -1054,3 +1054,19 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 未验证：从设置页发起一次真实探测（Codex）；放宽后真实评价与规划各一次；课中改课堂判断期限在真实课堂里的表现。
 - 继续条件：重启正式服务（新接口与页面随服务加载），在设置页核对七个时长与五个绑定显示；需要时把规划期限改为600并重试规划。
 - 状态：实现与自测完成，已本地提交d2b94bd（2026年10月25日）。
+
+## UI-BAR-1 课堂顶栏控制改为图标
+
+- 负责人：Claude Fable；发起：2026年10月25日用户要求：Skip 与 Wrap up 从“More”里拿出来直接放在进度格后面，Pause/Resume 与 Stop now 放左上角，全部用图标不用文字。
+- 实际改动：`Classroom.tsx`新增内联SVG的`IconButton`（无图标库；aria-label与title仍是原英文名），顶栏结构改为“左上角停止+暂停/继续 → 标题 → 进度条+跳过+收尾 → 状态字样”，删除`<details class="more">`；停止、跳过、收尾三个按钮先弹`<dialog>`确认（Yes/No），Yes才发命令，暂停/继续不确认（用户同日追加）；`style.css`加`.icon-button`/`.class-controls`，`.class-progress`允许换行，删`.more`样式。命令与课堂核心不变。设计同步：design/interface/student-classroom.md 1.7.0、design/classroom/time-exceptions.md 1.4.1。
+- 检查证据：登记检查全部重跑通过（主工程767、评分39、合成15项pytest；前端87、文档1；npm audit 0 vulnerabilities），UTC 2026-10-24T16:51:51.886986+00:00，工程摘要13eff83009b92ed7e4c320f22ab026763b94aee861fc2c87371039b8758c51b4；加确认框后再次重跑通过，UTC 2026-10-24T17:01:43.768915+00:00，摘要34996c44ce765ebf48922497d86f249d07d14628cf978533af82fc6505a7cc46。
+- 沙盒走查（project_j/test/ui/sandbox/class-bar.mjs，记录在project_j/test/records/class-bar-20261025.md）：运行中、暂停、停止确认框、420px窄屏四张截图，确认框选No后状态不变，按钮禁用逻辑如前，无页面错误。
+- 未验证：正式课堂里图标的辨识度；无前端逻辑变化，未加测试。
+- 状态：实现与自测完成，未提交。
+
+## UI-READ-1 朗读题不再显示文字作答框
+
+- 负责人：Claude Fable；发起：2026年10月25日用户在课堂页发现朗读题录音区下方还有文字作答框。原因：`Classroom.tsx`作答区的分支链没有检查`answerMode`的`'reading'`值，朗读题落进通用文字框分支（Submit已禁用，框是多余的）。
+- 实际改动：通用文字框只在`mode === 'text'`时渲染；设计同步design/interface/student-classroom.md（同一版本1.7.0内补一句）。
+- 检查证据：登记检查全部重跑通过（主工程767、评分39、合成15项pytest；前端87、文档1；npm audit 0 vulnerabilities），UTC 2026-10-24T17:11:17.065681+00:00，工程摘要88681d26bead025ec3bf8f0923cfd20ece593b8032b534c534262a021b4a2da7；沙盒朗读场景录音区外文本框由1变0（project_j/test/ui/sandbox/read-aloud-box.mjs，截图project_j/test/ui/output/sandbox/read-aloud-box.png）。
+- 状态：实现与自测完成，未提交。

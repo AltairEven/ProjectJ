@@ -118,8 +118,9 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
 .steps .current { color: var(--ink); font-weight: 700; }
 .section-title, .controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .controls { position: sticky; top: 0; z-index: 1; flex-wrap: wrap; padding: 12px 0; background: var(--paper); }
-.more { margin: 0; }
-.more summary { padding: 9px 4px; }
+.icon-button { width: 38px; height: 38px; padding: 0; display: inline-grid; place-items: center; }
+.icon-button svg { width: 20px; height: 20px; fill: currentColor; }
+.class-controls { gap: 8px; }
 .technical { padding: 20px; border: 1px dashed var(--rule-strong); border-radius: 6px; }
 .skills { border: 0; padding: 0; margin: 0 0 8px; }
 .skills legend { font-weight: 700; padding: 0; margin-bottom: 2px; }
@@ -190,7 +191,8 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
 .classroom { max-width: 1480px; height: 100vh; display: flex; flex-direction: column; padding: 16px 24px 20px; }
 .class-bar { display: flex; align-items: center; gap: 12px 28px; flex-wrap: wrap; margin-bottom: 16px; }
 .class-bar h1 { display: flex; align-items: center; gap: 8px; font-size: 19px; margin: 0; }
-.class-progress { flex: 1 1 240px; display: flex; align-items: center; gap: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.class-progress { flex: 1 1 240px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.class-progress .row { gap: 6px; margin-left: 4px; }
 /* One box a task; the teacher ticks it in red pen when it is done. */
 .ticks { display: flex; gap: 6px; }
 .ticks i { position: relative; width: 22px; height: 22px; border: 1.5px solid var(--rule-strong); border-radius: 3px; background: var(--page); }
