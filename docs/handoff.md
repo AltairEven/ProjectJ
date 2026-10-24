@@ -1023,3 +1023,14 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 审查后精简（2026年10月24日，用户要求“按清单改”）：去掉记录字段`mastered_at`/`mastered_course`（掌握日期即`last_seen`，掌握课程即最后一次未标记出现）；内联`lemma_of`、`vocabulary_listing`、前端`vocabularyGroups`；`candidates`直接排活跃词；`lookup_words`不再重复置pending；`regenerate_entry`不返回值；`spawn`只在事件循环内建任务（测试改为在协程里等待`word_jobs`，support加`finish_reading`/`regenerate_word`）；`config.bindings`回落改为一个小函数；主页`objects`不再重复带`vocabulary`文档；课堂生词盒入口挪到Jane那一栏下方（用户定）。
 - 提交后补记（2026年10月24日）：补三条日志测试（`preparation vocabulary used= dropped=`、`vocabulary update …`、`vocabulary regenerate outcome=`），断言只记计数不记词；本机`project-j-init probe`07:44:49Z通过，五个用途初始化，Word meanings为codex:gpt-6.1-sol:low:fast。正式入口按运行编号me启动后用户决定暂不上课，服务正常停止，未开课、学习数据未变；核对清单留在本机project_j/test/records/voc-study-20261024.md。
 - 继续条件：在正式入口上两课核对标记、复用与回流，并记录真实查词与真实备课各一次的结果（probe已完成，无需重跑）。
+
+## EVAL-T1 课后评价期限放宽到600秒
+
+- 负责人：Claude Fable（实现与集成）；参与者：无。发起：2026年10月24日正式学习空间（运行编号me）一堂课后评价超时（“The evaluation could not be made (it took too long)”），用户决定把评价期限从180秒改为600秒。
+- 实际改动：`evaluation/assessment.py`的`evaluation_request`期限180→600秒（服务层`wait_for`与Codex适配器内部`asyncio.timeout`都按请求期限生效，不另改）；`test_evaluation_model.py`的`test_evaluation_request_carries_task_data_only`断言先改为600（先失败）再通过；docs/technology.md评价期限说明同步，版本1.21.1。学习规划与建档整理仍为180秒，未改。
+- 文件边界：project_j/python/src/project_j/evaluation/assessment.py、project_j/python/tests/test_evaluation_model.py、docs/technology.md、本记录。
+- 检查证据：登记检查全部重跑：三份uv sync（锁定依赖未变）、两份npm ci与npm audit（0 vulnerabilities）、统一check通过（主工程751、评分39、合成15项pytest），UTC 2026-10-24T14:22:58.860532+00:00，工程摘要69378dcd011435ab347165a57e5e9163850d513a88a2a0977bcfe67cbf56ac1d，actual_api为unverified；离线probe与模拟measure通过。
+- 另记：同日20:50启动的正式服务因验证戳记早于16:00的提交（指纹不一致）拒绝开课，重跑检查并重启服务后正常；不是程序故障。
+- 未验证：600秒期限下的真实评价调用；本次超时那堂课的评价重试（原课记录与补记已保存，可在评价页重试）。超时时的实际耗时只在服务进程内存里，未落盘。
+- 继续条件：重启正式服务后在评价页重试本次评价，观察日志中`evaluation`调用的毫秒数；若仍接近上限，再考虑更换档位而非继续放宽。
+- 状态：实现与自测完成，未提交。
