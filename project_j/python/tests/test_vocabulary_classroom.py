@@ -133,7 +133,7 @@ def test_recorded_audio_of_words_in_this_story_is_loaded_before_class(applicatio
         lemma="bridge",
         part_of_speech="noun",
         definition="a way to cross over",
-        audio=application.files.binary_asset(wav, "wav"),
+        audio=application.files.put("vocabulary/bridge.wav", wav),
     )
     other = looked.model_copy(update={"word": "zebra", "lemma": "zebra"})
     body, _ = update_after_lesson(

@@ -140,20 +140,24 @@ test('a model-planned demand explains its change and an uncovered goal reads as 
 test('resource lines show stage, spoken words, versions and adoption', () => {
   const demo = { resource_id: 'demo:read-aloud-1', kind: 'audio', purpose: 'Reading model: read-aloud-1', text: 'Mia has paper.', required: true,
     stage: 'help', fallback: 'Needed before the class.', state: 'generated', versions: [{ version: 1 }, { version: 2 }], adopted_version: 1 }
-  const lines = resourceLines({ resources: [
+  const lines = resourceLines([
     demo,
     { resource_id: 'cup', kind: 'image', purpose: 'Show two cups', required: false, stage: 'help', fallback: 'Use real cups.', state: 'planned' },
     { resource_id: 'clip', kind: 'video', purpose: 'Pouring water', required: false, stage: 'question', fallback: 'Show it yourself.', state: 'not_connected' },
     { resource_id: 'voice:goal', kind: 'audio', purpose: 'Opening', text: 'I am Jane.', required: false, stage: 'question', fallback: 'Made live.',
       state: 'adopted', versions: [{ version: 1 }], adopted_version: 1 },
-  ] })
+  ])
   assert.deepEqual(lines, [
     'Voice (needed, after help): Reading model: read-aloud-1 "Mia has paper."; without it: Needed before the class. - Ready to look at, version 1 in use, 2 in all',
     'Picture (optional, after help): Show two cups; without it: Use real cups. - Listed; made after you confirm',
     'Video (optional, with the question): Pouring water; without it: Show it yourself. - Not connected',
     'Voice (optional, with the question): Opening "I am Jane."; without it: Made live. - In use, version 1 in use, 1 in all',
   ])
-  assert.deepEqual(resourceLines({ resources: [] }), [])
+  assert.deepEqual(resourceLines([]), [])
+  // Once the resources are confirmed only the version in use is kept: no version counts.
+  assert.deepEqual(resourceLines([demo], true), [
+    'Voice (needed, after help): Reading model: read-aloud-1 "Mia has paper."; without it: Needed before the class. - Ready to look at',
+  ])
 })
 
 test('discussion rounds read as the student feedback and what the model changed', () => {
@@ -206,21 +210,21 @@ test('the reading row shows time, words and speed, or that it was not finished',
 
 test('a picture the check turned down says what happens instead and why', () => {
   const base = { kind: 'image', purpose: 'Option picture', required: false, fallback: 'Words instead.', versions: [{}, {}, {}] }
-  const [option, story] = resourceLines({ resources: [
+  const [option, story] = resourceLines([
     { ...base, resource_id: 'o', stage: 'option', option: 1, state: 'rejected', rejected_reason: 'alike' },
     { ...base, resource_id: 's', stage: 'story', paragraph: 2, state: 'rejected', rejected_reason: 'wrong' },
-  ] })
+  ])
   assert.equal(option, 'Picture (optional, as an option): Option picture; without it: Words instead. - In words instead: the pictures look too alike, 3 in all')
   assert.equal(story, 'Picture (optional, with the story, paragraph 2): Option picture; without it: Words instead. - Not shown: it does not show the right thing, 3 in all')
 })
 
 test('a question picture and an unchecked picture in use say so', () => {
-  const [look, scene] = resourceLines({ resources: [
+  const [look, scene] = resourceLines([
     { resource_id: 'l', kind: 'image', purpose: 'Look', required: false, stage: 'question', picture_question: true, fallback: 'Words.',
       state: 'adopted', versions: [{}], adopted_version: 1, checks: { 1: { result: 'pass', reason: null } } },
     { resource_id: 's', kind: 'image', purpose: 'Scene', required: false, stage: 'story', paragraph: 1, fallback: 'Read it.',
       state: 'adopted', versions: [{}], adopted_version: 1, checks: { 1: { result: 'unchecked', reason: null } } },
-  ] })
+  ])
   assert.equal(look, 'Picture (optional, with the question, picture question): Look; without it: Words. - In use, version 1 in use, 1 in all')
   assert.equal(scene, 'Picture (optional, with the story, paragraph 1): Scene; without it: Read it. - In use, not checked, version 1 in use, 1 in all')
 })

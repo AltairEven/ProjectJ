@@ -18,6 +18,7 @@ from project_j.classroom.responses import listed, option_pictures
 from project_j.evaluation.assessment import evaluation_request
 from project_j.interface.api import create_app
 from project_j.platform.models.contracts import solid_png
+from project_j.preparation.lessons import confirm_resources
 
 STORY_IDS = ["cup-scene", "kitchen-motion"]
 
@@ -26,6 +27,7 @@ def confirmed_lesson(application, monkeypatch, reject=()):
     course_ref, adapter, _ = lesson(application, monkeypatch)
     adapter.reject_pictures = list(reject)
     confirm(application, course_ref)
+    confirm_resources(application, "r1", LEARNER, course_ref)
     return course_ref
 
 

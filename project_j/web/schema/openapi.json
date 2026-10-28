@@ -290,6 +290,63 @@
         }
       }
     },
+    "/api/course/resources/confirm": {
+      "post": {
+        "summary": "Resources Confirm",
+        "description": "Keep the version in use of each resource in the lesson folder; the rest go.",
+        "operationId": "resources_confirm_api_course_resources_confirm_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CourseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/resource/file": {
       "get": {
         "summary": "Resource Download",
@@ -539,6 +596,61 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CourseConfirmRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/course/resources/remake": {
+      "post": {
+        "summary": "Resources Remake",
+        "description": "Make again the confirmed resources whose file no longer works.",
+        "operationId": "resources_remake_api_course_resources_remake_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CourseRequest"
               }
             }
           }
@@ -2777,6 +2889,31 @@
         ],
         "title": "CourseConfirmRequest"
       },
+      "CourseRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "learner_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "course_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "course_ref"
+        ],
+        "title": "CourseRequest"
+      },
       "CourseStartRequest": {
         "properties": {
           "request_id": {
@@ -3609,6 +3746,39 @@
         "title": "JobRow"
       },
       "JsonValue": {},
+      "LessonResult": {
+        "properties": {
+          "course_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "lesson_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "folder": {
+            "type": "string",
+            "title": "Folder"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "state": {
+            "type": "string",
+            "const": "confirmed",
+            "title": "State"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "course_ref",
+          "lesson_ref",
+          "folder",
+          "number",
+          "state"
+        ],
+        "title": "LessonResult"
+      },
       "LexileRequest": {
         "properties": {
           "request_id": {
@@ -4034,7 +4204,7 @@
           "course_ref": {
             "$ref": "#/components/schemas/RevisionRef"
           },
-          "preview_ref": {
+          "resource_ref": {
             "$ref": "#/components/schemas/RevisionRef"
           },
           "resource_id": {
@@ -4058,7 +4228,7 @@
         "type": "object",
         "required": [
           "course_ref",
-          "preview_ref",
+          "resource_ref",
           "resource_id",
           "version",
           "state"

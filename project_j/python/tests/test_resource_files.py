@@ -1,11 +1,12 @@
 import asyncio
+import hashlib
 import logging
 
 import pytest
 
-from project_j.platform.files import PrivateFiles
+from project_j.platform.files import PrivateFiles, file_stem, stems
 from project_j.platform.models.contracts import solid_png
-from project_j.platform.storage import SimulationStore
+from project_j.platform.storage import SimulationStore, StorageBlocked
 from project_j.platform.tts.recorded import decode_wav, encode_wav, speak
 from project_j.platform.tts.simulated import SimulatedSynthesizer
 from project_j.platform.visuals import MAX_SVG_BYTES, checked_svg, image_type
@@ -97,14 +98,52 @@ def test_image_type():
             image_type(bad)
 
 
-def test_binary_asset_is_checked(tmp_path):
+def test_put_writes_named_files_and_checks_them(tmp_path):
     store = SimulationStore(tmp_path / "simulation", "run1")
     files = PrivateFiles(store)
-    manifest = files.binary_asset(b"RIFF-data", "wav")
-    assert manifest["path"].endswith(".wav") and manifest["bytes"] == 9
-    assert files.read_binary(manifest) == b"RIFF-data"
-    assert files.binary_asset(b"RIFF-data", "wav") == manifest  # Shared by content.
-    (store.run / manifest["path"]).write_bytes(b"changed")
+    path = "drafts/2026-10-28-abcd1234/audio/voice-goal.v1.wav"
+    manifest = files.put(path, b"RIFF-1")
+    assert manifest == {"path": path, "sha256": hashlib.sha256(b"RIFF-1").hexdigest(), "bytes": 6}
+    assert (store.run / path).stat().st_mode & 0o777 == 0o600
+    assert files.read_binary(manifest) == b"RIFF-1"
+    story = files.put("lessons/lesson-001-2026-10-28/story.md", "# Zoë’s Bridge\n\nShe ran.\n")
+    assert files.read_asset(story) == "# Zoë’s Bridge\n\nShe ran.\n"
+    replaced = files.put(path, b"RIFF-2")  # A named file is replaced in place.
     with pytest.raises(ValueError):
-        files.read_binary(manifest)
+        files.read_binary(manifest)  # The old record no longer fits and says so.
+    assert files.read_binary(replaced) == b"RIFF-2"
+    for bad in ("assets/x.wav", "../x.wav", "lessons", "drafts/../x.wav", "drafts/../../x"):
+        with pytest.raises(ValueError):
+            files.put(bad, b"x")
+    store.active_activity_id = "class"
+    with pytest.raises(StorageBlocked):
+        files.put(path, b"x")
+    store.active_activity_id = None
+    store.close()
+
+
+def test_file_names_follow_resource_ids():
+    assert file_stem("voice:place-check") == "voice-place-check"
+    assert file_stem("demo:read-aloud-1") == "demo-read-aloud-1"
+    assert file_stem("../日本") == "item"
+    assert stems(["voice:goal", "voice-goal", "voice:goal2"]) == {
+        "voice:goal": "voice-goal",
+        "voice-goal": "voice-goal-2",
+        "voice:goal2": "voice-goal2",
+    }
+
+
+def test_removing_drafts_keeps_the_current_course_and_lessons(tmp_path):
+    store = SimulationStore(tmp_path / "simulation", "run1")
+    files = PrivateFiles(store)
+    files.put("drafts/a/story.r1.md", "A")
+    files.put("drafts/b/audio/x.v1.wav", b"x")
+    files.put("lessons/lesson-001-2026-10-28/story.md", "L")
+    assert files.remove_drafts(keep="drafts/a") == ["b"]
+    assert (store.run / "drafts/a/story.r1.md").exists() and not (store.run / "drafts/b").exists()
+    assert (store.run / "lessons/lesson-001-2026-10-28/story.md").exists()
+    assert files.remove("drafts/a/story.r1.md") is True
+    assert files.remove("drafts/a/story.r1.md") is False
+    assert files.remove_tree("drafts/a") == 0 and not (store.run / "drafts/a").exists()
+    assert files.remove_tree("drafts/missing") == 0
     store.close()

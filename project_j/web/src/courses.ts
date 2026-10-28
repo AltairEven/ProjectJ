@@ -13,6 +13,15 @@ const same = (value: unknown, doc: Shape) => (value as Ref | undefined)?.object_
 export const previewOf = (course: Shape, objects: Shape[]) =>
   objects.find(doc => doc.kind === 'preview' && same(doc.body.course_ref, course))
 
+/** The resource records of exactly this course revision, in the course's order (ADR-0027). */
+export const resourcesOf = (course: Shape, objects: Shape[]) =>
+  objects.filter(doc => doc.kind === 'resource' && same(doc.body.course_ref, course))
+    .sort((a, b) => Number(a.body.order) - Number(b.body.order))
+
+/** The lesson folder record, once this course revision's resources are confirmed. */
+export const lessonOf = (course: Shape, objects: Shape[]) =>
+  objects.find(doc => doc.kind === 'lesson' && same(doc.body.course_ref, course))
+
 function state(course: Shape, objects: Shape[]): CourseState {
   const facts = objects.filter(doc => doc.kind === 'fact' && (doc.body.course_ref as Ref | undefined)?.object_id === course.object_id)
   if (facts.length) return objects.some(doc => doc.kind === 'evaluation' && facts.some(fact => fact.body.activity_id === doc.body.activity_id)) ? 'Evaluated' : 'Taken'

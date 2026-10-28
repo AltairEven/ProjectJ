@@ -13,6 +13,7 @@ from project_j.interface.api import create_app
 from project_j.learning.fixtures import initialize
 from project_j.platform.storage import Conflict
 from project_j.preparation.drafting import PreparationUnavailable
+from project_j.preparation.lessons import confirm_resources
 
 READING, REPORT = "english.reading.facts", "english.speaking.report"
 SCIENCE = "science.observation.report"
@@ -275,6 +276,8 @@ def science_lesson(application, monkeypatch, *drafts):
 
 
 def start(application, course_ref, request_id="start2"):
+    """Confirm the resources in use, then start (the page's Start does both, ADR-0027)."""
+    confirm_resources(application, f"resources:{request_id}", LEARNER, course_ref)
     return application.start(request_id, LEARNER, course_ref, materials_ready=True)
 
 
@@ -282,7 +285,7 @@ def test_new_goals_are_prepared_confirmed_and_started(application, monkeypatch, 
     course_ref = science_lesson(application, monkeypatch)
     caplog.set_level(logging.INFO, logger="project_j")
     with pytest.raises(Conflict, match="^Confirm the lesson first"):
-        start(application, course_ref, "s2")
+        application.start("s2", LEARNER, course_ref, materials_ready=True)
     started = asyncio.run(application.confirm_and_start("s3", LEARNER, course_ref, True))
     assert started["decision"] == "allow_simulation"
     assert any("Sam has a red cup." in text for text in application.material_cache.values())

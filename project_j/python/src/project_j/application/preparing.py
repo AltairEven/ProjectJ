@@ -26,6 +26,7 @@ from project_j.preparation.drafting import (
     preparation_request,
     repair_request,
 )
+from project_j.preparation.folders import draft_of, story_path
 from project_j.preparation.packages import (
     COURSES,
     FIRST,
@@ -34,7 +35,7 @@ from project_j.preparation.packages import (
     story_text,
     template_draft,
 )
-from project_j.preparation.resources import GENERATED, ready_resources
+from project_j.preparation.resources import GENERATED, planned_resources, ready_resources
 from project_j.preparation.task_types import calibration, timing_samples
 from project_j.teacher.methods import JANE
 
@@ -236,6 +237,9 @@ class Preparing:
                 publications=publications(objects),
                 baselines=(demand.ref, state.ref, plan.ref, profile.ref, jane.ref),
             )
+            # Courses never confirmed are replaced by this one; their drafts go (ADR-0027).
+            draft = draft_of(self.store, learner_id, refs["course"].object_id)
+            log.info("drafts removed count=%d", len(self.files.remove_drafts(keep=draft)))
         course, _, _, checked, preview = package
         return self.ledger.finish(
             operation,
@@ -415,40 +419,36 @@ class Preparing:
                         "course_ref": course.ref.model_dump(),
                         "confirmed_at": datetime.now(UTC).isoformat(),
                     },
-                    "resources": [
-                        item
-                        | (
-                            {
-                                "state": "awaiting_generation",
-                                "versions": [],
-                                "adopted_version": None,
-                            }
-                            if item["kind"] in GENERATED
-                            else {"state": "not_connected"}
-                        )
-                        for item in preview.body["resources"]
-                    ],
                 },
                 refs=preview.dependency_refs,
             )
+            # Each resource is its own record from now on (ADR-0027).
+            listed = planned_resources(course, operation)
             saved = self.save_step(
                 operation,
                 learner_id,
                 "confirmation",
-                [obj],
+                [obj, *listed],
                 publications=(
                     publication(
                         obj, "The student confirmed this lesson version; resources to be made"
                     ),
+                    *(publication(item, "Listed for making") for item in listed),
                 ),
                 baselines=(course.ref, preview.ref),
             )
         resources = sum(item["kind"] in GENERATED for item in saved[0].body["resources"])
+        # Only the confirmed version's story stays in the draft (ADR-0027).
+        draft = draft_of(self.store, learner_id, course.object_id)
+        removed = sum(
+            self.files.remove(story_path(draft, revision)) for revision in range(1, course.revision)
+        )
         log.info(
-            "preparation confirmed course=%s revision=%d resources=%d",
+            "preparation confirmed course=%s revision=%d resources=%d stories_removed=%d",
             course.object_id,
             course.revision,
             resources,
+            removed,
         )
         return self.ledger.finish(
             operation,
@@ -563,7 +563,13 @@ class Preparing:
             None,
             {
                 "status": "checked",
-                "asset": self.files.asset(text),
+                "asset": self.files.put(
+                    story_path(
+                        draft_of(self.store, learner_id, refs["course"].object_id),
+                        refs["course"].revision,
+                    ),
+                    text,
+                ),
                 "source": source,
                 "origin": origin,
                 "title": checked.title,

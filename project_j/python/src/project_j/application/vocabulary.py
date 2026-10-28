@@ -20,6 +20,7 @@ from project_j.learning.vocabulary import (
     WordEntry,
     update_after_lesson,
 )
+from project_j.platform.files import VOCABULARY, file_stem
 from project_j.platform.storage import SaveKey
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.recorded import encode_wav
@@ -139,6 +140,10 @@ class Vocabulary:
 
     # The learner record, written once the class is sealed (never while teaching).
 
+    def word_file(self, lemma: str, wav: bytes) -> dict:
+        """The word's audio, named by the word; a new sound replaces the file."""
+        return self.files.put(f"{VOCABULARY}/{file_stem(lemma)}.wav", wav)
+
     def vocabulary_record(self, learner_id: str) -> tuple[Document | None, VocabularyBody]:
         saved = self.store.current(identity(learner_id, "vocabulary"), learner_id)
         return saved, VocabularyBody.model_validate(saved.body) if saved else VocabularyBody()
@@ -167,6 +172,9 @@ class Vocabulary:
         )
         try:
             saved, body = self.vocabulary_record(learner_id)
+            # A recorded word keeps its audio (update_after_lesson): its file is not rewritten,
+            # or the record's digest would no longer fit the same-named file (ADR-0027).
+            heard = {entry.lemma for entry in body.words if entry.audio}
             marked = []
             for value in core.box.values():
                 ready = value["status"] == "ready"  # Otherwise the word is kept without a meaning.
@@ -175,7 +183,9 @@ class Vocabulary:
                     "lemma": value["lemma"],
                     "part_of_speech": value["part_of_speech"],
                     "definition": value["definition"],
-                    "audio": self.files.binary_asset(wav, "wav") if wav else None,
+                    "audio": self.word_file(value["lemma"], wav)
+                    if wav and value["lemma"] not in heard
+                    else None,
                 }
                 marked.append(
                     LookedUp(
@@ -235,7 +245,7 @@ class Vocabulary:
             update={
                 "part_of_speech": definition.part_of_speech,
                 "definition": definition.definition,
-                "audio": self.files.binary_asset(wav, "wav") if wav else entry.audio,
+                "audio": self.word_file(lemma, wav) if wav else entry.audio,
             }
         )
         words = tuple(updated if item.lemma == lemma else item for item in body.words)

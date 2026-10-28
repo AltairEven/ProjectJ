@@ -15,6 +15,7 @@ from project_j.application.progress import latest_facts, next_step, retake_cours
 from project_j.interface.api import create_app
 from project_j.platform.models.contracts import AdapterReply
 from project_j.platform.storage import Conflict
+from project_j.preparation.resources import resources_of
 
 
 def preview_of(app, course_ref):
@@ -68,7 +69,9 @@ def test_one_click_confirms_prepares_resources_and_starts(application, monkeypat
     end_class(application)
     preview = preview_of(application, course_ref)
     assert preview.body["confirmation"]["course_ref"] == course_ref.model_dump()
-    generated = [item for item in preview.body["resources"] if "versions" in item]
+    generated = [
+        item for item in resources_of(application, LEARNER, course_ref) if "versions" in item
+    ]
     assert generated and all(item["adopted_version"] == 1 for item in generated)
     assert progress and progress[-1] == (len(generated), len(generated))
 
@@ -92,7 +95,7 @@ def test_optional_resource_failure_still_starts(application, monkeypatch):
     end_class(application)
     motion = next(
         item
-        for item in preview_of(application, course_ref).body["resources"]
+        for item in resources_of(application, LEARNER, course_ref)
         if item["resource_id"] == "cup-motion"
     )
     assert not motion.get("adopted_version")
@@ -120,7 +123,7 @@ def test_adopted_versions_are_reused_on_retry(application, monkeypatch):
         asyncio.run(application.confirm_and_start("go", LEARNER, course_ref, True))
     asyncio.run(application.confirm_and_start("go", LEARNER, course_ref, True))
     end_class(application)
-    for item in preview_of(application, course_ref).body["resources"]:
+    for item in resources_of(application, LEARNER, course_ref):
         if "versions" in item:
             assert len(item["versions"]) == 1, item["resource_id"]
 
@@ -175,7 +178,7 @@ def test_confirming_saves_and_makes_resources_but_waits_for_the_student(
         before = application.core and application.core.activity_id
         assert application.core is None or application.core.mode == "ended"
         assert data["next"]["kind"] == "course" and data["next"]["subject"]["confirmed"] is True
-        generated = [item for item in preview_of(application, course_ref).body["resources"]]
+        generated = [item for item in resources_of(application, LEARNER, course_ref)]
         made = [item for item in generated if "versions" in item]
         assert made and all(item["adopted_version"] == 1 for item in made)
         assert f"job done name=confirm:{course_ref.object_id}" in caplog.text

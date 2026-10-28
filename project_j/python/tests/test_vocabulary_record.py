@@ -98,3 +98,34 @@ def test_evaluation_request_carries_no_vocabulary(application):
     )
     context = evaluation_request(fact.body, course.body, [], None).context
     assert "vocabulary" not in context and "word_marked" not in str(context)
+
+
+def test_a_word_marked_again_keeps_its_recorded_audio(application):
+    core = mark_and_finish(application, "bridge", "She wants a bridge for her car.")
+    core.control(str(uuid4()), "stop")
+    application.seal()
+    first = record(application)[1].words[0].audio
+    assert first["path"] == "vocabulary/bridge.wav"  # Named by the word (ADR-0027).
+    core = mark_and_finish(application, "bridge", "Another bridge for the car.")
+    application.word_audio["bridge"] = b"RIFF-another-voice"  # A new sound made in this class.
+    core.control(str(uuid4()), "stop")
+    application.seal()
+    assert record(application)[1].words[0].audio == first
+    assert application.word_asset(application.learner_id, "bridge")[:4] == b"RIFF"  # Still reads.
+
+
+def test_regenerating_a_word_replaces_its_file_and_record(application, monkeypatch):
+    core = mark_and_finish(application, "bridge", "She wants a bridge for her car.")
+    core.control(str(uuid4()), "stop")
+    application.seal()
+    before = record(application)[1].words[0].audio
+
+    async def regenerated(lemma):
+        return b"RIFF-regenerated"
+
+    monkeypatch.setattr(application, "synthesize", regenerated)
+    asyncio.run(application.regenerate_entry("re1", application.learner_id, "bridge"))
+    after = record(application)[1].words[0].audio
+    assert after["path"] == before["path"] == "vocabulary/bridge.wav"
+    assert after["sha256"] != before["sha256"]
+    assert application.word_asset(application.learner_id, "bridge") == b"RIFF-regenerated"

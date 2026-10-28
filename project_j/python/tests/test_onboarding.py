@@ -29,6 +29,7 @@ from project_j.learning.onboarding import (
     save_chat,
     save_lexile,
 )
+from project_j.preparation.lessons import lesson_of
 
 ANSWERS = ["为了工作和旅行", "喜欢做饭和科幻", "每周三小时", "口语和听力", "No extra help."][
     : len(QUESTIONS)
@@ -47,6 +48,8 @@ async def placement_lesson(app):
     assert step["kind"] == "placement"
     course_ref = RevisionRef.model_validate(step["subject"]["course_ref"])
     await ready(app, {"course_ref": course_ref})
+    folder = lesson_of(app, LEARNER, course_ref).body["folder"]
+    assert folder.startswith("lessons/placement-001-")  # Its own numbering (ADR-0027).
     assert app.start("placement", LEARNER, course_ref)["decision"] == "allow_simulation"
     core = app.core
     deliver_all(core)

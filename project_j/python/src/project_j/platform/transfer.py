@@ -5,6 +5,7 @@ restores it into a run that does not exist yet. Models and the Codex login are n
 """
 
 import argparse
+import json
 import logging
 import os
 import shutil
@@ -37,7 +38,7 @@ def export_run(project_root: Path, run_id: str, archive: Path) -> int:
     finally:
         store.close()
     try:
-        files = sum(1 for path in (backup / "assets").rglob("*") if path.is_file())
+        files = len(json.loads((backup / "manifest.json").read_text())["files"])
         fd = os.open(archive, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         try:
             with os.fdopen(fd, "wb") as stream, tarfile.open(fileobj=stream, mode="w:gz") as tar:
@@ -50,7 +51,7 @@ def export_run(project_root: Path, run_id: str, archive: Path) -> int:
         backups = backup.parent
         if not any(backups.iterdir()):
             backups.rmdir()  # Left as it was when the run had no backups.
-    log.info("transfer export run=%s assets=%d bytes=%d", run_id, files, archive.stat().st_size)
+    log.info("transfer export run=%s files=%d bytes=%d", run_id, files, archive.stat().st_size)
     return files
 
 
@@ -77,9 +78,9 @@ def import_run(project_root: Path, run_id: str, archive: Path) -> int:
             raise ValueError(
                 f"导入未通过核对（{error}），运行编号 {run_id} 未改动{kept}。"
             ) from error
-        files = sum(1 for path in (backup / "assets").rglob("*") if path.is_file())
+        files = len(json.loads((backup / "manifest.json").read_text())["files"])
     staging.rename(target)
-    log.info("transfer import run=%s assets=%d", run_id, files)
+    log.info("transfer import run=%s files=%d", run_id, files)
     return files
 
 

@@ -14,7 +14,7 @@ from project_j.evaluation.assessment import evaluation_request
 from project_j.interface.api import create_app
 from project_j.platform.models.contracts import solid_png
 from project_j.platform.storage import Conflict
-from project_j.preparation.resources import adopt_resource, generate_resource
+from project_j.preparation.lessons import confirm_resources
 
 
 async def to_reading(app):
@@ -36,9 +36,11 @@ def test_start_needs_adopted_required_resources(application, caplog):
     course_ref = ref(asyncio.run(application.prepare("prepare1", LEARNER))["course_ref"])
     application.confirm("c1", LEARNER, course_ref)
     caplog.set_level(logging.INFO, logger="project_j")
-    with pytest.raises(Conflict, match="Reading model"):
+    with pytest.raises(Conflict, match="Confirm the resources first"):
         application.start("s1", LEARNER, course_ref, materials_ready=True)
-    assert "start refused reason=resources_missing" in caplog.text
+    assert "start refused reason=resources_unconfirmed" in caplog.text
+    with pytest.raises(Conflict, match="Resources not ready: Reading model"):
+        confirm_resources(application, "r0", LEARNER, course_ref)
     asyncio.run(ready(application, {"course_ref": course_ref}))
     assert application.start("s2", LEARNER, course_ref, materials_ready=True)["decision"] == (
         "allow_simulation"
@@ -50,7 +52,7 @@ def test_changed_voice_counts_as_missing(application, monkeypatch):
     course_ref = ref(asyncio.run(application.prepare("prepare1", LEARNER))["course_ref"])
     asyncio.run(ready(application, {"course_ref": course_ref}))
     monkeypatch.setattr(application.synthesizer, "voice", "another-voice")
-    with pytest.raises(Conflict, match="Resources not ready"):
+    with pytest.raises(Conflict, match="Resources not usable"):
         application.start("s1", LEARNER, course_ref, materials_ready=True)
 
 
@@ -111,10 +113,7 @@ def visual_draft(context):
 
 def visual_class(application, monkeypatch, client=None):
     course_ref = science_lesson(application, monkeypatch, visual_draft)
-    asyncio.run(ready(application, {"course_ref": course_ref}))
-    for name in ("cup-motion", "cup-note"):
-        made = asyncio.run(generate_resource(application, f"g:{name}", LEARNER, course_ref, name))
-        adopt_resource(application, f"a:{name}", LEARNER, course_ref, name, made["version"])
+    asyncio.run(ready(application, {"course_ref": course_ref}, extra=("cup-motion", "cup-note")))
     result = application.start("visual", LEARNER, course_ref, materials_ready=True)
     core = application.core
     deliver_all(core)

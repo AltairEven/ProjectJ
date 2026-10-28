@@ -20,9 +20,10 @@ from project_j.platform.storage import (
 )
 from project_j.platform.tts.contracts import SynthesizerNotReady
 from project_j.preparation.contracts import CourseBody
+from project_j.preparation.lessons import confirm_resources, lesson_of, lesson_resources
 from project_j.preparation.packages import student_text
 from project_j.preparation.reading import words
-from project_j.preparation.resources import adopted, ready_resources
+from project_j.preparation.resources import ready_resources
 
 log = logging.getLogger(__name__)
 
@@ -46,10 +47,12 @@ class Teaching:
         if self.verification.get("result") != "pass":  # start() would refuse after resources
             log.info("start refused reason=unchecked_build")
             raise Conflict("This version has not passed the checks. Run the checks, then start.")
-        self.confirm(f"{request_id}:confirm", learner_id, course_ref)
-        failed = await ready_resources(self, learner_id, course_ref, on_progress)
-        if failed:
-            raise Conflict(f"Resources not ready: {', '.join(failed)}. You can try again.")
+        if lesson_of(self, learner_id, course_ref) is None:  # Start confirms what is in use.
+            self.confirm(f"{request_id}:confirm", learner_id, course_ref)
+            failed = await ready_resources(self, learner_id, course_ref, on_progress)
+            if failed:
+                raise Conflict(f"Resources not ready: {', '.join(failed)}. You can try again.")
+            confirm_resources(self, f"{request_id}:resources", learner_id, course_ref)
         result = self.start(f"{request_id}:start", learner_id, course_ref, materials_ready)
         if result["decision"] != f"allow_{self.store.realm}":
             reason = result.get("reason") or ", ".join(result.get("missing", ()))
@@ -155,12 +158,17 @@ class Teaching:
         if confirmed is None:
             log.info("start refused reason=unconfirmed")
             raise Conflict("Confirm the lesson first; then the class can start.")
-        recorded, visuals, missing, skipped = adopted(self, confirmed)
+        lesson = lesson_of(self, learner_id, course_ref)
+        if lesson is None:
+            log.info("start refused reason=resources_unconfirmed")
+            raise Conflict("Confirm the resources first; then the class can start.")
+        # Only the lesson folder is read: the draft is gone once the resources are confirmed.
+        recorded, visuals, missing, broken = lesson_resources(self, data, lesson)
         if missing:
             log.info("start refused reason=resources_missing count=%d", len(missing))
             raise Conflict(
-                f"Resources not ready: {', '.join(missing)}. Make, check and adopt them in the "
-                "lesson plan, then start."
+                f"Resources not usable: {', '.join(missing)}. Use Remake broken resources on the "
+                "lesson page, then start."
             )
         operation = self.request(
             request_id,
@@ -258,10 +266,9 @@ class Teaching:
             {"planned_activity_id": activity_id, "actual_activity": "unknown_after_restart"},
         )
         self.material_cache = {
-            ref.object_id: student_text(
-                self.files.read_asset(self.store.read(ref, learner_id).body["asset"])
+            data.material_refs[0].object_id: student_text(
+                self.files.read_asset(lesson.body["story"])
             )
-            for ref in data.material_refs
         }
         # The same course is taught again when the student retakes a stopped class.
         attempt = 1 + sum(
@@ -323,7 +330,7 @@ class Teaching:
             len(visuals),
             stages.count("story"),
             stages.count("option"),
-            skipped,
+            len(broken),
             attempt,
             story_words,
             first_reading,

@@ -104,3 +104,7 @@ test('a chosen topic that is no longer listed is no topic, not a crash', () => {
   assert.equal(chosenTopic('own', [], '  Trains '), 'Trains')
   assert.equal(chosenTopic(null, topics, ''), '')
 })
+
+test('remaking broken resources reads as such (ADR-0027)', () => {
+  assert.deepEqual(jobLines([{ name: 'remake:c1:2', state: 'running', progress: '1/1' }]), ['Remaking broken resources: item 1/1'])
+})

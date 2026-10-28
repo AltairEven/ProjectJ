@@ -341,7 +341,9 @@ def next_step(app, learner_id: str) -> dict:
                 "targets": targets(account.get("lexile")),
             },
         }
-    starting = [row for row in jobs(app) if row["name"].startswith(("confirm:", "start:"))]
+    starting = [
+        row for row in jobs(app) if row["name"].startswith(("confirm:", "start:", "remake:"))
+    ]
     if starting:  # Confirmed: resources are made and adopted; start: the class then opens.
         return {"kind": "resources", "subject": starting[0]}
     current = lesson(app, learner_id)

@@ -8,13 +8,22 @@ from test_preparation_model import ref, science_draft, science_lesson
 
 from project_j.application.configuration import Settings
 from project_j.interface.api import create_app
-from project_j.platform.files import PrivateFiles
+from project_j.platform.files import PrivateFiles, file_stem
 from project_j.platform.models.contracts import AdapterReply, solid_png
 from project_j.platform.storage import Conflict, StorageBlocked
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.recorded import decode_wav
 from project_j.preparation.drafting import PreparationUnavailable
-from project_j.preparation.resources import adopt_resource, generate_resource, resource_file
+from project_j.preparation.folders import draft_of
+from project_j.preparation.lessons import confirm_resources, lesson_of
+from project_j.preparation.resources import (
+    adopt_resource,
+    generate_resource,
+    resource_doc,
+    resource_docs,
+    resource_file,
+    resources_of,
+)
 
 UNSAFE = '<svg xmlns="http://www.w3.org/2000/svg"><script>x()</script></svg>'
 
@@ -32,19 +41,16 @@ def preview(application, course_ref):
 
 
 def resource(application, course_ref, resource_id):
-    return next(
-        item
-        for item in preview(application, course_ref).body["resources"]
-        if item["resource_id"] == resource_id
-    )
+    return resource_doc(application, LEARNER, course_ref, resource_id).body
 
 
 def demo_of(application, course_ref):
-    return next(
-        item
-        for item in preview(application, course_ref).body["resources"]
-        if item["resource_id"].startswith("demo:")
+    """Before confirmation only the course lists it; after, its own record."""
+    items = (
+        resources_of(application, LEARNER, course_ref)
+        or preview(application, course_ref).body["resources"]
     )
+    return next(item for item in items if item["resource_id"].startswith("demo:"))
 
 
 def generate(application, request_id, course_ref, resource_id):
@@ -57,6 +63,33 @@ def test_resources_wait_for_confirmation(application):
     assert demo["state"] == "planned"
     with pytest.raises(Conflict, match="Confirm the lesson first"):
         generate(application, "g0", course_ref, demo["resource_id"])
+
+
+def test_confirming_the_content_lists_each_resource_as_its_own_record(application):
+    course_ref = prepared(application)
+    application.confirm("c1", LEARNER, course_ref)
+    docs = resource_docs(application, LEARNER, course_ref)
+    spec = application.store.read(course_ref, LEARNER).body["resources"]
+    assert [doc.body["resource_id"] for doc in docs] == [item["resource_id"] for item in spec]
+    assert all(doc.kind == "resource" for doc in docs)
+    assert all(doc.body["course_ref"] == course_ref.model_dump() for doc in docs)
+    assert {doc.body["state"] for doc in docs} <= {"awaiting_generation", "not_connected"}
+
+
+def test_a_resource_change_saves_only_that_resource(application):
+    course_ref = prepared(application)
+    application.confirm("c1", LEARNER, course_ref)
+    before = preview(application, course_ref).revision
+    demo = demo_of(application, course_ref)
+    generate(application, "g1", course_ref, demo["resource_id"])
+    adopt_resource(application, "a1", LEARNER, course_ref, demo["resource_id"], 1)
+    assert preview(application, course_ref).revision == before
+    doc = resource_doc(application, LEARNER, course_ref, demo["resource_id"])
+    draft = draft_of(application.store, LEARNER, course_ref.object_id)
+    assert doc.revision == 3  # Listed, generated, adopted.
+    assert doc.body["versions"][0]["asset"]["path"] == (
+        f"{draft}/audio/{file_stem(demo['resource_id'])}.v1.wav"
+    )
 
 
 def test_generate_regenerate_and_adopt_audio(application, caplog):
@@ -207,14 +240,19 @@ def test_no_generation_during_class(application, monkeypatch):
     assert said == []
 
 
-def test_backup_restore_keeps_resource_files(application, monkeypatch):
+def test_backup_restore_keeps_the_lesson_folder(application, monkeypatch):
     course_ref = science_lesson(application, monkeypatch, visual_draft)
-    application.confirm("c1", LEARNER, course_ref)
-    generate(application, "g1", course_ref, "cup-picture")
-    manifest = resource(application, course_ref, "cup-picture")["versions"][0]["asset"]
+    asyncio.run(application.confirm_course("c1", LEARNER, course_ref))
+    confirm_resources(application, "r1", LEARNER, course_ref)
+    lesson = lesson_of(application, LEARNER, course_ref)
+    # Older previews and materials still name drafts that are gone; the backup does not care.
     backup = application.files.backup()
     restored = PrivateFiles.restore(backup, application.store.root, "restored")
-    assert PrivateFiles(restored).read_binary(manifest) == solid_png()
+    files = PrivateFiles(restored)
+    assert files.read_binary(lesson.body["files"]["cup-picture"]) == solid_png()
+    for entry in lesson.body["files"].values():
+        files.read_binary(entry)
+    files.read_asset(lesson.body["story"])
     restored.close()
 
 

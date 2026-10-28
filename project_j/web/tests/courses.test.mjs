@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { courseRows, latestFact, needsMaterials, retakeOffered } from '../src/courses.ts'
+import { courseRows, latestFact, lessonOf, needsMaterials, resourcesOf, retakeOffered } from '../src/courses.ts'
 
 const ref = (object_id, revision) => ({ object_id, revision })
 const course = (id, revision, created_at, story) => ({ object_id: id, revision, kind: 'course', created_at,
@@ -48,4 +48,14 @@ test('a course taken again shows its latest class', () => {
   assert.equal(latestFact(course('c1', 2, '', 'x'), [retaken, other, stopped])?.body.activity_id, 'a2')
   assert.equal(latestFact(course('c1', 2, '', 'x'), [stopped, other, retaken])?.body.activity_id, 'a2')
   assert.equal(latestFact(course('c9', 1, '', 'x'), [stopped]), undefined)
+})
+
+test('a course lists its own resource records in order and its lesson folder', () => {
+  const c = course('c1', 2, '2026-10-28', 'Story')
+  const res = (id, order, target) => ({ object_id: id, revision: 1, kind: 'resource', created_at: '', body: { resource_id: id, order, course_ref: target } })
+  const objects = [c, res('b', 1, ref('c1', 2)), res('a', 0, ref('c1', 2)), res('x', 0, ref('c1', 1)),
+    { object_id: 'l', revision: 1, kind: 'lesson', created_at: '', body: { course_ref: ref('c1', 2), folder: 'lessons/lesson-001-2026-10-28' } }]
+  assert.deepEqual(resourcesOf(c, objects).map(doc => doc.object_id), ['a', 'b'])
+  assert.equal(lessonOf(c, objects)?.body.folder, 'lessons/lesson-001-2026-10-28')
+  assert.equal(lessonOf(course('c2', 1, '', 'Other'), objects), undefined)
 })

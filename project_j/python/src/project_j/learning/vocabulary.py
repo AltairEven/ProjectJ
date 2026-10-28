@@ -28,7 +28,7 @@ class LookedUp(Contract):
     lemma: str | None = None
     part_of_speech: str | None = None
     definition: str | None = None
-    audio: dict | None = None  # binary_asset manifest
+    audio: dict | None = None  # file manifest: vocabulary/<word>.wav (ADR-0027)
 
 
 class WordEntry(Contract):

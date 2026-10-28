@@ -1,8 +1,9 @@
 """Teaching resources of a confirmed course: generate, look or listen, adopt (ADR-0017).
 
 Voice comes from the local synthesizer; pictures and animations from the preparation model.
-Each generation is a new version in the preview; adopting one makes it the version a class
-uses, and earlier versions stay.
+Each resource is its own record once the content is confirmed; each generation is a new
+version in its course's draft, and adopting one makes it the version a class uses. Earlier
+versions stay until the resources are confirmed (ADR-0027).
 """
 
 import logging
@@ -10,14 +11,16 @@ import time
 from contextlib import aclosing
 from datetime import UTC, datetime
 
-from project_j.application.documents import publication, successor
-from project_j.contracts import RevisionRef
+from project_j.application.documents import document, identity, publication, successor
+from project_j.contracts import Document, RevisionRef
+from project_j.platform.files import stems
 from project_j.platform.storage import Conflict
 from project_j.platform.tts.contracts import SynthesisFailed
-from project_j.platform.tts.recorded import decode_wav, encode_wav
+from project_j.platform.tts.recorded import encode_wav
 from project_j.platform.visuals import MEDIA_TYPES, checked_svg, image_type
 from project_j.preparation.contracts import CourseBody
 from project_j.preparation.drafting import PreparationUnavailable
+from project_j.preparation.folders import draft_of, lesson_of, version_path
 from project_j.preparation.materials import (
     animation_request,
     check_request,
@@ -68,11 +71,53 @@ def confirmed_package(app, learner_id: str, course_ref: RevisionRef):
     return course, preview
 
 
-def entry(preview, resource_id: str) -> tuple[int, dict]:
-    for index, item in enumerate(preview.body["resources"]):
-        if item["resource_id"] == resource_id:
-            return index, item
-    raise LookupError("unknown resource of this course version")
+def resource_identity(course_ref: RevisionRef, resource_id: str) -> str:
+    return identity(f"{course_ref.object_id}:{course_ref.revision}", f"resource:{resource_id}")
+
+
+def planned_resources(course: Document, operation_id: str) -> list[Document]:
+    """One record per resource the confirmed course lists, in its order."""
+    return [
+        document(
+            "resource",
+            resource_identity(course.ref, item["resource_id"]),
+            operation_id,
+            course.learner_id,
+            item
+            | (
+                {"state": "awaiting_generation", "versions": [], "adopted_version": None}
+                if item["kind"] in GENERATED
+                else {"state": "not_connected"}
+            )
+            | {"status": "checked", "course_ref": course.ref.model_dump(), "order": order},
+            refs=(course.ref,),
+        )
+        for order, item in enumerate(course.body["resources"])
+    ]
+
+
+def resource_docs(app, learner_id: str, course_ref: RevisionRef) -> list[Document]:
+    docs = [
+        doc
+        for doc in app.store.list_current(learner_id, "resource")
+        if doc.body["course_ref"] == course_ref.model_dump()
+    ]
+    return sorted(docs, key=lambda doc: doc.body["order"])
+
+
+def resources_of(app, learner_id: str, course_ref: RevisionRef) -> list[dict]:
+    return [doc.body for doc in resource_docs(app, learner_id, course_ref)]
+
+
+def resource_doc(app, learner_id: str, course_ref: RevisionRef, resource_id: str) -> Document:
+    doc = app.store.current(resource_identity(course_ref, resource_id), learner_id)
+    if doc is None:
+        raise LookupError("unknown resource of this course version")
+    return doc
+
+
+def items_by_id(app, learner_id: str, course_ref: RevisionRef) -> dict[str, dict]:
+    return {item["resource_id"]: item for item in resources_of(app, learner_id, course_ref)}
 
 
 class Failed(Exception):
@@ -83,9 +128,12 @@ class Failed(Exception):
         self.code, self.reason = code, reason
 
 
-def story_of(app, learner_id: str, course: CourseBody) -> str:
-    """The story as the student sees it (title and paragraphs), from the course's material."""
-    material = app.store.read(course.material_refs[0], learner_id)
+def story_of(app, learner_id: str, course: Document) -> str:
+    """The story as the student sees it (title and paragraphs): from the lesson folder once
+    the resources are confirmed (the draft is gone then), before that from the material."""
+    if lesson := lesson_of(app, learner_id, course.ref):
+        return student_text(app.files.read_asset(lesson.body["story"]))
+    material = app.store.read(CourseBody.model_validate(course.body).material_refs[0], learner_id)
     return student_text(app.files.read_asset(material.body["asset"]))
 
 
@@ -137,8 +185,8 @@ async def generate_resource(app, request_id, learner_id, course_ref: RevisionRef
     if completed:
         return completed
     app.store.ensure_idle()  # Never while a class runs: GPU and storage stay with the class.
-    course, preview = confirmed_package(app, learner_id, course_ref)
-    _, item = entry(preview, resource_id)
+    course, _ = confirmed_package(app, learner_id, course_ref)
+    item = resource_doc(app, learner_id, course_ref, resource_id).body
     if item["kind"] not in GENERATED:
         raise Conflict(
             f"{KIND_LABELS[item['kind']]} resources cannot be made yet; use the fallback."
@@ -160,7 +208,7 @@ async def generate_resource(app, request_id, learner_id, course_ref: RevisionRef
         try:
             body = CourseBody.model_validate(course.body)
             content, media_type, source = await produce(
-                app, item, body, story_of(app, learner_id, body)
+                app, item, body, story_of(app, learner_id, course)
             )
         except Failed as error:
             log.warning(
@@ -172,21 +220,28 @@ async def generate_resource(app, request_id, learner_id, course_ref: RevisionRef
                 round((time.perf_counter() - started) * 1000),
             )
             raise PreparationUnavailable(error.reason, "resource") from None
+        doc = resource_doc(app, learner_id, course_ref, resource_id)
+        item, number = doc.body, len(doc.body["versions"]) + 1
+        name = stems([spec["resource_id"] for spec in course.body["resources"]])[resource_id]
+        path = version_path(
+            draft_of(app.store, learner_id, course.object_id),
+            item["kind"],
+            name,
+            number,
+            SUFFIXES[media_type],
+        )
         version = {
-            "version": len(item["versions"]) + 1,
-            "asset": app.files.binary_asset(content, SUFFIXES[media_type]),
+            "version": number,
+            "asset": app.files.put(path, content),
             "media_type": media_type,
             "generated_at": datetime.now(UTC).isoformat(),
             "source": source,
         }
-        index, _ = entry(preview, resource_id)
-        resources = list(preview.body["resources"])
-        resources[index] = item | {"state": "generated", "versions": [*item["versions"], version]}
         obj = successor(
-            preview,
+            doc,
             operation,
-            preview.body | {"resources": resources},
-            refs=preview.dependency_refs,
+            item | {"state": "generated", "versions": [*item["versions"], version]},
+            refs=doc.dependency_refs,
         )
         saved = app.save_step(
             operation,
@@ -205,15 +260,14 @@ async def generate_resource(app, request_id, learner_id, course_ref: RevisionRef
             len(content),
             round((time.perf_counter() - started) * 1000),
         )
-    _, generated = entry(saved[0], resource_id)
     return app.ledger.finish(
         operation,
         learner_id,
         {
             "course_ref": course.ref.model_dump(),
-            "preview_ref": saved[0].ref.model_dump(),
+            "resource_ref": saved[0].ref.model_dump(),
             "resource_id": resource_id,
-            "version": len(generated["versions"]),
+            "version": len(saved[0].body["versions"]),
             "state": "generated",
         },
     )
@@ -228,8 +282,8 @@ def adopt_resource(app, request_id, learner_id, course_ref: RevisionRef, resourc
     completed = app.ledger.completed_request(request_id, learner_id, "adopt_resource", signature)
     if completed:
         return completed
-    course, preview = confirmed_package(app, learner_id, course_ref)
-    index, item = entry(preview, resource_id)
+    course, _ = confirmed_package(app, learner_id, course_ref)
+    item = resource_doc(app, learner_id, course_ref, resource_id).body
     if not 1 <= version <= len(item.get("versions", ())):
         raise LookupError("unknown version of this resource")
     operation = app.request(
@@ -245,14 +299,13 @@ def adopt_resource(app, request_id, learner_id, course_ref: RevisionRef, resourc
         return completed
     saved = app.saved_step(operation, learner_id, "adoption")
     if saved is None:
-        resources = list(preview.body["resources"])
-        kept = {key: value for key, value in item.items() if key != "rejected_reason"}
-        resources[index] = kept | {"state": "adopted", "adopted_version": version}
+        doc = resource_doc(app, learner_id, course_ref, resource_id)
+        kept = {key: value for key, value in doc.body.items() if key != "rejected_reason"}
         obj = successor(
-            preview,
+            doc,
             operation,
-            preview.body | {"resources": resources},
-            refs=preview.dependency_refs,
+            kept | {"state": "adopted", "adopted_version": version},
+            refs=doc.dependency_refs,
         )
         saved = app.save_step(
             operation,
@@ -273,7 +326,7 @@ def adopt_resource(app, request_id, learner_id, course_ref: RevisionRef, resourc
         learner_id,
         {
             "course_ref": course.ref.model_dump(),
-            "preview_ref": saved[0].ref.model_dump(),
+            "resource_ref": saved[0].ref.model_dump(),
             "resource_id": resource_id,
             "version": version,
             "state": "adopted",
@@ -282,54 +335,26 @@ def adopt_resource(app, request_id, learner_id, course_ref: RevisionRef, resourc
 
 
 def resource_file(app, learner_id, course_ref: RevisionRef, resource_id, version):
-    """One generated version's file and media type, checked against its digest."""
-    _, _, preview = app.current_package(learner_id, course_ref)
-    _, item = entry(preview, resource_id)
-    versions = item.get("versions", ())
+    """One generated version's file and media type, checked against its digest; once the
+    resources are confirmed, the file in the lesson folder."""
+    app.current_package(learner_id, course_ref)
+    lesson = lesson_of(app, learner_id, course_ref)
+    if lesson and (entry := lesson.body["files"].get(resource_id)):
+        return app.files.read_binary(entry), entry["media_type"]
+    versions = resource_doc(app, learner_id, course_ref, resource_id).body.get("versions", ())
     if not 1 <= version <= len(versions):
         raise LookupError("unknown version of this resource")
     chosen = versions[version - 1]
     return app.files.read_binary(chosen["asset"]), chosen["media_type"]
 
 
-def adopted(app, preview) -> tuple[dict[str, bytes], dict[str, tuple[bytes, str]], list[str], int]:
-    """What a class may use from a confirmed preview: recorded speech by its exact text and
-    student visuals by resource id; the required ones without a usable adopted version; and
-    how many adopted versions were unusable (file changed, or another voice or sample rate)."""
-    recorded, visuals, missing, skipped = {}, {}, [], 0
-    for item in preview.body["resources"]:
-        content = None
-        if version := item.get("adopted_version"):
-            chosen = item["versions"][version - 1]
-            try:
-                data = app.files.read_binary(chosen["asset"])
-                if item["kind"] == "audio":
-                    rate, data = decode_wav(data)
-                    if (rate, chosen["source"]["voice"]) != (
-                        app.synthesizer.sample_rate,
-                        app.synthesizer.voice,
-                    ):
-                        raise ValueError("recorded with another voice configuration")
-                content = data
-            except ValueError:
-                skipped += 1
-        if content is None:
-            if item["required"]:
-                missing.append(item["purpose"])
-        elif item["kind"] == "audio":
-            recorded[item["text"]] = content
-        elif item["audience"] == "student":
-            visuals[item["resource_id"]] = (content, chosen["media_type"])
-    return recorded, visuals, missing, skipped
-
-
 def update_resources(app, request_id, learner_id, course_ref: RevisionRef, changes: dict):
-    """Merge changes[resource_id] into those resources of the preview: picture checks (added
-    to those recorded before) and pictures turned down. Idempotent by request_id."""
+    """Merge changes[resource_id] into those resource records: picture checks (added to those
+    recorded before) and pictures turned down; one save. Idempotent by request_id."""
     signature = {"course_ref": course_ref.model_dump(), "changes": changes}
     if app.ledger.completed_request(request_id, learner_id, "update_resources", signature):
         return
-    course, preview = confirmed_package(app, learner_id, course_ref)
+    course, _ = confirmed_package(app, learner_id, course_ref)
     operation = app.request(
         request_id,
         learner_id,
@@ -341,24 +366,18 @@ def update_resources(app, request_id, learner_id, course_ref: RevisionRef, chang
     if app.ledger.result(operation, learner_id):
         return
     if app.saved_step(operation, learner_id, "update") is None:
-        resources = []
-        for item in preview.body["resources"]:
-            change = changes.get(item["resource_id"], {})
+        objs = []
+        for resource_id, change in changes.items():
+            doc = resource_doc(app, learner_id, course_ref, resource_id)
             if "checks" in change:
-                change = change | {"checks": item.get("checks", {}) | change["checks"]}
-            resources.append(item | change)
-        obj = successor(
-            preview,
-            operation,
-            preview.body | {"resources": resources},
-            refs=preview.dependency_refs,
-        )
+                change = change | {"checks": doc.body.get("checks", {}) | change["checks"]}
+            objs.append(successor(doc, operation, doc.body | change, refs=doc.dependency_refs))
         app.save_step(
             operation,
             learner_id,
             "update",
-            [obj],
-            publications=(publication(obj, "Picture checks recorded"),),
+            objs,
+            publications=tuple(publication(obj, "Picture checks recorded") for obj in objs),
             baselines=(course.ref,),
         )
     app.ledger.finish(operation, learner_id, {"resource_ids": sorted(changes)})
@@ -373,15 +392,15 @@ async def check_group(
     app, request_id, learner_id, course_ref: RevisionRef, group_key, versions, round_no
 ):
     """Let the preparation model look at these versions of one group: resource id -> why it
-    failed (None: passed), recorded in the preview; None when the check could not run.
+    failed (None: passed), recorded in their records; None when the check could not run.
     Idempotent by request_id: a replay calls no model."""
     signature = {"course_ref": course_ref.model_dump(), "group": group_key, "versions": versions}
     completed = app.ledger.completed_request(request_id, learner_id, "check_pictures", signature)
     if completed:
         return completed["reasons"]
-    course, preview = confirmed_package(app, learner_id, course_ref)
+    course, _ = confirmed_package(app, learner_id, course_ref)
     body = CourseBody.model_validate(course.body)
-    items = [entry(preview, resource_id)[1] for resource_id in versions]
+    items = [resource_doc(app, learner_id, course_ref, name).body for name in versions]
     images = tuple(
         app.files.read_binary(item["versions"][versions[item["resource_id"]] - 1]["asset"])
         for item in items
@@ -398,7 +417,7 @@ async def check_group(
     if completed:
         return completed["reasons"]
     started = time.perf_counter()
-    request = check_request(items, images, body, story_of(app, learner_id, body))
+    request = check_request(items, images, body, story_of(app, learner_id, course))
     result = await app.models.run(request)
     found = verdicts(result.output, len(items)) if result.ok else None
     elapsed = round((time.perf_counter() - started) * 1000)
@@ -457,9 +476,19 @@ def unchecked(app, request_id, learner_id, course_ref, resource_id, version, rea
     return adopt_resource(app, f"{request_id}:adopt", learner_id, course_ref, resource_id, version)
 
 
-async def make_checked(app, learner_id, course_ref: RevisionRef, group_key, group) -> bool:
-    """Draw, check, redraw what failed and adopt a group, or turn it down (ADR-0026). False
-    when a drawing failed: the group stays as it was, to be made again before class."""
+async def make_checked(
+    app,
+    learner_id,
+    course_ref: RevisionRef,
+    group_key,
+    group,
+    redraw: list[str],
+    tag: str,
+) -> bool:
+    """Draw, check, redraw what failed and adopt a group, or turn it down (ADR-0026). Only the
+    pictures in redraw are drawn; the others are checked with their adopted
+    version. tag keeps the request ids of one making apart from another's. False when a
+    drawing failed: the group stays as it was, to be made again before class."""
     key = f"{course_ref.object_id}:{course_ref.revision}"
     question = group_key.startswith("task:")
     # Without image input a picture question goes in words; a story picture is drawn and used
@@ -467,21 +496,22 @@ async def make_checked(app, learner_id, course_ref: RevisionRef, group_key, grou
     seeing = app.models.sees_images("preparation")
     try:
         if question and not seeing:
-            reject(app, f"auto-reject:{key}:{group_key}", learner_id, course_ref, group_key,
+            reject(app, f"{tag}-reject:{key}:{group_key}", learner_id, course_ref, group_key,
                    group, "no_image_input")  # fmt: skip
             return True
-        versions: dict[str, int] = {}
-        pending = list(group)
+        items = items_by_id(app, learner_id, course_ref)
+        versions = {name: items[name]["adopted_version"] for name in group if name not in redraw}
+        pending = list(redraw)
         for round_no in range(1, ROUNDS + 1):
             for name in pending:
                 drawn = await generate_resource(
-                    app, f"auto-generate:{key}:{name}:r{round_no}", learner_id, course_ref, name
+                    app, f"{tag}-generate:{key}:{name}:r{round_no}", learner_id, course_ref, name
                 )
                 versions[name] = drawn["version"]
             reasons = (
                 await check_group(
                     app,
-                    f"auto-check:{key}:{group_key}:r{round_no}",
+                    f"{tag}-check:{key}:{group_key}:r{round_no}",
                     learner_id,
                     course_ref,
                     group_key,
@@ -494,39 +524,37 @@ async def make_checked(app, learner_id, course_ref: RevisionRef, group_key, grou
             if reasons is None:
                 why = "check_unavailable" if seeing else "no_image_input"
                 if question:
-                    reject(app, f"auto-reject:{key}:{group_key}", learner_id, course_ref,
+                    reject(app, f"{tag}-reject:{key}:{group_key}", learner_id, course_ref,
                            group_key, group, why)  # fmt: skip
                 else:
-                    unchecked(app, f"auto-unchecked:{key}:{group[0]}", learner_id, course_ref,
+                    unchecked(app, f"{tag}-unchecked:{key}:{group[0]}", learner_id, course_ref,
                               group[0], versions[group[0]], why)  # fmt: skip
                 return True
-            pending = [name for name in group if reasons[name]]
-            if not pending:
+            failing = [name for name in group if reasons[name]]
+            if not failing:
                 for name in group:
                     adopt_resource(
                         app,
-                        f"auto-adopt:{key}:{name}:v{versions[name]}",
+                        f"{tag}-adopt:{key}:{name}:v{versions[name]}",
                         learner_id,
                         course_ref,
                         name,
                         versions[name],
                     )
                 return True
-        reject(app, f"auto-reject:{key}:{group_key}", learner_id, course_ref, group_key, group,
-               reasons[pending[0]])  # fmt: skip
+            pending = [name for name in failing if name in redraw]
+            if len(pending) < len(failing):  # A picture that is not redrawn fails: no fix.
+                break
+        reject(app, f"{tag}-reject:{key}:{group_key}", learner_id, course_ref, group_key, group,
+               reasons[failing[0]])  # fmt: skip
         return True
     except PreparationUnavailable:
         return False
 
 
-def group_of(preview, resource_id) -> tuple[str, list[str]] | None:
+def group_of(items: list[dict], resource_id) -> tuple[str, list[str]] | None:
     return next(
-        (
-            (key, names)
-            for key, names in picture_groups(preview.body["resources"])
-            if resource_id in names
-        ),
-        None,
+        ((key, names) for key, names in picture_groups(items) if resource_id in names), None
     )
 
 
@@ -559,10 +587,10 @@ async def use_checked(app, request_id, learner_id, course_ref, group_key, versio
     return adopted[resource_id]
 
 
-def chosen_versions(preview, group, resource_id, version) -> dict[str, int]:
+def chosen_versions(items: dict[str, dict], group, resource_id, version) -> dict[str, int]:
     versions = {}
     for name in group:
-        _, item = entry(preview, name)
+        item = items[name]
         pick = (
             version
             if name == resource_id
@@ -574,19 +602,26 @@ def chosen_versions(preview, group, resource_id, version) -> dict[str, int]:
     return versions
 
 
+def unlocked(app, learner_id, course_ref: RevisionRef):
+    """The student's own changes stop once the resources are confirmed (ADR-0027)."""
+    confirmed_package(app, learner_id, course_ref)
+    if lesson_of(app, learner_id, course_ref):
+        raise Conflict("Resources are confirmed and locked.")
+
+
 async def choose_resource(
     app, request_id, learner_id, course_ref: RevisionRef, resource_id, version
 ):
     """Course details "Use version": a checked picture is checked with its group first."""
-    _, preview = confirmed_package(app, learner_id, course_ref)
-    found = group_of(preview, resource_id)
+    unlocked(app, learner_id, course_ref)
+    items = items_by_id(app, learner_id, course_ref)
+    found = group_of(list(items.values()), resource_id)
     if found is None:
         return adopt_resource(app, request_id, learner_id, course_ref, resource_id, version)
-    _, item = entry(preview, resource_id)
-    if not 1 <= version <= len(item.get("versions", ())):
+    if not 1 <= version <= len(items[resource_id].get("versions", ())):
         raise LookupError("unknown version of this resource")
     group_key, group = found
-    versions = chosen_versions(preview, group, resource_id, version)
+    versions = chosen_versions(items, group, resource_id, version)
     return await use_checked(app, request_id, learner_id, course_ref, group_key, versions,
                              resource_id)  # fmt: skip
 
@@ -594,27 +629,30 @@ async def choose_resource(
 async def remake_resource(app, request_id, learner_id, course_ref: RevisionRef, resource_id):
     """Course details "Make again": a checked picture is drawn, then checked with its group and
     adopted if it passes; anything else is only drawn, as before."""
-    _, preview = confirmed_package(app, learner_id, course_ref)
-    found = group_of(preview, resource_id)
+    unlocked(app, learner_id, course_ref)
+    found = group_of(resources_of(app, learner_id, course_ref), resource_id)
     if found is None:
         return await generate_resource(app, request_id, learner_id, course_ref, resource_id)
     group_key, group = found
     if group_key.startswith("task:") and not app.models.sees_images("preparation"):
         raise Conflict(NO_CHECK)
     drawn = await generate_resource(app, f"{request_id}:make", learner_id, course_ref, resource_id)
-    _, preview = confirmed_package(app, learner_id, course_ref)
-    versions = chosen_versions(preview, group, resource_id, drawn["version"])
+    items = items_by_id(app, learner_id, course_ref)
+    versions = chosen_versions(items, group, resource_id, drawn["version"])
     return await use_checked(app, request_id, learner_id, course_ref, group_key, versions,
                              resource_id)  # fmt: skip
 
 
-async def ready_resources(app, learner_id, course_ref: RevisionRef, on_progress=None) -> list[str]:
+async def ready_resources(
+    app, learner_id, course_ref: RevisionRef, on_progress=None, tag: str = "auto"
+) -> list[str]:
     """Generate and adopt every generatable resource that has no adopted version yet
     (ADR-0018: the AI adopts the latest good version); pictures that are checked go group by
-    group through make_checked, and those turned down stay down. Returns the purposes of
-    required resources that failed; an optional failure is only logged."""
-    _, preview = confirmed_package(app, learner_id, course_ref)
-    resources = {item["resource_id"]: item for item in preview.body["resources"]}
+    group through make_checked, only those without an adopted version drawn, and those turned
+    down stay down. Returns the purposes of required resources that failed; an optional failure
+    is only logged."""
+    confirmed_package(app, learner_id, course_ref)
+    resources = items_by_id(app, learner_id, course_ref)
     groups = picture_groups(list(resources.values()))
     grouped = {name for _, names in groups for name in names}
     todo = [
@@ -638,11 +676,11 @@ async def ready_resources(app, learner_id, course_ref: RevisionRef, on_progress=
         key = f"{course_ref.object_id}:{course_ref.revision}:{item['resource_id']}"
         try:
             made = await generate_resource(
-                app, f"auto-generate:{key}", learner_id, course_ref, item["resource_id"]
+                app, f"{tag}-generate:{key}", learner_id, course_ref, item["resource_id"]
             )
             adopt_resource(
                 app,
-                f"auto-adopt:{key}",
+                f"{tag}-adopt:{key}",
                 learner_id,
                 course_ref,
                 item["resource_id"],
@@ -657,7 +695,8 @@ async def ready_resources(app, learner_id, course_ref: RevisionRef, on_progress=
         if on_progress:
             on_progress(done, total)
     for key, names in waiting:
-        if not await make_checked(app, learner_id, course_ref, key, names):
+        redraw = [name for name in names if not resources[name].get("adopted_version")]
+        if not await make_checked(app, learner_id, course_ref, key, names, redraw, tag):
             optional += len(names)
         done += len(names)
         if on_progress:

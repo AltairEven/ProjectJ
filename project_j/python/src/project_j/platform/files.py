@@ -1,8 +1,10 @@
-"""Immutable assets and idle-boundary export/backup; no credentials or audio archive."""
+"""Named files of the student's lessons, drafts and words, and idle-boundary export/backup;
+no credentials or audio archive (ADR-0027)."""
 
 import hashlib
 import json
 import os
+import re
 import shutil
 import sqlite3
 from pathlib import Path
@@ -11,6 +13,26 @@ from uuid import uuid4
 from project_j.contracts import Document
 from project_j.paths import check_path
 from project_j.platform.storage import REALMS, SimulationStore, canonical, digest
+
+# The only trees files are written to inside a run (the student's directory).
+LESSONS, DRAFTS, VOCABULARY = "lessons", "drafts", "vocabulary"
+TREES = (LESSONS, DRAFTS, VOCABULARY)
+
+
+def file_stem(name: str) -> str:
+    """A resource id or word as a file name: anything but letters, digits, _ and - becomes -."""
+    return re.sub(r"[^A-Za-z0-9_-]+", "-", name).strip("-") or "item"
+
+
+def stems(names: list[str]) -> dict[str, str]:
+    """File stems in order; a stem already taken gets -2, -3, ..."""
+    taken: dict[str, str] = {}
+    for name in names:
+        stem, n = file_stem(name), 1
+        while (candidate := stem if n == 1 else f"{stem}-{n}") in taken.values():
+            n += 1
+        taken[name] = candidate
+    return taken
 
 
 def private_write(path: Path, content: bytes):
@@ -32,38 +54,57 @@ class PrivateFiles:
     def __init__(self, store: SimulationStore):
         self.store = store
 
-    def asset(self, text: str) -> dict:
-        self.store.ensure_idle()
-        checksum = digest(text)
-        relative = f"assets/{checksum}.txt"
+    def path(self, relative: str) -> Path:
+        """A path in one of the run's trees, below its root; anything else is refused."""
         path = check_path(self.store.run, relative)
-        if path.exists():
-            if digest(path.read_text()) != checksum:
-                raise ValueError("fixed material integrity failure")
-        else:
-            private_write(path, text.encode())
-        return {"path": relative, "sha256": checksum, "bytes": len(text.encode())}
+        parts = path.relative_to(self.store.run.resolve()).parts
+        if len(parts) < 2 or parts[0] not in TREES:
+            raise ValueError("files live only in lessons/, drafts/ and vocabulary/")
+        return path
+
+    def put(self, relative: str, content: bytes | str) -> dict:
+        """Write a named file (replacing it unless it already holds these bytes)."""
+        self.store.ensure_idle()
+        data = content.encode() if isinstance(content, str) else content
+        path = self.path(relative)
+        checksum = hashlib.sha256(data).hexdigest()
+        if not (path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == checksum):
+            private_write(path, data)
+        relative = path.relative_to(self.store.run.resolve()).as_posix()
+        return {"path": relative, "sha256": checksum, "bytes": len(data)}
+
+    def remove(self, relative: str) -> bool:
+        self.store.ensure_idle()
+        path = self.path(relative)
+        if not path.is_file():
+            return False
+        path.unlink()
+        return True
+
+    def remove_tree(self, relative: str) -> int:
+        """Remove a directory; the number of files it held."""
+        self.store.ensure_idle()
+        path = self.path(relative)
+        if not path.is_dir():
+            return 0
+        count = sum(1 for item in path.rglob("*") if item.is_file())
+        shutil.rmtree(path)
+        return count
+
+    def remove_drafts(self, keep: str) -> list[str]:
+        """Remove every course draft but keep; the names removed."""
+        self.store.ensure_idle()
+        root = self.store.run / DRAFTS
+        if not root.is_dir():
+            return []
+        kept = self.path(keep).name
+        removed = sorted(p.name for p in root.iterdir() if p.is_dir() and p.name != kept)
+        for name in removed:
+            self.remove_tree(f"{DRAFTS}/{name}")
+        return removed
 
     def read_asset(self, manifest: dict) -> str:
-        self.store.ensure_idle()
-        path = check_path(self.store.run, manifest["path"])
-        text = path.read_text()
-        if digest(text) != manifest["sha256"] or len(text.encode()) != manifest["bytes"]:
-            raise ValueError("material missing or corrupted")
-        return text
-
-    def binary_asset(self, content: bytes, suffix: str) -> dict:
-        """Generated audio or pictures, named by their own SHA-256."""
-        self.store.ensure_idle()
-        checksum = hashlib.sha256(content).hexdigest()
-        relative = f"assets/{checksum}.{suffix}"
-        path = check_path(self.store.run, relative)
-        if path.exists():
-            if hashlib.sha256(path.read_bytes()).hexdigest() != checksum:
-                raise ValueError("fixed material integrity failure")
-        else:
-            private_write(path, content)
-        return {"path": relative, "sha256": checksum, "bytes": len(content)}
+        return self.read_binary(manifest).decode()
 
     def read_binary(self, manifest: dict) -> bytes:
         self.store.ensure_idle()
@@ -110,27 +151,27 @@ class PrivateFiles:
         # SQLite's backup API snapshots committed state; all app writes share this idle boundary.
         with self.store.engine.connect() as connection, sqlite3.connect(destination) as backup:
             connection.connection.driver_connection.backup(backup)
-        with sqlite3.connect(destination) as backup:
-            rows = backup.execute("SELECT payload FROM revisions").fetchall()
-        manifests = {}
-        for (payload,) in rows:
-            doc = Document.model_validate_json(payload)
-            if doc.kind == "material":
-                manifests[doc.body["asset"]["path"]] = doc.body["asset"]
-            elif doc.kind == "preview":  # Generated resource versions (ADR-0017).
-                for item in doc.body.get("resources", ()):
-                    for version in item.get("versions", ()):
-                        manifests[version["asset"]["path"]] = version["asset"]
-        for manifest in manifests.values():
-            copied = check_path(target, manifest["path"])
-            private_write(copied, self.read_binary(manifest))
-        manifests = list(manifests.values())
+        # Every file of the student's trees, as it is: old records may name files since removed.
+        manifests = []
+        for tree in TREES:
+            root = self.store.run / tree
+            for path in sorted(root.rglob("*")) if root.is_dir() else ():
+                if path.is_file() and not path.name.startswith("."):  # Not a write in progress.
+                    relative, data = path.relative_to(self.store.run).as_posix(), path.read_bytes()
+                    private_write(check_path(target, relative), data)
+                    manifests.append(
+                        {
+                            "path": relative,
+                            "sha256": hashlib.sha256(data).hexdigest(),
+                            "bytes": len(data),
+                        }
+                    )
         private_write(
             target / "manifest.json",
             canonical(
                 {
                     "realm": self.store.realm,
-                    "assets": manifests,
+                    "files": manifests,
                     "database_sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
                 }
             ).encode(),
@@ -155,7 +196,7 @@ class PrivateFiles:
         store.close()
         shutil.copyfile(backup / "project_j.sqlite3", store.path)
         store.path.chmod(0o600)
-        for asset in manifest["assets"]:
+        for asset in manifest["files"]:
             source = check_path(backup, asset["path"])
             target = check_path(store.run, asset["path"])
             content = source.read_bytes()
@@ -169,10 +210,32 @@ class PrivateFiles:
         with restored.engine.begin() as connection:
             if connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall():
                 raise ValueError("backup contains broken exact references")
+            effective = set(connection.execute(restored.tables["effective"].select()).all())
+            current = []
             for row in connection.execute(restored.tables["revisions"].select()).mappings():
-                document = Document.model_validate_json(row["payload"])
                 if digest(row["payload"]) != row["digest"]:
                     raise ValueError("backup object integrity failure")
-                if document.kind == "material":
-                    PrivateFiles(restored).read_asset(document.body["asset"])
+                if (row["object_id"], row["revision"]) in effective:
+                    current.append(Document.model_validate_json(row["payload"]))
+        files = PrivateFiles(restored)
+        for manifest in named_files(current):
+            # A draft removed on purpose (confirmed or replaced course) is not checked.
+            parts = manifest["path"].split("/")
+            if parts[0] != DRAFTS or (restored.run / DRAFTS / parts[1]).is_dir():
+                files.read_binary(manifest)
         return restored
+
+
+def named_files(documents: list[Document]) -> list[dict]:
+    """The files current records name: lessons, word audio, and drafts of courses in work."""
+    found = []
+    for doc in documents:
+        if doc.kind == "lesson":
+            found += [doc.body["story"], *doc.body["files"].values()]
+        elif doc.kind == "vocabulary":
+            found += [word["audio"] for word in doc.body.get("words", ()) if word.get("audio")]
+        elif doc.kind == "material":
+            found.append(doc.body["asset"])
+        elif doc.kind == "resource":
+            found += [version["asset"] for version in doc.body.get("versions", ())]
+    return found

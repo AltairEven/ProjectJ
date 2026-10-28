@@ -200,6 +200,21 @@ export type CourseConfirmRequest = {
 };
 
 /**
+ * CourseRequest
+ */
+export type CourseRequest = {
+    /**
+     * Request Id
+     */
+    request_id: string;
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    course_ref: RevisionRef;
+};
+
+/**
  * CourseStartRequest
  */
 export type CourseStartRequest = {
@@ -663,6 +678,26 @@ export type JobRow = {
 export type JsonValue = unknown;
 
 /**
+ * LessonResult
+ */
+export type LessonResult = {
+    course_ref: RevisionRef;
+    lesson_ref: RevisionRef;
+    /**
+     * Folder
+     */
+    folder: string;
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * State
+     */
+    state: 'confirmed';
+};
+
+/**
  * LexileRequest
  */
 export type LexileRequest = {
@@ -899,7 +934,7 @@ export type ResourceRequest = {
  */
 export type ResourceResult = {
     course_ref: RevisionRef;
-    preview_ref: RevisionRef;
+    resource_ref: RevisionRef;
     /**
      * Resource Id
      */
@@ -1347,6 +1382,37 @@ export type AdoptApiResourceAdoptPostResponses = {
 
 export type AdoptApiResourceAdoptPostResponse = AdoptApiResourceAdoptPostResponses[keyof AdoptApiResourceAdoptPostResponses];
 
+export type ResourcesConfirmApiCourseResourcesConfirmPostData = {
+    body: CourseRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/course/resources/confirm';
+};
+
+export type ResourcesConfirmApiCourseResourcesConfirmPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ResourcesConfirmApiCourseResourcesConfirmPostError = ResourcesConfirmApiCourseResourcesConfirmPostErrors[keyof ResourcesConfirmApiCourseResourcesConfirmPostErrors];
+
+export type ResourcesConfirmApiCourseResourcesConfirmPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: LessonResult;
+};
+
+export type ResourcesConfirmApiCourseResourcesConfirmPostResponse = ResourcesConfirmApiCourseResourcesConfirmPostResponses[keyof ResourcesConfirmApiCourseResourcesConfirmPostResponses];
+
 export type ResourceDownloadApiResourceFileGetData = {
     body?: never;
     headers?: {
@@ -1487,6 +1553,35 @@ export type ConfirmCourseApiCourseConfirmPostErrors = {
 export type ConfirmCourseApiCourseConfirmPostError = ConfirmCourseApiCourseConfirmPostErrors[keyof ConfirmCourseApiCourseConfirmPostErrors];
 
 export type ConfirmCourseApiCourseConfirmPostResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
+};
+
+export type ResourcesRemakeApiCourseResourcesRemakePostData = {
+    body: CourseRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/course/resources/remake';
+};
+
+export type ResourcesRemakeApiCourseResourcesRemakePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ResourcesRemakeApiCourseResourcesRemakePostError = ResourcesRemakeApiCourseResourcesRemakePostErrors[keyof ResourcesRemakeApiCourseResourcesRemakePostErrors];
+
+export type ResourcesRemakeApiCourseResourcesRemakePostResponses = {
     /**
      * Successful Response
      */

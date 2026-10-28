@@ -5,7 +5,8 @@ from uuid import uuid4
 from project_j.classroom.harness import DeliveryFeedback
 from project_j.classroom.responses import presentation
 from project_j.contracts import RevisionRef
-from project_j.preparation.resources import adopt_resource, generate_resource
+from project_j.preparation.lessons import confirm_resources
+from project_j.preparation.resources import adopt_resource, generate_resource, resources_of
 from project_j.preparation.task_types import PROGRAM_JUDGED
 
 LEARNER = "fictional-L1"
@@ -171,22 +172,23 @@ def judgments(app):
     return [call for call in app.models.calls if call["purpose"] == "classroom_judgment"]
 
 
-async def ready(app, prepared):
-    """The course version is confirmed and its required resources made and adopted; starting
-    needs both. Only required ones, to keep the suite fast: confirm-and-start makes all of
-    them and test_confirm_and_start covers that."""
+async def ready(app, prepared, extra=()):
+    """The course version is confirmed, its required resources (and those named in extra) made
+    and adopted, and the resources confirmed; starting needs all three. Only required ones by
+    default, to keep the suite fast: confirm-and-start makes all of them and
+    test_confirm_and_start covers that."""
     course_ref = prepared["course_ref"]
     if isinstance(course_ref, dict):
         course_ref = RevisionRef.model_validate(course_ref)
     key = f"{course_ref.object_id}:{course_ref.revision}"
     learner = app.learner_id
     result = app.confirm(f"confirm:{key}", learner, course_ref)
-    preview = app.store.read(RevisionRef.model_validate(result["preview_ref"]), learner)
-    for item in preview.body["resources"]:
-        if item["required"]:
+    for item in resources_of(app, learner, course_ref):
+        if item["required"] or item["resource_id"] in extra:
             name = item["resource_id"]
             made = await generate_resource(app, f"generate:{key}:{name}", learner, course_ref, name)
             adopt_resource(app, f"adopt:{key}:{name}", learner, course_ref, name, made["version"])
+    confirm_resources(app, f"resources:{key}", learner, course_ref)
     return result
 
 

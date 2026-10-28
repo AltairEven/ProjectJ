@@ -8,15 +8,16 @@ import pytest
 from support import LEARNER
 from test_picture_drafting import OPTIONS, STYLE, picture_draft
 from test_preparation_model import science_lesson
-from test_preparation_resources import preview
 
 from project_j.platform.models.contracts import AdapterReply
 from project_j.platform.storage import Conflict
 from project_j.preparation import resources as made
+from project_j.preparation.lessons import confirm_resources, lesson_of, remake_broken
 from project_j.preparation.pictures import picture_groups
 from project_j.preparation.resources import (
     choose_resource,
     generate_resource,
+    items_by_id,
     ready_resources,
     remake_resource,
 )
@@ -47,9 +48,7 @@ def confirm(application, course_ref, request_id="c1"):
 
 
 def items(application, course_ref) -> dict[str, dict]:
-    return {
-        item["resource_id"]: item for item in preview(application, course_ref).body["resources"]
-    }
+    return items_by_id(application, LEARNER, course_ref)
 
 
 def versions(item) -> int:
@@ -138,6 +137,7 @@ def test_failing_illustration_is_not_shown(application, monkeypatch):
     confirm(application, course_ref)
     scene = items(application, course_ref)["cup-scene"]
     assert (scene["state"], scene["rejected_reason"], versions(scene)) == ("rejected", "wrong", 3)
+    confirm_resources(application, "r1", LEARNER, course_ref)
     application.start("s1", LEARNER, course_ref, materials_ready=True)
     assert "cup-scene" not in application.visuals and "kitchen-motion" in application.visuals
 
@@ -342,3 +342,43 @@ def test_picture_logs_carry_no_content(application, monkeypatch, caplog):
     assert f"resource adopted course={course_ref.object_id} resource=cup-scene" in text
     for secret in ("What cup-", "Which one shows", STYLE, "Simulated picture", "water"):
         assert secret not in text
+
+
+def confirmed_lesson(application, monkeypatch):
+    course_ref, adapter, counted = lesson(application, monkeypatch)
+    confirm(application, course_ref)
+    confirm_resources(application, "r1", LEARNER, course_ref)
+    return course_ref, adapter, lesson_of(application, LEARNER, course_ref)
+
+
+def test_a_broken_option_picture_is_remade_and_checked_with_the_others(application, monkeypatch):
+    course_ref, adapter, before = confirmed_lesson(application, monkeypatch)
+    files = before.body["files"]
+    broken = OPTION_IDS[1]
+    (application.store.run / files[broken]["path"]).write_bytes(b"broken")
+    # The check reads the story: once confirmed it comes from story.md, the draft is gone.
+    remade = asyncio.run(remake_broken(application, "b1", LEARNER, course_ref))
+    assert remade["remade"] == [broken]
+    after = lesson_of(application, LEARNER, course_ref).body["files"]
+    assert {name: after[name]["sha256"] for name in files if name != broken} == {
+        name: files[name]["sha256"] for name in files if name != broken
+    }
+    application.files.read_binary(after[broken])
+
+
+def test_a_remade_option_failing_three_times_turns_the_question_to_words(application, monkeypatch):
+    course_ref, adapter, before = confirmed_lesson(application, monkeypatch)
+    files = before.body["files"]
+    (application.store.run / files[OPTION_IDS[1]]["path"]).write_bytes(b"broken")
+    adapter.reject_pictures = [{2}, {2}, {2}]
+    asyncio.run(remake_broken(application, "b1", LEARNER, course_ref))
+    after = lesson_of(application, LEARNER, course_ref).body
+    assert set(OPTION_IDS) <= set(after["rejected"]) and not set(OPTION_IDS) & set(after["files"])
+    assert not any((application.store.run / files[name]["path"]).exists() for name in OPTION_IDS)
+    rest = [name for name in files if name not in OPTION_IDS]
+    assert {name: after["files"][name]["sha256"] for name in rest} == {
+        name: files[name]["sha256"] for name in rest
+    }
+    started = application.start("s1", LEARNER, course_ref, materials_ready=True)
+    assert started["decision"] == "allow_simulation"
+    assert not set(OPTION_IDS) & set(application.visuals)  # The question goes in words.

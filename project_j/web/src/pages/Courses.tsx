@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { api, fileUrl, show, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
-import { courseRows, latestFact, needsMaterials, previewLabels, previewOf, previewRank, retakeOffered, storyLevelLine } from '../courses'
+import { courseRows, latestFact, lessonOf, needsMaterials, previewLabels, previewOf, previewRank, resourcesOf, retakeOffered, storyLevelLine } from '../courses'
 import { discussionLines, resourceLines } from '../report'
 import { JobLine, Rows, useRun, type PageProps } from '../ui'
 
@@ -24,9 +24,11 @@ function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & 
   const taught = state === 'Taken' || state === 'Evaluated'
   const retaking = taught && retakeOffered(dashboard.next, course)  // Stopped: the same class from the start.
   const courseRef = { object_id: course.object_id, revision: course.revision }
-  const resources = (preview?.body.resources ?? []) as Resource[]
+  // Each resource is its own record; once confirmed, the lesson folder holds the one in use (ADR-0027).
+  const resources = resourcesOf(course, objects).map(doc => doc.body) as Resource[]
+  const lesson = lessonOf(course, objects)
   const job = (kind: string) => (dashboard.jobs ?? []).find(item => item.name === `${kind}:${course.object_id}:${course.revision}`)
-  const confirming = job('confirm'), starting = job('start')
+  const confirming = job('confirm'), starting = job('start'), remaking = job('remake')
   const materials = needsMaterials(course)
   const fact = latestFact(course, objects)
   // Request bodies are made once, so resuming a failed operation repeats the same request.
@@ -41,6 +43,7 @@ function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & 
     const body = { request_id: uid(), learner_id: learner, course_ref: courseRef, resource_id: item.resource_id, version }
     return async () => { await api(token, 'resource/adopt', body) }
   }
+  const whole = () => ({ request_id: uid(), learner_id: learner, course_ref: courseRef })
   const look = (item: Resource, version: number) => async () => {
     const query = new URLSearchParams({ learner_id: learner, object_id: course.object_id, revision: String(course.revision),
       resource_id: item.resource_id, version: String(version) })
@@ -77,21 +80,30 @@ function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & 
         void run(async () => { await api(token, 'course/start', body) }, 'Starting') }}>{starting?.state === 'failed' ? 'Try again' : retaking ? 'Take it again' : 'Start'}</button></section>}
     {taught && fact && <section><h2>You took this lesson</h2><button className="quiet" onClick={() => go('evaluations', String(fact.body.activity_id))}>Read the evaluation</button></section>}
     {confirmed && preview && <section><h2>Resources</h2>
-      {resources.length ? <ul>{resourceLines(preview.body).map((line, index) => {
+      {lesson && <p>Confirmed. The lesson folder is {String(lesson.body.folder)}.</p>}
+      {remaking && <JobLine job={remaking} />}
+      {resources.length ? <ul>{resourceLines(resources, !!lesson).map((line, index) => {
         const item = resources[index], latest = item.versions?.length ?? 0
-        const version = Math.min(picked[item.resource_id] ?? latest, latest)
+        const version = lesson ? item.adopted_version ?? 0 : Math.min(picked[item.resource_id] ?? latest, latest)
         return <li key={item.resource_id}>{line}
-          {generatable.includes(item.kind) && <div className="row">
+          {generatable.includes(item.kind) && (lesson ? version > 0 && <div className="row">
+            <button className="quiet" disabled={busy} onClick={() => void run(look(item, version))}>{item.kind === 'audio' ? 'Listen' : 'Look'}</button></div>
+          : <div className="row">
             <button className="quiet" disabled={busy} onClick={() => void run(generate(item), `Making ${item.resource_id}`)}>{latest ? 'Make again' : 'Make'}</button>
             {latest > 1 && <select aria-label="Choose a version" value={version} disabled={busy}
               onChange={event => setPicked(current => ({ ...current, [item.resource_id]: Number(event.target.value) }))}>
               {Array.from({ length: latest }, (_, i) => i + 1).map(n => <option key={n} value={n}>Version {n}{item.adopted_version === n ? ' (in use)' : ''}</option>)}</select>}
             {latest > 0 && <><button className="quiet" disabled={busy} onClick={() => void run(look(item, version))}>{item.kind === 'audio' ? 'Listen to' : 'Look at'} version {version}</button>
               <button disabled={busy || item.adopted_version === version} onClick={() => void run(adopt(item, version))}>Use version {version}</button></>}
-          </div>}
+          </div>)}
           {shown[item.resource_id] && <img className="resource-preview" src={shown[item.resource_id]} alt={item.purpose} />}
         </li>
-      })}</ul> : <p>This lesson needs no extra resources.</p>}</section>}
+      })}</ul> : <p>This lesson needs no extra resources.</p>}
+      {lesson ? <><p>If a voice or picture no longer plays or shows, Jane makes only that one again.</p>
+        <button className="quiet" disabled={busy || remaking?.state === 'running'} onClick={() => void run(async () => { await api(token, 'course/resources/remake', whole()) })}>Remake broken resources</button></>
+      : <><h3>Confirm resources</h3>
+        <p>Confirming keeps the version in use for each resource and removes the others. After that they cannot be changed.</p>
+        <button disabled={busy || confirming?.state === 'running'} onClick={() => void run(async () => { await api(token, 'course/resources/confirm', whole()) }, 'Confirming resources')}>Confirm resources</button></>}</section>}
   </>
 }
 

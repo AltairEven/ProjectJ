@@ -24,6 +24,8 @@ OWNERS = {
     "capability": "learning",
     "vocabulary": "learning",
     "preview": "preparation",
+    "resource": "preparation",
+    "lesson": "preparation",
     "content_check": "preparation",
     "issue": "evaluation",
     "restriction": "curriculum",

@@ -66,6 +66,7 @@ from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.local import LocalSynthesizer, SynthesizerUnavailable
 from project_j.platform.tts.recorded import speak
+from project_j.preparation.lessons import confirm_resources, remake_broken
 from project_j.preparation.resources import choose_resource, remake_resource, resource_file
 
 LEARNER_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
@@ -343,9 +344,17 @@ class PreparationResult(Contract):
     unverified: tuple[str, ...]
 
 
+class LessonResult(Contract):
+    course_ref: RevisionRef
+    lesson_ref: RevisionRef
+    folder: str
+    number: int
+    state: Literal["confirmed"]
+
+
 class ResourceResult(Contract):
     course_ref: RevisionRef
-    preview_ref: RevisionRef
+    resource_ref: RevisionRef
     resource_id: str
     version: int
     state: Literal["generated", "adopted"]
@@ -705,6 +714,17 @@ def create_app(
             request.version,
         )
 
+    @app.post(
+        "/api/course/resources/confirm",
+        dependencies=[Depends(operator)],
+        response_model=LessonResult,
+    )
+    async def resources_confirm(request: CourseRequest):
+        """Keep the version in use of each resource in the lesson folder; the rest go."""
+        return confirm_resources(
+            controller(), request.request_id, request.learner_id, request.course_ref
+        )
+
     @app.get("/api/resource/file", dependencies=[Depends(operator)])
     async def resource_download(
         object_id: str,
@@ -763,6 +783,18 @@ def create_app(
             f"confirm:{course.object_id}:{course.revision}",
             lambda progress: controller().confirm_course(
                 request.request_id, request.learner_id, course, progress
+            ),
+        )
+
+    @app.post("/api/course/resources/remake", dependencies=[Depends(operator)], status_code=202)
+    async def resources_remake(request: CourseRequest):
+        """Make again the confirmed resources whose file no longer works."""
+        course = request.course_ref
+        return background(
+            request.learner_id,
+            f"remake:{course.object_id}:{course.revision}",
+            lambda progress: remake_broken(
+                controller(), request.request_id, request.learner_id, course, progress
             ),
         )
 

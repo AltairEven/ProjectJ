@@ -134,9 +134,11 @@ export function revisionChanges(current: Doc, previous: Doc, docs: Doc[]): [stri
 }
 
 /** One line per teaching resource: kind, need, stage, purpose, Jane's words, fallback, state and versions. */
-export function resourceLines(preview: Body): string[] {
-  return (preview.resources ?? []).map((item: Body) => {
-    const versions = item.versions?.length ? `${item.adopted_version ? `, version ${item.adopted_version} in use` : ''}, ${item.versions.length} in all` : ''
+/** One line per resource record; once the resources are confirmed (locked) only the version in
+ * use is kept, so no version counts (ADR-0027). */
+export function resourceLines(items: Body[], locked = false): string[] {
+  return items.map((item: Body) => {
+    const versions = !locked && item.versions?.length ? `${item.adopted_version ? `, version ${item.adopted_version} in use` : ''}, ${item.versions.length} in all` : ''
     const stage = `${stageLabels[item.stage] ?? item.stage}${item.paragraph ? `, paragraph ${item.paragraph}` : ''}${item.picture_question ? ', picture question' : ''}`
     const reason = checkReasons[item.rejected_reason] ?? item.rejected_reason
     const state = item.state === 'rejected' ? `${item.stage === 'story' ? 'Not shown' : 'In words instead'}: ${reason}`

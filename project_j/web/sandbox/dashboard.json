@@ -3480,7 +3480,6 @@
         "note": "Reused the paper bridge course from the library.",
         "resources": [
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3489,32 +3488,11 @@
             "required": false,
             "resource_id": "voice:goal",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [],
-            "text": "I'm Jane. First we read a story and find the words that show the answers, then do a short observation away from the screen. You can pause or stop at any time. Did you hear the plan?",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 1303244,
-                  "path": "assets/fbb3572999ec7d384fa4bca7eb27bde6a0385336c3ae0e0de2d3b76520c6c239.wav",
-                  "sha256": "fbb3572999ec7d384fa4bca7eb27bde6a0385336c3ae0e0de2d3b76520c6c239"
-                },
-                "generated_at": "2026-10-21T17:47:35.934775+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 27.15,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "I'm Jane. First we read a story and find the words that show the answers, then do a short observation away from the screen. You can pause or stop at any time. Did you hear the plan?"
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3523,34 +3501,13 @@
             "required": false,
             "resource_id": "voice:reading-fact",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "reading-fact"
             ],
-            "text": "What does Mia want to make?",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 194444,
-                  "path": "assets/51781d3cb8cb77d742d0c483ae9b0ebbe08cef594e8e35768d4a24525538a183.wav",
-                  "sha256": "51781d3cb8cb77d742d0c483ae9b0ebbe08cef594e8e35768d4a24525538a183"
-                },
-                "generated_at": "2026-10-21T17:47:35.956661+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 4.05,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "What does Mia want to make?"
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3559,34 +3516,13 @@
             "required": false,
             "resource_id": "voice:reading-sequence",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "reading-sequence"
             ],
-            "text": "What did Mia do to the new paper before the successful try?",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 424844,
-                  "path": "assets/613b78a9db96dde892dc0fff9e7067c1f43e69c2131dfd5d3f705dc6ae88317a.wav",
-                  "sha256": "613b78a9db96dde892dc0fff9e7067c1f43e69c2131dfd5d3f705dc6ae88317a"
-                },
-                "generated_at": "2026-10-21T17:47:35.979457+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 8.85,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "What did Mia do to the new paper before the successful try?"
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3595,34 +3531,13 @@
             "required": false,
             "resource_id": "voice:point-paper",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "point-paper"
             ],
-            "text": "Point to the paper you mean, then say which one you pointed to.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 453644,
-                  "path": "assets/169e7aef29a6f98e02d823472a5559ef0300674c2e839900330f8309d01aa486.wav",
-                  "sha256": "169e7aef29a6f98e02d823472a5559ef0300674c2e839900330f8309d01aa486"
-                },
-                "generated_at": "2026-10-21T17:47:36.003313+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 9.45,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Point to the paper you mean, then say which one you pointed to."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3631,34 +3546,13 @@
             "required": false,
             "resource_id": "voice:paper-experiment",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "paper-experiment"
             ],
-            "text": "Away from the screen, compare your two paper bridge tries. Come back and report: were the things the same, what did you change, what really happened, and did anyone help? This takes about 7 minutes. When you are done, press \"Back\" and tell me what really happened.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 1900844,
-                  "path": "assets/48cd021f4513f7329f214c614792104a9e5169130d71305ea947cd7d6e8daf18.wav",
-                  "sha256": "48cd021f4513f7329f214c614792104a9e5169130d71305ea947cd7d6e8daf18"
-                },
-                "generated_at": "2026-10-21T17:47:36.030248+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 39.6,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Away from the screen, compare your two paper bridge tries. Come back and report: were the things the same, what did you change, what really happened, and did anyone help? This takes about 7 minutes. When you are done, press \"Back\" and tell me what really happened."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3667,34 +3561,13 @@
             "required": false,
             "resource_id": "voice:choice-first-try",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "choice-first-try"
             ],
-            "text": "What happens the first time Mia puts her car on the paper?",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 417644,
-                  "path": "assets/b552c27b72a63172a1e138e5ef7ad2fc73af2da1f7f3e68848cba0e1386c09a6.wav",
-                  "sha256": "b552c27b72a63172a1e138e5ef7ad2fc73af2da1f7f3e68848cba0e1386c09a6"
-                },
-                "generated_at": "2026-10-21T17:47:36.058616+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 8.7,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "What happens the first time Mia puts her car on the paper?"
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3703,34 +3576,13 @@
             "required": false,
             "resource_id": "voice:order-bridge",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "order-bridge"
             ],
-            "text": "Put these in the order they happen in the story.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 345644,
-                  "path": "assets/4f9d9837e91ce1cb773fad39247bc7e56a48862b96febaeb117e5ff99e6fe191.wav",
-                  "sha256": "4f9d9837e91ce1cb773fad39247bc7e56a48862b96febaeb117e5ff99e6fe191"
-                },
-                "generated_at": "2026-10-21T17:47:36.085900+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 7.2,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Put these in the order they happen in the story."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3739,34 +3591,13 @@
             "required": false,
             "resource_id": "voice:match-words",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "match-words"
             ],
-            "text": "Match each word from the story with what it means.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 360044,
-                  "path": "assets/e898f9a7b8bf70cb9cf3b5abd68570539452acf8fea9b1384cd80dd4185e64f3.wav",
-                  "sha256": "e898f9a7b8bf70cb9cf3b5abd68570539452acf8fea9b1384cd80dd4185e64f3"
-                },
-                "generated_at": "2026-10-21T17:47:36.113657+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 7.5,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Match each word from the story with what it means."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3775,34 +3606,13 @@
             "required": false,
             "resource_id": "voice:fill-puts",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "fill-puts"
             ],
-            "text": "Fill in the blank with a word from the story.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 324044,
-                  "path": "assets/90e628b892397d0b6d838ab0c29b392b328e4f340ce6d5c3e39674cf86d0d324.wav",
-                  "sha256": "90e628b892397d0b6d838ab0c29b392b328e4f340ce6d5c3e39674cf86d0d324"
-                },
-                "generated_at": "2026-10-21T17:47:36.143635+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 6.75,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Fill in the blank with a word from the story."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3811,34 +3621,13 @@
             "required": false,
             "resource_id": "voice:read-aloud-1",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "read-aloud-1"
             ],
-            "text": "Read part 1 of 2 aloud. Press the microphone to start and Done when you finish.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 568844,
-                  "path": "assets/a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4.wav",
-                  "sha256": "a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4"
-                },
-                "generated_at": "2026-10-21T17:47:36.173400+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 11.85,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Read part 1 of 2 aloud. Press the microphone to start and Done when you finish."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3847,34 +3636,13 @@
             "required": false,
             "resource_id": "voice:read-aloud-2",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "read-aloud-2"
             ],
-            "text": "Read part 2 of 2 aloud. Press the microphone to start and Done when you finish.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 568844,
-                  "path": "assets/a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4.wav",
-                  "sha256": "a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4"
-                },
-                "generated_at": "2026-10-21T17:47:36.204382+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 11.85,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Read part 2 of 2 aloud. Press the microphone to start and Done when you finish."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3883,34 +3651,13 @@
             "required": false,
             "resource_id": "voice:retell-bridge",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "retell-bridge"
             ],
-            "text": "Tell the story in two or three sentences: what went wrong first, and what did Mia change?",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 640844,
-                  "path": "assets/a0c105a7e4c8ae56f83bb762867402494c680c4b2109702e7830f63c82037934.wav",
-                  "sha256": "a0c105a7e4c8ae56f83bb762867402494c680c4b2109702e7830f63c82037934"
-                },
-                "generated_at": "2026-10-21T17:47:36.236474+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 13.35,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Tell the story in two or three sentences: what went wrong first, and what did Mia change?"
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3919,34 +3666,13 @@
             "required": false,
             "resource_id": "voice:choice-first-try:correct",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "choice-first-try"
             ],
-            "text": "Right! You found it.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 144044,
-                  "path": "assets/cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94.wav",
-                  "sha256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94"
-                },
-                "generated_at": "2026-10-21T17:47:36.269890+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 3.0,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Right! You found it."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3955,34 +3681,13 @@
             "required": false,
             "resource_id": "voice:choice-first-try:wrong-1",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "choice-first-try"
             ],
-            "text": "Not yet. Go back to the last sentence of part two. What happens to the paper and the car?",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 640844,
-                  "path": "assets/a0c105a7e4c8ae56f83bb762867402494c680c4b2109702e7830f63c82037934.wav",
-                  "sha256": "a0c105a7e4c8ae56f83bb762867402494c680c4b2109702e7830f63c82037934"
-                },
-                "generated_at": "2026-10-21T17:47:36.304129+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 13.35,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Not yet. Go back to the last sentence of part two. What happens to the paper and the car?"
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -3991,34 +3696,13 @@
             "required": false,
             "resource_id": "voice:choice-first-try:hint-1",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "choice-first-try"
             ],
-            "text": "Go back to the last sentence of part two. What happens to the paper and the car?",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 576044,
-                  "path": "assets/69cb3f12fbdd46bf2f41eaddcec48e76d6c46ad836db55c34dc23370f43acfb6.wav",
-                  "sha256": "69cb3f12fbdd46bf2f41eaddcec48e76d6c46ad836db55c34dc23370f43acfb6"
-                },
-                "generated_at": "2026-10-21T17:47:36.339790+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 12.0,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Go back to the last sentence of part two. What happens to the paper and the car?"
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4027,34 +3711,13 @@
             "required": false,
             "resource_id": "voice:choice-first-try:wrong-2",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "choice-first-try"
             ],
-            "text": "Not yet. The first time, the paper moves and so does the car. Pick the one about both.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 619244,
-                  "path": "assets/20344481172b9469954483dc8fd39a398380ccf02126b759bffa0e5b010a5e6c.wav",
-                  "sha256": "20344481172b9469954483dc8fd39a398380ccf02126b759bffa0e5b010a5e6c"
-                },
-                "generated_at": "2026-10-21T17:47:36.376664+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 12.9,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Not yet. The first time, the paper moves and so does the car. Pick the one about both."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4063,34 +3726,13 @@
             "required": false,
             "resource_id": "voice:choice-first-try:hint-2",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "choice-first-try"
             ],
-            "text": "The first time, the paper moves and so does the car. Pick the one about both.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 554444,
-                  "path": "assets/f6639fe3374e8bc3f23acb9cd87b1ba7ca8f4cf34ab5607fceee31c91898ba7a.wav",
-                  "sha256": "f6639fe3374e8bc3f23acb9cd87b1ba7ca8f4cf34ab5607fceee31c91898ba7a"
-                },
-                "generated_at": "2026-10-21T17:47:36.413765+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 11.55,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "The first time, the paper moves and so does the car. Pick the one about both."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4099,34 +3741,13 @@
             "required": false,
             "resource_id": "voice:choice-first-try:exit",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "choice-first-try"
             ],
-            "text": "Let's stop this one here and go on.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 252044,
-                  "path": "assets/13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8.wav",
-                  "sha256": "13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8"
-                },
-                "generated_at": "2026-10-21T17:47:36.452927+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 5.25,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Let's stop this one here and go on."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4135,34 +3756,13 @@
             "required": false,
             "resource_id": "voice:order-bridge:correct",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "order-bridge"
             ],
-            "text": "Right! You found it.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 144044,
-                  "path": "assets/cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94.wav",
-                  "sha256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94"
-                },
-                "generated_at": "2026-10-21T17:47:36.492276+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 3.0,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Right! You found it."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4171,34 +3771,13 @@
             "required": false,
             "resource_id": "voice:order-bridge:wrong-1",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "order-bridge"
             ],
-            "text": "Not yet. Find the sentence where the paper first goes on the books.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 482444,
-                  "path": "assets/19eeca2c1e8c503e2a1ee83e8034bda5fa9465105e3971817940f91053ed6166.wav",
-                  "sha256": "19eeca2c1e8c503e2a1ee83e8034bda5fa9465105e3971817940f91053ed6166"
-                },
-                "generated_at": "2026-10-21T17:47:36.532355+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 10.05,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Not yet. Find the sentence where the paper first goes on the books."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4207,34 +3786,13 @@
             "required": false,
             "resource_id": "voice:order-bridge:hint-1",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "order-bridge"
             ],
-            "text": "Find the sentence where the paper first goes on the books.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 417644,
-                  "path": "assets/b552c27b72a63172a1e138e5ef7ad2fc73af2da1f7f3e68848cba0e1386c09a6.wav",
-                  "sha256": "b552c27b72a63172a1e138e5ef7ad2fc73af2da1f7f3e68848cba0e1386c09a6"
-                },
-                "generated_at": "2026-10-21T17:47:36.574044+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 8.7,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Find the sentence where the paper first goes on the books."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4243,34 +3801,13 @@
             "required": false,
             "resource_id": "voice:order-bridge:wrong-2",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "order-bridge"
             ],
-            "text": "Not yet. First the paper goes on. Only after it bends does Mia have a new idea.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 568844,
-                  "path": "assets/a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4.wav",
-                  "sha256": "a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4"
-                },
-                "generated_at": "2026-10-21T17:47:36.616852+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 11.85,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Not yet. First the paper goes on. Only after it bends does Mia have a new idea."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4279,34 +3816,13 @@
             "required": false,
             "resource_id": "voice:order-bridge:hint-2",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "order-bridge"
             ],
-            "text": "First the paper goes on. Only after it bends does Mia have a new idea.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 504044,
-                  "path": "assets/293dece6a2f1bfa872cb89fc1bb47b98db62682e5380c277cb9070bb09ed6f84.wav",
-                  "sha256": "293dece6a2f1bfa872cb89fc1bb47b98db62682e5380c277cb9070bb09ed6f84"
-                },
-                "generated_at": "2026-10-21T17:47:36.660205+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 10.5,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "First the paper goes on. Only after it bends does Mia have a new idea."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4315,34 +3831,13 @@
             "required": false,
             "resource_id": "voice:order-bridge:exit",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "order-bridge"
             ],
-            "text": "Let's stop this one here and go on.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 252044,
-                  "path": "assets/13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8.wav",
-                  "sha256": "13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8"
-                },
-                "generated_at": "2026-10-21T17:47:36.705086+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 5.25,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Let's stop this one here and go on."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4351,34 +3846,13 @@
             "required": false,
             "resource_id": "voice:match-words:correct",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "match-words"
             ],
-            "text": "Right! You found it.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 144044,
-                  "path": "assets/cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94.wav",
-                  "sha256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94"
-                },
-                "generated_at": "2026-10-21T17:47:36.751682+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 3.0,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Right! You found it."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4387,34 +3861,13 @@
             "required": false,
             "resource_id": "voice:match-words:wrong-1",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "match-words"
             ],
-            "text": "Not yet. Find these words in the story. Is each one about the paper, Mia or the car?",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 604844,
-                  "path": "assets/d5f7b466b09b838046618013e7adfb38d5176e852ac56c31cdeba52ed99a0905.wav",
-                  "sha256": "d5f7b466b09b838046618013e7adfb38d5176e852ac56c31cdeba52ed99a0905"
-                },
-                "generated_at": "2026-10-21T17:47:36.799262+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 12.6,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Not yet. Find these words in the story. Is each one about the paper, Mia or the car?"
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4423,34 +3876,13 @@
             "required": false,
             "resource_id": "voice:match-words:hint-1",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "match-words"
             ],
-            "text": "Find these words in the story. Is each one about the paper, Mia or the car?",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 540044,
-                  "path": "assets/08819894486db63e31dd93d0dbde1c782ff630edd982fe0c76f57646fa3fa745.wav",
-                  "sha256": "08819894486db63e31dd93d0dbde1c782ff630edd982fe0c76f57646fa3fa745"
-                },
-                "generated_at": "2026-10-21T17:47:36.848877+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 11.25,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Find these words in the story. Is each one about the paper, Mia or the car?"
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4459,34 +3891,13 @@
             "required": false,
             "resource_id": "voice:match-words:wrong-2",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "match-words"
             ],
-            "text": "Not yet. \"bends\" is about the paper, \"folds\" is what Mia does to the paper, \"smiles\" is about her face.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 741644,
-                  "path": "assets/ce18b2a5a30f11868f3eeb70fec2b59a07815e0bcea832445274c4417419d975.wav",
-                  "sha256": "ce18b2a5a30f11868f3eeb70fec2b59a07815e0bcea832445274c4417419d975"
-                },
-                "generated_at": "2026-10-21T17:47:36.898768+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 15.45,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Not yet. \"bends\" is about the paper, \"folds\" is what Mia does to the paper, \"smiles\" is about her face."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4495,34 +3906,13 @@
             "required": false,
             "resource_id": "voice:match-words:hint-2",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "match-words"
             ],
-            "text": "\"bends\" is about the paper, \"folds\" is what Mia does to the paper, \"smiles\" is about her face.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 676844,
-                  "path": "assets/fae91c21cc726a15c680c625eef57eb58f69a5ef7a0b1347afa38587816e1bc8.wav",
-                  "sha256": "fae91c21cc726a15c680c625eef57eb58f69a5ef7a0b1347afa38587816e1bc8"
-                },
-                "generated_at": "2026-10-21T17:47:36.950015+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 14.1,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "\"bends\" is about the paper, \"folds\" is what Mia does to the paper, \"smiles\" is about her face."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4531,34 +3921,13 @@
             "required": false,
             "resource_id": "voice:match-words:exit",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "match-words"
             ],
-            "text": "Let's stop this one here and go on.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 252044,
-                  "path": "assets/13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8.wav",
-                  "sha256": "13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8"
-                },
-                "generated_at": "2026-10-21T17:47:37.002074+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 5.25,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Let's stop this one here and go on."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4567,34 +3936,13 @@
             "required": false,
             "resource_id": "voice:fill-puts:correct",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "fill-puts"
             ],
-            "text": "Right! You found it.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 144044,
-                  "path": "assets/cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94.wav",
-                  "sha256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94"
-                },
-                "generated_at": "2026-10-21T17:47:37.055020+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 3.0,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Right! You found it."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4603,34 +3951,13 @@
             "required": false,
             "resource_id": "voice:fill-puts:wrong-1",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "fill-puts"
             ],
-            "text": "Not yet. Find the sentence with \"her car on the paper\".",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 396044,
-                  "path": "assets/65649b93b5af1f2321a48537622dd56cc0776d9c9efda9fef00e7a78978f523d.wav",
-                  "sha256": "65649b93b5af1f2321a48537622dd56cc0776d9c9efda9fef00e7a78978f523d"
-                },
-                "generated_at": "2026-10-21T17:47:37.109339+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 8.25,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Not yet. Find the sentence with \"her car on the paper\"."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4639,34 +3966,13 @@
             "required": false,
             "resource_id": "voice:fill-puts:hint-1",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "fill-puts"
             ],
-            "text": "Find the sentence with \"her car on the paper\".",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 331244,
-                  "path": "assets/bcad2d320874eb4fe4ea1412a710221eca01a0f9503ed421eb07b6d40980b497.wav",
-                  "sha256": "bcad2d320874eb4fe4ea1412a710221eca01a0f9503ed421eb07b6d40980b497"
-                },
-                "generated_at": "2026-10-21T17:47:37.165298+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 6.9,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Find the sentence with \"her car on the paper\"."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4675,34 +3981,13 @@
             "required": false,
             "resource_id": "voice:fill-puts:wrong-2",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "fill-puts"
             ],
-            "text": "Not yet. In this sentence Mia moves her car onto the paper. Pick the word for that.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 597644,
-                  "path": "assets/f4ab03a8bfba0412faeb672c9cafe27eaea31ecf03835c42ead790bfd53f915e.wav",
-                  "sha256": "f4ab03a8bfba0412faeb672c9cafe27eaea31ecf03835c42ead790bfd53f915e"
-                },
-                "generated_at": "2026-10-21T17:47:37.222369+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 12.45,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Not yet. In this sentence Mia moves her car onto the paper. Pick the word for that."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4711,34 +3996,13 @@
             "required": false,
             "resource_id": "voice:fill-puts:hint-2",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "fill-puts"
             ],
-            "text": "In this sentence Mia moves her car onto the paper. Pick the word for that.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 532844,
-                  "path": "assets/afbe31298d4ab0f68b5e5faccba74300c00ec384f4f9c5e55efa5d179958850b.wav",
-                  "sha256": "afbe31298d4ab0f68b5e5faccba74300c00ec384f4f9c5e55efa5d179958850b"
-                },
-                "generated_at": "2026-10-21T17:47:37.296109+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 11.1,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "In this sentence Mia moves her car onto the paper. Pick the word for that."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Made ahead from the course text and played in class",
             "fallback": "If not adopted, the same sentence is spoken live",
@@ -4747,34 +4011,13 @@
             "required": false,
             "resource_id": "voice:fill-puts:exit",
             "stage": "question",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "fill-puts"
             ],
-            "text": "Let's stop this one here and go on.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 252044,
-                  "path": "assets/13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8.wav",
-                  "sha256": "13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8"
-                },
-                "generated_at": "2026-10-21T17:47:37.356241+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 5.25,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Let's stop this one here and go on."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Jane reads this part aloud as the second help",
             "fallback": "The class starts only after the model reading is adopted; live speech never stands in for it",
@@ -4783,34 +4026,13 @@
             "required": true,
             "resource_id": "demo:read-aloud-1",
             "stage": "help",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "read-aloud-1"
             ],
-            "text": "Mia has a toy car. She wants a bridge for her car. She puts two books on the table. There is a space between the books. Mia puts a piece of paper on the books. The paper makes a bridge. She puts her car on the paper. The paper bends. The car falls.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 1785644,
-                  "path": "assets/5d79fd14b9067387e38f646cdaed1e5dc394cb7ca55e38463351e00fa6bdc638.wav",
-                  "sha256": "5d79fd14b9067387e38f646cdaed1e5dc394cb7ca55e38463351e00fa6bdc638"
-                },
-                "generated_at": "2026-10-21T17:47:37.420060+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 37.2,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "Mia has a toy car. She wants a bridge for her car. She puts two books on the table. There is a space between the books. Mia puts a piece of paper on the books. The paper makes a bridge. She puts her car on the paper. The paper bends. The car falls."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
             "content": "Jane reads this part aloud as the second help",
             "fallback": "The class starts only after the model reading is adopted; live speech never stands in for it",
@@ -4819,41 +4041,14 @@
             "required": true,
             "resource_id": "demo:read-aloud-2",
             "stage": "help",
-            "state": "adopted",
+            "state": "planned",
             "task_ids": [
               "read-aloud-2"
             ],
-            "text": "“Can I make a new bridge?” says Mia. She folds a new piece of paper. She puts it on the same books. She tries the same car again. This time, the car stays on the bridge. Mia smiles. She draws the two bridges for Dad. “This one holds my car,” she says.",
-            "versions": [
-              {
-                "asset": {
-                  "bytes": 1807244,
-                  "path": "assets/f64ca5f432a860cb584752b421a817786b08d75eb4aa92e2c6fd55273836db5e.wav",
-                  "sha256": "f64ca5f432a860cb584752b421a817786b08d75eb4aa92e2c6fd55273836db5e"
-                },
-                "generated_at": "2026-10-21T17:47:37.488759+00:00",
-                "media_type": "audio/wav",
-                "source": {
-                  "audio_seconds": 37.65,
-                  "model": null,
-                  "sample_rate": 24000,
-                  "service": "simulated-synthesis",
-                  "version": "1",
-                  "voice": "simulated"
-                },
-                "version": 1
-              }
-            ]
+            "text": "“Can I make a new bridge?” says Mia. She folds a new piece of paper. She puts it on the same books. She tries the same car again. This time, the car stays on the bridge. Mia smiles. She draws the two bridges for Dad. “This one holds my car,” she says."
           },
           {
-            "adopted_version": 1,
             "audience": "student",
-            "checks": {
-              "1": {
-                "result": "pass",
-                "reason": null
-              }
-            },
             "content": "Mia folds the paper bridge",
             "fallback": "Read the words.",
             "kind": "image",
@@ -4864,35 +4059,11 @@
             "required": false,
             "resource_id": "story-1",
             "stage": "story",
-            "state": "adopted",
-            "task_ids": [],
-            "versions": [
-              {
-                "version": 1,
-                "generated_at": "2026-10-27T09:00:00+00:00",
-                "media_type": "image/png",
-                "source": {
-                  "description": "Simulated picture."
-                }
-              }
-            ]
+            "state": "planned",
+            "task_ids": []
           },
           {
             "audience": "student",
-            "checks": {
-              "1": {
-                "result": "fail",
-                "reason": "alike"
-              },
-              "2": {
-                "result": "fail",
-                "reason": "alike"
-              },
-              "3": {
-                "result": "fail",
-                "reason": "alike"
-              }
-            },
             "content": "Option picture 1",
             "fallback": "Read the words.",
             "kind": "image",
@@ -4900,57 +4071,16 @@
             "paragraph": null,
             "picture_question": false,
             "purpose": "Option picture 1",
-            "rejected_reason": "alike",
             "required": false,
             "resource_id": "choice-option-0",
             "stage": "option",
-            "state": "rejected",
+            "state": "planned",
             "task_ids": [
               "choice-first-try"
-            ],
-            "versions": [
-              {
-                "version": 1,
-                "generated_at": "2026-10-27T09:00:00+00:00",
-                "media_type": "image/png",
-                "source": {
-                  "description": "Simulated picture."
-                }
-              },
-              {
-                "version": 2,
-                "generated_at": "2026-10-27T09:00:00+00:00",
-                "media_type": "image/png",
-                "source": {
-                  "description": "Simulated picture."
-                }
-              },
-              {
-                "version": 3,
-                "generated_at": "2026-10-27T09:00:00+00:00",
-                "media_type": "image/png",
-                "source": {
-                  "description": "Simulated picture."
-                }
-              }
             ]
           },
           {
             "audience": "student",
-            "checks": {
-              "1": {
-                "result": "fail",
-                "reason": "alike"
-              },
-              "2": {
-                "result": "fail",
-                "reason": "alike"
-              },
-              "3": {
-                "result": "fail",
-                "reason": "alike"
-              }
-            },
             "content": "Option picture 2",
             "fallback": "Read the words.",
             "kind": "image",
@@ -4958,57 +4088,16 @@
             "paragraph": null,
             "picture_question": false,
             "purpose": "Option picture 2",
-            "rejected_reason": "alike",
             "required": false,
             "resource_id": "choice-option-1",
             "stage": "option",
-            "state": "rejected",
+            "state": "planned",
             "task_ids": [
               "choice-first-try"
-            ],
-            "versions": [
-              {
-                "version": 1,
-                "generated_at": "2026-10-27T09:00:00+00:00",
-                "media_type": "image/png",
-                "source": {
-                  "description": "Simulated picture."
-                }
-              },
-              {
-                "version": 2,
-                "generated_at": "2026-10-27T09:00:00+00:00",
-                "media_type": "image/png",
-                "source": {
-                  "description": "Simulated picture."
-                }
-              },
-              {
-                "version": 3,
-                "generated_at": "2026-10-27T09:00:00+00:00",
-                "media_type": "image/png",
-                "source": {
-                  "description": "Simulated picture."
-                }
-              }
             ]
           },
           {
             "audience": "student",
-            "checks": {
-              "1": {
-                "result": "fail",
-                "reason": "alike"
-              },
-              "2": {
-                "result": "fail",
-                "reason": "alike"
-              },
-              "3": {
-                "result": "fail",
-                "reason": "alike"
-              }
-            },
             "content": "Option picture 3",
             "fallback": "Read the words.",
             "kind": "image",
@@ -5016,39 +4105,12 @@
             "paragraph": null,
             "picture_question": false,
             "purpose": "Option picture 3",
-            "rejected_reason": "alike",
             "required": false,
             "resource_id": "choice-option-2",
             "stage": "option",
-            "state": "rejected",
+            "state": "planned",
             "task_ids": [
               "choice-first-try"
-            ],
-            "versions": [
-              {
-                "version": 1,
-                "generated_at": "2026-10-27T09:00:00+00:00",
-                "media_type": "image/png",
-                "source": {
-                  "description": "Simulated picture."
-                }
-              },
-              {
-                "version": 2,
-                "generated_at": "2026-10-27T09:00:00+00:00",
-                "media_type": "image/png",
-                "source": {
-                  "description": "Simulated picture."
-                }
-              },
-              {
-                "version": 3,
-                "generated_at": "2026-10-27T09:00:00+00:00",
-                "media_type": "image/png",
-                "source": {
-                  "description": "Simulated picture."
-                }
-              }
             ]
           }
         ],
@@ -5057,6 +4119,3594 @@
           "actual_api",
           "voice"
         ]
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "21ec09124c3c87ca4855d2d33d081ba305f05a1b",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: opening",
+        "required": false,
+        "resource_id": "voice:goal",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [],
+        "text": "I'm Jane. First we read a story and find the words that show the answers, then do a short observation away from the screen. You can pause or stop at any time. Did you hear the plan?",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 1303244,
+              "path": "assets/fbb3572999ec7d384fa4bca7eb27bde6a0385336c3ae0e0de2d3b76520c6c239.wav",
+              "sha256": "fbb3572999ec7d384fa4bca7eb27bde6a0385336c3ae0e0de2d3b76520c6c239"
+            },
+            "generated_at": "2026-10-21T17:47:35.934775+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 27.15,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 0
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "9c771f3f97d9abc62d084280dc652f1a2c29b12b",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: question reading-fact",
+        "required": false,
+        "resource_id": "voice:reading-fact",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "reading-fact"
+        ],
+        "text": "What does Mia want to make?",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 194444,
+              "path": "assets/51781d3cb8cb77d742d0c483ae9b0ebbe08cef594e8e35768d4a24525538a183.wav",
+              "sha256": "51781d3cb8cb77d742d0c483ae9b0ebbe08cef594e8e35768d4a24525538a183"
+            },
+            "generated_at": "2026-10-21T17:47:35.956661+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 4.05,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 1
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "30c92a615515e1bbacc505c28f020aedf7ac6b4a",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: question reading-sequence",
+        "required": false,
+        "resource_id": "voice:reading-sequence",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "reading-sequence"
+        ],
+        "text": "What did Mia do to the new paper before the successful try?",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 424844,
+              "path": "assets/613b78a9db96dde892dc0fff9e7067c1f43e69c2131dfd5d3f705dc6ae88317a.wav",
+              "sha256": "613b78a9db96dde892dc0fff9e7067c1f43e69c2131dfd5d3f705dc6ae88317a"
+            },
+            "generated_at": "2026-10-21T17:47:35.979457+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 8.85,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 2
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "1c1f181b3b001f1ce051513f8bf4edbf38fe010e",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: question point-paper",
+        "required": false,
+        "resource_id": "voice:point-paper",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "point-paper"
+        ],
+        "text": "Point to the paper you mean, then say which one you pointed to.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 453644,
+              "path": "assets/169e7aef29a6f98e02d823472a5559ef0300674c2e839900330f8309d01aa486.wav",
+              "sha256": "169e7aef29a6f98e02d823472a5559ef0300674c2e839900330f8309d01aa486"
+            },
+            "generated_at": "2026-10-21T17:47:36.003313+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 9.45,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 3
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "1760d6e56e3e29a7eb1baed3bf1b4701837ca299",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: question paper-experiment",
+        "required": false,
+        "resource_id": "voice:paper-experiment",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "paper-experiment"
+        ],
+        "text": "Away from the screen, compare your two paper bridge tries. Come back and report: were the things the same, what did you change, what really happened, and did anyone help? This takes about 7 minutes. When you are done, press \"Back\" and tell me what really happened.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 1900844,
+              "path": "assets/48cd021f4513f7329f214c614792104a9e5169130d71305ea947cd7d6e8daf18.wav",
+              "sha256": "48cd021f4513f7329f214c614792104a9e5169130d71305ea947cd7d6e8daf18"
+            },
+            "generated_at": "2026-10-21T17:47:36.030248+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 39.6,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 4
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "c8da140e05807ae784579f7555b838b826d7e88a",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: question choice-first-try",
+        "required": false,
+        "resource_id": "voice:choice-first-try",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "choice-first-try"
+        ],
+        "text": "What happens the first time Mia puts her car on the paper?",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 417644,
+              "path": "assets/b552c27b72a63172a1e138e5ef7ad2fc73af2da1f7f3e68848cba0e1386c09a6.wav",
+              "sha256": "b552c27b72a63172a1e138e5ef7ad2fc73af2da1f7f3e68848cba0e1386c09a6"
+            },
+            "generated_at": "2026-10-21T17:47:36.058616+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 8.7,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 5
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "1b5d6b2e631039eb02b9f2665cc2482ccfc23715",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: question order-bridge",
+        "required": false,
+        "resource_id": "voice:order-bridge",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "order-bridge"
+        ],
+        "text": "Put these in the order they happen in the story.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 345644,
+              "path": "assets/4f9d9837e91ce1cb773fad39247bc7e56a48862b96febaeb117e5ff99e6fe191.wav",
+              "sha256": "4f9d9837e91ce1cb773fad39247bc7e56a48862b96febaeb117e5ff99e6fe191"
+            },
+            "generated_at": "2026-10-21T17:47:36.085900+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 7.2,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 6
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "2064d77aee48fa58f9696533e7f00fb5343f2ffa",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: question match-words",
+        "required": false,
+        "resource_id": "voice:match-words",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "match-words"
+        ],
+        "text": "Match each word from the story with what it means.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 360044,
+              "path": "assets/e898f9a7b8bf70cb9cf3b5abd68570539452acf8fea9b1384cd80dd4185e64f3.wav",
+              "sha256": "e898f9a7b8bf70cb9cf3b5abd68570539452acf8fea9b1384cd80dd4185e64f3"
+            },
+            "generated_at": "2026-10-21T17:47:36.113657+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 7.5,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 7
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "7319e6702cda3cb9cc476f67888f7aee73349ca8",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: question fill-puts",
+        "required": false,
+        "resource_id": "voice:fill-puts",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "fill-puts"
+        ],
+        "text": "Fill in the blank with a word from the story.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 324044,
+              "path": "assets/90e628b892397d0b6d838ab0c29b392b328e4f340ce6d5c3e39674cf86d0d324.wav",
+              "sha256": "90e628b892397d0b6d838ab0c29b392b328e4f340ce6d5c3e39674cf86d0d324"
+            },
+            "generated_at": "2026-10-21T17:47:36.143635+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 6.75,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 8
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "f53bb7e6c1556cc94a37cacee6e468ad8eb892fe",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: question read-aloud-1",
+        "required": false,
+        "resource_id": "voice:read-aloud-1",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "read-aloud-1"
+        ],
+        "text": "Read part 1 of 2 aloud. Press the microphone to start and Done when you finish.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 568844,
+              "path": "assets/a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4.wav",
+              "sha256": "a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4"
+            },
+            "generated_at": "2026-10-21T17:47:36.173400+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 11.85,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 9
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "29e0369ab2aee5ae8a883ab5b9272f6f318cab61",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: question read-aloud-2",
+        "required": false,
+        "resource_id": "voice:read-aloud-2",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "read-aloud-2"
+        ],
+        "text": "Read part 2 of 2 aloud. Press the microphone to start and Done when you finish.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 568844,
+              "path": "assets/a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4.wav",
+              "sha256": "a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4"
+            },
+            "generated_at": "2026-10-21T17:47:36.204382+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 11.85,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 10
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "e56758a81f531f308b302a28078023042d6f4bd1",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: question retell-bridge",
+        "required": false,
+        "resource_id": "voice:retell-bridge",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "retell-bridge"
+        ],
+        "text": "Tell the story in two or three sentences: what went wrong first, and what did Mia change?",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 640844,
+              "path": "assets/a0c105a7e4c8ae56f83bb762867402494c680c4b2109702e7830f63c82037934.wav",
+              "sha256": "a0c105a7e4c8ae56f83bb762867402494c680c4b2109702e7830f63c82037934"
+            },
+            "generated_at": "2026-10-21T17:47:36.236474+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 13.35,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 11
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "0534c4d2689d41eb07e6f4f4f257057454859928",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: choice-first-try, when right",
+        "required": false,
+        "resource_id": "voice:choice-first-try:correct",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "choice-first-try"
+        ],
+        "text": "Right! You found it.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 144044,
+              "path": "assets/cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94.wav",
+              "sha256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94"
+            },
+            "generated_at": "2026-10-21T17:47:36.269890+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 3.0,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 12
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "99463a766baae3ff946ee6b6f7a0b77d735017fc",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: choice-first-try, help 1 after a wrong answer",
+        "required": false,
+        "resource_id": "voice:choice-first-try:wrong-1",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "choice-first-try"
+        ],
+        "text": "Not yet. Go back to the last sentence of part two. What happens to the paper and the car?",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 640844,
+              "path": "assets/a0c105a7e4c8ae56f83bb762867402494c680c4b2109702e7830f63c82037934.wav",
+              "sha256": "a0c105a7e4c8ae56f83bb762867402494c680c4b2109702e7830f63c82037934"
+            },
+            "generated_at": "2026-10-21T17:47:36.304129+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 13.35,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 13
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "d3880204347a9a0f236d4be7b00f32b194efcec0",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: choice-first-try, help 1 on a hint",
+        "required": false,
+        "resource_id": "voice:choice-first-try:hint-1",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "choice-first-try"
+        ],
+        "text": "Go back to the last sentence of part two. What happens to the paper and the car?",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 576044,
+              "path": "assets/69cb3f12fbdd46bf2f41eaddcec48e76d6c46ad836db55c34dc23370f43acfb6.wav",
+              "sha256": "69cb3f12fbdd46bf2f41eaddcec48e76d6c46ad836db55c34dc23370f43acfb6"
+            },
+            "generated_at": "2026-10-21T17:47:36.339790+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 12.0,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 14
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "57b497bcc466d8d003d4458a47b336f3f4a730a7",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: choice-first-try, help 2 after a wrong answer",
+        "required": false,
+        "resource_id": "voice:choice-first-try:wrong-2",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "choice-first-try"
+        ],
+        "text": "Not yet. The first time, the paper moves and so does the car. Pick the one about both.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 619244,
+              "path": "assets/20344481172b9469954483dc8fd39a398380ccf02126b759bffa0e5b010a5e6c.wav",
+              "sha256": "20344481172b9469954483dc8fd39a398380ccf02126b759bffa0e5b010a5e6c"
+            },
+            "generated_at": "2026-10-21T17:47:36.376664+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 12.9,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 15
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "dafd1625e99f84cc7c965d613b2a76ea39ddbb83",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: choice-first-try, help 2 on a hint",
+        "required": false,
+        "resource_id": "voice:choice-first-try:hint-2",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "choice-first-try"
+        ],
+        "text": "The first time, the paper moves and so does the car. Pick the one about both.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 554444,
+              "path": "assets/f6639fe3374e8bc3f23acb9cd87b1ba7ca8f4cf34ab5607fceee31c91898ba7a.wav",
+              "sha256": "f6639fe3374e8bc3f23acb9cd87b1ba7ca8f4cf34ab5607fceee31c91898ba7a"
+            },
+            "generated_at": "2026-10-21T17:47:36.413765+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 11.55,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 16
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "1bce258437bf71a8822cdc04b54ac34e001d121a",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: choice-first-try, exit line",
+        "required": false,
+        "resource_id": "voice:choice-first-try:exit",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "choice-first-try"
+        ],
+        "text": "Let's stop this one here and go on.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 252044,
+              "path": "assets/13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8.wav",
+              "sha256": "13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8"
+            },
+            "generated_at": "2026-10-21T17:47:36.452927+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 5.25,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 17
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "b6ff59f00567335162604382576351c9d304906a",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: order-bridge, when right",
+        "required": false,
+        "resource_id": "voice:order-bridge:correct",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "order-bridge"
+        ],
+        "text": "Right! You found it.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 144044,
+              "path": "assets/cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94.wav",
+              "sha256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94"
+            },
+            "generated_at": "2026-10-21T17:47:36.492276+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 3.0,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 18
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "3412b5f215d2114970f970646093326ea51d5b65",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: order-bridge, help 1 after a wrong answer",
+        "required": false,
+        "resource_id": "voice:order-bridge:wrong-1",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "order-bridge"
+        ],
+        "text": "Not yet. Find the sentence where the paper first goes on the books.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 482444,
+              "path": "assets/19eeca2c1e8c503e2a1ee83e8034bda5fa9465105e3971817940f91053ed6166.wav",
+              "sha256": "19eeca2c1e8c503e2a1ee83e8034bda5fa9465105e3971817940f91053ed6166"
+            },
+            "generated_at": "2026-10-21T17:47:36.532355+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 10.05,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 19
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "98ab6cc4ea8f73929a8fc85a92bdd293b79ffd45",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: order-bridge, help 1 on a hint",
+        "required": false,
+        "resource_id": "voice:order-bridge:hint-1",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "order-bridge"
+        ],
+        "text": "Find the sentence where the paper first goes on the books.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 417644,
+              "path": "assets/b552c27b72a63172a1e138e5ef7ad2fc73af2da1f7f3e68848cba0e1386c09a6.wav",
+              "sha256": "b552c27b72a63172a1e138e5ef7ad2fc73af2da1f7f3e68848cba0e1386c09a6"
+            },
+            "generated_at": "2026-10-21T17:47:36.574044+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 8.7,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 20
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "ed05045973119fe670ec10564338614036a8c1d2",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: order-bridge, help 2 after a wrong answer",
+        "required": false,
+        "resource_id": "voice:order-bridge:wrong-2",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "order-bridge"
+        ],
+        "text": "Not yet. First the paper goes on. Only after it bends does Mia have a new idea.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 568844,
+              "path": "assets/a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4.wav",
+              "sha256": "a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4"
+            },
+            "generated_at": "2026-10-21T17:47:36.616852+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 11.85,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 21
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "e2ee51cc1f0dc06b6502e1c04cfffaacd12084b4",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: order-bridge, help 2 on a hint",
+        "required": false,
+        "resource_id": "voice:order-bridge:hint-2",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "order-bridge"
+        ],
+        "text": "First the paper goes on. Only after it bends does Mia have a new idea.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 504044,
+              "path": "assets/293dece6a2f1bfa872cb89fc1bb47b98db62682e5380c277cb9070bb09ed6f84.wav",
+              "sha256": "293dece6a2f1bfa872cb89fc1bb47b98db62682e5380c277cb9070bb09ed6f84"
+            },
+            "generated_at": "2026-10-21T17:47:36.660205+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 10.5,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 22
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "aeb93a60beea4ee52d8274644517d265b4410038",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: order-bridge, exit line",
+        "required": false,
+        "resource_id": "voice:order-bridge:exit",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "order-bridge"
+        ],
+        "text": "Let's stop this one here and go on.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 252044,
+              "path": "assets/13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8.wav",
+              "sha256": "13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8"
+            },
+            "generated_at": "2026-10-21T17:47:36.705086+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 5.25,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 23
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "11af103239c2256df06f6ebb1d37d8dbcb4681ba",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: match-words, when right",
+        "required": false,
+        "resource_id": "voice:match-words:correct",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "match-words"
+        ],
+        "text": "Right! You found it.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 144044,
+              "path": "assets/cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94.wav",
+              "sha256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94"
+            },
+            "generated_at": "2026-10-21T17:47:36.751682+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 3.0,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 24
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "50a0bf956af401f4f1cfc2fdc1780f3b2bc9cd0c",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: match-words, help 1 after a wrong answer",
+        "required": false,
+        "resource_id": "voice:match-words:wrong-1",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "match-words"
+        ],
+        "text": "Not yet. Find these words in the story. Is each one about the paper, Mia or the car?",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 604844,
+              "path": "assets/d5f7b466b09b838046618013e7adfb38d5176e852ac56c31cdeba52ed99a0905.wav",
+              "sha256": "d5f7b466b09b838046618013e7adfb38d5176e852ac56c31cdeba52ed99a0905"
+            },
+            "generated_at": "2026-10-21T17:47:36.799262+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 12.6,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 25
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "c44dd71e26fa98441a1bd8b6aedc79d09f0fc9ac",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: match-words, help 1 on a hint",
+        "required": false,
+        "resource_id": "voice:match-words:hint-1",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "match-words"
+        ],
+        "text": "Find these words in the story. Is each one about the paper, Mia or the car?",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 540044,
+              "path": "assets/08819894486db63e31dd93d0dbde1c782ff630edd982fe0c76f57646fa3fa745.wav",
+              "sha256": "08819894486db63e31dd93d0dbde1c782ff630edd982fe0c76f57646fa3fa745"
+            },
+            "generated_at": "2026-10-21T17:47:36.848877+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 11.25,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 26
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "157abbfaa5fef926be4f2ac2a9fbe99d7a2b4b07",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: match-words, help 2 after a wrong answer",
+        "required": false,
+        "resource_id": "voice:match-words:wrong-2",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "match-words"
+        ],
+        "text": "Not yet. \"bends\" is about the paper, \"folds\" is what Mia does to the paper, \"smiles\" is about her face.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 741644,
+              "path": "assets/ce18b2a5a30f11868f3eeb70fec2b59a07815e0bcea832445274c4417419d975.wav",
+              "sha256": "ce18b2a5a30f11868f3eeb70fec2b59a07815e0bcea832445274c4417419d975"
+            },
+            "generated_at": "2026-10-21T17:47:36.898768+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 15.45,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 27
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "5a6bf8971972bac52b29b19bbe915abf477d3d74",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: match-words, help 2 on a hint",
+        "required": false,
+        "resource_id": "voice:match-words:hint-2",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "match-words"
+        ],
+        "text": "\"bends\" is about the paper, \"folds\" is what Mia does to the paper, \"smiles\" is about her face.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 676844,
+              "path": "assets/fae91c21cc726a15c680c625eef57eb58f69a5ef7a0b1347afa38587816e1bc8.wav",
+              "sha256": "fae91c21cc726a15c680c625eef57eb58f69a5ef7a0b1347afa38587816e1bc8"
+            },
+            "generated_at": "2026-10-21T17:47:36.950015+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 14.1,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 28
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "6da9c179a3f612cef3f10dbdaabb653bd9811adf",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: match-words, exit line",
+        "required": false,
+        "resource_id": "voice:match-words:exit",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "match-words"
+        ],
+        "text": "Let's stop this one here and go on.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 252044,
+              "path": "assets/13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8.wav",
+              "sha256": "13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8"
+            },
+            "generated_at": "2026-10-21T17:47:37.002074+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 5.25,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 29
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "08c4cb0011ec659906a84bae530e555c0d69f51d",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: fill-puts, when right",
+        "required": false,
+        "resource_id": "voice:fill-puts:correct",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "fill-puts"
+        ],
+        "text": "Right! You found it.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 144044,
+              "path": "assets/cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94.wav",
+              "sha256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94"
+            },
+            "generated_at": "2026-10-21T17:47:37.055020+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 3.0,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 30
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "0b734395eb296665cfda1c226e1312edd3f76f57",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: fill-puts, help 1 after a wrong answer",
+        "required": false,
+        "resource_id": "voice:fill-puts:wrong-1",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "fill-puts"
+        ],
+        "text": "Not yet. Find the sentence with \"her car on the paper\".",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 396044,
+              "path": "assets/65649b93b5af1f2321a48537622dd56cc0776d9c9efda9fef00e7a78978f523d.wav",
+              "sha256": "65649b93b5af1f2321a48537622dd56cc0776d9c9efda9fef00e7a78978f523d"
+            },
+            "generated_at": "2026-10-21T17:47:37.109339+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 8.25,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 31
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "40d1840fa71ac0a8d7cf89a1aa5b5d10456d1b46",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: fill-puts, help 1 on a hint",
+        "required": false,
+        "resource_id": "voice:fill-puts:hint-1",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "fill-puts"
+        ],
+        "text": "Find the sentence with \"her car on the paper\".",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 331244,
+              "path": "assets/bcad2d320874eb4fe4ea1412a710221eca01a0f9503ed421eb07b6d40980b497.wav",
+              "sha256": "bcad2d320874eb4fe4ea1412a710221eca01a0f9503ed421eb07b6d40980b497"
+            },
+            "generated_at": "2026-10-21T17:47:37.165298+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 6.9,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 32
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "212a87d1f2dbbfd1ca898c35f9dba786154e75e8",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: fill-puts, help 2 after a wrong answer",
+        "required": false,
+        "resource_id": "voice:fill-puts:wrong-2",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "fill-puts"
+        ],
+        "text": "Not yet. In this sentence Mia moves her car onto the paper. Pick the word for that.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 597644,
+              "path": "assets/f4ab03a8bfba0412faeb672c9cafe27eaea31ecf03835c42ead790bfd53f915e.wav",
+              "sha256": "f4ab03a8bfba0412faeb672c9cafe27eaea31ecf03835c42ead790bfd53f915e"
+            },
+            "generated_at": "2026-10-21T17:47:37.222369+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 12.45,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 33
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "e5c8f10d7c439cc213b8b4f996c6cc98435ae2de",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: fill-puts, help 2 on a hint",
+        "required": false,
+        "resource_id": "voice:fill-puts:hint-2",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "fill-puts"
+        ],
+        "text": "In this sentence Mia moves her car onto the paper. Pick the word for that.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 532844,
+              "path": "assets/afbe31298d4ab0f68b5e5faccba74300c00ec384f4f9c5e55efa5d179958850b.wav",
+              "sha256": "afbe31298d4ab0f68b5e5faccba74300c00ec384f4f9c5e55efa5d179958850b"
+            },
+            "generated_at": "2026-10-21T17:47:37.296109+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 11.1,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 34
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "c87093328043ec5983f09eefc3b769a308570803",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Made ahead from the course text and played in class",
+        "fallback": "If not adopted, the same sentence is spoken live",
+        "kind": "audio",
+        "purpose": "Jane's fixed line: fill-puts, exit line",
+        "required": false,
+        "resource_id": "voice:fill-puts:exit",
+        "stage": "question",
+        "state": "adopted",
+        "task_ids": [
+          "fill-puts"
+        ],
+        "text": "Let's stop this one here and go on.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 252044,
+              "path": "assets/13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8.wav",
+              "sha256": "13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8"
+            },
+            "generated_at": "2026-10-21T17:47:37.356241+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 5.25,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 35
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "e24a30fa0eae57b07e3a871854a82fcaed11a733",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Jane reads this part aloud as the second help",
+        "fallback": "The class starts only after the model reading is adopted; live speech never stands in for it",
+        "kind": "audio",
+        "purpose": "Reading model: read-aloud-1",
+        "required": true,
+        "resource_id": "demo:read-aloud-1",
+        "stage": "help",
+        "state": "adopted",
+        "task_ids": [
+          "read-aloud-1"
+        ],
+        "text": "Mia has a toy car. She wants a bridge for her car. She puts two books on the table. There is a space between the books. Mia puts a piece of paper on the books. The paper makes a bridge. She puts her car on the paper. The paper bends. The car falls.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 1785644,
+              "path": "assets/5d79fd14b9067387e38f646cdaed1e5dc394cb7ca55e38463351e00fa6bdc638.wav",
+              "sha256": "5d79fd14b9067387e38f646cdaed1e5dc394cb7ca55e38463351e00fa6bdc638"
+            },
+            "generated_at": "2026-10-21T17:47:37.420060+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 37.2,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 36
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "4c857840cf20ff931c5d5d03993c23ecec02fb28",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "content": "Jane reads this part aloud as the second help",
+        "fallback": "The class starts only after the model reading is adopted; live speech never stands in for it",
+        "kind": "audio",
+        "purpose": "Reading model: read-aloud-2",
+        "required": true,
+        "resource_id": "demo:read-aloud-2",
+        "stage": "help",
+        "state": "adopted",
+        "task_ids": [
+          "read-aloud-2"
+        ],
+        "text": "“Can I make a new bridge?” says Mia. She folds a new piece of paper. She puts it on the same books. She tries the same car again. This time, the car stays on the bridge. Mia smiles. She draws the two bridges for Dad. “This one holds my car,” she says.",
+        "versions": [
+          {
+            "asset": {
+              "bytes": 1807244,
+              "path": "assets/f64ca5f432a860cb584752b421a817786b08d75eb4aa92e2c6fd55273836db5e.wav",
+              "sha256": "f64ca5f432a860cb584752b421a817786b08d75eb4aa92e2c6fd55273836db5e"
+            },
+            "generated_at": "2026-10-21T17:47:37.488759+00:00",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 37.65,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 37
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "8d2ae408905b159d20002a23c2e57318d0ee4961",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "adopted_version": 1,
+        "audience": "student",
+        "checks": {
+          "1": {
+            "result": "pass",
+            "reason": null
+          }
+        },
+        "content": "Mia folds the paper bridge",
+        "fallback": "Read the words.",
+        "kind": "image",
+        "option": null,
+        "paragraph": 1,
+        "picture_question": false,
+        "purpose": "Mia folds the paper bridge",
+        "required": false,
+        "resource_id": "story-1",
+        "stage": "story",
+        "state": "adopted",
+        "task_ids": [],
+        "versions": [
+          {
+            "version": 1,
+            "generated_at": "2026-10-27T09:00:00+00:00",
+            "media_type": "image/png",
+            "source": {
+              "description": "Simulated picture."
+            }
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 38
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "afc4836b3f4cca1609fe52bb967b3601f18dd3fb",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "audience": "student",
+        "checks": {
+          "1": {
+            "result": "fail",
+            "reason": "alike"
+          },
+          "2": {
+            "result": "fail",
+            "reason": "alike"
+          },
+          "3": {
+            "result": "fail",
+            "reason": "alike"
+          }
+        },
+        "content": "Option picture 1",
+        "fallback": "Read the words.",
+        "kind": "image",
+        "option": 0,
+        "paragraph": null,
+        "picture_question": false,
+        "purpose": "Option picture 1",
+        "rejected_reason": "alike",
+        "required": false,
+        "resource_id": "choice-option-0",
+        "stage": "option",
+        "state": "rejected",
+        "task_ids": [
+          "choice-first-try"
+        ],
+        "versions": [
+          {
+            "version": 1,
+            "generated_at": "2026-10-27T09:00:00+00:00",
+            "media_type": "image/png",
+            "source": {
+              "description": "Simulated picture."
+            }
+          },
+          {
+            "version": 2,
+            "generated_at": "2026-10-27T09:00:00+00:00",
+            "media_type": "image/png",
+            "source": {
+              "description": "Simulated picture."
+            }
+          },
+          {
+            "version": 3,
+            "generated_at": "2026-10-27T09:00:00+00:00",
+            "media_type": "image/png",
+            "source": {
+              "description": "Simulated picture."
+            }
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 39
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "94cc05e189785b76823f78078ca4373dbffcc86a",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "audience": "student",
+        "checks": {
+          "1": {
+            "result": "fail",
+            "reason": "alike"
+          },
+          "2": {
+            "result": "fail",
+            "reason": "alike"
+          },
+          "3": {
+            "result": "fail",
+            "reason": "alike"
+          }
+        },
+        "content": "Option picture 2",
+        "fallback": "Read the words.",
+        "kind": "image",
+        "option": 1,
+        "paragraph": null,
+        "picture_question": false,
+        "purpose": "Option picture 2",
+        "rejected_reason": "alike",
+        "required": false,
+        "resource_id": "choice-option-1",
+        "stage": "option",
+        "state": "rejected",
+        "task_ids": [
+          "choice-first-try"
+        ],
+        "versions": [
+          {
+            "version": 1,
+            "generated_at": "2026-10-27T09:00:00+00:00",
+            "media_type": "image/png",
+            "source": {
+              "description": "Simulated picture."
+            }
+          },
+          {
+            "version": 2,
+            "generated_at": "2026-10-27T09:00:00+00:00",
+            "media_type": "image/png",
+            "source": {
+              "description": "Simulated picture."
+            }
+          },
+          {
+            "version": 3,
+            "generated_at": "2026-10-27T09:00:00+00:00",
+            "media_type": "image/png",
+            "source": {
+              "description": "Simulated picture."
+            }
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 40
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "f5717364fb8092929408d29d05f1b26a1c6be35c",
+      "revision": 2,
+      "kind": "resource",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "audience": "student",
+        "checks": {
+          "1": {
+            "result": "fail",
+            "reason": "alike"
+          },
+          "2": {
+            "result": "fail",
+            "reason": "alike"
+          },
+          "3": {
+            "result": "fail",
+            "reason": "alike"
+          }
+        },
+        "content": "Option picture 3",
+        "fallback": "Read the words.",
+        "kind": "image",
+        "option": 2,
+        "paragraph": null,
+        "picture_question": false,
+        "purpose": "Option picture 3",
+        "rejected_reason": "alike",
+        "required": false,
+        "resource_id": "choice-option-2",
+        "stage": "option",
+        "state": "rejected",
+        "task_ids": [
+          "choice-first-try"
+        ],
+        "versions": [
+          {
+            "version": 1,
+            "generated_at": "2026-10-27T09:00:00+00:00",
+            "media_type": "image/png",
+            "source": {
+              "description": "Simulated picture."
+            }
+          },
+          {
+            "version": 2,
+            "generated_at": "2026-10-27T09:00:00+00:00",
+            "media_type": "image/png",
+            "source": {
+              "description": "Simulated picture."
+            }
+          },
+          {
+            "version": 3,
+            "generated_at": "2026-10-27T09:00:00+00:00",
+            "media_type": "image/png",
+            "source": {
+              "description": "Simulated picture."
+            }
+          }
+        ],
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "order": 41
+      }
+    },
+    {
+      "schema_version": 1,
+      "object_id": "lesson-001",
+      "revision": 1,
+      "kind": "lesson",
+      "owner": "preparation",
+      "realm": "simulation",
+      "source_type": "simulated",
+      "learner_id": "fictional-L1",
+      "scope": "learner:fictional-L1",
+      "occurred_at": null,
+      "received_at": "2026-10-21T17:47:37.520026Z",
+      "created_at": "2026-10-21T17:47:37.520027Z",
+      "source_revision": 1,
+      "operation_id": "cda9c381-2a85-4b00-8dde-b7afb7118d45",
+      "dependency_refs": [
+        {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        }
+      ],
+      "source_refs": [],
+      "limitations": [
+        "Simulation only; the real API, voice and teaching results are not verified."
+      ],
+      "supersedes": null,
+      "body": {
+        "status": "checked",
+        "course_ref": {
+          "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+          "revision": 1
+        },
+        "category": "lesson",
+        "number": 1,
+        "date": "2026-10-24",
+        "folder": "lessons/lesson-001-2026-10-24",
+        "story": {
+          "path": "lessons/lesson-001-2026-10-24/story.md",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "bytes": 0
+        },
+        "files": {
+          "voice:goal": {
+            "bytes": 1303244,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-goal.wav",
+            "sha256": "fbb3572999ec7d384fa4bca7eb27bde6a0385336c3ae0e0de2d3b76520c6c239",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 27.15,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:reading-fact": {
+            "bytes": 194444,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-reading-fact.wav",
+            "sha256": "51781d3cb8cb77d742d0c483ae9b0ebbe08cef594e8e35768d4a24525538a183",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 4.05,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:reading-sequence": {
+            "bytes": 424844,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-reading-sequence.wav",
+            "sha256": "613b78a9db96dde892dc0fff9e7067c1f43e69c2131dfd5d3f705dc6ae88317a",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 8.85,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:point-paper": {
+            "bytes": 453644,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-point-paper.wav",
+            "sha256": "169e7aef29a6f98e02d823472a5559ef0300674c2e839900330f8309d01aa486",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 9.45,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:paper-experiment": {
+            "bytes": 1900844,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-paper-experiment.wav",
+            "sha256": "48cd021f4513f7329f214c614792104a9e5169130d71305ea947cd7d6e8daf18",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 39.6,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:choice-first-try": {
+            "bytes": 417644,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-choice-first-try.wav",
+            "sha256": "b552c27b72a63172a1e138e5ef7ad2fc73af2da1f7f3e68848cba0e1386c09a6",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 8.7,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:order-bridge": {
+            "bytes": 345644,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-order-bridge.wav",
+            "sha256": "4f9d9837e91ce1cb773fad39247bc7e56a48862b96febaeb117e5ff99e6fe191",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 7.2,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:match-words": {
+            "bytes": 360044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-match-words.wav",
+            "sha256": "e898f9a7b8bf70cb9cf3b5abd68570539452acf8fea9b1384cd80dd4185e64f3",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 7.5,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:fill-puts": {
+            "bytes": 324044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-fill-puts.wav",
+            "sha256": "90e628b892397d0b6d838ab0c29b392b328e4f340ce6d5c3e39674cf86d0d324",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 6.75,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:read-aloud-1": {
+            "bytes": 568844,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-read-aloud-1.wav",
+            "sha256": "a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 11.85,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:read-aloud-2": {
+            "bytes": 568844,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-read-aloud-2.wav",
+            "sha256": "a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 11.85,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:retell-bridge": {
+            "bytes": 640844,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-retell-bridge.wav",
+            "sha256": "a0c105a7e4c8ae56f83bb762867402494c680c4b2109702e7830f63c82037934",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 13.35,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:choice-first-try:correct": {
+            "bytes": 144044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-choice-first-try-correct.wav",
+            "sha256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 3.0,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:choice-first-try:wrong-1": {
+            "bytes": 640844,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-choice-first-try-wrong-1.wav",
+            "sha256": "a0c105a7e4c8ae56f83bb762867402494c680c4b2109702e7830f63c82037934",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 13.35,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:choice-first-try:hint-1": {
+            "bytes": 576044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-choice-first-try-hint-1.wav",
+            "sha256": "69cb3f12fbdd46bf2f41eaddcec48e76d6c46ad836db55c34dc23370f43acfb6",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 12.0,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:choice-first-try:wrong-2": {
+            "bytes": 619244,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-choice-first-try-wrong-2.wav",
+            "sha256": "20344481172b9469954483dc8fd39a398380ccf02126b759bffa0e5b010a5e6c",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 12.9,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:choice-first-try:hint-2": {
+            "bytes": 554444,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-choice-first-try-hint-2.wav",
+            "sha256": "f6639fe3374e8bc3f23acb9cd87b1ba7ca8f4cf34ab5607fceee31c91898ba7a",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 11.55,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:choice-first-try:exit": {
+            "bytes": 252044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-choice-first-try-exit.wav",
+            "sha256": "13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 5.25,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:order-bridge:correct": {
+            "bytes": 144044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-order-bridge-correct.wav",
+            "sha256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 3.0,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:order-bridge:wrong-1": {
+            "bytes": 482444,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-order-bridge-wrong-1.wav",
+            "sha256": "19eeca2c1e8c503e2a1ee83e8034bda5fa9465105e3971817940f91053ed6166",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 10.05,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:order-bridge:hint-1": {
+            "bytes": 417644,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-order-bridge-hint-1.wav",
+            "sha256": "b552c27b72a63172a1e138e5ef7ad2fc73af2da1f7f3e68848cba0e1386c09a6",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 8.7,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:order-bridge:wrong-2": {
+            "bytes": 568844,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-order-bridge-wrong-2.wav",
+            "sha256": "a4d72c9927a19bb23bb88c760ebf1ab19ec5572399a26d088598f2223e3dc7c4",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 11.85,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:order-bridge:hint-2": {
+            "bytes": 504044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-order-bridge-hint-2.wav",
+            "sha256": "293dece6a2f1bfa872cb89fc1bb47b98db62682e5380c277cb9070bb09ed6f84",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 10.5,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:order-bridge:exit": {
+            "bytes": 252044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-order-bridge-exit.wav",
+            "sha256": "13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 5.25,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:match-words:correct": {
+            "bytes": 144044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-match-words-correct.wav",
+            "sha256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 3.0,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:match-words:wrong-1": {
+            "bytes": 604844,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-match-words-wrong-1.wav",
+            "sha256": "d5f7b466b09b838046618013e7adfb38d5176e852ac56c31cdeba52ed99a0905",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 12.6,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:match-words:hint-1": {
+            "bytes": 540044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-match-words-hint-1.wav",
+            "sha256": "08819894486db63e31dd93d0dbde1c782ff630edd982fe0c76f57646fa3fa745",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 11.25,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:match-words:wrong-2": {
+            "bytes": 741644,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-match-words-wrong-2.wav",
+            "sha256": "ce18b2a5a30f11868f3eeb70fec2b59a07815e0bcea832445274c4417419d975",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 15.45,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:match-words:hint-2": {
+            "bytes": 676844,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-match-words-hint-2.wav",
+            "sha256": "fae91c21cc726a15c680c625eef57eb58f69a5ef7a0b1347afa38587816e1bc8",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 14.1,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:match-words:exit": {
+            "bytes": 252044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-match-words-exit.wav",
+            "sha256": "13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 5.25,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:fill-puts:correct": {
+            "bytes": 144044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-fill-puts-correct.wav",
+            "sha256": "cb285321577f2cae96d045a03703d8dab14a24b2d1ac8a931dfcbb35f46a1f94",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 3.0,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:fill-puts:wrong-1": {
+            "bytes": 396044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-fill-puts-wrong-1.wav",
+            "sha256": "65649b93b5af1f2321a48537622dd56cc0776d9c9efda9fef00e7a78978f523d",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 8.25,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:fill-puts:hint-1": {
+            "bytes": 331244,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-fill-puts-hint-1.wav",
+            "sha256": "bcad2d320874eb4fe4ea1412a710221eca01a0f9503ed421eb07b6d40980b497",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 6.9,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:fill-puts:wrong-2": {
+            "bytes": 597644,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-fill-puts-wrong-2.wav",
+            "sha256": "f4ab03a8bfba0412faeb672c9cafe27eaea31ecf03835c42ead790bfd53f915e",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 12.45,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:fill-puts:hint-2": {
+            "bytes": 532844,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-fill-puts-hint-2.wav",
+            "sha256": "afbe31298d4ab0f68b5e5faccba74300c00ec384f4f9c5e55efa5d179958850b",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 11.1,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "voice:fill-puts:exit": {
+            "bytes": 252044,
+            "path": "lessons/lesson-001-2026-10-24/audio/voice-fill-puts-exit.wav",
+            "sha256": "13b72a1a3117bc489adde7b83b9f63ef08d38099e7f1897eeb02af2611e075c8",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 5.25,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "demo:read-aloud-1": {
+            "bytes": 1785644,
+            "path": "lessons/lesson-001-2026-10-24/audio/demo-read-aloud-1.wav",
+            "sha256": "5d79fd14b9067387e38f646cdaed1e5dc394cb7ca55e38463351e00fa6bdc638",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 37.2,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "demo:read-aloud-2": {
+            "bytes": 1807244,
+            "path": "lessons/lesson-001-2026-10-24/audio/demo-read-aloud-2.wav",
+            "sha256": "f64ca5f432a860cb584752b421a817786b08d75eb4aa92e2c6fd55273836db5e",
+            "media_type": "audio/wav",
+            "source": {
+              "audio_seconds": 37.65,
+              "model": null,
+              "sample_rate": 24000,
+              "service": "simulated-synthesis",
+              "version": "1",
+              "voice": "simulated"
+            },
+            "version": 1
+          },
+          "story-1": {
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "bytes": 0,
+            "path": "lessons/lesson-001-2026-10-24/pictures/story-1.png",
+            "media_type": "image/png",
+            "source": {
+              "description": "Simulated picture."
+            },
+            "version": 1
+          }
+        },
+        "rejected": {
+          "choice-option-0": "alike",
+          "choice-option-1": "alike",
+          "choice-option-2": "alike"
+        }
       }
     },
     {
