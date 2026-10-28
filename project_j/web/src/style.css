@@ -222,6 +222,14 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
 /* Numbered as Jane counts paragraphs ("Read paragraph 3"). */
 .reading ol { list-style: none; counter-reset: paragraph; margin: 0; padding: 0; }
 .reading li { counter-increment: paragraph; position: relative; max-width: 68ch; margin: 0 0 1em; font-family: var(--book); font-size: 19px; line-height: 1.75; white-space: pre-wrap; }
+/* Story pictures float right of their paragraph, text around them; tap to enlarge (ADR-0026). */
+.reading li { display: flow-root; }
+.reading .illustration { float: right; width: 150px; margin: 4px 0 8px 14px; }
+.reading .illustration .picture { display: block; width: 100%; padding: 0; border: 0; background: none; box-shadow: none; cursor: zoom-in; }
+.reading .illustration img { display: block; width: 100%; height: auto; border: 5px solid #fff; box-shadow: 0 2px 7px #22313b29; }
+.zoom { padding: 0; border: 0; background: transparent; cursor: zoom-out; }
+.zoom::backdrop { background: #22313bb3; }
+.zoom img { display: block; max-width: 90vw; max-height: 85vh; border: 7px solid #fff; }
 .reading li::before { content: counter(paragraph); position: absolute; left: -40px; width: 24px; top: .45em; text-align: right; font-family: var(--ui); font-size: 12px; font-weight: 700; line-height: 1; color: var(--muted); }
 
 .notebook section + section { border-top: 1px solid var(--rule); padding-top: 16px; }
@@ -229,6 +237,10 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
 /* A clicked task: options, cards and words are pieces of paper the student moves in blue ink. */
 .task-input .choices, .task-input .cards { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
 .task-input .choices { flex-direction: column; }
+.task-input .picture-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 8px 0 12px; }
+.task-input .picture-option { padding: 6px; }
+.task-input .picture-option[aria-pressed="true"] { outline: 3px solid var(--ink); }
+.task-input .picture-option img { display: block; width: 100%; height: auto; }
 .task-input .choices button, .task-input .cards button, .task-input .pairs button, .task-input .placed button { font-family: var(--book); font-weight: 500; text-align: left; }
 .task-input button[aria-pressed="true"] { background: var(--ink-wash); border-color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); }
 .task-input .placed { margin: 8px 0; padding-left: 28px; min-height: 2em; border-bottom: 1px dashed var(--rule-strong); }
@@ -253,6 +265,9 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
 }
 @media (max-width: 600px) {
   main { padding: 24px 16px; }
+  /* Too narrow to wrap text around a picture: it goes below its paragraph, full width. */
+  .reading li { display: flex; flex-direction: column; }
+  .reading .illustration { order: 1; float: none; width: 100%; margin: 10px 0 0; }
   h1 { font-size: 22px; }
   .row button { flex: 1 1 130px; }
   .class-bar .row button { flex: none; }

@@ -23,7 +23,8 @@ from project_j.preparation.contracts import (
     demand_requirements,
 )
 from project_j.preparation.packages import reading_tasks
-from project_j.preparation.reading import flat, segment_reading, sentences, words
+from project_j.preparation.pictures import picture_problems
+from project_j.preparation.reading import flat, passage, segment_reading, sentences, words
 from project_j.preparation.task_types import (
     CONTENT_FIELDS_INSTRUCTION,
     CONTENT_TYPES,
@@ -104,9 +105,22 @@ PREPARATION_INSTRUCTIONS = (
     "demand_mapping对requirements每一条写一项：index对应，implementation写本课怎样落实或为何沿用，"
     "task_ids写落实它的题号，朗读题写read_aloud。"
     "lesson_type：observation短观察，practice练习；复习已读故事时由规则定为复习。"
-    "resources只列需要的图片、动画、视频，写清用途、要画的内容与出现阶段"
-    "（stage为question时提问时显示，help时学生求助后作为帮助显示），现在不生成；"
-    "学生看的资源不能含本题或后续题的答案；图片与动画由多模态模型生成，"
+    "resources只列需要的图片、动画、视频，写清用途、要画的内容与出现阶段，现在不生成："
+    "stage为question时提问时显示，help时学生求助后作为帮助显示，这两种不能含本题或后续题的答案；"
+    "stage为story时是课文插图，paragraph写配给第几段（从1起，不含标题），每段最多1张、每课0到2张，"
+    "只配给故事里难懂的场景、过程或动作（场景用image，过程或动作用animation），照这一段故事画，"
+    "不用避开题目，故事里没有难懂之处就不配；story插图task_ids为空、audience为student、required为false。"
+    "带图题每课0到2道，题目不适合用图考就不出：一种是图片选项，题目是single的choice、3到4个选项，"
+    "每个选项一张stage为option的image，option写对应的选项下标，选项文字写成这张图要画的内容；"
+    "另一种是看图题，choice或fill题配一张stage为question、picture_question为true的image，看图选择或填空，"
+    "没有图时也要能按故事或句子答出。一题只用一种带图形式，图片选项题不再配stage为question的图。"
+    "带图题的图task_ids只写这一题，audience为student，required为false，只用静态image；"
+    "图可以画出题目要考的东西，但不写出答案文字、不画出后续题的答案；带图题的prompt、correct_text、"
+    "supports与exit_text写成有图没图都说得通（说Which one shows…，"
+    "不说the picture或the second picture，选项顺序会打乱）；"
+    "用带图题练生词时只用vocabulary_used里的词，weight高的优先。"
+    "有任何图片或动画时，picture_style用一句英文写本课画面风格，按故事的题材和气氛定，不限于线框图，"
+    "本课所有图片和动画都按这一种风格画；没有图片和动画时填null。图片与动画由多模态模型生成，"
     "kind不在connected_kinds里的资源required必须为false，课程在没有这些资源时也要能上，fallback写替代办法；"
     "Jane的题目语音与朗读示范由规则生成，不要列音频。"
     "reading_focus是Jane开场说的阅读提醒：1到2句、合计不超过30个英文单词，告诉学生读的时候留意哪些信息"
@@ -171,13 +185,16 @@ class MappingDraft(Contract):
 class ResourceDraft(Contract):
     resource_id: str = Field(pattern=TASK_ID)
     kind: Literal["image", "animation", "video"]
-    stage: Literal["question", "help"]
+    stage: Literal["question", "help", "story", "option"]
     purpose: Text
     content: Text
     task_ids: tuple[str, ...]
     audience: Literal["student", "parent", "teacher"]
     required: bool
     fallback: Text
+    paragraph: int | None = None  # story: which paragraph, from 1, title not counted
+    option: int | None = None  # option: the index in the choice's options
+    picture_question: bool = False  # A still question picture that is the question itself.
 
 
 class PreviewDraft(Contract):
@@ -210,6 +227,7 @@ class CourseDraft(Contract):
     note: Text
     limitations: tuple[Text, ...]
     vocabulary_used: tuple[str, ...] = ()  # Offered words the story actually uses.
+    picture_style: Text | None = None  # One sentence on how this lesson's pictures look.
 
 
 def preparation_request(
@@ -485,6 +503,8 @@ def checked_course(
             problems.append(
                 ("resource", f"{item.resource_id} points to a task that does not exist")
             )
+    if story:  # A refused story is reported above; its paragraphs cannot be counted.
+        problems += picture_problems(draft, len(passage(f"{title}\n\n{story}")[1]))
 
     try:
         aloud = read_aloud_text(story, draft.read_aloud_passage)
@@ -581,6 +601,7 @@ def checked_course(
             else ()
         ),
         vocabulary_used=used,
+        picture_style=draft.picture_style,
         resources=tuple(
             ResourceSpec(**item.model_dump(exclude={"task_ids"}), task_ids=expand(item.task_ids))
             for item in draft.resources

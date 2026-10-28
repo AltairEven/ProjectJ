@@ -10,6 +10,14 @@ WORD = re.compile(r"[A-Za-z]+(?:['’][A-Za-z]+)?")
 SENTENCE = re.compile(r"[^.!?]+[.!?]+[”\"’]?")
 
 
+def passage(text: str) -> tuple[str, list[str]]:
+    """Title and paragraphs exactly as the page's passage() splits them (web/src/passage.ts):
+    blank lines part paragraphs; a one-line first block is the title when more follow."""
+    blocks = [block.strip() for block in re.split(r"\n\s*\n", text) if block.strip()]
+    titled = len(blocks) > 1 and "\n" not in blocks[0]
+    return (blocks[0] if titled else "", blocks[1:] if titled else blocks)
+
+
 def flat(text: str) -> str:
     """Line breaks and runs of spaces are one space: a quote may join lines of a story."""
     return " ".join(text.split())

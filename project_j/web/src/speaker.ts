@@ -53,11 +53,18 @@ export function reportsFor(action: AllowedAction, outcome: Outcome, halted: bool
 }
 
 // Which of an action's pictures or animations actually displayed; a fact, not a transition.
-export function visualReport(action: AllowedAction, shown: string[], now: Date): DeliveryFeedback {
-  const status = shown.length === (action.visuals ?? []).length ? 'completed' : shown.length ? 'partial' : 'failed'
-  return { delivery_event_id: `${action.action_id}:visual`, delivery_id: `${action.action_id}:visual`, action_id: action.action_id,
+/** Which pictures displayed: the action's own (visual), the story pictures (story) or the
+ * option pictures (options) of the question it asks (ADR-0026). */
+export function pictureReport(action: AllowedAction, part: 'visual' | 'story' | 'options', expected: string[], shown: string[], now: Date): DeliveryFeedback {
+  const status = shown.length === expected.length ? 'completed' : shown.length ? 'partial' : 'failed'
+  const id = `${action.action_id}:${part}`
+  return { delivery_event_id: id, delivery_id: id, action_id: action.action_id,
     activity_id: action.activity_id, task_instance_id: action.task_instance_id, sequence: 1, output_device_id: 'browser-screen',
     modality: 'image', status, delivered_range: shown, occurred_at: now.toISOString() }
+}
+
+export function visualReport(action: AllowedAction, shown: string[], now: Date): DeliveryFeedback {
+  return pictureReport(action, 'visual', action.visuals ?? [], shown, now)
 }
 
 export const speechPath = (actionId: string) => `/api/class/speech/${encodeURIComponent(actionId)}`

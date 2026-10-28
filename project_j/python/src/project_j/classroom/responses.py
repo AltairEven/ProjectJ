@@ -55,6 +55,21 @@ def listed(task: TaskDefinition) -> list[str]:
     return [items[i] for i in order_of(task)]
 
 
+def option_pictures(task: TaskDefinition, visible) -> list[str] | None:
+    """The adopted option pictures of a choice task in display order, when every option has
+    one (ADR-0026); None otherwise, and the page shows the options as words."""
+    if task.purpose != "choice":
+        return None
+    by_option = {
+        item.option: item.resource_id
+        for item in visible
+        if item.stage == "option" and task.task_id in item.task_ids
+    }
+    if set(by_option) != set(range(len(task.choice.options))):
+        return None
+    return [by_option[index] for index in order_of(task)]
+
+
 def presentation(task: TaskDefinition) -> dict | None:
     """The question as the page shows it; None for a task answered by text or recording."""
     if task.purpose not in PROGRAM_JUDGED:

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { answerMode, emptyAnswer, fillParts, fillWord, ready, setBlank, tapCard, tapPair, toResponse } from '../src/tasks.ts'
+import { answerMode, emptyAnswer, picturesSettled, fillParts, fillWord, ready, setBlank, tapCard, tapPair, toResponse } from '../src/tasks.ts'
 
 const choice = { type: 'choice', version: 1, variant: 'single', options: ['a', 'b', 'c'] }
 const order = { type: 'order', version: 1, variant: 'events', items: ['B', 'A', 'C'] }
@@ -71,4 +71,11 @@ test('reading the story is answered with the reading buttons only', () => {
   for (const wait_kind of ['reading_start', 'reading'])
     for (const mode of ['waiting_input', 'delivering', 'paused'])
       assert.equal(answerMode({ mode, wait_kind, task: null, recording: null }), 'story')
+})
+
+test('picture options show only when every picture loads', () => {
+  assert.equal(picturesSettled([true, undefined, true]), 'loading')
+  assert.equal(picturesSettled([true, true, true]), 'pictures')
+  assert.equal(picturesSettled([true, false, undefined]), 'words')
+  assert.equal(picturesSettled([]), 'words')
 })

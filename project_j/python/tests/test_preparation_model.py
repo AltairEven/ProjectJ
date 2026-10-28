@@ -132,6 +132,7 @@ def science_draft(context, evidence="He fills it with water."):
         },
         "note": "This lesson starts with a real cup observation.",
         "limitations": [],
+        "picture_style": "Clear, bright kitchen drawings.",
     }
     draft["tasks"] = [typed(task) for task in draft["tasks"]]
     return draft

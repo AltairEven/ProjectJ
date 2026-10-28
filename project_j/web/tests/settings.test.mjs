@@ -15,7 +15,9 @@ const models = {
 test('the seven waiting-time keys have labels', () => {
   assert.deepEqual(Object.keys(deadlineLabels), [
     'classroom_judgment', 'vocabulary', 'evaluation', 'planning', 'preparation_drafting', 'preparation_image', 'preparation_animation',
+    'preparation_image_check',
   ])
+  assert.equal(deadlineLabels.preparation_image_check, 'Preparation: picture checks')
   assert.equal(deadlineLabels.preparation_image, 'Preparation: pictures')
 })
 

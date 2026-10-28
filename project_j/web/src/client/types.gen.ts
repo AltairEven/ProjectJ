@@ -1088,6 +1088,12 @@ export type Snapshot = {
         [key: string]: string;
     };
     /**
+     * Illustrations
+     */
+    illustrations?: Array<{
+        [key: string]: JsonValue;
+    }>;
+    /**
      * Vocabulary
      */
     vocabulary?: Array<{
@@ -2358,6 +2364,40 @@ export type VisualApiClassVisualActionIdResourceIdGetErrors = {
 export type VisualApiClassVisualActionIdResourceIdGetError = VisualApiClassVisualActionIdResourceIdGetErrors[keyof VisualApiClassVisualActionIdResourceIdGetErrors];
 
 export type VisualApiClassVisualActionIdResourceIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type PictureApiClassPictureResourceIdGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Resource Id
+         */
+        resource_id: string;
+    };
+    query?: never;
+    url: '/api/class/picture/{resource_id}';
+};
+
+export type PictureApiClassPictureResourceIdGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PictureApiClassPictureResourceIdGetError = PictureApiClassPictureResourceIdGetErrors[keyof PictureApiClassPictureResourceIdGetErrors];
+
+export type PictureApiClassPictureResourceIdGetResponses = {
     /**
      * Successful Response
      */

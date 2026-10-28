@@ -327,6 +327,7 @@ def test_resources_are_planned_only(demand, draft):
         "fallback": "Just read the text.",
         "stage": "question",
     }
+    draft["picture_style"] = "Simple paper-craft drawings."  # Pictures need a style (ADR-0026).
     draft["resources"] = [resource, resource]
     assert rejected(demand, draft) == {"resource"}
     draft["resources"] = [resource | {"task_ids": ["no-such-task"]}]

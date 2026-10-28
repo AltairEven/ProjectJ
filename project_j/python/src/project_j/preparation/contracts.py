@@ -133,15 +133,26 @@ class ResourceSpec(Contract):
     audience: Literal["student", "parent", "teacher"]
     required: bool
     fallback: str = Field(min_length=1)
-    # When the student sees or hears it: with the question, or as help after asking.
-    stage: Literal["question", "help"] = "question"
+    # When the student sees or hears it: with the question, as help after asking, beside a
+    # story paragraph, or as one option of a picture-option question (ADR-0026).
+    stage: Literal["question", "help", "story", "option"] = "question"
     # Audio only: the exact words Jane says, word for word the course text.
     text: str | None = Field(default=None, min_length=1, max_length=MAX_AUDIO_CHARS)
+    paragraph: int | None = Field(default=None, ge=1)  # story: which paragraph, title not counted
+    option: int | None = Field(default=None, ge=0)  # option: the index in choice.options
+    # A still question picture that is part of the question itself, and so is checked.
+    picture_question: bool = False
 
     @model_validator(mode="after")
     def spoken_text(self):
         if (self.kind == "audio") != (self.text is not None):
             raise ValueError("audio resources carry exactly the text Jane says; others none")
+        if (self.stage == "story") != (self.paragraph is not None):
+            raise ValueError("a story picture names its paragraph; others none")
+        if (self.stage == "option") != (self.option is not None):
+            raise ValueError("an option picture names its option; others none")
+        if self.picture_question and (self.stage != "question" or self.kind != "image"):
+            raise ValueError("a question picture is a still picture shown with the question")
         return self
 
 
@@ -173,6 +184,8 @@ class CourseBody(Contract):
     reading_focus: str | None = None
     story_level: StoryLevel | None = None  # None: no Lexile, or an older course.
     vocabulary_used: tuple[str, ...] = ()  # Marked words the story reviews (design/learning).
+    # One sentence on how this lesson's pictures look (ADR-0026); None: no pictures or older.
+    picture_style: str | None = None
     limitations: tuple[str, ...]
     resources: tuple[ResourceSpec, ...] = ()
 

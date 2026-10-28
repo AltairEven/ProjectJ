@@ -203,3 +203,24 @@ test('the reading row shows time, words and speed, or that it was not finished',
     'Not finished (read for 3 min 20 s)')
   assert.equal(readingLine([ev('task_started', {})]), undefined)
 })
+
+test('a picture the check turned down says what happens instead and why', () => {
+  const base = { kind: 'image', purpose: 'Option picture', required: false, fallback: 'Words instead.', versions: [{}, {}, {}] }
+  const [option, story] = resourceLines({ resources: [
+    { ...base, resource_id: 'o', stage: 'option', option: 1, state: 'rejected', rejected_reason: 'alike' },
+    { ...base, resource_id: 's', stage: 'story', paragraph: 2, state: 'rejected', rejected_reason: 'wrong' },
+  ] })
+  assert.equal(option, 'Picture (optional, as an option): Option picture; without it: Words instead. - In words instead: the pictures look too alike, 3 in all')
+  assert.equal(story, 'Picture (optional, with the story, paragraph 2): Option picture; without it: Words instead. - Not shown: it does not show the right thing, 3 in all')
+})
+
+test('a question picture and an unchecked picture in use say so', () => {
+  const [look, scene] = resourceLines({ resources: [
+    { resource_id: 'l', kind: 'image', purpose: 'Look', required: false, stage: 'question', picture_question: true, fallback: 'Words.',
+      state: 'adopted', versions: [{}], adopted_version: 1, checks: { 1: { result: 'pass', reason: null } } },
+    { resource_id: 's', kind: 'image', purpose: 'Scene', required: false, stage: 'story', paragraph: 1, fallback: 'Read it.',
+      state: 'adopted', versions: [{}], adopted_version: 1, checks: { 1: { result: 'unchecked', reason: null } } },
+  ] })
+  assert.equal(look, 'Picture (optional, with the question, picture question): Look; without it: Words. - In use, version 1 in use, 1 in all')
+  assert.equal(scene, 'Picture (optional, with the story, paragraph 1): Scene; without it: Read it. - In use, not checked, version 1 in use, 1 in all')
+})

@@ -1,7 +1,8 @@
 // Clicked task types (ADR-0020): what the page shows and the answer it sends. The page only sees
 // shuffled options, cards, right-hand items and word banks, and answers by display position.
 
-export type ChoiceView = { type: 'choice', version: number, variant: 'true_false' | 'true_false_not_given' | 'single', options: string[] }
+// pictures: the option pictures' resource ids in display order, when every option has one (ADR-0026).
+export type ChoiceView = { type: 'choice', version: number, variant: 'true_false' | 'true_false_not_given' | 'single', options: string[], pictures?: string[] }
 export type OrderView = { type: 'order', version: number, variant: 'events' | 'words', items: string[] }
 export type MatchView = { type: 'match', version: number, left: string[], right: string[] }
 export type FillView = { type: 'fill', version: number, variant: 'word_bank' | 'free', text: string, blanks: number, bank: string[] | null }
@@ -15,6 +16,12 @@ export type Answer =
   | { type: 'fill', blanks: string[] }
 
 export const BLANK = '___'
+
+/** Picture options show only once every picture loaded; one failure turns them back into words. */
+export function picturesSettled(outcomes: (boolean | undefined)[]): 'loading' | 'pictures' | 'words' {
+  if (!outcomes.length || outcomes.includes(false)) return 'words'
+  return outcomes.every(Boolean) ? 'pictures' : 'loading'
+}
 
 export function emptyAnswer(task: TaskView): Answer {
   switch (task.type) {

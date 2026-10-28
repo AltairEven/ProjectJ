@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { playbackOf, playbackPath, reportsFor, speechPath, startedReport, visualReport } from '../src/speaker.ts'
+import { pictureReport, playbackOf, playbackPath, reportsFor, speechPath, startedReport, visualReport } from '../src/speaker.ts'
 
 const action = { action_id: 'a1', activity_id: 'act', task_instance_id: 't1', text: 'Hello.' }
 const now = new Date('2026-10-18T00:00:00Z')
@@ -68,4 +68,19 @@ test('a picture report names the visuals that actually displayed', () => {
 test('class speech and playback reports use the class routes', () => {
   assert.equal(speechPath('a b'), '/api/class/speech/a%20b')
   assert.equal(playbackPath, '/api/class/playback')
+})
+
+test('picture reports name their part and how much showed', () => {
+  const report = pictureReport(action, 'story', ['a', 'b'], ['a'], now)
+  assert.equal(report.delivery_event_id, 'a1:story'); assert.equal(report.delivery_id, 'a1:story')
+  assert.equal(report.status, 'partial'); assert.deepEqual(report.delivered_range, ['a'])
+  assert.equal(report.modality, 'image'); assert.equal(report.sequence, 1)
+  assert.equal(pictureReport(action, 'options', ['a'], [], now).status, 'failed')
+  assert.equal(pictureReport(action, 'options', ['a', 'b'], ['b', 'a'], now).status, 'completed')
+})
+
+test('the action report keeps its old shape', () => {
+  const pictured = { ...action, visuals: ['x', 'y'] }
+  assert.deepEqual(visualReport(pictured, ['x'], now), pictureReport(pictured, 'visual', ['x', 'y'], ['x'], now))
+  assert.equal(visualReport(pictured, ['x'], now).delivery_id, 'a1:visual')
 })

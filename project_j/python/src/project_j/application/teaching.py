@@ -315,11 +315,14 @@ class Teaching:
                     self.word_audio[entry.lemma] = self.files.read_binary(entry.audio)
                 except ValueError:
                     pass  # Missing or corrupted: the box offers Regenerate instead.
+        stages = [item.stage for item in self.core.visible]
         log.info(
-            "start resources recorded=%d visuals=%d skipped=%d attempt=%d "
-            "story_words=%d first_reading=%s",
+            "start resources recorded=%d visuals=%d illustrations=%d option_pictures=%d "
+            "skipped=%d attempt=%d story_words=%d first_reading=%s",
             len(recorded),
             len(visuals),
+            stages.count("story"),
+            stages.count("option"),
             skipped,
             attempt,
             story_words,
@@ -343,7 +346,9 @@ class Teaching:
         # The story shows from "Start reading" on, except while reading is paused (ADR-0022).
         shown = core.course.material_refs if core.story_visible() else ()
         return core.snapshot() | {
-            "materials": {ref.object_id: self.material_cache[ref.object_id] for ref in shown}
+            "materials": {ref.object_id: self.material_cache[ref.object_id] for ref in shown},
+            # Story pictures beside their paragraphs, only while the story shows (ADR-0026).
+            "illustrations": core.illustrations() if core.story_visible() else [],
         }
 
     def seal(self):

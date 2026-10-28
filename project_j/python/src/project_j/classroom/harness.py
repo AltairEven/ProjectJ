@@ -11,7 +11,7 @@ from uuid import uuid4
 from pydantic import AwareDatetime, Field
 
 from project_j.classroom.judgment import ModelProposal, judgment_request, method_context
-from project_j.classroom.responses import describe, judge, presentation
+from project_j.classroom.responses import describe, judge, option_pictures, presentation
 from project_j.contracts import Contract, RevisionRef, SubmittedInput
 from project_j.english import chinese
 from project_j.learning.vocabulary import LookedUp
@@ -287,6 +287,34 @@ class Harness:
         """The story shows after "Start reading", except while reading is paused."""
         return self.story_open and not (self.mode == "paused" and self.story_timer is not None)
 
+    def illustrations(self) -> list[dict]:
+        """Adopted story pictures by paragraph; the page shows them beside the story."""
+        story = [item for item in self.visible if item.stage == "story"]
+        return [
+            {"resource_id": item.resource_id, "paragraph": item.paragraph}
+            for item in sorted(story, key=lambda item: item.paragraph)
+        ]
+
+    def option_ids(self) -> list[str]:
+        """The current clicked task's option pictures, when all of them are adopted."""
+        clicked = self.clicked_task()
+        return (option_pictures(clicked, self.visible) or []) if clicked else []
+
+    def picture_available(self, resource_id: str) -> bool:
+        """A story picture while the story shows, or an option picture of the current task."""
+        story = {item["resource_id"] for item in self.illustrations()}
+        return (self.story_visible() and resource_id in story) or resource_id in self.option_ids()
+
+    def pictures_allowed(self, action: AllowedAction) -> set[str]:
+        """What a picture report on this action may name: its own visuals, the story pictures
+        while the story shows, and its task's option pictures."""
+        allowed = set(action.visuals)
+        if self.story_visible():
+            allowed |= {item["resource_id"] for item in self.illustrations()}
+        if action.task_instance_id == self.task_instance_id:
+            allowed |= set(self.option_ids())
+        return allowed
+
     def stop_story(self, kind: str):
         """Record how long the student read (reading_finished or reading_unfinished)."""
         timer = self.story_timer
@@ -371,6 +399,14 @@ class Harness:
         task = self.current_task()
         return task if task and task.purpose in PROGRAM_JUDGED else None
 
+    def task_view(self) -> dict | None:
+        """The clicked task as the page shows it, with its option pictures when all exist."""
+        clicked = self.clicked_task()
+        if clicked is None:
+            return None
+        pictures = self.option_ids()
+        return presentation(clicked) | ({"pictures": pictures} if pictures else {})
+
     def class_ms(self) -> float:
         """Milliseconds since the class started, for the attempt record's time points."""
         return round((time.monotonic() - self.started_clock) * 1000, 1)
@@ -413,7 +449,7 @@ class Harness:
             if (reading := self.reading_task()) and self.scorer
             else None,
             # A clicked task as the page shows it; never its answer.
-            "task": presentation(clicked) if (clicked := self.clicked_task()) else None,
+            "task": self.task_view(),
             "vocabulary": [value | {"surface": key} for key, value in self.box.items()],
             "end": self.end,
             "actual_api": "unverified",
@@ -431,10 +467,10 @@ class Harness:
         action = self.actions.get(feedback.action_id)
         if action is None or action.task_instance_id != feedback.task_instance_id:
             raise ValueError("delivery must refer to an approved action and its task")
-        if feedback.modality == "image" and not set(feedback.delivered_range) <= set(
-            action.visuals
-        ):
-            raise ValueError("a picture report may name only the action's own visuals")
+        if feedback.modality == "image" and not set(
+            feedback.delivered_range
+        ) <= self.pictures_allowed(action):
+            raise ValueError("a picture report may name only the visuals shown with this action")
         previous = self.delivery_sequences.get(feedback.delivery_id, 0)
         if feedback.sequence <= previous:
             raise Conflict("out-of-order delivery feedback")
@@ -442,6 +478,13 @@ class Harness:
         self.delivery_events[feedback.delivery_event_id] = fingerprint
         self.record("delivery", feedback.model_dump(mode="json"))
         if feedback.modality == "image":  # A fact for evaluation; the speech or text moves on.
+            log.info(
+                "class pictures activity=%s part=%s shown=%d status=%s",
+                self.activity_id,
+                feedback.delivery_id.rsplit(":", 1)[-1],
+                len(feedback.delivered_range),
+                feedback.status,
+            )
             stages = {item.resource_id: item.stage for item in self.visible}
             seen = self.seen.setdefault(action.task_instance_id, {})
             seen.update({resource: stages[resource] for resource in feedback.delivered_range})
@@ -885,6 +928,7 @@ class Harness:
     def new_attempt(self, task: TaskDefinition, recorded: bool) -> dict:
         """A new try at the current task, with the help and pictures it had and when it came
         (class milliseconds; judged_ms is set when it is judged)."""
+        looked = {item.resource_id for item in self.visible if item.picture_question}
         return {
             "attempt_id": str(uuid4()),
             "task_instance_id": self.task_instance_id,
@@ -895,6 +939,7 @@ class Harness:
             "help": dict(self.help_by_task.get(self.task_instance_id, {})),
             "visuals": [
                 {"resource_id": resource, "stage": stage}
+                | ({"picture_question": True} if resource in looked else {})
                 for resource, stage in self.seen.get(self.task_instance_id, {}).items()
             ],
             "external_help": "unknown",

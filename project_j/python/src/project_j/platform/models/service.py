@@ -83,6 +83,13 @@ class ModelService:
             None,
         )
 
+    def sees_images(self, purpose: Purpose) -> bool:
+        """Whether this purpose's model passed the image-input probe (the picture check)."""
+        binding = self.bindings.get(purpose)
+        report = self.report_for(binding) if binding else None
+        item = report.items.get("image_input") if report else None
+        return bool(item and item.status == "verified")
+
     def reasons(self, purpose: Purpose) -> list[str]:
         if self.problem:
             return [self.problem]
@@ -120,6 +127,7 @@ class ModelService:
             "usage": None,
             "request_id": None,
             "elapsed_ms": None,
+            "images": len(request.images),
         }
         seconds = (
             request.deadline_seconds
@@ -180,7 +188,7 @@ class ModelService:
     def log(entry: dict):
         log.info(
             "model %s adapter=%s model=%s effort=%s tier=%s failure=%s elapsed_ms=%.0f "
-            "error_type=%s request_id=%s usage=%s media=%s media_bytes=%s",
+            "error_type=%s request_id=%s usage=%s media=%s media_bytes=%s images=%s",
             entry["purpose"],
             entry["adapter"],
             entry["model"],
@@ -193,6 +201,7 @@ class ModelService:
             entry["usage"],
             entry.get("media", 0),
             entry.get("media_bytes", 0),
+            entry.get("images", 0),
         )
 
     def status(self) -> dict:

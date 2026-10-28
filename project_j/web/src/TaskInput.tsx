@@ -3,14 +3,18 @@ import { emptyAnswer, fillParts, fillWord, ready, setBlank, tapCard, tapPair, to
 
 // A clicked task in the exercise book (ADR-0020): pick, order, pair or fill, then hand it in.
 // There is no text box: these tasks are judged by their own rule and Jane is not asked.
-export function TaskInput({ task, disabled, onSubmit, onHint }: {
-  task: TaskView, disabled: boolean, onSubmit: (response: Record<string, unknown>) => void, onHint: () => void,
+// Picture options (ADR-0026): image URLs in display order (undefined while fetching), whether
+// they all showed, and each image's own load result. Words take over if any picture fails.
+export type OptionPictures = { urls: (string | undefined)[], state: 'loading' | 'pictures' | 'words', onLoad: (index: number, displayed: boolean) => void }
+
+export function TaskInput({ task, disabled, onSubmit, onHint, pictures }: {
+  task: TaskView, disabled: boolean, onSubmit: (response: Record<string, unknown>) => void, onHint: () => void, pictures?: OptionPictures,
 }) {
   const [answer, setAnswer] = useState<Answer>(() => emptyAnswer(task))
   const current = answer.type === task.type ? answer : emptyAnswer(task)
   return <section className="task-input">
     <h2>{{ choice: 'Choose one', order: 'Put in order', match: 'Match', fill: 'Fill in' }[task.type]}</h2>
-    {body(task, current, setAnswer, disabled)}
+    {body(task, current, setAnswer, disabled, pictures)}
     <div className="row">
       <button disabled={disabled || !ready(task, current)} onClick={() => onSubmit(toResponse(current))}>Submit</button>
       <button className="quiet" disabled={disabled} onClick={onHint}>Hint</button>
@@ -18,10 +22,15 @@ export function TaskInput({ task, disabled, onSubmit, onHint }: {
   </section>
 }
 
-function body(task: TaskView, answer: Answer, set: (answer: Answer) => void, disabled: boolean) {
+function body(task: TaskView, answer: Answer, set: (answer: Answer) => void, disabled: boolean, pictures?: OptionPictures) {
   switch (task.type) {
     case 'choice': {
       const picked = answer.type === 'choice' ? answer.choice : null
+      // A picture is the option itself: no words under it, and no enlarging (tapping picks it).
+      if (pictures && pictures.state !== 'words') return <div className="picture-options" role="group" aria-label="Options">{pictures.urls.map((url, index) =>
+        <button key={index} className="quiet picture-option" aria-pressed={picked === index} aria-label={`Option ${index + 1}`}
+          disabled={disabled || pictures.state !== 'pictures'} onClick={() => set({ type: 'choice', choice: index })}>
+          {url && <img src={url} alt="" onLoad={() => pictures.onLoad(index, true)} onError={() => pictures.onLoad(index, false)} />}</button>)}</div>
       return <div className="choices" role="group" aria-label="Options">{task.options.map((option, index) =>
         <button key={index} className="quiet" aria-pressed={picked === index} disabled={disabled}
           onClick={() => set({ type: 'choice', choice: index })}>{option}</button>)}</div>

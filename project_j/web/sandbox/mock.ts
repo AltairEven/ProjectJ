@@ -3,7 +3,7 @@
 import type { AllowedAction, Snapshot } from '../src/client/types.gen'
 
 // clicked: a task answered on the page (ADR-0020); view is what the core shows, right the answer.
-type Task = { kind: 'question' | 'reading' | 'offscreen' | 'clicked'; text: string; reference?: string; view?: Snapshot['task']; right?: unknown; hint?: string }
+type Task = { kind: 'question' | 'reading' | 'offscreen' | 'clicked'; text: string; reference?: string; view?: Snapshot['task']; right?: unknown; hint?: string; visuals?: string[] }
 
 const passage = `Checking a Trail Sensor
 
@@ -40,7 +40,19 @@ const tasks: Task[] = [
   { kind: 'clicked', text: 'Fill in the blank with a word from the story.', hint: 'Look at the sentence with "The app showed only".',
     view: { type: 'fill', version: 1, variant: 'free', text: 'The app showed only ___ for the same two hours.', blanks: 1, bank: null }, right: { blanks: ['nineteen'] } },
   { kind: 'question', text: 'Tell the story in two or three sentences: what went wrong, and how did Mia find out?' },
+  // Picture questions (ADR-0026): picture options, a question picture with a fill-in, and
+  // picture options with one picture that never loads (the page falls back to words).
+  { kind: 'clicked', text: 'Which one shows why the app counted fewer people?', hint: 'Look at paragraph 3: what did Mia see at the post?',
+    view: { type: 'choice', version: 1, variant: 'single', options: ['Rain on the trail', 'Leaves over the sensor', 'A broken phone'], pictures: ['option-rain', 'option-leaves', 'option-phone'] }, right: { choice: 1 } },
+  { kind: 'clicked', text: 'Look at the picture. Which word fits?', hint: 'Find the sentence with "covered half of".', visuals: ['look-window'],
+    view: { type: 'fill', version: 1, variant: 'word_bank', text: 'Leaves covered half of the small ___.', blanks: 1, bank: ['post', 'window', 'river'] }, right: { blanks: ['window'] } },
+  { kind: 'clicked', text: 'Which one shows why the app counted fewer people?', hint: 'Look at paragraph 3: what did Mia see at the post?',
+    view: { type: 'choice', version: 1, variant: 'single', options: ['Rain on the trail', 'Leaves over the sensor', 'A broken phone'], pictures: ['option-rain', 'broken-picture', 'option-phone'] }, right: { choice: 1 } },
 ]
+
+// Story pictures beside paragraphs 2 and 3: a still picture and an animation (ADR-0026).
+const storyPictures = [{ resource_id: 'story-count', paragraph: 2 }, { resource_id: 'motion-leaves', paragraph: 3 }]
+let illustrated: Snapshot['illustrations'] = []
 
 let snapshot: Snapshot
 let revision = 0
@@ -73,7 +85,8 @@ function ask(index: number) {
   if (!task) return say(action('closing', 'That is all for today. You found why the sensor counted too few, and you read paragraph 3. Say you heard this summary, and we are done.', 'end_confirmation'),
     { task_index: tasks.length, wait_kind: 'closing_confirmation', recording: null })
   const after = task.kind === 'offscreen' ? 'offscreen' : 'input'
-  return say(action('question', task.text, after, index === 0 ? { visuals: ['trail-sensor'] } : {}), {
+  const visuals = index === 0 ? ['trail-sensor'] : task.visuals
+  return say(action('question', task.text, after, visuals ? { visuals } : {}), {
     task_index: index, attempt_count: 0, wait_kind: 'answer', task_instance_id: `task-${index}`,
     recording: task.kind === 'reading' ? { reference_text: task.reference!, max_seconds: 60 } : null,
     task: task.kind === 'clicked' ? task.view : null,
@@ -86,7 +99,7 @@ const base = (realm: Snapshot['realm']): Snapshot => ({
   core_revision: 0, cancellation_epoch: 0, input_policy_ref: { object_id: 'policy', revision: 1 },
   pending_action: null, presented_action: null, attempt_count: 0, task_index: 0, task_count: tasks.length,
   elapsed_seconds: 0, end: null, actual_api: 'unverified', actual_voice: 'unverified', recording: null, task: null,
-  materials: { 'passage': passage },
+  materials: { 'passage': passage }, illustrations: illustrated,
 })
 
 const opening = "I'm Jane. As you read, notice how Mia finds out that the app counts too few. Press Start reading when you are ready."
@@ -168,10 +181,20 @@ export const scenes: Record<string, (realm: Snapshot['realm']) => void> = {
   'Fill (word bank)': realm => { snapshot = { ...base(realm), materials: { passage, notes } }; ask(8) },
   'Fill (free)': realm => { snapshot = base(realm); ask(9) },
   'Open question': realm => { snapshot = base(realm); ask(10) },
+  'Story pictures': realm => { illustrated = storyPictures; snapshot = base(realm); ask(2) },
+  'Story pictures (reading)': realm => {
+    illustrated = storyPictures
+    snapshot = { ...base(realm), task_index: -1, wait_kind: 'reading' }
+    snapshot.presented_action = action('goal', opening, 'input')
+  },
+  'Picture options': realm => { snapshot = base(realm); ask(11) },
+  'Picture fill-in': realm => { snapshot = base(realm); ask(12) },
+  'Picture options in words': realm => { snapshot = base(realm); ask(13) },
 }
 
 export function load(scene: string, realm: Snapshot['realm']) {
   revision = 0
+  illustrated = []
   scenes[scene](realm)
 }
 
@@ -214,9 +237,9 @@ async function responded(body: Body) {
 async function controlled(command: string) {
   switch (command) {
     // Like the core: a paused reading hides the story, and the story shows once reading starts.
-    case 'pause': return set({ mode: 'paused', activity_state: 'paused', pending_action: null, ...(snapshot.wait_kind === 'reading' ? { materials: {} } : {}) })
-    case 'resume': return set({ mode: 'waiting_input', activity_state: 'running', ...(snapshot.wait_kind === 'reading' ? { materials: { passage } } : {}) })
-    case 'start_reading': return set({ wait_kind: 'reading', materials: { passage } })
+    case 'pause': return set({ mode: 'paused', activity_state: 'paused', pending_action: null, ...(snapshot.wait_kind === 'reading' ? { materials: {}, illustrations: [] } : {}) })
+    case 'resume': return set({ mode: 'waiting_input', activity_state: 'running', ...(snapshot.wait_kind === 'reading' ? { materials: { passage }, illustrations: illustrated } : {}) })
+    case 'start_reading': return set({ wait_kind: 'reading', materials: { passage }, illustrations: illustrated })
     case 'finish_reading': {
       // Like the server: the first question comes at once; the meanings follow a little later.
       const marked = (snapshot.vocabulary ?? []).map(item => ({ ...item, status: 'pending' }))
@@ -254,6 +277,14 @@ const picture = (name: string) => new Response(`<svg xmlns="http://www.w3.org/20
   <circle cx="380" cy="150" r="70" fill="#6f9e5c" opacity=".85"/><text x="20" y="380" font-family="sans-serif" font-size="20" fill="#3d4b55">${name}</text></svg>`,
 { headers: { 'content-type': 'image/svg+xml' } })
 
+// A looping animation for a story picture: leaves swaying in front of the sensor's window.
+const motion = () => new Response(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
+  <rect width="640" height="400" fill="#e8efe4"/><rect x="290" y="120" width="40" height="230" fill="#8a6a4a"/>
+  <rect x="270" y="150" width="80" height="50" rx="6" fill="#3d4b55"/><circle cx="310" cy="175" r="12" fill="#9fd3f0"/>
+  <g><ellipse cx="330" cy="170" rx="60" ry="28" fill="#6f9e5c" opacity=".9"/>
+  <animateTransform attributeName="transform" type="rotate" values="-8 380 120; 8 380 120; -8 380 120" dur="3s" repeatCount="indefinite"/></g></svg>`,
+{ headers: { 'content-type': 'image/svg+xml' } })
+
 const json = (value: unknown) => new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } })
 
 const realFetch = window.fetch.bind(window)
@@ -279,6 +310,11 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return speech(said?.text ?? '', init?.signal ?? undefined)
   }
   if (route.startsWith('class/visual/')) return picture(decodeURIComponent(route.split('/').pop()!))
+  if (route.startsWith('class/picture/')) {
+    const id = decodeURIComponent(route.split('/').pop()!)
+    if (id === 'broken-picture') return new Response(JSON.stringify({ detail: 'missing' }), { status: 404 })
+    return id.startsWith('motion-') ? motion() : picture(id)
+  }
   if (route === 'class/playback') return json({})
   return new Response(JSON.stringify({ detail: `The sandbox has no ${route}` }), { status: 404 })
 }

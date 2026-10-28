@@ -152,7 +152,7 @@ def test_failure_switch_fails_once_and_evaluation_has_a_draft():
 def test_simulated_report_is_marked_simulated():
     report = SimulatedAdapter().report(SIMULATED_MODEL, ("low", "medium"))
     assert report.simulated and report.items["effort:medium"].status == "verified"
-    assert report.items["image_input"].status == "unsupported"
+    assert report.items["image_input"].status == "verified"  # The picture check runs simulated.
 
 
 def reading_context(pronunciation, help=False):

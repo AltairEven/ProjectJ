@@ -51,6 +51,7 @@ from project_j.platform.models.contracts import (
     Tier,
     solid_png,
 )
+from project_j.platform.visuals import MEDIA_TYPES, image_type
 
 log = logging.getLogger(__name__)
 ERRORS = {
@@ -111,6 +112,11 @@ SERVICE_TIERS = {"fast": "priority"}
 def codex_config(home: Path, workdir: Path, image: bool = False) -> CodexConfig:
     overrides = OVERRIDES if image else (*OVERRIDES, NO_CODE_MODE)
     return CodexConfig(env={"CODEX_HOME": str(home)}, cwd=str(workdir), config_overrides=overrides)
+
+
+def data_url(data: bytes) -> str:
+    """A still picture as an inline image input."""
+    return f"data:{MEDIA_TYPES[image_type(data)]};base64,{base64.b64encode(data).decode()}"
 
 
 def error_kind(turn) -> str:
@@ -312,6 +318,8 @@ class CodexAdapter:
 
     async def invoke(self, request: ModelRequest, binding: Binding) -> AdapterReply:
         context = json.dumps(request.context, ensure_ascii=False)
+        if request.images:
+            context = [TextInput(context), *(ImageInput(data_url(b)) for b in request.images)]
         return await self.call(
             binding,
             request.instructions,

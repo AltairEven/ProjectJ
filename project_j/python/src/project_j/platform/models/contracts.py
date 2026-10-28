@@ -132,6 +132,7 @@ DeadlineKey = Literal[
     "preparation_drafting",
     "preparation_image",
     "preparation_animation",
+    "preparation_image_check",
 ]
 DEFAULT_DEADLINES: dict[DeadlineKey, int] = {
     "classroom_judgment": 10,
@@ -141,6 +142,7 @@ DEFAULT_DEADLINES: dict[DeadlineKey, int] = {
     "preparation_drafting": 1200,
     "preparation_image": 300,
     "preparation_animation": 600,
+    "preparation_image_check": 300,
 }
 DEADLINE_RANGE = (1, 3600)
 
@@ -157,6 +159,8 @@ class ModelRequest:
     # "image": the reply carries one generated picture besides the structured output.
     media: Literal["image"] | None = None
     deadline_key: DeadlineKey | None = None
+    # Still pictures (png, jpeg or webp) the model looks at: the preparation picture check.
+    images: tuple[bytes, ...] = ()
 
     def __post_init__(self):
         if self.purpose not in PURPOSES:
@@ -165,6 +169,8 @@ class ModelRequest:
             raise ValueError("a model request names a deadline key or carries its seconds")
         if not self.instructions.strip():
             raise ValueError("a model request needs instructions")
+        if self.media and self.images:
+            raise ValueError("a request draws a picture or looks at pictures, not both")
         if found := identity_keys(self.context):
             raise ValueError(f"model requests must not carry identity fields: {sorted(found)}")
 

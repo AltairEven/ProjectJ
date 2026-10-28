@@ -4,8 +4,10 @@ import json
 import logging
 
 import pytest
+from openai_codex import ImageInput, TextInput
 from openai_codex.generated.v2_all import ItemCompletedNotification
 from openai_codex.models import Notification
+from pydantic import BaseModel
 from test_models_codex import (  # private_tmp keeps adapter work directories here.
     FakeCodex,
     adapter,
@@ -17,13 +19,17 @@ from test_models_codex import (  # private_tmp keeps adapter work directories he
 
 from project_j.platform.models.codex_sdk import BASE_INSTRUCTIONS, IMAGE_INSTRUCTIONS
 from project_j.platform.models.contracts import (
+    DEFAULT_DEADLINES,
     AdapterReply,
     Binding,
+    CapabilityReport,
     ImageNote,
     ModelRequest,
+    ProbeItem,
     solid_png,
 )
 from project_j.platform.models.service import ModelService
+from project_j.platform.models.simulated import SimulatedAdapter
 from project_j.platform.visuals import image_type
 
 BINDING = Binding(adapter="codex", model="gpt-6.1-sol", effort="xhigh")
@@ -182,3 +188,72 @@ def test_media_must_be_exactly_one_image(caplog):
     with caplog.at_level(logging.INFO):
         result = asyncio.run(drawer_service((solid_png(),)).run(DRAW))
     assert result.ok and f"media=1 media_bytes={len(solid_png())}" in caplog.text
+
+
+class Verdicts(BaseModel):
+    pictures: list[dict]
+
+
+LOOK = ModelRequest(
+    "preparation",
+    "look",
+    {"kind": "check"},
+    Verdicts,
+    deadline_key="preparation_image_check",
+    images=(solid_png(), solid_png(), solid_png()),
+)
+
+
+def test_a_request_draws_or_looks_not_both():
+    with pytest.raises(ValueError, match="not both"):
+        ModelRequest(
+            "preparation",
+            "x",
+            {},
+            ImageNote,
+            deadline_key="preparation_image",
+            media="image",
+            images=(solid_png(),),
+        )
+
+
+def test_picture_check_has_its_own_deadline():
+    assert DEFAULT_DEADLINES["preparation_image_check"] == 300
+
+
+def test_codex_sends_pictures_as_image_inputs(tmp_path):
+    fake = FakeCodex(events=[message(NOTE), completed()])
+    asyncio.run(adapter(fake, tmp_path).invoke(LOOK, BINDING))
+    sent = fake.turns[0][0]
+    assert isinstance(sent[0], TextInput) and json.loads(sent[0].text) == {"kind": "check"}
+    assert [type(item) for item in sent[1:]] == [ImageInput] * 3
+    assert sent[1].url == "data:image/png;base64," + PNG
+    assert fake.starts[0]["base_instructions"] == BASE_INSTRUCTIONS  # Looking draws nothing.
+
+
+def test_sees_images_follows_the_probe():
+    service = ModelService.simulated()
+    assert service.sees_images("preparation")
+    report = service.reports[0]
+    items = report.items | {"image_input": ProbeItem(status="unsupported")}
+    service.reports = [CapabilityReport(**report.model_dump() | {"items": items})]
+    assert not service.sees_images("preparation")
+    del service.bindings["preparation"]
+    assert not service.sees_images("preparation")
+
+
+def test_simulated_check_rejects_preset_pictures():
+    adapter_ = SimulatedAdapter()
+    adapter_.reject_pictures = [{2}]
+    first = asyncio.run(adapter_.invoke(LOOK, BINDING)).data["pictures"]
+    assert [item["ok"] for item in first] == [True, False, True]
+    assert first[1]["reason"] == "wrong" and first[0]["reason"] is None
+    again = asyncio.run(adapter_.invoke(LOOK, BINDING)).data["pictures"]
+    assert all(item["ok"] for item in again)
+
+
+def test_model_log_counts_pictures_sent(caplog):
+    with caplog.at_level(logging.INFO):
+        result = asyncio.run(ModelService.simulated().run(LOOK))
+    assert result.ok and "images=3" in caplog.text
+    assert PNG not in caplog.text

@@ -24,7 +24,13 @@ const valueLabels: Record<string, string> = {
   confirmed: 'Confirmed', awaiting_generation: 'Waiting to be made', planned: 'Listed; made after you confirm', generated: 'Ready to look at', adopted: 'In use', not_connected: 'Not connected',
 }
 const kindLabels: Record<string, string> = { image: 'Picture', audio: 'Voice', animation: 'Animation', video: 'Video' }
-const stageLabels: Record<string, string> = { question: 'with the question', help: 'after help' }
+const stageLabels: Record<string, string> = { question: 'with the question', help: 'after help', story: 'with the story', option: 'as an option' }
+// Why a checked picture is not used (ADR-0026), as the student reads it.
+const checkReasons: Record<string, string> = {
+  wrong: 'it does not show the right thing', misleading: 'it could mislead', answer_text: 'it writes the answer',
+  missing: 'it misses what the question asks about', alike: 'the pictures look too alike', also_fits: 'more than one picture fits',
+  style: 'its style does not match', no_image_input: 'pictures cannot be checked here', check_unavailable: 'the check could not run',
+}
 const directionLabels: Record<string, string> = {
   consolidate: 'Practise', review: 'Review', extend: 'Go wider', advance: 'Small step up', observe: 'Short check',
 }
@@ -131,8 +137,12 @@ export function revisionChanges(current: Doc, previous: Doc, docs: Doc[]): [stri
 export function resourceLines(preview: Body): string[] {
   return (preview.resources ?? []).map((item: Body) => {
     const versions = item.versions?.length ? `${item.adopted_version ? `, version ${item.adopted_version} in use` : ''}, ${item.versions.length} in all` : ''
-    return `${kindLabels[item.kind] ?? item.kind} (${item.required ? 'needed' : 'optional'}, ${stageLabels[item.stage] ?? item.stage}): ${item.purpose}`
-      + `${item.text ? ` "${item.text}"` : ''}; without it: ${item.fallback} - ${valueLabels[item.state] ?? item.state}${versions}`
+    const stage = `${stageLabels[item.stage] ?? item.stage}${item.paragraph ? `, paragraph ${item.paragraph}` : ''}${item.picture_question ? ', picture question' : ''}`
+    const reason = checkReasons[item.rejected_reason] ?? item.rejected_reason
+    const state = item.state === 'rejected' ? `${item.stage === 'story' ? 'Not shown' : 'In words instead'}: ${reason}`
+      : `${valueLabels[item.state] ?? item.state}${item.checks?.[item.adopted_version]?.result === 'unchecked' ? ', not checked' : ''}`
+    return `${kindLabels[item.kind] ?? item.kind} (${item.required ? 'needed' : 'optional'}, ${stage}): ${item.purpose}`
+      + `${item.text ? ` "${item.text}"` : ''}; without it: ${item.fallback} - ${state}${versions}`
   })
 }
 

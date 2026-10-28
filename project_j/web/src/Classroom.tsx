@@ -5,14 +5,14 @@ import { canConfirm, confirmationKey } from './confirmation'
 import { endLabels } from './report'
 import { finishRecording, idle, pauseRecording, recordedMs, resumeRecording, startRecording, type Recorder } from './recording'
 import type { RequestFailure } from './request'
-import { Speaker, reportsFor, startedReport, visualReport } from './speaker'
+import { Speaker, pictureReport, reportsFor, startedReport, visualReport } from './speaker'
 import { Microphone } from './microphone'
 import { passage, sentenceOf, wordTokens } from './passage'
 import { VocabularyBox } from './VocabularyBox'
 import type { Entry } from './vocabulary'
 import { classProgress, taskMarks } from './progress'
 import { Progress } from './ui'
-import { answerMode, type TaskView } from './tasks'
+import { answerMode, picturesSettled, type TaskView } from './tasks'
 import { TaskInput } from './TaskInput'
 import type { AllowedAction, Snapshot, Control, DeliveryFeedback, TextInput, InputResult as Ack } from './client/types.gen'
 
@@ -60,6 +60,28 @@ function Visuals({ token, action, onShown }: { token: string, action?: AllowedAc
   }, [token, id, key])
   return items.length ? <section className="visuals">{items.map(({ resource, url }) => <img key={url} src={url} alt="A picture Jane shows"
     onLoad={() => settle(resource, true)} onError={() => settle(resource, false)} />)}</section> : null
+}
+
+// Story and option pictures, fetched by resource while the class offers them (ADR-0026). Each
+// id ends displayed (true) or failed (false); the image's own load event settles a fetched one.
+function usePictures(token: string, ids: string[]) {
+  const [urls, setUrls] = useState<Record<string, string>>({})
+  const [outcomes, setOutcomes] = useState<Record<string, boolean>>({})
+  const key = ids.join(' ')
+  useEffect(() => {
+    setUrls({}); setOutcomes({})
+    if (!key) return
+    let alive = true
+    const made: string[] = []
+    for (const id of key.split(' ')) {
+      fileUrl(token, `/api/class/picture/${encodeURIComponent(id)}`)
+        .then(url => { if (!alive) { URL.revokeObjectURL(url); return } made.push(url); setUrls(old => ({ ...old, [id]: url })) })
+        .catch(() => { if (alive) setOutcomes(old => ({ ...old, [id]: false })) })
+    }
+    return () => { alive = false; made.forEach(url => URL.revokeObjectURL(url)) }
+  }, [token, key])
+  const settle = useCallback((id: string, displayed: boolean) => setOutcomes(old => id in old ? old : { ...old, [id]: displayed }), [])
+  return { urls, outcomes, settle }
 }
 
 export default function Classroom({ token, onLeave }: { token: string, onLeave: () => void }) {
@@ -290,6 +312,37 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     })
   }
   const shown = !voiced ? snapshot?.pending_action ?? snapshot?.presented_action : locked || voicing ? undefined : snapshot?.presented_action
+  // Story pictures beside their paragraphs; picture options of the clicked question (ADR-0026).
+  const illustrations = (snapshot?.illustrations ?? []) as { resource_id: string, paragraph: number }[]
+  const storyIds = illustrations.map(item => item.resource_id)
+  const story = usePictures(token, storyIds)
+  const task = snapshot?.task as TaskView | undefined
+  const optionIds = task?.type === 'choice' ? task.pictures ?? [] : []
+  const options = usePictures(token, optionIds)
+  const optionState = picturesSettled(optionIds.map(id => options.outcomes[id]))
+  // Each part is reported once per action it showed with, once every picture has an outcome.
+  const report = (part: 'story' | 'options', ids: string[], outcomes: Record<string, boolean>, settled = ids.every(id => id in outcomes)) => {
+    if (!shown || !ids.length || !settled) return
+    const key = `${shown.action_id}:${part}`
+    if (pictured.current.has(key)) return
+    pictured.current.add(key)
+    void sendDelivery(pictureReport(shown, part, ids, ids.filter(id => outcomes[id]), new Date()))
+  }
+  useEffect(() => report('story', storyIds, story.outcomes))
+  // Words take over at the first failure: the pictures not yet shown never will be.
+  useEffect(() => report('options', optionIds, options.outcomes, optionState !== 'loading'))
+  const [zoom, setZoom] = useState('')
+  const zoomBox = useRef<HTMLDialogElement>(null)
+  // The enlarged picture closes with its story; closing clears it.
+  useEffect(() => { if (!storyIds.length) zoomBox.current?.close() }, [storyIds.length])
+  const figure = (paragraph: number) => {
+    const item = illustrations.find(entry => entry.paragraph === paragraph)
+    const url = item && story.urls[item.resource_id]
+    if (!item || !url || story.outcomes[item.resource_id] === false) return null
+    return <figure className="illustration"><button type="button" className="picture" aria-label="Enlarge the picture" onClick={() => { setZoom(url); zoomBox.current?.showModal() }}>
+      <img src={url} alt="A picture for this part of the story" onLoad={() => story.settle(item.resource_id, true)}
+        onError={() => story.settle(item.resource_id, false)} /></button></figure>
+  }
   // Jane's board left, the textbook page in the middle, the student's notebook right (1:2:1), each
   // scrolling on its own: no page scroll between her question, the story and the answer box.
   return <main className="student classroom">
@@ -334,7 +387,7 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
           const { title, paragraphs } = passage(material)
           return <section key={id} className="reading">{title && <h2>{title}</h2>}
             {tapping && <p className="hint">Tap a word you do not know to put it in your vocabulary box.</p>}
-            <ol>{paragraphs.map((text, index) => <li key={index}>{tapping ? tappable(text) : text}</li>)}</ol></section>
+            <ol>{paragraphs.map((text, index) => <li key={index}>{figure(index + 1)}{tapping ? tappable(text) : text}</li>)}</ol></section>
         })}
         {!Object.keys(snapshot?.materials ?? {}).length && <p className="hint">{snapshot?.wait_kind === 'reading_start' ? 'The story shows when you press Start reading.' : 'The story shows here.'}</p>}
       </div>
@@ -364,6 +417,7 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
               <button className="quiet" onClick={() => { microphone.current?.discard(); setRecorder(idle) }}>Record again</button></>}
           </div></section>}
         {mode === 'task' && snapshot ? <TaskInput key={snapshot.task_instance_id} task={snapshot.task as TaskView} disabled={busy || halted}
+          pictures={optionIds.length ? { urls: optionIds.map(id => options.urls[id]), state: optionState, onLoad: (index, displayed) => options.settle(optionIds[index], displayed) } : undefined}
           onSubmit={response => void respond({ intent: 'answer', response })} onHint={() => void respond({ intent: 'help' })} /> :
           // Reading the story alone, timed by the class (ADR-0022); no seconds are shown.
           mode === 'story' && snapshot ? (snapshot.wait_kind === 'reading_start'
@@ -381,6 +435,8 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
         <p className="hint">{voiced ? 'Listen to Jane first; her words show after she speaks. Reading aloud is scored on this computer and not saved.' : 'Text simulation; nothing is recorded or played.'}</p>
       </div>
     </div>
+    <dialog ref={zoomBox} className="zoom" onClose={() => setZoom('')} onClick={() => zoomBox.current?.close()}>
+      {zoom && <img src={zoom} alt="The story picture, enlarged" />}</dialog>
     <dialog ref={askBox} className="confirm-box" onClose={() => setChecking(null)}>
       {checking && <><h2>{questions[checking][0]}</h2><p>{questions[checking][1]}</p>
         <div className="row"><button className={checking === 'stop' ? 'danger' : undefined} onClick={() => { const command = checking; askBox.current?.close(); void control(command) }}>Yes</button>

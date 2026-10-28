@@ -2102,6 +2102,60 @@
         }
       }
     },
+    "/api/class/picture/{resource_id}": {
+      "get": {
+        "summary": "Picture",
+        "description": "A story picture while the story shows, or an option picture of the current task.",
+        "operationId": "picture_api_class_picture__resource_id__get",
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Resource Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/class/control": {
       "post": {
         "summary": "Control",
@@ -2956,7 +3010,8 @@
                 "planning",
                 "preparation_drafting",
                 "preparation_image",
-                "preparation_animation"
+                "preparation_animation",
+                "preparation_image_check"
               ]
             },
             "type": "object",
@@ -4295,6 +4350,17 @@
             "type": "object",
             "title": "Materials",
             "default": {}
+          },
+          "illustrations": {
+            "items": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Illustrations",
+            "default": []
           },
           "vocabulary": {
             "items": {

@@ -575,6 +575,7 @@ def template_draft(
             for index, item in enumerate(mapping)
         ],
         "resources": [],
+        "picture_style": None,
         "preview": {
             "story": f"{title} ({stage})",
             "why": "Review of a story read before: answers in a familiar story are not a first "

@@ -43,6 +43,8 @@ class SimulatedAdapter:
     def __init__(self):
         self.delay_seconds = 0.0
         self.fail_next = False
+        # Picture checks to fail, one set per check: the 1-based pictures judged wrong.
+        self.reject_pictures: list[set[int]] = []
 
     def respond(self, request: ModelRequest) -> dict | None:
         context = request.context
@@ -97,6 +99,18 @@ class SimulatedAdapter:
                 ]
             }
         if request.purpose == "preparation":
+            if context.get("kind") == "check":
+                failing = self.reject_pictures.pop(0) if self.reject_pictures else set()
+                return {
+                    "pictures": [
+                        {
+                            "picture": number,
+                            "ok": number not in failing,
+                            "reason": "wrong" if number in failing else None,
+                        }
+                        for number in range(1, len(request.images) + 1)
+                    ]
+                }
             if context.get("kind") == "animation":
                 return {
                     "svg": SIMULATED_SVG,
@@ -262,9 +276,7 @@ class SimulatedAdapter:
         verified = ProbeItem(status="verified", detail="simulated")
         items = {name: verified for name in ("auth", "model", "structured_output", "cancellation")}
         items |= {f"effort:{effort}": verified for effort in efforts}
-        items["image_input"] = ProbeItem(
-            status="unsupported", detail="the simulated adapter takes no pictures"
-        )
+        items["image_input"] = ProbeItem(status="verified", detail="simulated")
         items["audio"] = ProbeItem(status="not_probed", detail="voice is designed separately")
         return CapabilityReport(
             adapter=self.adapter_id,

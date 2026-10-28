@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.50.0；更新：2026年10月22日。
+版本：1.51.0；更新：2026年10月27日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -1070,3 +1070,25 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 实际改动：通用文字框只在`mode === 'text'`时渲染；设计同步design/interface/student-classroom.md（同一版本1.7.0内补一句）。
 - 检查证据：登记检查全部重跑通过（主工程767、评分39、合成15项pytest；前端87、文档1；npm audit 0 vulnerabilities），UTC 2026-10-24T17:11:17.065681+00:00，工程摘要88681d26bead025ec3bf8f0923cfd20ece593b8032b534c534262a021b4a2da7；沙盒朗读场景录音区外文本框由1变0（project_j/test/ui/sandbox/read-aloud-box.mjs，截图project_j/test/ui/output/sandbox/read-aloud-box.png）。
 - 状态：实现与自测完成，已本地提交b2e9b05（2026年10月25日）。
+
+## PIC-1 课文插图与带图题目（ADR-0026）
+
+- 负责人：Claude Opus（实现与集成）；参与者：无。发起：2026年10月27日用户要求课文像小说一样配插图或小动画、题目也能用图来考；设计docs/superpowers/specs/2026-10-27-lesson-pictures-design.md（0.5.0，用户已确认），计划docs/superpowers/plans/2026-10-27-lesson-pictures.md（用户已确认，本会话逐任务实现）。
+- 实际改动：
+  1. 平台：`ModelRequest.images`（看图输入，与出图互斥）、期限键`preparation_image_check`（默认300）；`ModelService.sees_images`按探测报告的image_input判断；Codex适配器把上下文与`ImageInput`数据地址一起交给模型；模拟提供者image_input改为verified、核对默认全过、`reject_pictures`可预设不合格；调用日志加`images=`张数。
+  2. 备课：资源stage增加story/option与`paragraph`、`option`、`picture_question`字段，课程与草稿增加`picture_style`；新模块`preparation/pictures.py`（数量、段落、挂法、一题一种形式、风格必填的核对，以及要核对的组）；`reading.passage`与页面同一切段规则；起草指令补充插图与带图题写法；出图与动画请求带风格、插图照所配段落画、带图题的图可画出要考的东西但不写答案；`check_request`/`verdicts`看图核对。
+  3. 资源流程：`ready_resources`把静态插图与每道带图题按组生成→核对→只重画不合格的→采用，三次仍不合格退回（state=rejected及原因），探针未过或核对不可用时带图题退回、静态插图标unchecked采用；预览资源项记`checks`；课程详情“Make again”（`remake_resource`）与“Use version”（`choose_resource`）对要核对的图整组再核对，通过才采用。
+  4. 课堂与评价：`option_pictures`（全部采用才给、随选项打乱）；学生视图`illustrations`（故事可见时）、点选题视图`pictures`；`GET /api/class/picture/{resource_id}`只给故事可见时的插图和当前题的选项图；图片回报放行这两类；作答记录visuals带story/option，看图题的图带`picture_question`；评价指令说明三种用途。
+  5. 前端：插图在段落右侧绕排、点开放大（原生dialog，Esc关闭）、窄于600px移到段落下方；图片选项两列网格、不显示选项文字，任一张失败改回文字选项并按实际显示回报；`pictureReport`；课程详情资源行写“In words instead/Not shown”及原因、“not checked”；设置页加看图核对等待时长标签。
+  6. 沙盒：假课堂加Story pictures、Story pictures (reading)、Picture options、Picture fill-in、Picture options in words五个场景与取图路由；主页快照加一张已采用的插图、一道退回文字的图片选项题与一条带插图的作答。
+  7. 文档：ADR-0026；preparation（multimodal-materials 1.4.0、course-package 1.9.0、verification 1.3.0）、curriculum/presentation-resources 1.4.0、classroom/materials-offscreen 1.3.0、interface（student-classroom 1.8.0、preview-start 2.3.0）、platform（multimodal-materials 1.4.0、models 2.10.0、configuration-permissions 2.2.0）、evaluation/facts-evidence 1.3.0、shared/end-to-end-cases 1.7.0（新增E2E21，并把案例计数改为21）、docs/acceptance.md 2.6.0，以及七个模块入口的版本与日期；两份multimodal-materials里“家长查看或试听后采用”改为AI采用最新合格版本。
+- 文件边界：project_j/python/src/project_j/{platform/models/{contracts,service,codex_sdk,simulated}.py,preparation/{contracts,drafting,pictures,materials,resources,reading,packages}.py,classroom/{harness,responses}.py,application/teaching.py,interface/api.py,evaluation/assessment.py}；测试test_picture_{drafting,requests,resources,classroom}.py（新）与test_model_images、test_models_simulated、test_preparation_drafting、test_preparation_model（夹具补风格）；project_j/web/src/{Classroom,TaskInput}.tsx、{tasks,speaker,report,settings}.ts、style.css、client与schema生成文件；web/tests四个文件；web/sandbox/{mock.ts,dashboard.json}；上列设计文档与ADR。
+- 验收条件：起草核对、出图与核对请求、分组核对/重画/退回/恢复、开课补齐、课堂显示与回报、作答记录与评价的单元测试（四个新测试文件共51项）；前端纯函数测试；沙盒浏览器检查（布局、放大、窄屏、选项图、改回文字与回报）；统一check通过。
+- 检查证据：完整重跑登记检查：三份uv sync（锁定依赖未变）、两份npm ci与npm audit（0 vulnerabilities）、统一check通过（主工程824、评分39、合成15项pytest；前端92、文档1），UTC 2026-10-27T15:45:12.904358+00:00，工程摘要d4bed2fc6ae589ed872aaf6209b27fcc31fe6e7b51ad96aa39d12dc095ee01ff；project-j-probe与project-j-measure照常输出（模拟，actual_api/voice未验证）。
+- 诊断日志：`picture check course= group= resources= round= result=pass|fail|unavailable reasons= elapsed_ms=`、`picture rejected course= group= reason=`、`picture unchecked course= resource= reason=`、`class pictures activity= part=visual|story|options shown= status=`、开课`start resources ... illustrations= option_pictures=`、模型调用`images=`；均不含图片描述、风格、段落、题目、选项或答案（日志测试在test_picture_resources与test_picture_classroom）。
+- 沙盒走查（2026年10月27日，project_j/test/ui/sandbox/pictures.mjs，记录在project_j/test/records/pictures-sandbox-20261027.md）：全部断言通过；走查中修正了“选项图改回文字后回报不发”和“插图按钮带全局阴影”两处。2026年10月28日重跑同一脚本仍全部通过，用户在沙盒看过五个场景，确认没问题。
+- 自审取舍（计划内记账）：核对结果按每张图给类别（分不清、不止一张对得上标在出问题的图上），不另设整组字段；核对调用不可用时不记入台账，重启后可能再调一次；课程详情的重画与选用按第0轮记日志；测试先确认课程再启动测试服务，避免测试线程与服务线程同时写SQLite。延后的小问题：一节课若有多份材料，插图会在每份材料的同号段落旁重复（目前每课只有一份材料）；阅读刚暂停时恰好发出的插图回报会被拒，练习本里会出现一行英文错误。
+- 未验证：真实备课（插图是否配在难懂处、带图题与措辞、风格句）；真实出图加看图核对（结论是否可信、总耗时与额度）；正式入口上一节带插图与带图题的课及课后评价。
+- 继续条件：用单独运行编号（如pic-check）用真实模型备课一次、确认出图并核对一次，记录交用户看过认可，之后`project-j-reset --run-id pic-check`清空；用正式入口上一节课（沙盒走查已由用户确认）。
+- 精简审查（2026年10月28日，用户要求，主会话按ponytail-review自审）：修正一处崩溃——草稿里stage为option却没写option下标时，`picture_problems`排序会抛TypeError使备课核对中断，现改为退回给模型修改（新测试test_an_option_picture_without_its_option_is_repaired_not_a_crash先失败后通过）；精简：`make_checked`把“不能看图”的插图分支并入“核对没能运行”分支，删去先读预览再合并的`checked()`（改由`update_resources`合并checks），删去Python端用不到的`no_image_input`文案，`use_checked`改用字典取结果，`task_picture`只在pictures.py定义一次，放大窗口改为点击时直接打开、故事隐藏时关闭。未做：`Visuals`改用`usePictures`（会改原有组件）与删`visualReport`包装。检查：统一check通过（主工程825、评分39、合成15项pytest；前端92、文档1），UTC 2026-10-28T01:49:19.247400+00:00，工程摘要849e5cf9fe34624905e7b598db3d29fc05f8506b67692ebd2a992daf6e821638；沙盒浏览器脚本重跑全部通过。
+- 状态：实现与自测完成，未提交（用户要求说“提交”时再提交）。

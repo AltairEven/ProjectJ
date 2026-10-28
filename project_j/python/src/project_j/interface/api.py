@@ -66,7 +66,7 @@ from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.local import LocalSynthesizer, SynthesizerUnavailable
 from project_j.platform.tts.recorded import speak
-from project_j.preparation.resources import adopt_resource, generate_resource, resource_file
+from project_j.preparation.resources import choose_resource, remake_resource, resource_file
 
 LEARNER_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
 
@@ -268,6 +268,8 @@ class Snapshot(Contract):
     # A clicked task as the page shows it (options, cards, columns, blanks); never its answer.
     task: dict[str, JsonValue] | None = None
     materials: dict[str, str] = {}
+    # Story pictures beside their paragraphs while the story shows (ADR-0026).
+    illustrations: list[dict[str, JsonValue]] = []
     # Words marked while reading, with their meanings once looked up (never scored).
     vocabulary: list[dict[str, JsonValue]] = []
 
@@ -682,7 +684,7 @@ def create_app(
         response_model=ResourceResult,
     )
     async def generate(request: ResourceRequest):
-        return await generate_resource(
+        return await remake_resource(
             controller(),
             request.request_id,
             request.learner_id,
@@ -694,7 +696,7 @@ def create_app(
         "/api/resource/adopt", dependencies=[Depends(operator)], response_model=ResourceResult
     )
     async def adopt(request: AdoptRequest):
-        return adopt_resource(
+        return await choose_resource(
             controller(),
             request.request_id,
             request.learner_id,
@@ -1049,6 +1051,18 @@ def create_app(
         action = core.actions.get(action_id)
         if action is None or resource_id not in action.visuals:
             raise LookupError("unknown visual of an approved action")
+        data, media_type = controller().visuals[resource_id]
+        return Response(
+            data,
+            media_type=media_type,
+            headers={"Cache-Control": "no-store", "Content-Security-Policy": "sandbox"},
+        )
+
+    @app.get("/api/class/picture/{resource_id}")
+    async def picture(resource_id: str, core: ClassCore):
+        """A story picture while the story shows, or an option picture of the current task."""
+        if not core.picture_available(resource_id):
+            raise LookupError("unknown picture of the class")
         data, media_type = controller().visuals[resource_id]
         return Response(
             data,

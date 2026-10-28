@@ -4844,6 +4844,212 @@
                 "version": 1
               }
             ]
+          },
+          {
+            "adopted_version": 1,
+            "audience": "student",
+            "checks": {
+              "1": {
+                "result": "pass",
+                "reason": null
+              }
+            },
+            "content": "Mia folds the paper bridge",
+            "fallback": "Read the words.",
+            "kind": "image",
+            "option": null,
+            "paragraph": 1,
+            "picture_question": false,
+            "purpose": "Mia folds the paper bridge",
+            "required": false,
+            "resource_id": "story-1",
+            "stage": "story",
+            "state": "adopted",
+            "task_ids": [],
+            "versions": [
+              {
+                "version": 1,
+                "generated_at": "2026-10-27T09:00:00+00:00",
+                "media_type": "image/png",
+                "source": {
+                  "description": "Simulated picture."
+                }
+              }
+            ]
+          },
+          {
+            "audience": "student",
+            "checks": {
+              "1": {
+                "result": "fail",
+                "reason": "alike"
+              },
+              "2": {
+                "result": "fail",
+                "reason": "alike"
+              },
+              "3": {
+                "result": "fail",
+                "reason": "alike"
+              }
+            },
+            "content": "Option picture 1",
+            "fallback": "Read the words.",
+            "kind": "image",
+            "option": 0,
+            "paragraph": null,
+            "picture_question": false,
+            "purpose": "Option picture 1",
+            "rejected_reason": "alike",
+            "required": false,
+            "resource_id": "choice-option-0",
+            "stage": "option",
+            "state": "rejected",
+            "task_ids": [
+              "choice-first-try"
+            ],
+            "versions": [
+              {
+                "version": 1,
+                "generated_at": "2026-10-27T09:00:00+00:00",
+                "media_type": "image/png",
+                "source": {
+                  "description": "Simulated picture."
+                }
+              },
+              {
+                "version": 2,
+                "generated_at": "2026-10-27T09:00:00+00:00",
+                "media_type": "image/png",
+                "source": {
+                  "description": "Simulated picture."
+                }
+              },
+              {
+                "version": 3,
+                "generated_at": "2026-10-27T09:00:00+00:00",
+                "media_type": "image/png",
+                "source": {
+                  "description": "Simulated picture."
+                }
+              }
+            ]
+          },
+          {
+            "audience": "student",
+            "checks": {
+              "1": {
+                "result": "fail",
+                "reason": "alike"
+              },
+              "2": {
+                "result": "fail",
+                "reason": "alike"
+              },
+              "3": {
+                "result": "fail",
+                "reason": "alike"
+              }
+            },
+            "content": "Option picture 2",
+            "fallback": "Read the words.",
+            "kind": "image",
+            "option": 1,
+            "paragraph": null,
+            "picture_question": false,
+            "purpose": "Option picture 2",
+            "rejected_reason": "alike",
+            "required": false,
+            "resource_id": "choice-option-1",
+            "stage": "option",
+            "state": "rejected",
+            "task_ids": [
+              "choice-first-try"
+            ],
+            "versions": [
+              {
+                "version": 1,
+                "generated_at": "2026-10-27T09:00:00+00:00",
+                "media_type": "image/png",
+                "source": {
+                  "description": "Simulated picture."
+                }
+              },
+              {
+                "version": 2,
+                "generated_at": "2026-10-27T09:00:00+00:00",
+                "media_type": "image/png",
+                "source": {
+                  "description": "Simulated picture."
+                }
+              },
+              {
+                "version": 3,
+                "generated_at": "2026-10-27T09:00:00+00:00",
+                "media_type": "image/png",
+                "source": {
+                  "description": "Simulated picture."
+                }
+              }
+            ]
+          },
+          {
+            "audience": "student",
+            "checks": {
+              "1": {
+                "result": "fail",
+                "reason": "alike"
+              },
+              "2": {
+                "result": "fail",
+                "reason": "alike"
+              },
+              "3": {
+                "result": "fail",
+                "reason": "alike"
+              }
+            },
+            "content": "Option picture 3",
+            "fallback": "Read the words.",
+            "kind": "image",
+            "option": 2,
+            "paragraph": null,
+            "picture_question": false,
+            "purpose": "Option picture 3",
+            "rejected_reason": "alike",
+            "required": false,
+            "resource_id": "choice-option-2",
+            "stage": "option",
+            "state": "rejected",
+            "task_ids": [
+              "choice-first-try"
+            ],
+            "versions": [
+              {
+                "version": 1,
+                "generated_at": "2026-10-27T09:00:00+00:00",
+                "media_type": "image/png",
+                "source": {
+                  "description": "Simulated picture."
+                }
+              },
+              {
+                "version": 2,
+                "generated_at": "2026-10-27T09:00:00+00:00",
+                "media_type": "image/png",
+                "source": {
+                  "description": "Simulated picture."
+                }
+              },
+              {
+                "version": 3,
+                "generated_at": "2026-10-27T09:00:00+00:00",
+                "media_type": "image/png",
+                "source": {
+                  "description": "Simulated picture."
+                }
+              }
+            ]
           }
         ],
         "status": "checked",
@@ -5903,7 +6109,12 @@
             "task_instance_id": "be7c9145-29b2-4ca1-a403-cfebb50222e3",
             "task_started_ms": 0.7,
             "type_version": 1,
-            "visuals": []
+            "visuals": [
+              {
+                "resource_id": "story-1",
+                "stage": "story"
+              }
+            ]
           },
           {
             "answered_ms": 1.2,

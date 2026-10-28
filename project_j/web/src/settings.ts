@@ -4,6 +4,7 @@ type Body = Record<string, any>
 export const deadlineLabels: Record<string, string> = {
   classroom_judgment: 'Classroom judgment', vocabulary: 'Word meanings', evaluation: 'Evaluation', planning: 'Planning',
   preparation_drafting: 'Preparation: drafting', preparation_image: 'Preparation: pictures', preparation_animation: 'Preparation: animations',
+  preparation_image_check: 'Preparation: picture checks',
 }
 
 export const PURPOSES = ['planning', 'preparation', 'classroom_judgment', 'evaluation', 'vocabulary'] as const
