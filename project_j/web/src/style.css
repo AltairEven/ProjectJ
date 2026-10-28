@@ -212,6 +212,8 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
 /* Only what Jane says is in her hand; states like "Getting ready" stay in the interface face. */
 .board .jane p { color: var(--chalk-dim); }
 .board .jane p.said { font-family: var(--teacher); font-size: 20px; line-height: 1.6; color: var(--chalk); }
+/* The question's instructions and Jane's hints about it: smaller, under the question. */
+.board .jane p.note { font-size: 15px; line-height: 1.5; color: var(--chalk-dim); }
 /* Jane's new sentence appears on the board; the one moment of motion in class. */
 .said { animation: chalk .45s ease-out; }
 @keyframes chalk { from { opacity: 0; } to { opacity: 1; } }
@@ -278,11 +280,9 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
   progress:indeterminate { animation-duration: 8s; }
 }
 
-/* Story words tapped while reading: plain text until hovered; a marked word looks highlighted. */
-.word { font: inherit; display: inline; margin: 0; padding: 0 1px; border: 0; border-radius: 3px; background: none; color: inherit; box-shadow: none; cursor: pointer; }
-.word:hover:not(:disabled) { filter: none; background: var(--ink-wash); }
-.word:active:not(:disabled) { transform: none; box-shadow: none; }
-.word.marked { background: #f3d46ba6; }
+/* While reading, a marked word looks highlighted; a selected word gets its button just below. */
+.reading mark.marked { padding: 0 1px; border-radius: 3px; background: #f3d46ba6; color: inherit; }
+.word-pop { position: fixed; z-index: 5; padding: 5px 12px; font-size: 14px; }
 .vocabulary-box { margin: 0 0 18px; padding: 8px 14px 12px; border: 1px dashed var(--rule-strong); border-radius: 6px; font-family: var(--ui); }
 .vocabulary-box summary { font-size: 14px; }
 .vocabulary-box ul { list-style: none; margin: 8px 0 0; padding: 0; }

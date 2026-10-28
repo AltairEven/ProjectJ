@@ -190,26 +190,16 @@ class SimulatedAdapter:
             supports, count = context["allowed_supports"], context["help_count"]
             text = supports[count] if count < len(supports) else context["exit_text"]
             return {"judgment": "help", "evidence": evidence, "text": text}
-        if context["task_purpose"] == "read_aloud":
-            score = context["pronunciation"]
-            if score["status"] != "scored":
-                return {
-                    "judgment": "unclear",
-                    "evidence": evidence,
-                    "text": "No score came through. Please read this part again.",
-                }
-            weak = [word["word"] for word in score["words"] if word["error"] != "none"]
-            if not weak:
-                return {
-                    "judgment": "correct",
-                    "evidence": evidence,
-                    "text": "Clear and complete. Let's go on.",
-                }
-            return {
-                "judgment": "incorrect",
-                "evidence": evidence,
-                "text": "Read these words again: " + ", ".join(weak[:5]),
-            }
+        if context["task_purpose"] == "read_aloud":  # The core fixed the judgment; only words.
+            judgment, named = context["reading_judgment"], ", ".join(context["flagged_words"][:3])
+            text = {
+                "unclear": "No score came through. Please read this part again.",
+                "incorrect": f"Read these words again: {named}",
+                "correct": f"Good reading. Watch these words: {named}"
+                if named
+                else "Clear and complete. Let's go on.",
+            }[judgment]
+            return {"judgment": judgment, "evidence": evidence, "text": text}
         if han(context["answer"]):  # The student answers in English only (ADR-0021).
             return {"judgment": "unclear", "evidence": evidence, "text": ENGLISH_ONLY}
         answer = normalized(context["answer"])

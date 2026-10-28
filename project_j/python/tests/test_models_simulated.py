@@ -156,11 +156,16 @@ def test_simulated_report_is_marked_simulated():
 
 
 def reading_context(pronunciation, help=False):
+    from project_j.classroom.judgment import reading_rule
+
+    judgment, flagged = reading_rule(pronunciation)
     return {
         "task_purpose": "read_aloud",
         "evidence": "以评分为据",
         "reference_text": "She wants a bridge for her car.",
         "pronunciation": pronunciation,
+        "reading_judgment": judgment,
+        "flagged_words": flagged,
         "allowed_supports": ["看着标出的词再读一遍。", "先听示范再跟读。"],
         "exit_text": "跳过",
         "help_count": 0,
@@ -169,7 +174,7 @@ def reading_context(pronunciation, help=False):
     }
 
 
-def test_reading_judgment_follows_the_score_and_names_words_to_reread():
+def test_reading_judgment_keeps_the_core_judgment_and_names_its_words():
     from project_j.classroom.judgment import ClassroomJudgment
     from project_j.platform.models.contracts import ModelRequest
 
@@ -188,11 +193,30 @@ def test_reading_judgment_follows_the_score_and_names_words_to_reread():
     words = [{"word": "bridge", "accuracy": 40, "error": "mispronounced"}]
     weak = reply({"status": "scored", "words": words})
     assert weak["judgment"] == "incorrect" and "bridge" in weak["text"]
-    good = reply(
-        {"status": "scored", "words": [{"word": "bridge", "accuracy": 95, "error": "none"}]}
-    )
-    assert good["judgment"] == "correct"
+    fine = [{"word": w, "accuracy": 95, "error": "none"} for w in "Mia has a toy car".split()]
+    few = reply({"status": "scored", "words": fine * 2 + words})  # 1 of 11 flagged
+    assert few["judgment"] == "correct" and "bridge" in few["text"]
+    assert reply({"status": "scored", "words": fine})["judgment"] == "correct"
     assert reply({"status": "unknown", "words": []})["judgment"] == "unclear"
+
+
+def test_a_reading_passes_with_at_most_a_tenth_of_its_words_flagged():
+    from project_j.classroom.judgment import reading_rule
+
+    def scored(flags, total, inserted=0):
+        words = [{"word": f"w{i}.", "error": "mispronounced"} for i in range(flags)]
+        words += [{"word": "ok", "error": "none"}] * (total - flags)
+        words += [{"word": "ə b", "error": "inserted"}] * inserted
+        return {"status": "scored", "words": words}
+
+    assert reading_rule(scored(5, 53)) == ("correct", ["w0", "w1", "w2", "w3", "w4"])
+    assert reading_rule(scored(6, 53))[0] == "incorrect"
+    assert reading_rule(scored(5, 53, inserted=10))[0] == "correct"  # Extra sounds not counted.
+    assert reading_rule(scored(1, 9))[0] == "incorrect"
+    omitted = {"status": "scored", "words": [{"word": "box", "error": "omitted"}] * 2}
+    assert reading_rule(omitted) == ("incorrect", ["box"])
+    assert reading_rule({"status": "unknown", "words": []}) == ("unclear", [])
+    assert reading_rule(None) == ("unclear", [])
 
 
 def test_simulates_follows_the_purpose_binding():

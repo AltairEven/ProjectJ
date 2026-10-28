@@ -18,8 +18,10 @@ INSTRUCTIONS = (
     "学生一律用英文作答：answer整句或部分是中文（含英文句中夹中文词）时judgment为unclear，"
     "text提醒“Please answer in English.”，不算incorrect；"
     "point或offscreen的报告用中文时同样判unclear并提醒，不记为reported。英文换说法、小的拼写或语法错误，只要意思与依据一致就是correct。"
-    "task_purpose为read_aloud时answer为空：只依据pronunciation（发音评分模块的结果）与reference_text判断，"
-    "达到要求为correct，需要纠正的词为incorrect并在text中点出这些词，pronunciation.status为unknown时为unclear；"
+    "task_purpose为read_aloud时answer为空，judgment已由核心按发音评分定好，原样使用reading_judgment，不改判；"
+    "flagged_words是评分标出的读错或漏读的词：correct时肯定学生，flagged_words不为空就请学生留意其中至多三个词；"
+    "incorrect时点出其中至多三个词请学生再读；只提flagged_words里的词，不点评其他词；"
+    "unclear时说明没有听清、不算读错，请学生再读或跳过；"
     "pronunciation.limitations写明评分限制（如门槛未校准）时，分数只作纠正提示，不向学生报分数或等级；"
     "error为inserted的条目表示多读或重复（word为音素），只提醒按原文读，不当作要重读的词；"
     "不另评发音，不改写评分。"
@@ -41,6 +43,21 @@ OPEN_INSTRUCTIONS = (
     "并在text里提示还缺什么，不替学生说出完整回答；无法确认意思为unclear；"
     "用中文作答按上面的规则判unclear并提醒用英文。"
 )
+
+
+# A reading passes with at most this share of its words flagged: one weak phone flags a word and
+# the scorer is not calibrated, so a few flags are named, not failed (2026-10-28, ADR-0028).
+FLAGGED_SHARE = 0.1
+
+
+def reading_rule(pronunciation: dict | None) -> tuple[str, list[str]]:
+    """The core's judgment of a reading from its score, and its flagged words in reading order."""
+    if not pronunciation or pronunciation["status"] != "scored":
+        return "unclear", []
+    words = [word for word in pronunciation["words"] if word["error"] != "inserted"]
+    flagged = [word["word"] for word in words if word["error"] in {"mispronounced", "omitted"}]
+    judgment = "correct" if len(flagged) <= FLAGGED_SHARE * len(words) else "incorrect"
+    return judgment, list(dict.fromkeys(word.strip(".,!?;:\"'") for word in flagged))
 
 
 class ClassroomJudgment(Contract):
@@ -78,6 +95,7 @@ def judgment_request(
     goals: tuple[str, ...] = (),
 ) -> ModelRequest:
     item = task.open if task.purpose == "open" else None
+    score = pronunciation.model_dump(mode="json") if pronunciation else None
     return ModelRequest(
         purpose="classroom_judgment",
         instructions=INSTRUCTIONS + (OPEN_INSTRUCTIONS if item else ""),
@@ -93,10 +111,16 @@ def judgment_request(
             "core_decided_help": is_help,
             "answer": text,
             "reference_text": task.reference_text,
-            "pronunciation": pronunciation.model_dump(mode="json") if pronunciation else None,
+            "pronunciation": score,
             "jane_method": jane_method,
             "goals": list(goals),
         }
+        # A scored reading: the judgment the core fixed and the words to name.
+        | (
+            dict(zip(("reading_judgment", "flagged_words"), reading_rule(score), strict=True))
+            if score
+            else {}
+        )
         # Open questions only: what a good answer covers and when it is enough.
         | (
             {"variant": item.variant, "points": list(item.points), "guidance": item.guidance}

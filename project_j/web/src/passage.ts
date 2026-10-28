@@ -31,3 +31,11 @@ export function sentenceOf(paragraph: string, offset: number): string {
   }
   return paragraph.slice(start).trim()
 }
+
+/** The one story word a selection holds, and where it starts in the selected text; spaces and
+ *  punctuation around it are dropped. Undefined for no word or more than one (2026-10-28). */
+export function pickWord(selected: string): { word: string, at: number } | undefined {
+  const found = [...selected.matchAll(WORD)]
+  if (found.length !== 1 || /[A-Za-z0-9]/.test(selected.replace(found[0][0], ''))) return undefined
+  return { word: found[0][0], at: found[0].index }
+}

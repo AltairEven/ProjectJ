@@ -564,6 +564,11 @@ def test_completed_requests_replay_after_later_effective_versions_without_new_ca
     asyncio.run(scenario())
 
 
+def misread(text):
+    """More than a tenth of the words read wrong, so the reading rule fails it."""
+    return text.replace("bridge", "brige").replace("car", "kar").replace("books", "bux")
+
+
 async def reach_reading(app):
     core = await start(app)
     deliver_all(core)
@@ -589,8 +594,8 @@ def test_E2E13_reading_is_scored_first_and_a_reread_is_a_new_attempt(application
         }
         with pytest.raises(ValueError):
             await application.adapter.text("typed-reading", task.reference_text)
-        misread = task.reference_text.replace("bridge", "brige", 1)
-        await read(application, "r1", misread)
+        wrong = misread(task.reference_text)
+        await read(application, "r1", wrong)
         first = core.attempts[-1]
         first_score = dict(first["pronunciation"])
         assert first_score["status"] == "scored" and first["judgment"] == "incorrect"
@@ -641,10 +646,10 @@ def test_each_wrong_reading_gets_the_next_support_then_the_segment_moves_on(appl
     async def scenario():
         core = await reach_reading(application)
         task, instance = core.reading_task(), core.task_instance_id
-        misread = task.reference_text.replace("bridge", "brige", 1)
+        wrong = misread(task.reference_text)
         responses = []
         for index in range(len(task.supports) + 1):
-            await read(application, f"misread-{index}", misread)
+            await read(application, f"misread-{index}", wrong)
             action = core.actions[core.pending]
             responses.append((action.help, action.text, action.after_delivery))
             deliver_all(core)
@@ -683,8 +688,8 @@ def test_a_reading_whose_judgment_fails_is_answered_from_its_score(application, 
         task, instance = core.reading_task(), core.task_instance_id
         model = application.models.adapters["simulated"]
         model.fail_next = True
-        misread = task.reference_text.replace("bridge", "brige", 1)
-        assert (await read(application, "misread", misread))["ack"] == "accepted"
+        wrong = misread(task.reference_text)
+        assert (await read(application, "misread", wrong))["ack"] == "accepted"
         action = core.actions[core.pending]
         assert action.kind == "help" and action.after_delivery == "retry"
         assert action.help == task.supports[0].help
@@ -710,6 +715,48 @@ def test_a_reading_whose_judgment_fails_is_answered_from_its_score(application, 
     asyncio.run(scenario())
 
 
+def test_a_reading_with_a_few_weak_words_passes_and_names_them(application):
+    async def scenario():
+        core = await reach_reading(application)
+        task, instance = core.reading_task(), core.task_instance_id
+        await read(application, "few", task.reference_text.replace("bridge", "brige", 1))
+        action = core.actions[core.pending]
+        assert (action.kind, action.after_delivery) == ("feedback", "next_task")
+        assert "bridge" in action.text and core.attempts[-1]["judgment"] == "correct"
+        deliver_all(core)
+        assert core.task_instance_id != instance
+
+    asyncio.run(scenario())
+
+
+def test_a_judgment_off_the_reading_rule_gets_the_rule_reply(application, caplog):
+    caplog.set_level("INFO", logger="project_j")
+
+    async def scenario():
+        core = await reach_reading(application)
+        model = application.models.adapters["simulated"]
+        respond = model.respond
+
+        def strict(request):
+            reply = respond(request)
+            if request.context.get("task_purpose") == "read_aloud":
+                reply["judgment"], reply["text"] = "incorrect", "Read again: car."
+            return reply
+
+        model.respond = strict
+        await read(application, "fine", core.reading_task().reference_text)
+        action = core.actions[core.pending]
+        assert (action.kind, action.after_delivery) == ("feedback", "next_task")
+        assert action.text == "You read this part. Let's go on."
+        attempt = core.attempts[-1]
+        assert attempt["judgment"] == "correct"
+        assert any("fixed rules" in note for note in attempt["limitations"])
+        assert "classroom proposal rejected reason=reading_rule" in caplog.text
+        assert "rule=correct flagged=0" in caplog.text
+
+    asyncio.run(scenario())
+
+
 def test_the_scorer_is_warmed_whenever_a_reading_wait_begins(application):
     async def scenario():
         warmed = []
@@ -721,9 +768,7 @@ def test_the_scorer_is_warmed_whenever_a_reading_wait_begins(application):
         core = await reach_reading(application)
         await asyncio.sleep(0)
         assert warmed == ["answer"]
-        await read(
-            application, "misread", core.reading_task().reference_text.replace("bridge", "brige", 1)
-        )
+        await read(application, "misread", misread(core.reading_task().reference_text))
         deliver_all(core)
         await asyncio.sleep(0)
         assert warmed == ["answer", "retry"]

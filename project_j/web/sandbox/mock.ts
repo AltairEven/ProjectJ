@@ -86,7 +86,8 @@ function ask(index: number) {
     { task_index: tasks.length, wait_kind: 'closing_confirmation', recording: null })
   const after = task.kind === 'offscreen' ? 'offscreen' : 'input'
   const visuals = index === 0 ? ['trail-sensor'] : task.visuals
-  return say(action('question', task.text, after, visuals ? { visuals } : {}), {
+  // Like the core, the question already belongs to the task it opens.
+  return say(action('question', task.text, after, { task_instance_id: `task-${index}`, ...(visuals ? { visuals } : {}) }), {
     task_index: index, attempt_count: 0, wait_kind: 'answer', task_instance_id: `task-${index}`,
     recording: task.kind === 'reading' ? { reference_text: task.reference!, max_seconds: 60 } : null,
     task: task.kind === 'clicked' ? task.view : null,

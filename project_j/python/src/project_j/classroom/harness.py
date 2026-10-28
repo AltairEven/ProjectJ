@@ -10,7 +10,12 @@ from uuid import uuid4
 
 from pydantic import AwareDatetime, Field
 
-from project_j.classroom.judgment import ModelProposal, judgment_request, method_context
+from project_j.classroom.judgment import (
+    ModelProposal,
+    judgment_request,
+    method_context,
+    reading_rule,
+)
 from project_j.classroom.responses import describe, judge, option_pictures, presentation
 from project_j.contracts import Contract, RevisionRef, SubmittedInput
 from project_j.english import chinese
@@ -86,25 +91,26 @@ LIMITATIONS = {
     ),
 }
 NOT_ENGLISH = "model proposal text is not in English"
+OFF_RULE = "model proposal changes the reading judgment fixed from its score"
 HELP_ORDER = {"none": 0, "light_prompt": 1, "scaffold": 2, "full_model": 3, "unknown": 4}
-SCORE_RULE_NOTE = "No judgment came in time; this reply follows fixed rules from the score."
+SCORE_RULE_NOTE = "No usable judgment came in time; this reply follows fixed rules from the score."
 
 
 def score_rule(pronunciation: dict | None) -> tuple[str, str]:
-    """A reading's prepared response when no judgment came: the scorer's own word flags."""
-    if not pronunciation or pronunciation["status"] != "scored":
+    """A reading's prepared response when no usable judgment came: the rule's judgment and the
+    scorer's own word flags."""
+    judgment, flagged = reading_rule(pronunciation)
+    if judgment == "unclear":
         return "unclear", (
             "No reading came through, so it is not counted as wrong. "
             "Press the microphone to read again, or skip."
         )
-    flagged = dict.fromkeys(
-        word["word"].strip(".,!?;:\"'")
-        for word in pronunciation["words"]
-        if word["error"] in {"mispronounced", "omitted"}
-    )
-    if not flagged:
-        return "correct", "You read this part. Let's go on."
-    return "incorrect", f"Look again at these words: {', '.join(list(flagged)[:3])}."
+    named = ", ".join(flagged[:3])
+    if judgment == "incorrect":
+        return "incorrect", f"Look again at these words: {named}."
+    if flagged:
+        return "correct", f"You read this part well. Watch these words: {named}."
+    return "correct", "You read this part. Let's go on."
 
 
 class AllowedAction(Contract):
@@ -830,12 +836,15 @@ class Harness:
                     pronunciation = PronunciationResult.unknown("failed", self.scorer)
                 # Counts against the configured answer deadline, so it is kept with the attempt.
                 scoring_ms = round((time.perf_counter() - scoring) * 1000, 1)
+                rule, flagged = reading_rule(pronunciation.model_dump(mode="json"))
                 log.info(
-                    "pronunciation task=%s status=%s scoring_ms=%.0f reason=%s",
+                    "pronunciation task=%s status=%s scoring_ms=%.0f reason=%s rule=%s flagged=%d",
                     task.task_id,
                     pronunciation.status,
                     scoring_ms,
                     pronunciation.reason,
+                    rule,
+                    len(flagged),
                 )
                 if self.epoch != binding["cancellation_epoch"]:
                     raise asyncio.CancelledError  # Stopped meanwhile: drop the late score.
@@ -880,19 +889,7 @@ class Harness:
                 )
                 if task.purpose == "read_aloud" and attempt is not None:
                     # Scoring plus a judgment often passes 10 s; the score's own flags answer.
-                    judgment, text = score_rule(attempt.get("pronunciation"))
-                    attempt["limitations"].append(SCORE_RULE_NOTE)
-                    self.record(
-                        "judgment_fallback",
-                        {
-                            "event_id": submitted.event_id,
-                            "task_instance_id": self.task_instance_id,
-                            "judgment": judgment,
-                        },
-                    )
-                    return self.respond(
-                        task, submitted.event_id, attempt, judgment, task.evidence, text, True
-                    )
+                    return self.score_reply(task, submitted.event_id, attempt)
                 self.move("waiting_input")
                 self.action(
                     "clarification",
@@ -901,8 +898,10 @@ class Harness:
                 )
             return {"ack": "failed", "snapshot": self.snapshot()}
         proposal = ModelProposal(**binding, **result.output.model_dump(), call_id=result.call_id)
+        # A scored reading's judgment is the rule's; the model only words it (ADR-0028).
+        scored = attempt.get("pronunciation") if audio is not None and attempt else None
         try:
-            self.approve(proposal)
+            self.approve(proposal, reading_rule(scored)[0] if scored else None)
         except ValueError as error:
             if self.mode == "judging" and self.epoch == binding["cancellation_epoch"]:
                 reason = (
@@ -910,10 +909,14 @@ class Harness:
                     if isinstance(error, Conflict)
                     else "language"
                     if str(error) == NOT_ENGLISH
+                    else "reading_rule"
+                    if str(error) == OFF_RULE
                     else "evidence"
                 )
                 log.info("classroom proposal rejected reason=%s", reason)
                 self.record("proposal_rejected", {"event_id": submitted.event_id, "reason": reason})
+                if scored:  # A reading still gets its rule's reply.
+                    return self.score_reply(task, submitted.event_id, attempt)
                 self.move("waiting_input")
                 self.action(
                     "clarification",
@@ -924,6 +927,16 @@ class Harness:
         return self.respond(
             task, submitted.event_id, attempt, proposal.judgment, proposal.evidence, proposal.text
         )
+
+    def score_reply(self, task: TaskDefinition, event_id: str, attempt: dict):
+        """A reading answered by its score's fixed rule: no usable judgment came."""
+        judgment, text = score_rule(attempt.get("pronunciation"))
+        attempt["limitations"].append(SCORE_RULE_NOTE)
+        self.record(
+            "judgment_fallback",
+            {"event_id": event_id, "task_instance_id": self.task_instance_id, "judgment": judgment},
+        )
+        return self.respond(task, event_id, attempt, judgment, task.evidence, text, True)
 
     def new_attempt(self, task: TaskDefinition, recorded: bool) -> dict:
         """A new try at the current task, with the help and pictures it had and when it came
@@ -1043,7 +1056,7 @@ class Harness:
         self.inputs[event_id]["response_action"] = action.action_id
         return {"ack": "accepted", "snapshot": self.snapshot()}
 
-    def approve(self, proposal: ModelProposal):
+    def approve(self, proposal: ModelProposal, reading: str | None = None):
         if (
             self.mode != "judging"
             or proposal.activity_id != self.activity_id
@@ -1058,6 +1071,8 @@ class Harness:
             raise ValueError("model proposal does not use the fixed task evidence")
         if chinese(proposal.text):  # The student hears English only (ADR-0021).
             raise ValueError(NOT_ENGLISH)
+        if reading is not None and proposal.judgment != reading:
+            raise ValueError(OFF_RULE)
         self.record("approved_proposal", proposal.model_dump(mode="json"))
 
     def facts(self):

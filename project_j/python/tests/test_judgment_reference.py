@@ -70,8 +70,8 @@ def test_is_help_request(application, text, intent, purpose, expected):
 def test_reference_set_is_valid_against_the_course():
     reference, digest = load_reference(ROOT)
     assert validate(reference, reference_tasks(ROOT)) == []
-    assert len(digest) == 64 and len(reference.cases) == 54
-    assert reference.version == "2.0.0"
+    assert len(digest) == 64 and len(reference.cases) == 55
+    assert reference.version == "2.1.0"
 
 
 def test_reference_set_two_is_english():
@@ -88,12 +88,24 @@ def test_reference_set_two_is_english():
     asking = [c for c in reference.cases if c.category in chinese_cases]
     assert len(asking) == 12
     assert all(c.expected == "unclear" and c.required_any == ("English",) for c in asking)
-    added = {c.case_id: (c.category, c.expected) for c in reference.cases[50:]}
+    added = {c.case_id: (c.category, c.expected) for c in reference.cases[50:54]}
     assert added == {
         "F1-typo": ("variant", "correct"),
         "F1-dont-understand": ("help", "help"),
         "P1-report": ("report", "reported"),
         "P1-chinese-report": ("report", "unclear"),
+    }
+
+
+def test_readings_follow_the_tenth_rule():
+    reference, _ = load_reference(ROOT)
+    readings = {c.case_id: c.expected for c in reference.cases if c.category == "read_aloud"}
+    assert readings == {
+        "RA-good": "correct",
+        "RA-mispronounced": "correct",  # One flagged word of 53 is named, not failed.
+        "RA-omitted": "correct",
+        "RA-unknown": "unclear",
+        "RA-many": "incorrect",  # Six of 53 is more than a tenth (ADR-0028).
     }
 
 
@@ -249,7 +261,7 @@ def scripted_service(slow=(), invalid=()):
     cases = {
         key(reference_request(c, tasks[c.source, c.task_id]).context): c for c in reference.cases
     }
-    assert len(cases) == 54
+    assert len(cases) == 55
     service = ModelService.simulated()
 
     async def invoke(request, binding):
@@ -270,7 +282,7 @@ def test_run_reference_counts_failures(monkeypatch):
     monkeypatch.setattr(reference_module, "DEADLINE_SECONDS", 0.2)
     service = scripted_service(slow={"F1-variant-1"}, invalid={"B2-variant"})
     report = asyncio.run(run_reference(service, ROOT, repeats=2))
-    assert report["summary"]["total"] == 108 and report["summary"]["failed"] == 4
+    assert report["summary"]["total"] == 110 and report["summary"]["failed"] == 4
     assert report["summary"]["failed_cases"] == ["B2-variant", "F1-variant-1"]
     assert report["summary"]["all_passed"] is False
     failures = {r["failure"] for r in report["results"] if not r["passed"]}
@@ -297,7 +309,7 @@ def test_cli_writes_the_report(tmp_path, monkeypatch):
     monkeypatch.setattr(reference_module, "load_service", lambda files: scripted_service())
     assert main(["--run-id", "ref1", "--root", str(tmp_path)]) == 0
     saved = json.loads(report_path(tmp_path).read_text())
-    assert saved["summary"]["all_passed"] and saved["reference"]["cases"] == 54
+    assert saved["summary"]["all_passed"] and saved["reference"]["cases"] == 55
 
 
 def test_cli_refuses_existing_report(tmp_path, monkeypatch):

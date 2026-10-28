@@ -97,3 +97,23 @@ export function answerMode(snapshot: { task?: unknown, wait_kind: string, record
   if (snapshot.recording) return 'reading'
   return 'text'
 }
+
+/** A question and the instructions after it (2026-10-28): "What color is the box? Type your
+ *  answer." splits after its last "? "; a prompt with no question mark, a second question after
+ *  the instructions or more than one line stays whole. */
+export function splitQuestion(text: string): { question: string, note: string } {
+  const match = /^([^\n]*\?)\s+([^\n?]+)$/.exec(text)
+  return match ? { question: match[1], note: match[2] } : { question: text, note: '' }
+}
+
+type Said = { action_id: string, kind: string, text: string, task_instance_id: string }
+
+/** Jane's board while a question is open: the question stays through hints and feedback on it,
+ *  and the line under it is the question's instructions or her latest words about it. Undefined
+ *  when no question of the current task was shown, or a new one is on its way. */
+export function board(asked: Said | undefined, shown: Said | undefined, pending: Said | undefined, task: string | undefined) {
+  if (!asked || asked.task_instance_id !== task) return undefined
+  if (pending?.kind === 'question' && pending.action_id !== asked.action_id) return undefined
+  const { question, note } = splitQuestion(asked.text)
+  return { question, note: shown && shown.task_instance_id === task && shown.text !== asked.text ? shown.text : note }
+}

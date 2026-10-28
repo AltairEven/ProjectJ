@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { passage, sentenceOf, wordTokens } from '../src/passage.ts'
+import { passage, pickWord, sentenceOf, wordTokens } from '../src/passage.ts'
 
 test('a reading text shows its title and then numbered paragraphs, as Jane counts them', () => {
   const text = 'Checking a Trail Sensor\n\nMia volunteers with a group.\nShe likes it.\n\n\nIn June the numbers dropped.\n'
@@ -23,4 +23,11 @@ test('sentenceOf finds the sentence around an offset', () => {
   assert.equal(sentenceOf('She folds it. The car stays! Mia smiles.', 16), 'The car stays!')
   assert.equal(sentenceOf('She folds it. The car stays! Mia smiles.', 0), 'She folds it.')
   assert.equal(sentenceOf('No end punctuation here', 5), 'No end punctuation here')
+})
+
+test('pickWord takes the one word of a selection, without the space or punctuation around it', () => {
+  assert.deepEqual(pickWord('box'), { word: 'box', at: 0 })
+  assert.deepEqual(pickWord(' Mia’s, '), { word: 'Mia’s', at: 1 })
+  assert.deepEqual(pickWord('"door."'), { word: 'door', at: 1 })
+  for (const none of ['', '  ', 'green box', 'box2', '2', 'a-b']) assert.equal(pickWord(none), undefined)
 })

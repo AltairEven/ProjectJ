@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.51.0；更新：2026年10月27日。
+版本：1.52.0；更新：2026年10月28日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -1113,3 +1113,24 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 未验证：正式入口上一次完整的备课→确认资源→上课→课程文件夹核对；真实出图下的失效重做；真实合成下的生词重新生成。
 - 继续条件：用户在服务停止时运行`project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-reset --run-id me`清空本机me（旧数据不迁移），再用正式入口备一节课、确认资源并上课，打开project_j/private/study/me/lessons/核对。
 - 状态：实现与自测完成，已本地提交ca84f11（2026年10月28日）。
+
+## CLASS-FB-1 上课反馈五项（ADR-0028）
+
+- 负责人：Claude Opus（实现与集成）；参与者：无。发起：2026年10月28日用户上完建档小测与第一课后反馈：题目后的作答说明与题目同样字号、求助后原题看不到、标记生词像要双击（希望选中后弹出“Add to vocabulary”）、第一课没有插图、朗读判定太严。用户选定：插图仍0到2张只改措辞鼓励配；朗读按比例放宽。
+- 原因核对（只读本机me的课程文件夹与封存记录）：两节课的course.json都没有任何图片资源、picture_style为空，起草指令写“没有难懂之处就不配”；建档小测朗读两次整体准确度97.2/95.9、完整度100，各有5与7个词因单个音素偏弱被标读错而判不通过；第一课一次评分器没标任何词，判断模型却点了to、for判不通过。
+- 实际改动：
+  1. 前端：`tasks.ts`新增`splitQuestion`（最后一个“? ”后的作答说明另起一行）与`board`（当前题的题目留到下一题，求助、提示与反馈替换下方那一行）；Jane一栏两行显示（`.note`小一号、浅色），提示没有自带图时原题的图继续显示（同一动作不重复回报）。阅读阶段故事正文不再是逐词按钮：`passage.ts`新增`pickWord`，`Classroom.tsx`监听选区，选中一个故事词时在词下方显示固定定位按钮“Add to vocabulary”/“Remove from vocabulary”（按下不清选区，课文滚动时收起），已标记的词用`<mark>`高亮；提示语改为“Select a word you do not know, then press "Add to vocabulary".”。
+  2. 课堂：`judgment.py`新增`reading_rule`（标出疑似读错或漏读的词不超过本段十分之一为correct，否则incorrect，评分未知为unclear，多读不计），请求带`reading_judgment`与`flagged_words`，指令改为照用核心的判断、只提标出的词；`harness.py`批准时朗读判断与规则不同即拒收（`reason=reading_rule`）并按固定规则回应（抽出`score_reply`，超时失败同用），`score_rule`改用同一规则，通过且有标出的词时说“Watch these words”；模拟判断模型照用`reading_judgment`。
+  3. 备课：起草指令的插图一句改为像普通小说一样通常配1到2张，只有确实没有可画的场景时才不配（仍0到2张，不加规则）。
+  4. 参考题集2.1.0：RA-mispronounced、RA-omitted预期改为correct（仍须点出该词），新增RA-many（6/53个词，incorrect），共55题。
+  5. 沙盒：假课堂出题动作改用新题的题号（原先沿用上一题，求助后Jane一栏对不上题）。
+  6. 文档：ADR-0028；interface（README 2.4.0、student-classroom 1.9.0）、classroom/README 1.12.0、platform（README 1.13.0、realtime-voice 2.8.0、failures-performance 1.9.0）、preparation（README 2.10.0、multimodal-materials 1.5.0）、learning/profile 2.3.1、shared/end-to-end-cases 1.8.0（E2E20路径）、docs/acceptance.md 2.7.0。
+- 文件边界：project_j/python/src/project_j/{classroom/{judgment,harness}.py,platform/models/simulated.py,preparation/drafting.py}；project_j/python/tests/{test_runtime,test_models_simulated,test_judgment_reference}.py；courses/paper-bridge/judgment-reference.json；project_j/web/src/{Classroom.tsx,tasks.ts,passage.ts,style.css}、web/tests/{tasks,passage}.test.mjs、web/sandbox/mock.ts；上列设计文档与ADR。
+- 验收条件：比例规则、模拟判断照用规则、少量标出的朗读通过并点词、模型改判被拒收后按规则回应且记日志、多数读错仍逐级帮助；题目拆分与求助后保留的纯函数测试；选词按钮的纯函数测试与沙盒走查；统一check通过；课堂判断指令与请求变了，按约定用真实模型重跑参考题集。
+- 检查证据：统一check通过（主工程845、评分39、合成15项pytest；前端97、文档1），UTC 2026-10-28T14:16:24.962076+00:00，工程摘要a931b99dd3f12fce81d5842cfc538adfd617390f382de69a1de022f2788ab7d7；project-j-probe与project-j-measure照常输出（模拟，actual_api/voice未验证）。依赖未变，未重跑sync、npm ci与audit。沙盒走查project_j/test/ui/sandbox/class-feedback.mjs全部断言通过（题目与说明分行且说明更小、求助后题目与题图保留、点选题提示后题目保留、双击选词出按钮并标记/取消、选两个词不出按钮、无页面错误），截图project_j/test/ui/output/sandbox/feedback-*.png。
+- 真实参考题集（2.1.0，codex:gpt-6.1-sol:low:fast，截止10秒）：**未通过，原因是模型调用超时，不是判定内容**。第一次（运行编号judge-ra-20261028，UTC 2026-10-28T14:24:48）前5题通过（4.4–7.9秒），第6题起50题全部10秒超时；第二次（judge-ra-20261028b，UTC 2026-10-28T14:35:50）第1题通过，第2题起54题全部超时。超时都没有请求编号，适配器日志为线程已建、回合在期限内没有结束（status=cancelled）。两次之间用调试脚本（project_j/test/records/ra-reference-subset.py，只在本机）逐题单跑F1-correct、F1-mixed-2、F1-wrong-known、RA-good全部按预期通过（4.3–5.7秒，RA-good回“Good job reading this part!”）。规律是一次超时之后同一进程里后面的调用全部超时，像是Codex运行时被取消的回合卡住或服务端限流，尚未查明；当天正式课堂里一次朗读判断超时后下一次判断仍正常。按约定，参考题集通过前，新的课堂判断指令不用于正式学习。
+- 诊断日志：评分日志加`rule=`与`flagged=`（标出词的个数，不含词）；改判拒收沿用`classroom proposal rejected reason=reading_rule`与`judgment_fallback`事件；日志测试在test_runtime（`test_a_judgment_off_the_reading_rule_gets_the_rule_reply`）。前端为显示与选区变化，没有新链路。
+- 自审取舍：题目拆分只在页面按问号做，不改课程合同（新旧课都生效，问句在说明之后的题整句显示）；选词靠浏览器选区，键盘用户需开浏览器的光标浏览才能选词，原逐词按钮可Tab，记为已知限制；评分器门槛不动（ADR-0015，无真人语料）。
+- 未验证：正式课堂里的选词与题目显示；新措辞下真实备课是否配图（已备好的lesson-001不变，下一课起生效）；新规则下真实朗读的通过率。
+- 继续条件：先查明参考题集里一次超时后连续超时的原因（Codex适配器取消回合后的状态，或服务端限流），服务正常时重跑参考题集至全部通过；再用正式入口上一节课核对；备下一课时看课程文件夹是否有pictures/。
+- 状态：实现与自测完成，真实参考题集因模型超时未通过；用户要求跑完后提交，已本地提交（提交号见下一条记录）。

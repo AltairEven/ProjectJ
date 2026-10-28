@@ -1,7 +1,7 @@
 {
-  "version": "2.0.0",
+  "version": "2.1.0",
   "course": "L-C2026-01-001",
-  "authored": "成人编写的虚构作答；预期逐句核对reading-main.md与reading-transfer.md 1.1.0；不依赖模型自评。1.1.0补开放问答（复述与谈看法）13题。2.0.0（2026年10月22日，ADR-0021全英文）：学生一律用英文作答，原中文与中英混合作答12题预期改为unclear并须提醒用英文（required_any为English），求助与含糊题作答改为英文，禁止词去掉中文，退出语改英文后F1-help-3必含词改为skip；新增英文拼错、听不懂题目求助、英文与中文报告4题。回应含任何中文字符即不通过。",
+  "authored": "成人编写的虚构作答；预期逐句核对reading-main.md与reading-transfer.md 1.1.0；不依赖模型自评。1.1.0补开放问答（复述与谈看法）13题。2.0.0（2026年10月22日，ADR-0021全英文）：学生一律用英文作答，原中文与中英混合作答12题预期改为unclear并须提醒用英文（required_any为English），求助与含糊题作答改为英文，禁止词去掉中文，退出语改英文后F1-help-3必含词改为skip；新增英文拼错、听不懂题目求助、英文与中文报告4题。回应含任何中文字符即不通过。2.1.0（2026年10月28日，ADR-0028朗读按比例判定）：朗读由核心按评分定判断（标出的词不超过全段十分之一为correct），RA-mispronounced与RA-omitted只标一个词，预期改为correct并仍须点出该词；新增RA-many（标出6个词，超过53词的十分之一）预期incorrect。",
   "cases": [
     {
       "case_id": "F1-correct",
@@ -420,14 +420,14 @@
           ]
         }
       },
-      "expected": "incorrect",
+      "expected": "correct",
       "forbidden": [
         "35"
       ],
       "required_any": [
         "between"
       ],
-      "basis": "between读错（准确度35），要点出这个词。"
+      "basis": "between读错（准确度35），53词里只标出1个，不超过十分之一为correct；仍要请学生留意这个词。"
     },
     {
       "case_id": "RA-omitted",
@@ -443,12 +443,12 @@
           ]
         }
       },
-      "expected": "incorrect",
+      "expected": "correct",
       "forbidden": [],
       "required_any": [
         "table"
       ],
-      "basis": "table漏读，要点出这个词。"
+      "basis": "table漏读，53词里只标出1个，不超过十分之一为correct；仍要请学生留意这个词。"
     },
     {
       "case_id": "RA-unknown",
@@ -633,6 +633,51 @@
         "English"
       ],
       "basis": "用中文报告，判unclear并提醒用英文。"
+    },
+    {
+      "case_id": "RA-many",
+      "category": "read_aloud",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "read-aloud-1",
+      "pronunciation": {
+        "status": "scored",
+        "flagged": {
+          "toy": [
+            30,
+            "mispronounced"
+          ],
+          "wants": [
+            30,
+            "mispronounced"
+          ],
+          "table": [
+            30,
+            "mispronounced"
+          ],
+          "space": [
+            30,
+            "mispronounced"
+          ],
+          "between": [
+            30,
+            "mispronounced"
+          ],
+          "piece": [
+            30,
+            "mispronounced"
+          ]
+        }
+      },
+      "expected": "incorrect",
+      "forbidden": [
+        "30"
+      ],
+      "required_any": [
+        "toy",
+        "wants",
+        "table"
+      ],
+      "basis": "53词里标出6个，超过十分之一为incorrect；点出标出的词请学生再读，不报分数。"
     }
   ]
 }

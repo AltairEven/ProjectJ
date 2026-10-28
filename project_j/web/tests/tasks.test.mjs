@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { answerMode, emptyAnswer, picturesSettled, fillParts, fillWord, ready, setBlank, tapCard, tapPair, toResponse } from '../src/tasks.ts'
+import { answerMode, board, emptyAnswer, picturesSettled, fillParts, fillWord, ready, setBlank, splitQuestion, tapCard, tapPair, toResponse } from '../src/tasks.ts'
 
 const choice = { type: 'choice', version: 1, variant: 'single', options: ['a', 'b', 'c'] }
 const order = { type: 'order', version: 1, variant: 'events', items: ['B', 'A', 'C'] }
@@ -78,4 +78,26 @@ test('picture options show only when every picture loads', () => {
   assert.equal(picturesSettled([true, true, true]), 'pictures')
   assert.equal(picturesSettled([true, false, undefined]), 'words')
   assert.equal(picturesSettled([]), 'words')
+})
+
+test('a question shows apart from the instructions after it', () => {
+  assert.deepEqual(splitQuestion('What color is the box? Type your answer. Copy the story words that show it.'),
+    { question: 'What color is the box?', note: 'Type your answer. Copy the story words that show it.' })
+  for (const whole of ['Fill both gaps with words from the story.', 'Where does he go? What does he find?',
+    'Find "Where is it?" in the story.', 'Read part 1 aloud.\nIs it far? It is.', 'Who has two maps?'])
+    assert.deepEqual(splitQuestion(whole), { question: whole, note: '' })
+})
+
+test('the question stays on the board through hints and feedback until a new one comes', () => {
+  const q = { action_id: 'q', kind: 'question', text: 'Who has two maps? Use a full sentence.', task_instance_id: 't1' }
+  const hint = { action_id: 'h', kind: 'help', text: 'Look at the second paragraph.', task_instance_id: 't1' }
+  assert.deepEqual(board(q, q, undefined, 't1'), { question: 'Who has two maps?', note: 'Use a full sentence.' })
+  assert.deepEqual(board(q, hint, undefined, 't1'), { question: 'Who has two maps?', note: 'Look at the second paragraph.' })
+  // Jane still speaking the hint: the question stays and its own note waits.
+  assert.deepEqual(board(q, undefined, hint, 't1'), { question: 'Who has two maps?', note: 'Use a full sentence.' })
+  const again = { ...q, action_id: 'r', kind: 'repeat' }
+  assert.deepEqual(board(q, again, undefined, 't1'), { question: 'Who has two maps?', note: 'Use a full sentence.' })
+  assert.equal(board(q, hint, undefined, 't2'), undefined)
+  assert.equal(board(q, hint, { ...q, action_id: 'q2' }, 't1'), undefined)
+  assert.equal(board(undefined, hint, undefined, 't1'), undefined)
 })

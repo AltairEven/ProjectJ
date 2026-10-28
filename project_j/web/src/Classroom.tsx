@@ -7,12 +7,12 @@ import { finishRecording, idle, pauseRecording, recordedMs, resumeRecording, sta
 import type { RequestFailure } from './request'
 import { Speaker, pictureReport, reportsFor, startedReport, visualReport } from './speaker'
 import { Microphone } from './microphone'
-import { passage, sentenceOf, wordTokens } from './passage'
+import { passage, pickWord, sentenceOf, wordTokens } from './passage'
 import { VocabularyBox } from './VocabularyBox'
 import type { Entry } from './vocabulary'
 import { classProgress, taskMarks } from './progress'
 import { Progress } from './ui'
-import { answerMode, picturesSettled, type TaskView } from './tasks'
+import { answerMode, board, picturesSettled, type TaskView } from './tasks'
 import { TaskInput } from './TaskInput'
 import type { AllowedAction, Snapshot, Control, DeliveryFeedback, TextInput, InputResult as Ack } from './client/types.gen'
 
@@ -84,6 +84,22 @@ function usePictures(token: string, ids: string[]) {
   return { urls, outcomes, settle }
 }
 
+// The one story word selected while reading, its sentence, and where its button goes; undefined
+// for anything else (2026-10-28: select, then "Add to vocabulary", instead of tapping words).
+function selectedWord(selection: Selection | null) {
+  if (!selection || selection.isCollapsed || !selection.rangeCount) return undefined
+  const range = selection.getRangeAt(0)
+  const node = range.commonAncestorContainer
+  const item = (node instanceof Element ? node : node.parentElement)?.closest('.reading li')
+  const picked = pickWord(range.toString())
+  if (!item || !picked) return undefined
+  const before = document.createRange()
+  before.setStart(item, 0)
+  before.setEnd(range.startContainer, range.startOffset)
+  const box = range.getBoundingClientRect()
+  return { word: picked.word, sentence: sentenceOf(item.textContent ?? '', before.toString().length + picked.at), x: box.left, y: box.bottom }
+}
+
 export default function Classroom({ token, onLeave }: { token: string, onLeave: () => void }) {
   const [snapshot, setSnapshot] = useState<Snapshot>()
   const [text, setText] = useState('')
@@ -98,6 +114,7 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
   const [readingText, setReadingText] = useState('')
   const reading = snapshot?.recording
   const delivered = useRef(new Set<string>())
+  const asked = useRef<AllowedAction>(undefined)
   const pictured = useRef(new Set<string>())
   // Study: Jane speaks first and her text appears only after the audio; a simulation is text only.
   const voiced = snapshot?.realm === 'study'
@@ -287,10 +304,17 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     await send('class/response', { event_id: uid(), ...payload })
   }
   const progress = snapshot && classProgress(snapshot)
-  // Words are tapped only while reading; marking is never scored (design/learning).
+  // Words are marked only while reading; marking is never scored (design/learning).
   const vocabulary = (snapshot?.vocabulary ?? []) as unknown as Entry[]
   const tapping = mode === 'story' && snapshot?.wait_kind === 'reading' && !halted
   const markedWords = new Set(vocabulary.map(entry => String(entry.surface)))
+  const [picked, setPicked] = useState<ReturnType<typeof selectedWord>>()
+  useEffect(() => {
+    if (!tapping) { setPicked(undefined); return }
+    const update = () => setPicked(selectedWord(document.getSelection()))
+    document.addEventListener('selectionchange', update)
+    return () => document.removeEventListener('selectionchange', update)
+  }, [tapping])
   const markWord = async (word: string, sentence: string) => {
     setMessage('')
     try { setCurrent(await api<Snapshot>(token, 'class/word', { event_id: uid(), word, sentence, marked: !markedWords.has(word.toLowerCase()) })) }
@@ -300,18 +324,13 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     try { setCurrent(await api<Snapshot>(token, 'class/word/regenerate', { surface })) }
     catch (error) { setMessage((error as RequestFailure).message) }
   }
-  const tappable = (text: string) => {
-    let at = 0
-    return wordTokens(text).map((token, index) => {
-      const offset = at
-      at += token.text.length
-      if (!token.word) return token.text
-      const marked = markedWords.has(token.text.toLowerCase())
-      return <button key={index} type="button" className={marked ? 'word marked' : 'word'} aria-pressed={marked}
-        onClick={() => void markWord(token.text, sentenceOf(text, offset))}>{token.text}</button>
-    })
-  }
+  // Marked words stay highlighted while reading; the text itself stays plain to select.
+  const highlighted = (text: string) => wordTokens(text).map((token, index) =>
+    token.word && markedWords.has(token.text.toLowerCase()) ? <mark key={index} className="marked">{token.text}</mark> : token.text)
   const shown = !voiced ? snapshot?.pending_action ?? snapshot?.presented_action : locked || voicing ? undefined : snapshot?.presented_action
+  // The question stays on Jane's board through hints and feedback; hints refresh the line under it.
+  if (shown?.kind === 'question') asked.current = shown
+  const posed = board(asked.current, shown ?? undefined, snapshot?.pending_action ?? undefined, snapshot?.task_instance_id)
   // Story pictures beside their paragraphs; picture options of the clicked question (ADR-0026).
   const illustrations = (snapshot?.illustrations ?? []) as { resource_id: string, paragraph: number }[]
   const storyIds = illustrations.map(item => item.resource_id)
@@ -363,10 +382,12 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     <div className="stage">
       <div className="side board">
         <section className="jane"><span className="avatar" aria-hidden="true">J</span><div><h2>Jane</h2>
+          {!localCancelled && posed && <p className="said" key={asked.current?.action_id}>{posed.question}</p>}
           {localCancelled ? <p>Stopped on this page.</p>
             : voiced && locked ? <p>Press "Turn on sound" to hear Jane.</p>
             : voicing === 'preparing' ? <Progress label="Jane is getting ready to speak…" />
             : voicing === 'speaking' ? <p aria-live="polite">Jane is speaking…</p>
+            : posed ? posed.note && <p aria-live="polite" className="note said" key={shown?.action_id}>{posed.note}</p>
             : <p aria-live="polite" className="said" key={shown?.action_id}>{shown?.text ?? 'Waiting for Jane.'}</p>}
           {!localCancelled && !voicing && (busy || snapshot?.mode === 'judging') && <Progress label="Jane is reading your answer…" />}
           {voiced && locked && <button onClick={() => void speaker.current?.resume().then(() => setLocked(false))}>Turn on sound</button>}
@@ -377,8 +398,9 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
         {!localCancelled && snapshot && snapshot.task_index >= 0 && <VocabularyBox token={token} entries={vocabulary} busy={busy}
           audioUrl={lemma => `/api/class/word-audio/${encodeURIComponent(lemma)}`} onRegenerate={surface => void regenerateWord(surface)} />}
       </div>
-      <div className="side book">
-        {!localCancelled && <Visuals token={token} action={shown ?? undefined} onShown={(action, shown) => {
+      <div className="side book" onScroll={() => setPicked(undefined)}>
+        {/* The question's own picture stays through hints that bring none. */}
+        {!localCancelled && <Visuals token={token} action={(posed && !shown?.visuals?.length ? asked.current : shown) ?? undefined} onShown={(action, shown) => {
           if (pictured.current.has(action.action_id)) return  // Once per action, though it may show again.
           pictured.current.add(action.action_id)
           void sendDelivery(visualReport(action, shown, new Date()))
@@ -386,8 +408,8 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
         {!localCancelled && Object.entries(snapshot?.materials ?? {}).map(([id, material]) => {
           const { title, paragraphs } = passage(material)
           return <section key={id} className="reading">{title && <h2>{title}</h2>}
-            {tapping && <p className="hint">Tap a word you do not know to put it in your vocabulary box.</p>}
-            <ol>{paragraphs.map((text, index) => <li key={index}>{figure(index + 1)}{tapping ? tappable(text) : text}</li>)}</ol></section>
+            {tapping && <p className="hint">Select a word you do not know, then press "Add to vocabulary".</p>}
+            <ol>{paragraphs.map((text, index) => <li key={index}>{figure(index + 1)}{tapping ? highlighted(text) : text}</li>)}</ol></section>
         })}
         {!Object.keys(snapshot?.materials ?? {}).length && <p className="hint">{snapshot?.wait_kind === 'reading_start' ? 'The story shows when you press Start reading.' : 'The story shows here.'}</p>}
       </div>
@@ -435,6 +457,10 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
         <p className="hint">{voiced ? 'Listen to Jane first; her words show after she speaks. Reading aloud is scored on this computer and not saved.' : 'Text simulation; nothing is recorded or played.'}</p>
       </div>
     </div>
+    {/* Pressing it keeps the selection: the press itself must not clear what it acts on. */}
+    {picked && <button type="button" className="word-pop" style={{ left: picked.x, top: picked.y + 6 }} onMouseDown={event => event.preventDefault()}
+      onClick={() => { void markWord(picked.word, picked.sentence); document.getSelection()?.removeAllRanges() }}>
+      {markedWords.has(picked.word.toLowerCase()) ? 'Remove from vocabulary' : 'Add to vocabulary'}</button>}
     <dialog ref={zoomBox} className="zoom" onClose={() => setZoom('')} onClick={() => zoomBox.current?.close()}>
       {zoom && <img src={zoom} alt="The story picture, enlarged" />}</dialog>
     <dialog ref={askBox} className="confirm-box" onClose={() => setChecking(null)}>
