@@ -1091,4 +1091,4 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 未验证：真实备课（插图是否配在难懂处、带图题与措辞、风格句）；真实出图加看图核对（结论是否可信、总耗时与额度）；正式入口上一节带插图与带图题的课及课后评价。
 - 继续条件：用单独运行编号（如pic-check）用真实模型备课一次、确认出图并核对一次，记录交用户看过认可，之后`project-j-reset --run-id pic-check`清空；用正式入口上一节课（沙盒走查已由用户确认）。
 - 精简审查（2026年10月28日，用户要求，主会话按ponytail-review自审）：修正一处崩溃——草稿里stage为option却没写option下标时，`picture_problems`排序会抛TypeError使备课核对中断，现改为退回给模型修改（新测试test_an_option_picture_without_its_option_is_repaired_not_a_crash先失败后通过）；精简：`make_checked`把“不能看图”的插图分支并入“核对没能运行”分支，删去先读预览再合并的`checked()`（改由`update_resources`合并checks），删去Python端用不到的`no_image_input`文案，`use_checked`改用字典取结果，`task_picture`只在pictures.py定义一次，放大窗口改为点击时直接打开、故事隐藏时关闭。未做：`Visuals`改用`usePictures`（会改原有组件）与删`visualReport`包装。检查：统一check通过（主工程825、评分39、合成15项pytest；前端92、文档1），UTC 2026-10-28T01:49:19.247400+00:00，工程摘要849e5cf9fe34624905e7b598db3d29fc05f8506b67692ebd2a992daf6e821638；沙盒浏览器脚本重跑全部通过。
-- 状态：实现与自测完成，未提交（用户要求说“提交”时再提交）。
+- 状态：实现与自测完成，已本地提交0d18801（2026年10月28日）。
