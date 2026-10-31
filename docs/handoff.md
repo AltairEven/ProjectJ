@@ -1144,4 +1144,4 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 检查证据：`sh -n`通过；三个分支实测：端口被ParkDoc的http.server占用时显示其命令行、退出码1；临时端口上命令行含project-j-serve的假监听提示已在运行、退出码1；空闲端口走到启动一行。确认`.venv/bin/project-j-serve`是python脚本（shebang），服务进程命令行含该名。统一check通过（主工程845、评分39、合成15项pytest，前端与文档检查通过），依赖未变，未重跑sync、npm ci与audit。模拟入口（运行编号port-4242-check，数据在project_j/test/simulation，验后删除）不带--port启动，输出`Uvicorn running on http://127.0.0.1:4242`；运行中执行study.command提示已在运行、退出码1；SIGINT后服务停止、端口释放。只改端口默认值与启动脚本，不是新链路，未加诊断日志。
 - 未验证：关闭ParkDoc预览后从程序坞实际启动一次。
 - 继续条件：用户双击study.command，确认页面在127.0.0.1:4242打开。
-- 状态：实现与自测完成，未提交。
+- 状态：实现与自测完成，已本地提交7821d90（2026年10月31日）。
