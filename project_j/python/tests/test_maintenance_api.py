@@ -209,7 +209,7 @@ def test_closing_the_terminal_window_stops_like_ctrl_c_and_logs_it(monkeypatch, 
 def test_the_page_opens_once_the_service_listens_and_the_token_stays_out_of_logs(
     monkeypatch, caplog
 ):
-    opened, link = [], "http://127.0.0.1:8765/#token=secret-token"
+    opened, link = [], "http://127.0.0.1:4242/#token=secret-token"
     monkeypatch.setattr(api.webbrowser, "open", opened.append)
     with caplog.at_level("INFO", logger=api.log.name):
         api.open_when_started(SimpleNamespace(started=False, should_exit=True), link)

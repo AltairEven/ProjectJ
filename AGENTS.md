@@ -1,6 +1,6 @@
 # Project J Agent 工作约定
 
-版本：1.33.0；更新：2026年10月21日。
+版本：1.33.1；更新：2026年10月31日。
 
 Project J是AI自学助理（[ADR-0018](decisions/ADR-0018.md)）：程序只有“学生”一个身份，学生确认学什么、开始上课与认可评价，其余由AI完成；不预设学生是孩子还是成人。
 
@@ -80,6 +80,6 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python projec
 
 课堂与页面外观的快速调试用课堂沙盒（2026年10月21日用户决定长期保留，不随project_j/test删除）：`npm run --prefix project_j/web sandbox`后打开http://127.0.0.1:5174/（课堂：真实课堂组件与样式配浏览器内假课堂，可切场景与正式模式）或/app.html（主页与各页：一次模拟运行的主页数据快照）；不连后端、不调用模型、不保存任何数据（正式模式朗读会用本机麦克风，录音不发出），源码在project_j/web/sandbox，纳入类型检查、不打包进应用。改课堂交互、接口形状或主页数据结构时同步其假课堂与快照。
 
-完成上述检查和构建后，本机模拟入口为project_j/scripts/start.sh（默认127.0.0.1:8765，使用其输出的临时工作台链接）；入口固定模拟提供者，不读取.env，不调用真实模型/麦克风。正式学习入口为`project_j/scripts/start.sh --study --run-id <id>`（真实模型、本机评分与本机合成，数据写project_j/private/study），本机快捷启动为双击project_j/scripts/study.command（运行编号me，自动打开页面），前提与表现见技术文档；开发期间清空某个运行编号的全部学习记录用`project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-reset --run-id <id>`（需输入运行编号确认，服务运行时拒绝；不进统一check），换电脑迁移学习记录用project-j-transfer export/import（见[开发环境搭建](docs/setup.md)）。运行课堂时不运行工程检查或Git；停止服务时先由核心确定可控中断，再封存已取得范围。
+完成上述检查和构建后，本机模拟入口为project_j/scripts/start.sh（默认127.0.0.1:4242，使用其输出的临时工作台链接）；入口固定模拟提供者，不读取.env，不调用真实模型/麦克风。正式学习入口为`project_j/scripts/start.sh --study --run-id <id>`（真实模型、本机评分与本机合成，数据写project_j/private/study），本机快捷启动为双击project_j/scripts/study.command（运行编号me，自动打开页面），前提与表现见技术文档；开发期间清空某个运行编号的全部学习记录用`project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-reset --run-id <id>`（需输入运行编号确认，服务运行时拒绝；不进统一check），换电脑迁移学习记录用project-j-transfer export/import（见[开发环境搭建](docs/setup.md)）。运行课堂时不运行工程检查或Git；停止服务时先由核心确定可控中断，再封存已取得范围。
 
 检查使用明确模拟/临时目录/mock，不调用真实模型或麦克风冒称验收。用中文说明实际改动、检查范围、剩余缺口及提交状态；程序检查通过不证明新设计验收或教学效果。

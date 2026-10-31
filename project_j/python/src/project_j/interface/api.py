@@ -1230,7 +1230,7 @@ def main(argv: list[str] | None = None):
         description="Start Project J's loopback simulation, or study with real providers."
     )
     parser.add_argument("--run-id", default="local-simulation")
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--port", type=int, default=4242)
     parser.add_argument(
         "--open", action="store_true", help="服务开始监听后用默认浏览器打开带令牌的页面"
     )

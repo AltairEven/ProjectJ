@@ -179,10 +179,10 @@ def test_a_process_that_fails_to_start_leaves_class_start_blocked(tmp_path):
 def test_workbench_link_is_printed_once_the_service_has_started(application, capsys):
     # Printed earlier, it showed before the local models had loaded; unflushed, a redirected
     # log did not show it at all.
-    app = create_app(Settings(), application, announce=("工作台：http://127.0.0.1:8765/",))
+    app = create_app(Settings(), application, announce=("工作台：http://127.0.0.1:4242/",))
     assert capsys.readouterr().out == ""
     with TestClient(app):
-        assert "工作台：http://127.0.0.1:8765/" in capsys.readouterr().out
+        assert "工作台：http://127.0.0.1:4242/" in capsys.readouterr().out
 
 
 def test_service_start_prewarms_model_runtimes(application):

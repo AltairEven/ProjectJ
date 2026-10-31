@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     realm: Literal["simulation", "study"] = "simulation"
     onboarding: bool = False  # Simulation only: start at onboarding, as study always does.
     host: Literal["127.0.0.1"] = "127.0.0.1"
-    port: int = 8765
+    port: int = 4242
     # Debug-only switches for the simulated provider and store; both default to off.
     model_delay: float = Field(default=0, ge=0)
     fail_once: str | None = Field(

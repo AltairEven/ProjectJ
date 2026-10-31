@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.52.0；更新：2026年10月28日。
+版本：1.53.0；更新：2026年10月31日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -1134,3 +1134,14 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 未验证：正式课堂里的选词与题目显示；新措辞下真实备课是否配图（已备好的lesson-001不变，下一课起生效）；新规则下真实朗读的通过率。
 - 继续条件：限流解除后（建议隔一段时间、避开大量备课出图之后）重跑参考题集至全部通过；是否让参考题集放慢调用、或让适配器把429立即报为额度失败，待用户决定；再用正式入口上一节课核对；备下一课时看课程文件夹是否有pictures/。
 - 状态：实现与自测完成，真实参考题集因模型超时未通过；用户要求跑完后提交，已本地提交0c8fade（2026年10月28日）。
+
+## LAUNCH-FIX-1 快捷启动不再把其他程序当成Project J，默认端口改为4242
+
+- 负责人：Claude Opus（实现与集成）；参与者：无。发起：2026年10月31日用户双击study.command，提示“Project J 已在运行”，但实际没有Project J进程。
+- 原因：study.command只用`nc -z`判断8765端口能否连上；当时占用该端口的是另一项目的`python -m http.server 8765`（ParkDoc文档预览），被误当成Project J。不是Project J的问题，只是提示错误。用户随后结束了该预览进程，并决定把默认端口固定为4242（本机未被占用；不在常见开发工具默认端口中，OpenTSDB、Quassel等软件默认用它）。
+- 实际改动：study.command改用`lsof`找到监听8765的进程，命令行含`project-j-serve`才提示已在运行；否则显示占用程序的命令行并以1退出，不启动；端口空闲时照旧启动。默认端口8765改为4242：configuration.py与api.py的默认值、study.command、两个测试里的示例链接；AGENTS.md 1.33.1、project_j/README.md、docs/technology.md 1.22.1同步。前端不用浏览器存储，换端口（换来源）不丢页面数据。之前批次记录里的8765是历史，保持原样。
+- 文件边界：project_j/scripts/study.command；project_j/python/src/project_j/{interface/api.py,application/configuration.py}；project_j/python/tests/{test_study,test_maintenance_api}.py；AGENTS.md、project_j/README.md、docs/technology.md；本节。
+- 检查证据：`sh -n`通过；三个分支实测：端口被ParkDoc的http.server占用时显示其命令行、退出码1；临时端口上命令行含project-j-serve的假监听提示已在运行、退出码1；空闲端口走到启动一行。确认`.venv/bin/project-j-serve`是python脚本（shebang），服务进程命令行含该名。统一check通过（主工程845、评分39、合成15项pytest，前端与文档检查通过），依赖未变，未重跑sync、npm ci与audit。模拟入口（运行编号port-4242-check，数据在project_j/test/simulation，验后删除）不带--port启动，输出`Uvicorn running on http://127.0.0.1:4242`；运行中执行study.command提示已在运行、退出码1；SIGINT后服务停止、端口释放。只改端口默认值与启动脚本，不是新链路，未加诊断日志。
+- 未验证：关闭ParkDoc预览后从程序坞实际启动一次。
+- 继续条件：用户双击study.command，确认页面在127.0.0.1:4242打开。
+- 状态：实现与自测完成，未提交。
