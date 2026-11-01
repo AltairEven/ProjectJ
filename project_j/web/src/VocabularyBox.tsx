@@ -13,11 +13,13 @@ export async function playWord(token: string, path: string): Promise<void> {
 type Props = {
   token: string, entries: Entry[], audioUrl: (lemma: string) => string,
   onRegenerate?: (key: string) => void, title?: string, busy?: boolean,
+  // In class after reading: take a wrongly marked word out of the box (ADR-0029).
+  onRemove?: (entry: Entry) => void,
 }
 
 // The words the student marked, folded away until wanted: word, part of speech, meaning, sound.
 // Entries are shown as the server sent them; nothing here is scored.
-export function VocabularyBox({ token, entries, audioUrl, onRegenerate, title = 'Vocabulary box', busy }: Props) {
+export function VocabularyBox({ token, entries, audioUrl, onRegenerate, onRemove, title = 'Vocabulary box', busy }: Props) {
   const [message, setMessage] = useState('')
   if (!entries.length) return null
   const play = (lemma: string) => void playWord(token, audioUrl(lemma)).catch(() => setMessage('The sound did not come back. Try again.'))
@@ -34,6 +36,7 @@ export function VocabularyBox({ token, entries, audioUrl, onRegenerate, title = 
         <span className="row">
           {label === 'Ready' && entry.audio && entry.lemma && <button className="quiet" type="button" disabled={busy} onClick={() => play(entry.lemma!)}>Listen</button>}
           {onRegenerate && label !== 'Getting ready…' && <button className="quiet" type="button" disabled={busy} onClick={() => onRegenerate(key)}>Regenerate</button>}
+          {onRemove && <button className="quiet" type="button" disabled={busy} onClick={() => onRemove(entry)}>Remove</button>}
         </span>
       </li>
     })}</ul>

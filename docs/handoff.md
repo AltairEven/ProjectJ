@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.53.0；更新：2026年10月31日。
+版本：1.54.0；更新：2026年11月1日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -1145,3 +1145,24 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 未验证：关闭ParkDoc预览后从程序坞实际启动一次。
 - 继续条件：用户双击study.command，确认页面在127.0.0.1:4242打开。
 - 状态：实现与自测完成，已本地提交7821d90（2026年10月31日）。
+
+## CLASS-FB-2 上课反馈三项（ADR-0029）
+
+- 负责人：Claude Opus（实现与集成）；参与者：无。发起：2026年11月1日用户上课后反馈：先前提问的题目一直留在Jane一栏；题目长且生词盒展开时内容超出黑板底部；需要能从生词盒移除标错的词。
+- 原因核对（课堂沙盒复现，只读本机me最近一份封存记录的动作顺序，不读作答内容）：
+  1. 学生刚看到题目时，Jane一栏的题目（key=题目动作编号）和下方说明（key=当前显示动作编号）是同一动作，两行key相同；React报“Encountered two children with the same key”，下一题出现后旧题目的元素没被移除，叠在新题上方（题目带“? ”后的作答说明时出现；沙盒学习模式复现，模拟模式未见残留）。按收尾时核心不换题号，最后一题还留在收尾小结上方。封存记录的动作与题号顺序正常，问题只在页面。
+  2. 整块黑板是滚动区，`.board::after`粉笔槽绝对定位在滚动内容里，内容从槽下穿过，滚动时槽跟着跑到板中间。
+  3. ADR-0024第1条规定读完后不能再标记或取消，核心拒收。
+- 实际改动：
+  1. 前端：说明一行的key加`note:`前缀；等待确认收尾小结时不传当前题号，`board`不再给出上一题；黑板内包一层`.board-page`，木框与粉笔槽不滚动、板面在框内滚动（style.css）；VocabularyBox新增可选`onRemove`与“Remove”按钮，课堂里未暂停、未结束时提供，课后评价页不提供；`markWord`可指定标记或取消；Entry类型补`sentence`。
+  2. 课堂：`mark_word`读完后接受未暂停、未结束时的取消、拒绝新增，暂停或结束时提示“Remove words while the class runs.”；`set_word`遇到已移除的词丢弃查词结果并记日志。封存时生词记录按盒子写入，移除的词自然不进记录。
+  3. 文档：ADR-0029（部分替代ADR-0024第1条）；classroom/README 1.13.0、interface（README 2.5.0、student-classroom 1.10.0）、learning/profile 2.3.2、shared/end-to-end-cases 1.9.0（E2E20）。
+- 文件边界：project_j/python/src/project_j/classroom/harness.py；project_j/python/tests/{test_vocabulary_classroom,test_vocabulary_record}.py；project_j/web/src/{Classroom.tsx,VocabularyBox.tsx,vocabulary.ts,style.css}；上列设计文档与ADR；本节。沙盒假课堂的取消标记本来就不限阶段，未改。
+- 验收条件：读完后能移除、不能新增，暂停与结束时拒绝；查词中被移除的词结果丢弃；移除的词封存后不进记录；日志不含词；沙盒里新题出现后只有新题、收尾时不显示上一题、无页面错误；长题目加生词盒展开时板面在粉笔槽之上滚动；统一check通过。
+- 检查证据：统一check通过（主工程848、评分39、合成15项pytest；前端97、文档1），UTC 2026-11-01T12:02:42.543989+00:00，工程摘要a87a11cf40752bc5c75ed06a7709a679ab37a841c54acc7b7e5de52bc08c19fd（自审后改了测试注释与文档措辞，重跑）。依赖未变，未重跑sync、npm ci与audit。新增后端测试先失败后通过。沙盒走查（只在本机）project_j/test/ui/sandbox/board-history.mjs全部断言通过：模拟与学习模式答完一题后Jane一栏只有新题、收尾时不显示上一题、生词盒Remove移除一个词、暂停时没有Remove、无页面错误（修复前学习模式复现旧题残留与重复key报错）；overflow-board.mjs在1280×640与1440×900下长题目加生词盒展开时板面底边在粉笔槽之上、滚到底生词盒结束在槽上方，截图project_j/test/ui/output/sandbox/overflow-*.png；700宽窄屏板面完整展开不裁切。
+- 诊断日志：取消沿用`event word_unmarked … marked=False`（不含词与句子）；新增`word lookup dropped activity= reason=removed`（不含词）；日志测试`test_after_reading_a_word_can_leave_the_box_but_not_join_it`、`test_a_lookup_answer_for_a_word_removed_meanwhile_is_dropped`。
+- 自审取舍：移除不弹确认（误删只影响本课一个词，下次读到可再标）；读完后不能补标；React重复key是根因，只改key、不改`board`的保留规则。
+- 自审发现未改（低）：查词中被移除的词，模型结果回来后仍会合成发音、`vocabulary lookup`日志仍计入ok，丢弃另记一行`word lookup dropped`；连点两次Remove会多记一条`word_unmarked`（第二次盒中已无此词，无其他影响）。查词竞态的测试直接调`set_word`验证丢弃，没有驱动真实的后台查词。
+- 未验证：正式课堂（真实语音）里的题目切换、生词盒移除与长题目显示。
+- 继续条件：用户用正式入口上一节课，核对题目切换、展开生词盒时的黑板与移除。
+- 状态：实现与自测完成，未提交（等用户要求）。

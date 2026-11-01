@@ -70,6 +70,40 @@ def test_finish_reading_asks_the_first_question_at_once_and_fills_the_box_later(
     assert application.after_control(core, "skip") is None
 
 
+def test_after_reading_a_word_can_leave_the_box_but_not_join_it(application, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    core = opened(application)
+    core.control(str(uuid4()), "start_reading")
+    core.mark_word("m1", "bridge", "She wants a bridge for her car.", True)
+    core.mark_word("m2", "folds", "She folds a new piece of paper.", True)
+    finish_reading(application, core)
+    core.control(str(uuid4()), "pause")
+    with pytest.raises(ValueError, match="while the class runs"):
+        core.mark_word("m3", "folds", "She folds a new piece of paper.", False)
+    core.control(str(uuid4()), "resume")
+    core.mark_word("m4", "folds", "She folds a new piece of paper.", False)
+    assert list(box(core)) == ["bridge"]
+    with pytest.raises(ValueError, match="while you read"):
+        core.mark_word("m5", "folds", "She folds a new piece of paper.", True)
+    assert "event word_unmarked" in caplog.text and "marked=False" in caplog.text
+    assert "folds" not in caplog.text
+    core.control(str(uuid4()), "stop")
+    with pytest.raises(ValueError, match="while the class runs"):
+        core.mark_word("m6", "bridge", "She wants a bridge for her car.", False)
+
+
+def test_a_lookup_answer_for_a_word_removed_meanwhile_is_dropped(application, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    core = opened(application)
+    core.control(str(uuid4()), "start_reading")
+    core.mark_word("m1", "bridge", "She wants a bridge for her car.", True)
+    core.control(str(uuid4()), "finish_reading")
+    core.mark_word("m2", "bridge", "She wants a bridge for her car.", False)
+    core.set_word("bridge", None, False)  # what a lookup still running would answer
+    assert core.snapshot()["vocabulary"] == []
+    assert "word lookup dropped" in caplog.text and "bridge" not in caplog.text
+
+
 def test_a_failed_lookup_marks_words_failed_and_regenerate_recovers(application):
     core = opened(application)
     core.control(str(uuid4()), "start_reading")

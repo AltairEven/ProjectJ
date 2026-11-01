@@ -315,9 +315,9 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     document.addEventListener('selectionchange', update)
     return () => document.removeEventListener('selectionchange', update)
   }, [tapping])
-  const markWord = async (word: string, sentence: string) => {
+  const markWord = async (word: string, sentence: string, marked = !markedWords.has(word.toLowerCase())) => {
     setMessage('')
-    try { setCurrent(await api<Snapshot>(token, 'class/word', { event_id: uid(), word, sentence, marked: !markedWords.has(word.toLowerCase()) })) }
+    try { setCurrent(await api<Snapshot>(token, 'class/word', { event_id: uid(), word, sentence, marked })) }
     catch (error) { setMessage((error as RequestFailure).message) }
   }
   const regenerateWord = async (surface: string) => {
@@ -330,7 +330,9 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
   const shown = !voiced ? snapshot?.pending_action ?? snapshot?.presented_action : locked || voicing ? undefined : snapshot?.presented_action
   // The question stays on Jane's board through hints and feedback; hints refresh the line under it.
   if (shown?.kind === 'question') asked.current = shown
-  const posed = board(asked.current, shown ?? undefined, snapshot?.pending_action ?? undefined, snapshot?.task_instance_id)
+  // Wrapping up is about the whole class, so the last question leaves the board (2026-11-01).
+  const current = snapshot?.wait_kind === 'closing_confirmation' ? undefined : snapshot?.task_instance_id
+  const posed = board(asked.current, shown ?? undefined, snapshot?.pending_action ?? undefined, current)
   // Story pictures beside their paragraphs; picture options of the clicked question (ADR-0026).
   const illustrations = (snapshot?.illustrations ?? []) as { resource_id: string, paragraph: number }[]
   const storyIds = illustrations.map(item => item.resource_id)
@@ -380,14 +382,16 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
       <div className="controls"><span>{snapshot ? stateLabels[snapshot.activity_state] : 'Joining the class'}</span></div>
     </header>
     <div className="stage">
-      <div className="side board">
+      {/* The board's frame and chalk ledge stay put; only what is written on it scrolls. */}
+      <div className="side board"><div className="board-page">
         <section className="jane"><span className="avatar" aria-hidden="true">J</span><div><h2>Jane</h2>
+          {/* The question and its note can come from one action: their keys must differ, or React keeps old questions. */}
           {!localCancelled && posed && <p className="said" key={asked.current?.action_id}>{posed.question}</p>}
           {localCancelled ? <p>Stopped on this page.</p>
             : voiced && locked ? <p>Press "Turn on sound" to hear Jane.</p>
             : voicing === 'preparing' ? <Progress label="Jane is getting ready to speak…" />
             : voicing === 'speaking' ? <p aria-live="polite">Jane is speaking…</p>
-            : posed ? posed.note && <p aria-live="polite" className="note said" key={shown?.action_id}>{posed.note}</p>
+            : posed ? posed.note && <p aria-live="polite" className="note said" key={`note:${shown?.action_id}`}>{posed.note}</p>
             : <p aria-live="polite" className="said" key={shown?.action_id}>{shown?.text ?? 'Waiting for Jane.'}</p>}
           {!localCancelled && !voicing && (busy || snapshot?.mode === 'judging') && <Progress label="Jane is reading your answer…" />}
           {voiced && locked && <button onClick={() => void speaker.current?.resume().then(() => setLocked(false))}>Turn on sound</button>}
@@ -396,8 +400,9 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
             <button className="quiet" disabled={halted} onClick={() => void control('repeat')}>Say it again</button></div>}</div></section>
         {/* The words marked while reading, below Jane: meanings arrive after "I've finished reading". */}
         {!localCancelled && snapshot && snapshot.task_index >= 0 && <VocabularyBox token={token} entries={vocabulary} busy={busy}
-          audioUrl={lemma => `/api/class/word-audio/${encodeURIComponent(lemma)}`} onRegenerate={surface => void regenerateWord(surface)} />}
-      </div>
+          audioUrl={lemma => `/api/class/word-audio/${encodeURIComponent(lemma)}`} onRegenerate={surface => void regenerateWord(surface)}
+          onRemove={halted || snapshot.mode === 'ended' ? undefined : entry => void markWord(String(entry.word), String(entry.sentence), false)} />}
+      </div></div>
       <div className="side book" onScroll={() => setPicked(undefined)}>
         {/* The question's own picture stays through hints that bring none. */}
         {!localCancelled && <Visuals token={token} action={(posed && !shown?.visuals?.length ? asked.current : shown) ?? undefined} onShown={(action, shown) => {

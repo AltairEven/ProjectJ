@@ -203,7 +203,9 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
 .side { min-height: 0; overflow-y: auto; }
 .stage section { border: 0; padding: 0; margin: 0 0 18px; }
 
-.board { padding: 20px 20px 30px; }
+/* The board's frame and ledge stay put; only its page scrolls, above the ledge (2026-11-01). */
+.side.board { display: grid; overflow: hidden; padding: 0 0 12px; }
+.board-page { min-height: 0; overflow-y: auto; padding: 20px 20px 18px; }
 .stage .jane { display: grid; grid-template-columns: 40px 1fr; align-items: center; gap: 14px 10px; }
 .stage .jane > div { display: contents; }
 .stage .jane > div > :not(h2) { grid-column: 1 / -1; margin: 0; }

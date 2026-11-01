@@ -68,6 +68,15 @@ def test_a_stopped_class_with_pending_words_saves_them_without_a_definition(appl
     assert listed[0]["lemma"] == "bridge" and listed[0]["weight"] == 1
 
 
+def test_a_word_removed_after_reading_is_not_recorded(application, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    core = mark_and_finish(application, "bridge", "She wants a bridge for her car.")
+    core.mark_word(str(uuid4()), "bridge", "She wants a bridge for her car.", False)
+    core.control(str(uuid4()), "stop")
+    application.seal()
+    assert "vocabulary update new=0 marked=0 exits=0 mastered=0 total=0 saved=false" in caplog.text
+
+
 def test_regenerate_outside_class_fills_the_definition(application, caplog):
     caplog.set_level(logging.INFO, logger="project_j")
     core = asyncio.run(start(application))

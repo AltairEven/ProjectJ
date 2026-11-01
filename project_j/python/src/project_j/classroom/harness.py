@@ -337,15 +337,19 @@ class Harness:
         )
 
     def mark_word(self, event_id: str, word: str, sentence: str, marked: bool):
-        """Mark or unmark a story word; only while the story is being read (not paused)."""
+        """Mark or unmark a story word while the story is being read (not paused); after
+        reading a word can still leave the box while the class runs, never join it (ADR-0029)."""
         signature = {"event_id": event_id, "word": word, "sentence": sentence, "marked": marked}
         previous = self.inputs.get(event_id)
         if previous:
             if previous["signature"] != signature:
                 raise Conflict("same mark identity has different content")
             return self.snapshot()
-        if self.story_timer is None or self.mode not in {"waiting_input", "delivering"}:
+        reading = self.story_timer is not None and self.mode in {"waiting_input", "delivering"}
+        if not reading and (marked or self.task_index < 0):
             raise ValueError("Mark words while you read the story.")
+        if not reading and self.mode in {"paused", "ended"}:
+            raise ValueError("Remove words while the class runs.")
         self.inputs[event_id] = {"signature": signature, "attempt_id": None}
         key = word.lower()
         if marked:
@@ -377,7 +381,10 @@ class Harness:
 
     def set_word(self, surface: str, looked: LookedUp | None, audio: bool):
         """The lookup's outcome for one marked word; None means it failed (retry possible)."""
-        entry = self.box[surface]
+        entry = self.box.get(surface)
+        if entry is None:  # Removed from the box while it was being looked up.
+            log.info("word lookup dropped activity=%s reason=removed", self.activity_id)
+            return
         if looked is None:
             entry["status"] = "failed"
         else:

@@ -2,7 +2,7 @@
 // vocabulary page (by lemma), as the server computed them. Nothing here scores anything.
 
 export type Entry = {
-  surface?: string, word?: string, lemma: string | null, forms?: string[],
+  surface?: string, word?: string, sentence?: string, lemma: string | null, forms?: string[],
   part_of_speech: string | null, definition: string | null, status: string,
   audio?: boolean | Record<string, unknown> | null,
   weight?: number, mark_count?: number, exit_count?: number,
