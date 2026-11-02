@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import json
 from types import SimpleNamespace
 
@@ -10,6 +11,7 @@ from project_j.application.progress import advance, next_step, retry
 from project_j.classroom.judgment import method_context
 from project_j.contracts import RevisionRef
 from project_j.evaluation.assessment import (
+    RULE_DECIDED,
     DraftMismatch,
     EvaluationDraft,
     EvaluationUnavailable,
@@ -17,6 +19,7 @@ from project_j.evaluation.assessment import (
     apply_draft,
     evaluation_request,
     interpret,
+    working_judgment,
 )
 from project_j.platform.models.simulated import SimulatedAdapter
 from project_j.platform.storage import Publication, SaveKey
@@ -52,8 +55,19 @@ def test_simulated_evaluation_draft_mirrors_the_rules(application):
     draft = EvaluationDraft.model_validate(SimulatedAdapter().respond(request))
     judgments = {t.attempt_id: t.working_judgment for t in draft.tasks}
     for attempt in fact.body["attempts"]:
-        helped = any(v not in {"none", "unknown"} for v in attempt["help"].values())
-        assert judgments[attempt["attempt_id"]] == ("needs_help" if helped else "unknown")
+        expected = working_judgment(attempt["judgment"], attempt["help"], False, "unknown")
+        assert judgments[attempt["attempt_id"]] == expected
+
+
+def test_working_judgment_follows_the_class_record():
+    facts = "english.reading.facts"
+    assert working_judgment("correct", {}, False, "unknown") == "single_independent"
+    assert working_judgment("correct", {facts: "none"}, False, "none") == "single_independent"
+    assert working_judgment("correct", {}, False, "reported") == "needs_help"
+    assert working_judgment("correct", {facts: "light_prompt"}, False, "unknown") == "needs_help"
+    assert working_judgment("incorrect", {}, False, "unknown") == "needs_help"
+    assert working_judgment("correct", {}, True, "none") == "unknown"
+    assert working_judgment("reported", {}, False, "unknown") == "unknown"
 
 
 def base_and_draft(application, helped=False):
@@ -62,7 +76,8 @@ def base_and_draft(application, helped=False):
     readings = [
         TaskReading(
             attempt_id=t["attempt_id"],
-            working_judgment="unknown",
+            # The base already holds the rules' judgment; a draft agreeing with it adds no check.
+            working_judgment=t["working_judgment"],
             external_help="unknown",
             explanation="说明。",
         )
@@ -94,43 +109,59 @@ def test_quoted_no_help_allows_single_independent(application):
         external_help="none",
         help_quote="我没有帮忙",
     )
+    before = copy.deepcopy(base)
     merged = apply_draft(base, draft, [{"text": "我没有帮忙，他自己读的。", "corrections": []}])
     task = merged["tasks"][first]
     assert task["working_judgment"] == "single_independent" and task["external_help"] == "none"
     assert task["help"]["english.reading.facts"] == "none" and merged["checks"] == []
     assert merged["report"]["summary"] == "概括" and merged["basis_version"] == "evaluation-draft-1"
-    assert base["tasks"][first]["working_judgment"] == "unknown"  # the base is not modified
+    assert base == before  # the base is not modified
 
 
-def test_unquoted_external_help_stays_unknown(application):
+def test_unquoted_external_help_is_unknown_but_a_right_first_answer_is_independent(application):
     fact, base, draft = base_and_draft(application)
+    first = index_of(base, "reading-fact")  # first answer "a bridge", no help
     draft = reading(
         draft,
-        0,
+        first,
         working_judgment="single_independent",
         external_help="none",
         help_quote="我没有帮忙",
     )
     merged = apply_draft(base, draft, [{"text": "无额外补充", "corrections": []}])
-    assert merged["tasks"][0]["external_help"] == "unknown"
-    assert merged["tasks"][0]["working_judgment"] == "unknown"
+    assert merged["tasks"][first]["external_help"] == "unknown"
+    assert merged["tasks"][first]["working_judgment"] == "single_independent"
     assert [c["reason"] for c in merged["checks"]] == [
         "Outside help was not quoted word for word from your notes; unknown",
-        "Not enough to call it done alone",
     ]
 
 
-def test_rule_violations_fall_back_to_unknown(application):
+def test_the_rules_decide_the_working_judgment(application):
     fact, base, draft = base_and_draft(application, helped=True)
     wrong = index_of(base, "reading-fact")  # first attempt "a car": incorrect
     plain = index_of(base, "reading-sequence")  # correct, no help
     draft = reading(draft, wrong, working_judgment="single_independent")
     draft = reading(draft, plain, working_judgment="needs_help")
     merged = apply_draft(base, draft, [])
-    assert merged["tasks"][wrong]["working_judgment"] == "unknown"
-    assert merged["tasks"][plain]["working_judgment"] == "unknown"
-    assert "No evidence that help was needed" in merged["tasks"][plain]["limitations"]
+    assert merged["tasks"][wrong]["working_judgment"] == "needs_help"
+    assert merged["tasks"][plain]["working_judgment"] == "single_independent"
     assert {c["task_id"] for c in merged["checks"]} == {"reading-fact", "reading-sequence"}
+    assert {c["reason"] for c in merged["checks"]} == {RULE_DECIDED}
+
+
+def test_reported_help_on_a_right_first_answer_needs_help(application):
+    fact, base, draft = base_and_draft(application)
+    first = index_of(base, "reading-fact")
+    draft = reading(
+        draft,
+        first,
+        working_judgment="single_independent",
+        external_help="reported",
+        help_quote="朋友帮我找了这一句",
+    )
+    merged = apply_draft(base, draft, [{"text": "朋友帮我找了这一句。", "corrections": []}])
+    assert merged["tasks"][first]["external_help"] == "reported"
+    assert merged["tasks"][first]["working_judgment"] == "needs_help"
 
 
 def test_reported_help_supports_needs_help(application):

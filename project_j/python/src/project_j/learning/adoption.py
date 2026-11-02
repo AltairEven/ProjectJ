@@ -61,7 +61,7 @@ def adopt_state(current: Document, evaluation: Document) -> StateBody:
             retention=previous.retention if previous else None,
             transfer=previous.transfer if previous else None,
             limitations=tuple(sorted({item for task in tasks for item in task["limitations"]}))
-            + ("Right in one class does not mean done alone or learned for good.",),
+            + ("Right in one class does not mean learned for good.",),
         )
     return StateBody(status="checked", dimensions=tuple(dimensions.values()))
 

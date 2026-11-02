@@ -24,6 +24,7 @@ from project_j.learning.planning import (
     PlanningUnavailable,
     apply_demand_draft,
     demand_request,
+    difficulty_step,
     week_plan_after,
 )
 from project_j.platform.storage import (
@@ -33,6 +34,14 @@ from project_j.platform.storage import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def difficulty(evaluation: Document, course: dict) -> str | None:
+    """The rule's step for planning the next lesson; the log keeps the kind only (ADR-0030)."""
+    step, reason = difficulty_step(evaluation.body, course)
+    activity = evaluation.body["activity_id"]
+    log.info("planning activity=%s difficulty=%s reason=%s", activity, step or "none", reason)
+    return step
 
 
 class Adopting:
@@ -83,6 +92,8 @@ class Adopting:
             )
             catalog = [doc.body for doc in self.store.list_current(learner_id, "capability")]
             known = {item["dimension_id"] for item in catalog}
+            course = self.lesson_course(learner_id, evaluation)
+            step = difficulty(evaluation, course)
             self.models.require()
             result = await self.models.run(
                 demand_request(
@@ -98,6 +109,7 @@ class Adopting:
                     old.body,
                     self.recent_titles(learner_id),
                     lesson_score_summary(self, learner_id, "planning"),
+                    course=course,
                 )
             )
             activity_id = evaluation.body["activity_id"]
@@ -137,6 +149,7 @@ class Adopting:
                     plan.ref,
                     suggestion.ref,
                     plan_adjusted=adjusted is not None,
+                    step=step,
                 )
             except PlanningUnavailable as error:
                 log.warning("planning activity=%s rejected: %s", activity_id, error)
@@ -179,10 +192,11 @@ class Adopting:
                 baselines=baselines,
             )
             log.info(
-                "planning activity=%s goals=%s/%s action=%s plan_effect=%s topics=%d",
+                "planning activity=%s goals=%s/%s direction=%s action=%s plan_effect=%s topics=%d",
                 activity_id,
                 data.primary_goal.dimension_id,
                 data.auxiliary_goal.dimension_id,
+                data.direction,
                 result.output.suggestion_action,
                 data.plan_effect,
                 len(data.topic_suggestions),
@@ -491,6 +505,11 @@ class Adopting:
         )
         return self.ledger.finish(operation, learner_id, {"demand_ref": saved[0].ref.model_dump()})
 
+    def lesson_course(self, learner_id: str, evaluation: Document) -> dict:
+        """The course the evaluated lesson taught."""
+        ref = RevisionRef.model_validate(evaluation.body["alignment"]["tasks_materials"])
+        return self.store.read(ref, learner_id).body
+
     async def replan_keeping_goals(self, learner_id: str, demand: Document, body: DemandBody):
         """Planning again from the same evaluation, told to keep the previous two goals."""
         previous = DemandBody.model_validate(
@@ -509,6 +528,8 @@ class Adopting:
             "primary_goal": previous.primary_goal.model_dump(mode="json"),
             "auxiliary_goal": previous.auxiliary_goal.model_dump(mode="json"),
         }
+        course = self.lesson_course(learner_id, evaluation)
+        step = difficulty(evaluation, course)
         request = demand_request(
             evaluation.body,
             self.store.read(body.state_ref, learner_id).body,
@@ -519,6 +540,7 @@ class Adopting:
             previous.model_dump(mode="json"),
             self.recent_titles(learner_id),
             lesson_score_summary(self, learner_id, "planning"),
+            course=course,
         )
         self.models.require()
         result = await self.models.run(
@@ -536,13 +558,18 @@ class Adopting:
         ):
             raise PlanningUnavailable("the goals were not kept")
         known = {item["dimension_id"] for item in catalog}
-        kept = apply_demand_draft(
-            draft,
-            previous,
-            known,
-            body.state_ref,
-            body.plan_ref,
-            choice.suggestion_ref,
-            plan_adjusted=False,
-        )
+        try:
+            kept = apply_demand_draft(
+                draft,
+                previous,
+                known,
+                body.state_ref,
+                body.plan_ref,
+                choice.suggestion_ref,
+                plan_adjusted=False,
+                step=step,
+            )
+        except PlanningUnavailable as error:
+            log.warning("planning activity=%s rejected: %s", evaluation.body["activity_id"], error)
+            raise
         return kept.model_copy(update={"goal_confirmation": "confirmed"})

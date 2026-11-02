@@ -822,3 +822,11 @@ def test_placement_and_review_lessons_offer_no_candidates(application):
     assert application.offered_vocabulary(body, placement=True, familiar=False, today=today) is None
     assert application.offered_vocabulary(body, placement=False, familiar=True, today=today) is None
     assert application.offered_vocabulary(None, placement=False, familiar=False, today=today) == []
+
+
+def test_preparation_treats_requirements_as_targets():
+    from project_j.preparation.drafting import PREPARATION_INSTRUCTIONS
+
+    # A demand's question list is a target, not a template to copy (ADR-0030).
+    assert "点名的具体题目、题型或题数只作参考" in PREPARATION_INSTRUCTIONS
+    assert "落实prerequisites里写明的那一步难度" in PREPARATION_INSTRUCTIONS

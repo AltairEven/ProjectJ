@@ -6,6 +6,7 @@ from pydantic import Field
 
 from project_j.contracts import Contract, RevisionRef
 from project_j.evaluation.assessment import ModelStepUnavailable
+from project_j.evaluation.scoring import SCORING
 from project_j.learning.contracts import (
     SKILLS,
     DemandBody,
@@ -19,6 +20,7 @@ from project_j.learning.contracts import (
     TopicSuggestion,
 )
 from project_j.platform.models.contracts import ModelRequest
+from project_j.preparation.task_types import CONTENT_TYPES
 
 PLANNING_INSTRUCTIONS = (
     "你是学习规划助手。Jane是唯一的AI教师，不是学生；学习者在上下文中不具名，一律称“学生”。"
@@ -32,6 +34,15 @@ PLANNING_INSTRUCTIONS = (
     "上下文有keep_goals时，学生不同意换目标：主要与辅助目标必须与keep_goals相同。"
     "direction：consolidate巩固，review复查，extend拓展，advance小步进阶，observe短观察；"
     "一次通常只增加一种主要难度；需要帮助的先改变支持并留独立尝试。"
+    "difficulty是规则按本课主要目标各题算出的难度方向：step为up时direction必须是advance或extend，"
+    "只加一种主要难度；step为down时direction不能是advance或extend，退回上一步：demand里写着上一课"
+    "加的那一步就撤回它，上一课没有加难度就比上一课再容易一级（换容易一级的变种、多一级支持或少一种难点，"
+    "三者选一）；上一步是换目标时只在新目标内换容易一级；step为null时自己判断。"
+    "difficulty优先于suggestion里的方向。变难指题目变难（变种、问法、帮助），故事难度由学生自选的档位"
+    "决定，不写更难或更长的故事。加难度或退回时，在prerequisites的第一项用一句话写清这一步具体改了什么。"
+    "lesson_tasks是本课每题的题型与变种。"
+    "sampling_requirements写取样纪律与要收集的证据（练哪项能力、先取初答、帮助前后分开、要观察的条件），"
+    "不写具体题目、题干、题数或题型分布；难度这一步可以点名一个变种或一种问法。题型、题数和问法由备课决定。"
     "预算固定30分钟，不改预算，不把时间排满。"
     "scores是最近几节课按题型与能力的平均分（10分制，未知不计）与题数：参考它决定下节课的目标与加强方向；"
     "分数低不等于没学会，结合评价的依据与限制判断，题数少于3只作参考。"
@@ -64,6 +75,48 @@ REVIEW_INSTRUCTIONS = (
 )
 
 Direction = Literal["consolidate", "review", "extend", "advance", "observe"]
+Step = Literal["up", "down"] | None
+LOW_AVERAGE = 6  # A main-goal average below this steps down (user, 2026-11-02).
+RAISING = {"advance", "extend"}
+
+
+def difficulty_step(evaluation: dict, course: dict) -> tuple[Step, str]:
+    """Up when every main-goal question was done alone, down when their average is below 6,
+    else none; an unknown score keeps the rule silent (ADR-0030). The second item names why."""
+    primary = course["primary_goal"]["dimension_id"]
+    ids = {
+        task["task_id"]
+        for task in course["tasks"]
+        if task["dimension_id"] == primary and SCORING.get(task["purpose"])
+    }
+    if not ids:
+        return None, "no_scored_tasks"
+    entries = [entry for entry in evaluation.get("scores", []) if entry["task_id"] in ids]
+    if {entry["task_id"] for entry in entries} != ids or any(
+        entry["score"] is None for entry in entries
+    ):
+        return None, "unknown_scores"
+    if sum(entry["score"] for entry in entries) / len(entries) < LOW_AVERAGE:
+        return "down", "low_average"
+    tries = [task["working_judgment"] for task in evaluation["tasks"] if task["task_id"] in ids]
+    if tries and all(judgment == "single_independent" for judgment in tries):
+        return "up", "all_independent"
+    return None, "between"
+
+
+def lesson_tasks(course: dict) -> list[dict]:
+    """Each question's type and variant, never its prompt, evidence or answers."""
+    return [
+        {
+            "task_id": task["task_id"],
+            "dimension_id": task["dimension_id"],
+            "purpose": task["purpose"],
+            "variant": (task.get(task["purpose"]) or {}).get("variant")
+            if task["purpose"] in CONTENT_TYPES
+            else None,
+        }
+        for task in course["tasks"]
+    ]
 
 
 class PlanPatch(Contract):
@@ -174,8 +227,11 @@ def demand_request(
     demand: dict,
     recent_titles: list[str],
     scores: dict | None = None,
+    *,
+    course: dict,
 ) -> ModelRequest:
     material = suggestion["material"]
+    step, reason = difficulty_step(evaluation, course)
     return ModelRequest(
         "planning",
         PLANNING_INSTRUCTIONS,
@@ -199,6 +255,8 @@ def demand_request(
             ),
             "recent_titles": recent_titles,
             "scores": scores or {},
+            "difficulty": {"step": step, "reason": reason},
+            "lesson_tasks": lesson_tasks(course),
             "skills": [
                 {"skill_id": skill, "group": group, "label": label, "hint": hint}
                 for skill, (group, label, hint) in SKILLS.items()
@@ -269,6 +327,7 @@ def apply_demand_draft(
     plan_ref: RevisionRef,
     suggestion_ref: RevisionRef,
     plan_adjusted: bool,
+    step: Step = None,
 ) -> DemandBody:
     """The model's demand as a checked revision; an unknown or repeated goal voids the draft."""
     proposed = {item.dimension_id for item in draft.new_capabilities}
@@ -281,6 +340,10 @@ def apply_demand_draft(
         raise PlanningUnavailable("a goal is not in the skill list")
     if goals[0] == goals[1]:
         raise PlanningUnavailable("the two goals are the same")
+    if (step == "up" and draft.direction not in RAISING) or (
+        step == "down" and draft.direction in RAISING
+    ):
+        raise PlanningUnavailable("the direction does not follow the difficulty rule")
     # A proposal no goal uses is dropped; the catalog only grows by what a lesson needs.
     used = tuple(item for item in draft.new_capabilities if item.dimension_id in goals)
     body = DemandBody(

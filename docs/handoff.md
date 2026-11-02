@@ -1166,3 +1166,21 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 未验证：正式课堂（真实语音）里的题目切换、生词盒移除与长题目显示。
 - 继续条件：用户用正式入口上一节课，核对题目切换、展开生词盒时的黑板与移除。
 - 状态：实现与自测完成，用户审阅后要求提交，已本地提交cf9cb79（2026年11月1日）。
+
+## LEVEL-1 答对算独立完成、按上一课结果升降难度、规划不写题目清单（ADR-0030）
+
+- 负责人：Claude Opus（实现与集成）；参与者：无。发起：2026年11月2日用户上完4节课后反馈：课堂问题多数用原文回答、选择/填空/问答比例不均衡、没见过开放问答。设计docs/superpowers/specs/2026-11-02-difficulty-progression-design.md，计划docs/superpowers/plans/2026-11-02-difficulty-progression.md（用户确认设计与计划，要求在当前会话实施）。
+- 原因核对（只读本机me的课程、需求、评价与状态，不读作答文字）：4节课题目同构（选择1、填空1、问答3、朗读，第2–4课加复述1）；规划需求每课把题目清单写进取样要求，备课逐条映射后复制骨架；评价要单次独立须学生补记明确说没人帮忙，43次尝试0次单次独立，状态一直未知，规划一直巩固或观察，4课几乎全对也没变难。
+- 实际改动：
+  1. 评价：新增规则函数`working_judgment`，按课堂记录直接判三档（初答正确、课中无帮助、补记没说有人帮→单次独立；课中有帮助、补记说有人帮或答错→需要帮助；受更正及其余→未知），模型提议只作参考，不同时记`RULE_DECIDED`核对；评价指令、模拟评价同步；“outside help is unknown/does not mean done alone”等英文限制改为只在学生说了时记外部帮助。
+  2. 规划：新增`difficulty_step`（主要目标计分题全部已知且全部单次独立→升；平均低于6→降；同时成立以降为准；有题未知、没有计分题或其余→无），规划请求带`difficulty`与`lesson_tasks`（每题题型与变种，不含题干与答案），`apply_demand_draft`核对方向（升须advance/extend，降不得advance/extend），违规不保存、可重试；两处规划调用（adopt与keep_goals重规划）都接入；规划指令写明升降含义与“不写题目清单”；模拟规划按规则给方向。
+  3. 备课：指令写明需求是目的，旧需求点名的题目、题型或题数只作参考，方向为进阶/拓展时落实需求写明的一步难度。
+  4. 文档：ADR-0030；design/evaluation（README 1.13.0、inputs-feedback 2.2.0、handoffs 1.3.2）、learning（plans 1.5.0、updates 2.1.0、state 1.2.3）、preparation/README 2.11.0、shared/end-to-end-cases 1.10.0。
+- 文件边界：project_j/python/src/project_j/{evaluation/assessment.py,learning/planning.py,learning/adoption.py,application/adopting.py,application/evaluating.py,classroom/harness.py,platform/models/simulated.py,preparation/drafting.py}；project_j/python/tests/{test_evaluation_model,test_runtime,test_review_fixes,test_diagnostic_logs,test_learning_planning,test_preparation_drafting}.py；上列设计文档、ADR、设计与计划文档；本节。课堂判断未改，不需重跑参考题集；沙盒快照dashboard.json里的旧限制文字未改（数据结构没变）。
+- 验收条件：三档判定（含补记说有人帮、补记没提、受更正、模型提议不同）；升、降、6分不算低、先错后对不升、有题没开始或得分未知不触发、旧评价没有scores不触发、指认/离屏不计、发音目标全部独立但平均低于6以降为准、其他维度不影响；方向违规不保存并记日志；模拟规划全对后为advance；指令文字；统一check通过。
+- 检查证据：统一check通过（主工程869、评分39、合成15项pytest；前端97、文档1），UTC 2026-11-02T14:47:39.587047+00:00，工程摘要123bc89cd868d3f7d5f375ce460b4ccddf03f4f120be843bed422f6e8b086616（对照设计自审后补了保存需求日志的`direction=`与learning/state 1.2.3，重跑）。只读核对：用本机me的真实评价与课程跑`difficulty_step`，旧判定下5次全为“介于之间”，按新判定第4课为“升”，其余因有答错或帮助仍为“介于之间”；未写任何数据。依赖未变，未重跑sync、npm ci与audit。新增测试先失败后通过。
+- 诊断日志：`evaluation judgments activity= single_independent= needs_help= unknown= ruled=`（只记条数）；`planning activity= difficulty=up|down|none reason=`（原因类别），保存需求时原有日志加`direction=`；方向违规沿用`planning activity= rejected:`（重规划路径补了同格式警告）。日志测试`test_evaluation_logs_judgment_counts_only`、`test_simulated_planning_raises_after_an_all_right_lesson`、`test_a_direction_against_the_rule_is_logged_and_not_saved`。
+- 自审取舍：规则判定为准、不加修正回合（真实模型违规再加）；合并学习状态规则不变，答对的题参与合并后，同一维度有题需要帮助、有题独立时显示“不一致”；某题初答答错且课中尚无帮助时，这次尝试的帮助程度记为未知，合并后该维度帮助程度可能显示未知（改动前真实数据已是如此，未改）。
+- 未验证：第5课备课题型是否不再照旧骨架；第5课评价是否出现单次独立；第6课规划是否按规则升降、加的难度是否只有一种；真实规划与备课模型对新指令的遵守情况。
+- 继续条件：用户用正式入口上第5、6课后核对上述三点。
+- 状态：实现与自测完成，未提交，等用户要求。

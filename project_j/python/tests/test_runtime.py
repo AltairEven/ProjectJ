@@ -97,9 +97,13 @@ def test_E2E02_wrong_first_answer_two_different_help_and_offscreen_unknown(appli
         evaluation = await application.evaluate(
             "evaluate", LEARNER, core.activity_id, "final_feedback"
         )
-        assert all(
-            task["working_judgment"] != "single_independent" for task in evaluation.body["tasks"]
-        )
+        # ADR-0030: a right first answer with no help counts as done alone; a helped or wrong
+        # try never does.
+        tasks = evaluation.body["tasks"]
+        first = next(task for task in tasks if task["task_id"] == "reading-fact")
+        plain = next(task for task in tasks if task["task_id"] == "reading-sequence")
+        assert first["working_judgment"] == "needs_help"
+        assert plain["working_judgment"] == "single_independent"
 
     asyncio.run(scenario())
 
@@ -116,12 +120,14 @@ def test_E2E02_state_records_english_expression_only_where_help_marked_it(applic
         dims = {item["dimension_id"]: item for item in state.body["dimensions"]}
         speaking = dims["english.speaking.report"]
         if helped:
-            assert (speaking["judgment"], speaking["help"]) == ("needs_help", "scaffold")
+            # The sentence frame on reading-fact sampled English expression with help, and the
+            # retelling was done alone: the dimension merges as inconsistent (ADR-0030).
+            assert (speaking["judgment"], speaking["help"]) == ("inconsistent", "scaffold")
             assert speaking["evidence_refs"] == dims["english.reading.facts"]["evidence_refs"]
         else:
             # The retelling (an open question on English expression) observes it without help;
-            # one unhelped try is not independence, so it stays unknown (ADR-0020).
-            assert speaking["judgment"] == "unknown"
+            # one right first try with no help counts as done alone (ADR-0030).
+            assert speaking["judgment"] == "single_independent"
             assert speaking["evidence_refs"] == dims["english.reading.facts"]["evidence_refs"]
 
     asyncio.run(scenario())

@@ -8,12 +8,16 @@ from support import LEARNER, complete_story, next_course, wait_jobs
 from project_j.application.documents import identity
 from project_j.application.progress import advance, retry
 from project_j.contracts import RevisionRef
+from project_j.learning.contracts import DemandBody
 from project_j.learning.maintenance import review
 from project_j.learning.planning import (
+    PLANNING_INSTRUCTIONS,
     DemandDraft,
     PlanningUnavailable,
     ReviewDraft,
+    apply_demand_draft,
     demand_request,
+    difficulty_step,
     review_request,
 )
 from project_j.platform.models.simulated import SimulatedAdapter
@@ -33,8 +37,11 @@ def taught(application, feedback="孩子说很好玩。"):
 
 def bodies(application, activity):
     demand = application.current(LEARNER, "demand")
+    evaluation = application.store.current(identity(activity, "evaluation"), LEARNER).body
+    course_ref = RevisionRef.model_validate(evaluation["alignment"]["tasks_materials"])
     return {
-        "evaluation": application.store.current(identity(activity, "evaluation"), LEARNER).body,
+        "evaluation": evaluation,
+        "course": application.store.read(course_ref, LEARNER).body,
         "state": application.current(LEARNER, "state").body,
         "plans": {level: application.current(LEARNER, f"plan:{level}").body for level in LEVELS},
         "profile": application.store.read(
@@ -137,7 +144,7 @@ def model_changes_goals(application, monkeypatch, primary=SCIENCE, adjust=True):
             reply |= {
                 "suggestion_action": "modify",
                 "suggestion_reason": "Model reason: reading needed hints; observe a report next.",
-                "direction": "observe",
+                "direction": "extend",
                 "primary_goal": primary,
                 "auxiliary_goal": REPORT,
                 "plan_effect": "adjusted" if adjust else "reused",
@@ -160,7 +167,7 @@ def test_model_demand_changes_goals_and_explains(application, monkeypatch, caplo
     result = asyncio.run(application.adopt("adopt1", LEARNER, evaluation_of(application, activity)))
     demand = application.current(LEARNER, "demand")
     week = application.current(LEARNER, "plan:week")
-    assert demand.body["primary_goal"] == SCIENCE and demand.body["direction"] == "observe"
+    assert demand.body["primary_goal"] == SCIENCE and demand.body["direction"] == "extend"
     assert demand.body["note"]["after"]
     choice = demand.body["suggestion_choices"][0]
     assert choice["action"] == "modify" and choice["reason"].startswith("Model reason")
@@ -447,3 +454,180 @@ def test_a_plan_review_with_chinese_fails(application, monkeypatch, caplog):
     assert application.current(LEARNER, "plan:week").revision == 1
     assert "review level=week failure=language" in caplog.text
     assert "先补实际报告" not in caplog.text
+
+
+# Difficulty up or down from the lesson's main-goal questions (ADR-0030).
+FACTS, SPEAKING = "english.reading.facts", "english.speaking.report"
+PRONUNCIATION = "english.speaking.pronunciation"
+
+
+def lesson(primary, tasks, scores, tries):
+    """A course and its evaluation reduced to what the rule reads: tasks (id, dimension,
+    purpose), scores by task id, and each try's working judgment by task id."""
+    course = {
+        "primary_goal": {"dimension_id": primary},
+        "tasks": [{"task_id": i, "dimension_id": d, "purpose": p} for i, d, p in tasks],
+    }
+    evaluation = {
+        "scores": [{"task_id": i, "score": score} for i, score in scores.items()],
+        "tasks": [
+            {"task_id": i, "working_judgment": judgment}
+            for i, judgments in tries.items()
+            for judgment in judgments
+        ],
+    }
+    return evaluation, course
+
+
+TWO_ANSWERS = [("a", FACTS, "answer"), ("b", FACTS, "choice")]
+ALONE = "single_independent"
+
+
+def test_all_independent_main_goal_tasks_step_up():
+    step = difficulty_step(
+        *lesson(FACTS, TWO_ANSWERS, {"a": 10, "b": 10}, {"a": [ALONE], "b": [ALONE]})
+    )
+    assert step == ("up", "all_independent")
+
+
+def test_a_low_average_steps_down():
+    tries = {"a": ["needs_help"], "b": ["needs_help"]}
+    assert difficulty_step(*lesson(FACTS, TWO_ANSWERS, {"a": 5, "b": 6}, tries)) == (
+        "down",
+        "low_average",
+    )
+
+
+def test_six_is_not_low():
+    tries = {"a": ["needs_help"], "b": ["needs_help"]}
+    assert difficulty_step(*lesson(FACTS, TWO_ANSWERS, {"a": 6, "b": 6}, tries)) == (
+        None,
+        "between",
+    )
+
+
+def test_a_wrong_first_try_then_right_does_not_step_up():
+    tries = {"a": [ALONE], "b": ["needs_help", "needs_help"]}
+    assert difficulty_step(*lesson(FACTS, TWO_ANSWERS, {"a": 10, "b": 7}, tries)) == (
+        None,
+        "between",
+    )
+
+
+def test_a_task_never_started_keeps_the_rule_silent():
+    tasks = [*TWO_ANSWERS, ("c", FACTS, "fill")]
+    tries = {"a": [ALONE], "b": [ALONE]}
+    step = difficulty_step(*lesson(FACTS, tasks, {"a": 10, "b": 10}, tries))
+    assert step == (None, "unknown_scores")
+
+
+def test_an_unknown_score_keeps_the_rule_silent():
+    tries = {"a": [ALONE], "b": [ALONE]}
+    step = difficulty_step(*lesson(FACTS, TWO_ANSWERS, {"a": 10, "b": None}, tries))
+    assert step == (None, "unknown_scores")
+
+
+def test_an_evaluation_without_scores_keeps_the_rule_silent():
+    evaluation, course = lesson(FACTS, TWO_ANSWERS, {}, {"a": [ALONE], "b": [ALONE]})
+    del evaluation["scores"]  # Saved before scoring existed (ADR-0020).
+    assert difficulty_step(evaluation, course) == (None, "unknown_scores")
+
+
+def test_point_and_offscreen_do_not_count():
+    science = "science.observation.report"
+    tasks = [("p", science, "point"), ("o", science, "offscreen")]
+    step = difficulty_step(*lesson(science, tasks, {}, {"p": ["unknown"], "o": ["unknown"]}))
+    assert step == (None, "no_scored_tasks")
+
+
+def test_low_average_wins_over_all_independent():
+    tasks = [("r1", PRONUNCIATION, "read_aloud"), ("r2", PRONUNCIATION, "read_aloud")]
+    tries = {"r1": [ALONE], "r2": [ALONE]}
+    step = difficulty_step(*lesson(PRONUNCIATION, tasks, {"r1": 5.0, "r2": 5.5}, tries))
+    assert step == ("down", "low_average")
+
+
+def test_other_dimensions_do_not_count():
+    tasks = [*TWO_ANSWERS, ("s", SPEAKING, "open")]
+    tries = {"a": [ALONE], "b": [ALONE], "s": ["needs_help"]}
+    step = difficulty_step(*lesson(FACTS, tasks, {"a": 10, "b": 10, "s": 2}, tries))
+    assert step == ("up", "all_independent")
+
+
+def drafted(application, direction):
+    data = bodies(application, taught(application))
+    reply = SimulatedAdapter().respond(demand_request(**data))
+    return data, DemandDraft.model_validate(reply | {"direction": direction})
+
+
+def checked(data, draft, step):
+    current = DemandBody.model_validate(data["demand"])
+    known = {item["dimension_id"] for item in data["catalog"]}
+    ref = RevisionRef(object_id="x", revision=1)
+    return apply_demand_draft(draft, current, known, ref, ref, ref, plan_adjusted=False, step=step)
+
+
+def test_step_up_refuses_a_direction_that_does_not_raise(application):
+    data, draft = drafted(application, "consolidate")
+    with pytest.raises(PlanningUnavailable, match="difficulty rule"):
+        checked(data, draft, "up")
+
+
+def test_step_down_refuses_a_raising_direction(application):
+    data, draft = drafted(application, "advance")
+    with pytest.raises(PlanningUnavailable, match="difficulty rule"):
+        checked(data, draft, "down")
+
+
+def test_no_step_allows_any_direction(application):
+    data, draft = drafted(application, "advance")
+    assert checked(data, draft, None).direction == "advance"
+
+
+def test_demand_request_carries_the_difficulty_and_lesson_tasks(application):
+    data = bodies(application, taught(application))
+    context = demand_request(**data).context
+    assert context["difficulty"] == {"step": "up", "reason": "all_independent"}
+    tasks = context["lesson_tasks"]
+    assert tasks and all(
+        set(item) == {"task_id", "dimension_id", "purpose", "variant"} for item in tasks
+    )
+    text = json.dumps(tasks, ensure_ascii=False)
+    assert all(task["prompt"] not in text for task in data["course"]["tasks"])
+
+
+def test_simulated_planning_raises_after_an_all_right_lesson(application, caplog):
+    activity = taught(application)
+    caplog.set_level(logging.INFO, logger="project_j")
+    asyncio.run(application.adopt("adopt1", LEARNER, evaluation_of(application, activity)))
+    assert application.current(LEARNER, "demand").body["direction"] == "advance"
+    assert f"planning activity={activity} difficulty=up reason=all_independent" in caplog.text
+    assert "direction=advance" in caplog.text  # The saved plan's direction, which obeyed it.
+
+
+def test_a_direction_against_the_rule_is_logged_and_not_saved(application, monkeypatch, caplog):
+    activity = taught(application, feedback="No one helped me.")
+    demand = application.current(LEARNER, "demand")
+    adapter = application.models.adapters["simulated"]
+    original = adapter.respond
+
+    def respond(request):
+        reply = original(request)
+        if request.purpose == "planning" and "demand" in request.context:
+            reply |= {"direction": "consolidate"}
+        return reply
+
+    monkeypatch.setattr(adapter, "respond", respond)
+    caplog.set_level(logging.INFO, logger="project_j")
+    with pytest.raises(PlanningUnavailable, match="difficulty rule"):
+        asyncio.run(application.adopt("adopt1", LEARNER, evaluation_of(application, activity)))
+    assert application.current(LEARNER, "demand").ref == demand.ref
+    assert "difficulty=up" in caplog.text
+    rejected = [r.getMessage() for r in caplog.records if "rejected:" in r.getMessage()]
+    assert rejected and "the direction does not follow the difficulty rule" in rejected[0]
+    assert "No one helped me." not in caplog.text
+
+
+def test_planning_instructions_ask_for_targets_not_question_lists():
+    assert "不写具体题目、题干、题数或题型分布" in PLANNING_INSTRUCTIONS
+    assert "difficulty优先于suggestion里的方向" in PLANNING_INSTRUCTIONS

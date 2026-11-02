@@ -119,7 +119,9 @@ def test_state_merges_all_tasks_of_a_dimension_independent_of_order(application)
             update={"body": evaluation.body | {"tasks": evaluation.body["tasks"][::-1]}}
         )
         reading = {item.dimension_id: item for item in merged.dimensions}["english.reading.facts"]
-        assert (reading.judgment, reading.help) == ("needs_help", "scaffold")
+        # The helped reading-fact and the tasks done alone merge as inconsistent (ADR-0030); its
+        # wrong first try had no help recorded for the dimension, so the help level is unknown.
+        assert (reading.judgment, reading.help) == ("inconsistent", "unknown")
         assert "reading-fact" in reading.task_scope and "reading-sequence" in reading.task_scope
         assert adopt_state(current, reversed_evaluation).dimensions == merged.dimensions
 
@@ -504,7 +506,8 @@ def test_E2E06_rechecking_an_older_lesson_keeps_newer_evidence_and_the_lesson_or
         # English expression was only observed in C1, so its corrected source is re-reviewed.
         rechecked = app.store.current(identity(first.activity_id, "evaluation"), LEARNER)
         speaking = dims["english.speaking.report"]
-        assert speaking["judgment"] == "unknown"
+        # The correction names reading-fact only; the retelling was right with no help (ADR-0030).
+        assert speaking["judgment"] == "single_independent"
         assert speaking["evidence_refs"] == [rechecked.ref.model_dump()]
         # The next lesson still follows the latest one (C2 Ben), not the corrected C1.
         course = app.store.read(ref(result["next_package"]["course_ref"]), LEARNER).body

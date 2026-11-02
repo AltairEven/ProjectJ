@@ -82,6 +82,9 @@ PREPARATION_INSTRUCTIONS = (
     + "".join(TYPE_INSTRUCTIONS.values())
     + CONTENT_FIELDS_INSTRUCTION
     + "不要写其他题型。"
+    "requirements是本课要达到的目的：其中点名的具体题目、题型或题数只作参考，题型、题数和问法"
+    "仍按本课目标、scores与demand.direction决定。demand.direction为advance或extend时落实"
+    "prerequisites里写明的那一步难度，只加这一种；prerequisites写明退回某一步时照着退回。"
     "每节课用哪些题型、各几道由你按本课目标决定：先易后难，从原文里直接找到的事实到自己表达，"
     "点选类放前面确认读懂；复习课以选择、排序、配对、填空和复述为主；"
     "主要目标至少一道answer、open、point、offscreen或朗读；练习课至少3种题型（朗读算一种），"

@@ -3,6 +3,7 @@ evaluation of a lesson."""
 
 import asyncio
 import logging
+from collections import Counter
 from datetime import UTC, datetime
 
 from project_j.application.documents import document, identity, publication
@@ -10,6 +11,7 @@ from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.corrections import affected
 from project_j.english import chinese
 from project_j.evaluation.assessment import (
+    RULE_DECIDED,
     DraftMismatch,
     EvaluationDraft,
     EvaluationUnavailable,
@@ -105,7 +107,7 @@ class Evaluating:
                     "occurred_at": None,
                     "reported_at": datetime.now(UTC).isoformat(),
                     "corrections": list(corrections),
-                    "limitations": ["Nothing to add does not mean done alone."],
+                    "limitations": ["Nothing to add is not a report of outside help."],
                 },
                 refs=(fact.ref,),
                 sources=tuple(fb.ref for fb in old),
@@ -423,6 +425,16 @@ class Evaluating:
                 counts["model"],
                 counts["pronunciation"],
                 counts["unknown"],
+            )
+            judged = Counter(task["working_judgment"] for task in body["tasks"])
+            log.info(  # How many tries in each judgment, never which or why (ADR-0030).
+                "evaluation judgments activity=%s single_independent=%d needs_help=%d unknown=%d "
+                "ruled=%d",
+                activity_id,
+                judged["single_independent"],
+                judged["needs_help"],
+                judged["unknown"],
+                sum(RULE_DECIDED in task["limitations"] for task in body["tasks"]),
             )
             obj = document(
                 "evaluation",

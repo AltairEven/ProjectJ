@@ -116,3 +116,15 @@ def test_scoring_and_estimates_log_counts_only(application, caplog):
     # A first lesson: no scores and no sealed times yet; counts only.
     assert "preparation scores lessons=0 types=0" in text
     assert "preparation calibration types=0 samples=0" in text
+
+
+def test_evaluation_logs_judgment_counts_only(application, caplog):
+    caplog.set_level(logging.INFO, logger="project_j")
+    _, fact = asyncio.run(complete_story(application))
+    activity = fact.body["activity_id"]
+    application.feedback("fb1", LEARNER, activity, "No one helped me.", [])
+    asyncio.run(application.evaluate("e1", LEARNER, activity, "after_class"))
+    text = caplog.text
+    assert f"evaluation judgments activity={activity} single_independent=" in text
+    assert "needs_help=" in text and "ruled=" in text
+    assert "No one helped me." not in text and "a bridge" not in text

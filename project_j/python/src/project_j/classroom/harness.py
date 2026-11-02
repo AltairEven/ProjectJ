@@ -80,12 +80,12 @@ def is_confirmation(text: str) -> bool:
 # Per realm: a text attempt, a recorded attempt, the sealed activity.
 LIMITATIONS = {
     "simulation": (
-        "Simulated; outside help, recall and transfer are unknown.",
+        "Simulated; recall and transfer are unknown; outside help counts only when reported.",
         "Simulated recording and score; not real pronunciation.",
         "Simulated activity, not a learning record.",
     ),
     "study": (
-        "Real study; outside help, recall and transfer are unknown.",
+        "Real study; recall and transfer are unknown; outside help counts only when you said so.",
         "Your reading was scored on this computer; the score limits are not calibrated.",
         "Real study activity; recall and transfer are unknown.",
     ),

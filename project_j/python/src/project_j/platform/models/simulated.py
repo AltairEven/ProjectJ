@@ -49,6 +49,8 @@ class SimulatedAdapter:
     def respond(self, request: ModelRequest) -> dict | None:
         context = request.context
         if request.purpose == "evaluation":
+            from project_j.evaluation.assessment import working_judgment
+
             # Story and open questions: 10 when every try was right without help, else 6.
             scored = {t["task_id"] for t in context["tasks"] if t["purpose"] in {"answer", "open"}}
             tries: dict[str, list[dict]] = {}
@@ -59,9 +61,9 @@ class SimulatedAdapter:
                 "tasks": [
                     {
                         "attempt_id": attempt["attempt_id"],
-                        "working_judgment": "needs_help"
-                        if any(v not in {"none", "unknown"} for v in attempt["help"].values())
-                        else "unknown",
+                        "working_judgment": working_judgment(
+                            attempt["judgment"], attempt["help"], False, "unknown"
+                        ),
                         "external_help": "unknown",
                         "explanation": "Simulated evaluation from the class record.",
                     }
@@ -83,7 +85,7 @@ class SimulatedAdapter:
                 ],
                 "summary": "Simulated evaluation of the class record; no real model was called.",
                 "strongest": [],
-                "uncertain": ["Working alone, recall and transfer were not observed."],
+                "uncertain": ["Recall and transfer were not observed."],
                 "alignment": "Only what happened.",
             }
         if request.purpose == "vocabulary":
@@ -145,7 +147,10 @@ class SimulatedAdapter:
             return {
                 "suggestion_action": "adopt",
                 "suggestion_reason": "Simulated plan: the suggestion fits the goals and the time.",
-                "direction": "consolidate",
+                # Like a real plan, the simulated one follows the difficulty rule (ADR-0030).
+                "direction": {"up": "advance", "down": "review"}.get(
+                    context["difficulty"]["step"], "consolidate"
+                ),
                 "primary_goal": goals[0],
                 "auxiliary_goal": goals[1],
                 "prerequisites": demand["prerequisites"],
@@ -169,7 +174,7 @@ class SimulatedAdapter:
                     "before": "The current plan and week plan.",
                     "after": "Simulated plan: goals kept, suggestion adopted.",
                     "why": "From the saved evaluation and suggestion; no real model was called.",
-                    "uncertain": ["Working alone, recall and transfer were not observed."],
+                    "uncertain": ["Recall and transfer were not observed."],
                     "expectation": suggestion["sampling"][0],
                 },
             }

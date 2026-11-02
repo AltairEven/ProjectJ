@@ -8,6 +8,24 @@ from project_j.evaluation.scoring import AWAITING, CORRECTED, model_score, score
 from project_j.platform.models.contracts import ModelRequest
 from project_j.preparation.task_types import CONTENT_TYPES
 
+WorkingJudgment = Literal["unknown", "needs_help", "single_independent"]
+RULE_DECIDED = "Decided by the rules from the class record"
+
+
+def working_judgment(
+    task_judgment: str, help_map: dict[str, str], corrected: bool, external: str
+) -> WorkingJudgment:
+    """One try's judgment from the class record (ADR-0030): right with no help is done alone,
+    unless the student said someone helped; outside help never has to be ruled out first."""
+    if corrected:
+        return "unknown"
+    helped = any(level not in {"none", "unknown"} for level in help_map.values())
+    if helped or external == "reported" or task_judgment == "incorrect":
+        return "needs_help"
+    if task_judgment == "correct" and all(level == "none" for level in help_map.values()):
+        return "single_independent"
+    return "unknown"
+
 
 def interpret(
     fact: Document, feedbacks: list[Document], source_revision: int, purpose: str
@@ -23,12 +41,8 @@ def interpret(
             if not correction.get("task_id") or correction["task_id"] == attempt["task_id"]
         ]
         help_map = attempt["help"]
-        judgment = (
-            "needs_help"
-            if any(value not in {"none", "unknown"} for value in help_map.values())
-            else "unknown"
-        )
-        # Correctness of a task never fills unobserved independence, retention or transfer.
+        # Outside help stays unknown until the evaluation reads the student's notes.
+        judgment = working_judgment(attempt["judgment"], help_map, bool(affected), "unknown")
         tasks.append(
             {
                 "task_id": attempt["task_id"],
@@ -36,7 +50,7 @@ def interpret(
                 "task_instance_id": attempt["task_instance_id"],
                 "dimension_id": attempt["dimension_id"],
                 "task_judgment": "unclear" if affected else attempt["judgment"],
-                "working_judgment": "unknown" if affected else judgment,
+                "working_judgment": judgment,
                 "help": help_map,
                 # Scoring-module evidence for read-aloud segments; the model never re-scores it.
                 "pronunciation": attempt.get("pronunciation"),
@@ -62,13 +76,14 @@ def interpret(
         "alignment": {
             "goals_scope": "Only what happened; tasks not done are not made up.",
             "tasks_materials": fact.body["course_ref"],
-            "help_difficulty": "Help and task conditions are kept apart; outside help is unknown.",
+            "help_difficulty": "Help and task conditions are kept apart; outside help counts "
+            "only when you said so.",
             "process": fact.body["end"],
             "time_burden": "Only what happened; pace and workload are judged elsewhere.",
         },
         "limitations": [
             "Technical or simulated sources are not learning evidence.",
-            "Recall, transfer and working alone were not observed.",
+            "Recall and transfer were not observed.",
         ],
         "actual_api": "unverified",
         "actual_voice": "unverified",
@@ -118,9 +133,9 @@ EVALUATION_INSTRUCTIONS = (
     "tasks里有content的choice、order、match、fill题由程序判定对错，open题没有唯一答案；"
     "attempts的answers是学生实际点选、填写或写下的内容。"
     "tasks必须覆盖attempts里的每个attempt_id，每个只出现一次。"
-    "working_judgment：single_independent只用于初答judgment为correct、help里没有任何帮助、"
-    "且学生补记明确说没有额外帮助的尝试；needs_help用于课中有帮助、学生补记了帮助，或答错的尝试；"
-    "其余为unknown。“无额外补充”“Nothing to add”“没观察到”都不等于没有帮助。"
+    "working_judgment：single_independent用于初答judgment为correct、help里没有任何帮助、"
+    "且学生补记没有说有人帮忙的尝试；needs_help用于课中有帮助、学生补记说有人帮了，或答错的尝试；"
+    "其余为unknown。"
     "attempts的visuals是作答前学生页实际显示过的图片或动画：stage为question属于题目材料，"
     "其中带picture_question的是看图题的题图；option是图片选项本身；"
     "story是课文插图，属于故事本身，不是帮助；help属于帮助、随help说明；"
@@ -138,9 +153,9 @@ EVALUATION_INSTRUCTIONS = (
 
 class TaskReading(Contract):
     attempt_id: str
-    working_judgment: Literal["unknown", "needs_help", "single_independent"]
+    working_judgment: WorkingJudgment  # A proposal; the rules decide (ADR-0030).
     external_help: Literal["none", "reported", "unknown"]
-    help_quote: str = ""  # The parent's words, verbatim.
+    help_quote: str = ""  # The student's notes, verbatim.
     explanation: str = Field(min_length=1)
 
 
@@ -248,24 +263,13 @@ def apply_draft(base: dict, draft: EvaluationDraft, feedbacks: list[dict]) -> di
         if external != "unknown" and not (quote and any(quote in text for text in said)):
             external = "unknown"
             reasons.append("Outside help was not quoted word for word from your notes; unknown")
-        helped = any(level not in {"none", "unknown"} for level in task["help"].values())
-        judgment = reading.working_judgment
-        if task["corrections"]:
-            if judgment != "unknown":
-                reasons.append(CORRECTED)
-            judgment = "unknown"
-        elif judgment == "single_independent" and not (
-            task["task_judgment"] == "correct"
-            and all(level == "none" for level in task["help"].values())
-            and external == "none"
-        ):
-            reasons.append("Not enough to call it done alone")
-            judgment = "unknown"
-        elif judgment == "needs_help" and not (
-            helped or external == "reported" or task["task_judgment"] == "incorrect"
-        ):
-            reasons.append("No evidence that help was needed")
-            judgment = "unknown"
+        proposed = reading.working_judgment
+        corrected = bool(task["corrections"])
+        judgment = working_judgment(task["task_judgment"], task["help"], corrected, external)
+        if corrected and proposed != "unknown":
+            reasons.append(CORRECTED)
+        elif proposed != judgment:
+            reasons.append(RULE_DECIDED)
         help_map = dict(task["help"])
         if judgment == "single_independent":
             help_map[task["dimension_id"]] = "none"  # learning requires it for independence
