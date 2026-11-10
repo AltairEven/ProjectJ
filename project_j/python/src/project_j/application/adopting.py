@@ -6,7 +6,7 @@ from dataclasses import replace
 
 from project_j.application.documents import identity, publication, successor
 from project_j.application.ledger import Step
-from project_j.application.progress import lesson_score_summary
+from project_j.application.progress import evaluation_job, lesson_score_summary
 from project_j.contracts import Document, RevisionRef
 from project_j.curriculum.corrections import release_rechecked
 from project_j.english import chinese
@@ -113,6 +113,11 @@ class Adopting:
                 )
             )
             activity_id = evaluation.body["activity_id"]
+            if self.source_revision(activity_id, learner_id)[0] != current_revision:
+                # A report arrived while planning: this plan is from the old source and is never
+                # published; the new evaluation plans again (design/shared/execution-recovery.md).
+                log.info("planning activity=%s superseded", activity_id)
+                return self.ledger.finish(operation, learner_id, {"superseded": True})
             if not result.ok:
                 log.warning("planning activity=%s failure=%s", activity_id, result.failure)
                 raise PlanningUnavailable(result.failure)
@@ -443,6 +448,10 @@ class Adopting:
         demand = self.current(learner_id, "demand")
         if demand.ref != demand_ref or demand.body.get("topic"):
             raise Conflict("This plan no longer needs a choice. Please refresh.", demand.ref)
+        if evaluation_job(self, learner_id) is not None:
+            # A newer evaluation plans this demand again first; its topic would be dropped.
+            log.info("focus refused reason=planning")
+            raise Conflict("Jane is still planning the next lesson. Please wait.", demand.ref)
         chosen = DemandBody.model_validate(
             demand.body
             | {

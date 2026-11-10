@@ -213,6 +213,91 @@ def test_a_correction_after_acknowledgement_is_rechecked_and_released(applicatio
     asyncio.run(scenario())
 
 
+async def acknowledged_lesson(app):
+    """A taught lesson evaluated after class and acknowledged, as in the study space."""
+    core, _ = await complete_story(app)
+    evaluation = await app.evaluate("evaluate", LEARNER, core.activity_id, "after_class")
+    app.acknowledge("ack", LEARNER, core.activity_id, evaluation.ref)
+    return core.activity_id, evaluation
+
+
+def correct(app, activity):
+    note = {"note": "有家长辅助"}
+    app.feedback("correction", LEARNER, activity, "有家长辅助", corrections=(note,))
+
+
+def test_a_correction_during_planning_keeps_the_stale_plan_unpublished(application, caplog):
+    """2026-11-09: the plan of the evaluation the correction replaced was published and the
+    correction's restrictions released as if checked against it."""
+    app = application
+
+    async def scenario():
+        activity, evaluation = await acknowledged_lesson(app)
+        before = app.current(LEARNER, "demand").ref
+        planning = app.models.run
+
+        async def correction_arrives(request):
+            correct(app, activity)  # The student's correction lands while the model plans.
+            return await planning(request)
+
+        app.models.run = correction_arrives
+        with caplog.at_level(logging.INFO, logger="project_j"):
+            result = await app.adopt("adopt-v1", LEARNER, evaluation)
+        app.models.run = planning
+        assert result == {"superseded": True}
+        assert app.current(LEARNER, "demand").ref == before
+        assert restricted_in_use(app)
+        assert f"planning activity={activity} superseded" in caplog.text
+        calls = len(app.models.calls)
+        assert await app.adopt("adopt-v1", LEARNER, evaluation) == result
+        assert len(app.models.calls) == calls
+        await jobs_done(app)
+        step = next_step(app, LEARNER)
+        assert step["kind"] == "evaluation" and step["subject"]["corrected"] is True
+        corrected = ref(step["subject"]["evaluation_ref"])
+        app.acknowledge("ack-again", LEARNER, activity, corrected)
+        await jobs_done(app)
+        assert corrected in app.current(LEARNER, "demand").source_refs
+        assert not restricted_in_use(app)
+        evidence = [
+            doc.body["recheck_evidence"]
+            for doc in app.store.list_current(LEARNER, "restriction")
+            if doc.body["restriction_state"] == "resolved"
+        ]
+        assert not any("version 1;" in text for text in evidence)
+
+    asyncio.run(scenario())
+
+
+def test_the_topic_is_asked_only_after_the_newer_evaluation_is_planned(application, caplog):
+    """2026-11-09: the topic was offered for the demand a running replan was about to replace."""
+    app = application
+
+    async def scenario():
+        activity, evaluation = await acknowledged_lesson(app)
+        await app.adopt("adopt-v1", LEARNER, evaluation)
+        stale = app.current(LEARNER, "demand")
+        assert next_step(app, LEARNER)["kind"] == "focus"
+        correct(app, activity)
+        assert next_step(app, LEARNER)["kind"] != "focus"  # Evaluated again first.
+        await jobs_done(app)
+        step = next_step(app, LEARNER)
+        app.acknowledge("ack-again", LEARNER, activity, ref(step["subject"]["evaluation_ref"]))
+        assert next_step(app, LEARNER)["kind"] != "focus"  # Planned again first.
+        with caplog.at_level(logging.INFO, logger="project_j"):
+            with pytest.raises(Conflict, match="still planning"):
+                app.choose_focus("early", LEARNER, stale.ref, "Link Plays a Song", [], None)
+        assert "focus refused reason=planning" in caplog.text
+        await jobs_done(app)
+        step = next_step(app, LEARNER)
+        assert step["kind"] == "focus" and step["subject"]["demand_ref"] != stale.ref.model_dump()
+        demand = ref(step["subject"]["demand_ref"])
+        app.choose_focus("focus", LEARNER, demand, "Link Plays a Song", [], None)
+        assert app.current(LEARNER, "demand").body["topic"] == "Link Plays a Song"
+
+    asyncio.run(scenario())
+
+
 def test_a_correction_of_an_older_lesson_is_evaluated_again_and_rechecked(application, caplog):
     app = application
 
@@ -496,8 +581,14 @@ def test_E2E06_rechecking_an_older_lesson_keeps_newer_evidence_and_the_lesson_or
 
     async def scenario():
         first, second, _ = await correct_first_lesson_after_a_second(app)
-        result = await next_course(app, "recheck1", LEARNER, first.activity_id)
-        state = app.store.read(ref(result["adoption"]["state_ref"]), LEARNER)
+        # As the service does: evaluate C1 again, acknowledge, recheck, prepare.
+        await jobs_done(app)
+        step = next_step(app, LEARNER)
+        app.acknowledge(
+            "ack-c1", LEARNER, first.activity_id, ref(step["subject"]["evaluation_ref"])
+        )
+        await jobs_done(app)
+        state = app.current(LEARNER, "state")
         dims = {item["dimension_id"]: item for item in state.body["dimensions"]}
         later = app.store.current(identity(second.body["activity_id"], "evaluation"), LEARNER)
         reading = dims["english.reading.facts"]
@@ -510,7 +601,9 @@ def test_E2E06_rechecking_an_older_lesson_keeps_newer_evidence_and_the_lesson_or
         assert speaking["judgment"] == "single_independent"
         assert speaking["evidence_refs"] == [rechecked.ref.model_dump()]
         # The next lesson still follows the latest one (C2 Ben), not the corrected C1.
-        course = app.store.read(ref(result["next_package"]["course_ref"]), LEARNER).body
+        step = next_step(app, LEARNER)
+        assert step["kind"] == "course"
+        course = app.store.read(ref(step["subject"]["course_ref"]), LEARNER).body
         assert course["tasks"][0]["prompt"] == "What does Mia want to make?"
         assert course["lesson_type"] == "review"
 

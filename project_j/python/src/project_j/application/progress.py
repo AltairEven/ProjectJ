@@ -324,7 +324,12 @@ def next_step(app, learner_id: str) -> dict:
                 "proposed_capabilities": demand.body.get("proposed_capabilities", []),
             },
         }
-    if focus_needed(demand) and lesson(app, learner_id) is None:
+    # Not while a newer evaluation still has to plan this demand again (2026-11-09).
+    if (
+        focus_needed(demand)
+        and lesson(app, learner_id) is None
+        and evaluation_job(app, learner_id) is None
+    ):
         account = app.store.current(identity(learner_id, "profile"), learner_id)
         account = account.body if account else {}
         return {
