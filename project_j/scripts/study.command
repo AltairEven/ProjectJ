@@ -10,4 +10,13 @@ if [ -n "$pids" ]; then
   esac
   exit 1
 fi
-exec "$(dirname -- "$0")/start.sh" --study --run-id me --open
+here=$(dirname -- "$0")
+# Diagnostics (standard error, metadata only) are also kept in a local file; standard output,
+# with the page link and its token, stays on the screen. The copy ignores Ctrl+C and the window
+# closing, so it keeps the lines the service writes while it stops and seals.
+logs="$(CDPATH='' cd -- "$here/.." && pwd)/private/logs"
+mkdir -p -m 700 "$logs"
+log="$logs/study-me-$(date -u +%Y%m%dT%H%M%SZ).log"
+echo "诊断日志另存：$log"
+{ "$here/start.sh" --study --run-id me --open 2>&1 1>&3 3>&- |
+  (trap '' HUP INT TERM PIPE; umask 077; exec tee -a "$log" >&2); } 3>&1

@@ -1,6 +1,6 @@
 # Project J 开发环境搭建
 
-版本：1.2.0；更新：2026年10月28日。
+版本：1.2.1；更新：2026年11月10日。
 
 在一台新Mac上从零搭好开发与正式学习环境，或从旧电脑迁移过来。本文只排顺序；登记检查以[AGENTS](../AGENTS.md)为准，初始化细节与继续条件见[技术选型](technology.md)，两者与本文不一致时以它们为准。所有命令都从仓库根运行。
 
@@ -75,7 +75,7 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python projec
 
 ## 6. 启动
 
-- 正式学习：双击`project_j/scripts/study.command`（可拖到程序坞右侧单击），以运行编号me启动，服务开始监听后自动打开页面；也可用`project_j/scripts/start.sh --study --run-id <id>`，见[正式学习入口](technology.md#正式学习入口)。停止时在终端按Ctrl+C或关闭终端窗口，进行中的课按中断封存。
+- 正式学习：双击`project_j/scripts/study.command`（可拖到程序坞右侧单击），以运行编号me启动，服务开始监听后自动打开页面；也可用`project_j/scripts/start.sh --study --run-id <id>`，见[正式学习入口](technology.md#正式学习入口)。停止时在终端按Ctrl+C或关闭终端窗口，进行中的课按中断封存。双击启动时诊断日志另存在`project_j/private/logs/`，每次启动一个文件。
 - 模拟运行：`project_j/scripts/start.sh`，使用终端输出的链接。
 - 课堂沙盒：`npm run --prefix project_j/web sandbox`后打开http://127.0.0.1:5174/，不连后端、不保存数据。
 

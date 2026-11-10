@@ -1,6 +1,10 @@
 import asyncio
 import base64
+import os
+import signal
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -264,3 +268,50 @@ def test_onboarding_switch_is_for_simulation_only():
     with pytest.raises(SystemExit) as stop:
         main(["--study", "--onboarding"])
     assert stop.value.code == 2
+
+
+STUDY_COMMAND = Path(__file__).parents[2] / "scripts/study.command"
+FAKE_SERVICE = """import logging, signal, sys, time
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+stop = []
+signal.signal(signal.SIGINT, lambda *a: stop.append(1))
+print("正式学习：http://127.0.0.1:4242/#token=SECRET", flush=True)
+logging.info("service started args=%s", " ".join(sys.argv[1:]))
+while not stop:
+    time.sleep(0.05)
+logging.info("sealed after stop")
+"""
+
+
+def test_study_command_keeps_diagnostics_but_not_the_token_in_a_local_file(tmp_path):
+    """2026-11-10: the study logs lived only in the terminal and were lost with its window."""
+    scripts, tools = tmp_path / "project_j/scripts", tmp_path / "bin"
+    scripts.mkdir(parents=True)
+    tools.mkdir()
+    (scripts / "study.command").write_text(STUDY_COMMAND.read_text())
+    (tmp_path / "service.py").write_text(FAKE_SERVICE)
+    (scripts / "start.sh").write_text(f'#!/bin/sh\nexec "{sys.executable}" ../../service.py "$@"\n')
+    (tools / "lsof").write_text("#!/bin/sh\nexit 1\n")  # Port 4242 is free here.
+    for path in (scripts / "start.sh", tools / "lsof"):
+        path.chmod(0o755)
+    process = subprocess.Popen(
+        ["sh", "study.command"],
+        cwd=scripts,
+        env=os.environ | {"PATH": f"{tools}:{os.environ['PATH']}"},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    logs = tmp_path / "project_j/private/logs"
+    deadline = time.monotonic() + 10
+    while not any("service started" in p.read_text() for p in logs.glob("*.log")):
+        assert time.monotonic() < deadline
+        time.sleep(0.05)
+    os.killpg(process.pid, signal.SIGINT)  # Ctrl+C reaches the whole group, the copy too.
+    out, err = (stream.decode() for stream in process.communicate(timeout=10))
+    (log,) = logs.glob("study-me-*.log")
+    text = log.read_text()
+    assert "service started args=--study --run-id me --open" in text and "sealed after stop" in text
+    assert "SECRET" not in text and "token=SECRET" in out  # The link stays on the screen only.
+    assert "sealed after stop" in err and str(log) in out
+    assert log.stat().st_mode & 0o777 == 0o600 and logs.stat().st_mode & 0o777 == 0o700
