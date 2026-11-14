@@ -233,7 +233,7 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
 .reading .illustration img { display: block; width: 100%; height: auto; border: 5px solid #fff; box-shadow: 0 2px 7px #22313b29; }
 .zoom { padding: 0; border: 0; background: transparent; cursor: zoom-out; }
 .zoom::backdrop { background: #22313bb3; }
-.zoom img { display: block; max-width: 90vw; max-height: 85vh; border: 7px solid #fff; }
+.zoom img { display: block; border: 7px solid #fff; }
 .reading li::before { content: counter(paragraph); position: absolute; left: -40px; width: 24px; top: .45em; text-align: right; font-family: var(--ui); font-size: 12px; font-weight: 700; line-height: 1; color: var(--muted); }
 
 .notebook section + section { border-top: 1px solid var(--rule); padding-top: 16px; }

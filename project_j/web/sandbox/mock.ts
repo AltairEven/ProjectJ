@@ -278,8 +278,9 @@ const picture = (name: string) => new Response(`<svg xmlns="http://www.w3.org/20
   <circle cx="380" cy="150" r="70" fill="#6f9e5c" opacity=".85"/><text x="20" y="380" font-family="sans-serif" font-size="20" fill="#3d4b55">${name}</text></svg>`,
 { headers: { 'content-type': 'image/svg+xml' } })
 
-// A looping animation for a story picture: leaves swaying in front of the sensor's window.
-const motion = () => new Response(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
+// A looping animation for a story picture: leaves swaying in front of the sensor's window. Like
+// generated ones, only a viewBox: no size of its own.
+const motion = () => new Response(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400">
   <rect width="640" height="400" fill="#e8efe4"/><rect x="290" y="120" width="40" height="230" fill="#8a6a4a"/>
   <rect x="270" y="150" width="80" height="50" rx="6" fill="#3d4b55"/><circle cx="310" cy="175" r="12" fill="#9fd3f0"/>
   <g><ellipse cx="330" cy="170" rx="60" ry="28" fill="#6f9e5c" opacity=".9"/>

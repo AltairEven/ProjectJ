@@ -134,6 +134,9 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
   const localCancelled = presentationCancelled(cancellation, snapshot)
   // A pause typed or spoken as an answer reaches the core without the local cancel path.
   const halted = localCancelled || snapshot?.mode === 'paused'
+  // Jane's words closing a task leave nothing to answer: input then would stop her, move the class
+  // on and reach the next question before it is asked (2026-11-14: a second click on an answer).
+  const movingOn = snapshot?.pending_action?.after_delivery === 'next_task'
   useEffect(() => {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const socket = new WebSocket(`${protocol}//${location.host}/api/class/events`, `project-j.${token}`)
@@ -352,7 +355,9 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
   useEffect(() => report('story', storyIds, story.outcomes))
   // Words take over at the first failure: the pictures not yet shown never will be.
   useEffect(() => report('options', optionIds, options.outcomes, optionState !== 'loading'))
-  const [zoom, setZoom] = useState('')
+  // Sized from the thumbnail's shape: an SVG with only a viewBox has no size of its own and
+  // collapsed to its border in the dialog (2026-11-14).
+  const [zoom, setZoom] = useState<{ url: string, ratio: number }>()
   const zoomBox = useRef<HTMLDialogElement>(null)
   // The enlarged picture closes with its story; closing clears it.
   useEffect(() => { if (!storyIds.length) zoomBox.current?.close() }, [storyIds.length])
@@ -360,7 +365,10 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     const item = illustrations.find(entry => entry.paragraph === paragraph)
     const url = item && story.urls[item.resource_id]
     if (!item || !url || story.outcomes[item.resource_id] === false) return null
-    return <figure className="illustration"><button type="button" className="picture" aria-label="Enlarge the picture" onClick={() => { setZoom(url); zoomBox.current?.showModal() }}>
+    return <figure className="illustration"><button type="button" className="picture" aria-label="Enlarge the picture" onClick={event => {
+      const thumbnail = event.currentTarget.firstElementChild as HTMLImageElement
+      setZoom({ url, ratio: thumbnail.clientWidth / thumbnail.clientHeight }); zoomBox.current?.showModal()
+    }}>
       <img src={url} alt="A picture for this part of the story" onLoad={() => story.settle(item.resource_id, true)}
         onError={() => story.settle(item.resource_id, false)} /></button></figure>
   }
@@ -396,7 +404,7 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
           {!localCancelled && !voicing && (busy || snapshot?.mode === 'judging') && <Progress label="Jane is reading your answer…" />}
           {voiced && locked && <button onClick={() => void speaker.current?.resume().then(() => setLocked(false))}>Turn on sound</button>}
           {snapshot && snapshot.mode !== 'offscreen' && snapshot.mode !== 'ended' && <div className="row">
-            {mode !== 'task' && mode !== 'story' && <button className="quiet" disabled={busy || halted} onClick={() => void input('Help me, please.', 'help')}>Help me</button>}
+            {mode !== 'task' && mode !== 'story' && <button className="quiet" disabled={busy || halted || movingOn} onClick={() => void input('Help me, please.', 'help')}>Help me</button>}
             <button className="quiet" disabled={halted} onClick={() => void control('repeat')}>Say it again</button></div>}</div></section>
         {/* The words marked while reading, below Jane: meanings arrive after "I've finished reading". */}
         {!localCancelled && snapshot && snapshot.task_index >= 0 && <VocabularyBox token={token} entries={vocabulary} busy={busy}
@@ -437,13 +445,13 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
           {!voiced && <label>Simulated reading (no microphone; it only goes to scoring)<textarea value={readingText} onChange={event => setReadingText(event.target.value)} disabled={halted} /></label>}
           <p>{{ idle: 'Not started', recording: 'Recording', paused: 'Paused' }[recorder.state]}</p>
           <div className="row">
-            {recorder.state === 'idle' && <button disabled={busy || halted} onClick={() => void beginReading()}>Start recording</button>}
+            {recorder.state === 'idle' && <button disabled={busy || halted || movingOn} onClick={() => void beginReading()}>Start recording</button>}
             {recorder.state === 'recording' && <button className="quiet" onClick={() => { microphone.current?.pause(); setRecorder(pauseRecording(recorder, performance.now())) }}>Pause recording</button>}
             {recorder.state === 'paused' && <button className="quiet" onClick={() => { microphone.current?.resume(); setRecorder(resumeRecording(recorder, performance.now())) }}>Resume recording</button>}
             {recorder.state !== 'idle' && <><button disabled={busy} onClick={() => void finishReading(performance.now())}>Finish and submit</button>
               <button className="quiet" onClick={() => { microphone.current?.discard(); setRecorder(idle) }}>Record again</button></>}
           </div></section>}
-        {mode === 'task' && snapshot ? <TaskInput key={snapshot.task_instance_id} task={snapshot.task as TaskView} disabled={busy || halted}
+        {mode === 'task' && snapshot ? <TaskInput key={snapshot.task_instance_id} task={snapshot.task as TaskView} disabled={busy || halted || movingOn}
           pictures={optionIds.length ? { urls: optionIds.map(id => options.urls[id]), state: optionState, onLoad: (index, displayed) => options.settle(optionIds[index], displayed) } : undefined}
           onSubmit={response => void respond({ intent: 'answer', response })} onHint={() => void respond({ intent: 'help' })} /> :
           // Reading the story alone, timed by the class (ADR-0022); no seconds are shown.
@@ -455,9 +463,9 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
           snapshot?.mode === 'offscreen' ? <section><p>Nothing is recorded while you are away. When you come back, tell Jane what you did and what happened; coming back alone does not finish it.</p><button onClick={() => void control('return')}>I'm back: report</button></section> :
           // Free text only when the class waits for words; a read-aloud task has its recording section alone.
           mode === 'text' && snapshot && <section><label>{voiced ? 'Your answer or report' : 'Your answer or report (simulation)'}<textarea value={text} onChange={event => setText(event.target.value)} disabled={localCancelled} /></label>
-            <div className="row"><button disabled={busy || !text.trim() || halted || Boolean(reading)} onClick={() => void input(text)}>Submit</button>
+            <div className="row"><button disabled={busy || !text.trim() || halted || movingOn || Boolean(reading)} onClick={() => void input(text)}>Submit</button>
               {canConfirm(snapshot) && setAside === confirming && <button className="quiet" disabled={busy || halted} onClick={confirm}>Yes, I heard</button>}
-              <button className="quiet" disabled={!lastInput || !text.trim() || halted} onClick={() => void input(text, 'unknown', true)}>I'm not done: add more</button></div></section>}
+              <button className="quiet" disabled={!lastInput || !text.trim() || halted || movingOn} onClick={() => void input(text, 'unknown', true)}>I'm not done: add more</button></div></section>}
         {snapshot?.mode === 'ended' && <section><h2>The class is over</h2>{snapshot.end && <p>How it ended: {endLabels[String(snapshot.end.reason)] ?? String(snapshot.end.reason)}.</p>}<p>Only what happened is kept; your evaluation comes next by itself.</p><button onClick={onLeave}>Back to home</button></section>}
         <p className="hint">{voiced ? 'Listen to Jane first; her words show after she speaks. Reading aloud is scored on this computer and not saved.' : 'Text simulation; nothing is recorded or played.'}</p>
       </div>
@@ -466,8 +474,8 @@ export default function Classroom({ token, onLeave }: { token: string, onLeave: 
     {picked && <button type="button" className="word-pop" style={{ left: picked.x, top: picked.y + 6 }} onMouseDown={event => event.preventDefault()}
       onClick={() => { void markWord(picked.word, picked.sentence); document.getSelection()?.removeAllRanges() }}>
       {markedWords.has(picked.word.toLowerCase()) ? 'Remove from vocabulary' : 'Add to vocabulary'}</button>}
-    <dialog ref={zoomBox} className="zoom" onClose={() => setZoom('')} onClick={() => zoomBox.current?.close()}>
-      {zoom && <img src={zoom} alt="The story picture, enlarged" />}</dialog>
+    <dialog ref={zoomBox} className="zoom" onClose={() => setZoom(undefined)} onClick={() => zoomBox.current?.close()}>
+      {zoom && <img src={zoom.url} style={{ width: `min(90vw, ${85 * zoom.ratio}vh)` }} alt="The story picture, enlarged" />}</dialog>
     <dialog ref={askBox} className="confirm-box" onClose={() => setChecking(null)}>
       {checking && <><h2>{questions[checking][0]}</h2><p>{questions[checking][1]}</p>
         <div className="row"><button className={checking === 'stop' ? 'danger' : undefined} onClick={() => { const command = checking; askBox.current?.close(); void control(command) }}>Yes</button>
