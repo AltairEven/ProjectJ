@@ -114,6 +114,23 @@ SKILLS: dict[str, tuple[str, str, str]] = {
     "questions": ("Sentences", "Questions", "Word order in yes/no and wh- questions"),
 }
 MAX_FOCUS = 3
+# What a lesson's text may be: id -> (name the student sees, how it is written). Every form is
+# written in whole sentences, so reading aloud and word-for-word evidence work for all of them.
+FORMS: dict[str, tuple[str, str]] = {
+    "story": ("Story", "A short story with a small problem or a surprise, and how it ends"),
+    "dialogue": ("Talk", "A scene told mostly by what two people say; they want different things"),
+    "letter": ("Letter", "A letter or message from one person to another, with what they think"),
+    "diary": ("Diary", "A diary page: I tell my day, what I did and how I felt"),
+    "fact_page": ("Fact page", "Facts about a place, a creature or a thing; no plot"),
+    "how_to": ("How-to", "How to make or do something, step by step"),
+    "interview": ("Interview", "Someone asks a person questions and the person answers"),
+}
+RECENT_FORMS = 2  # A new text does not take the form of the last two lessons.
+
+
+def recent_forms(stories: list[dict]) -> list[str]:
+    """The forms of the last RECENT_FORMS stories (newest first); an older lesson has none."""
+    return [item["form"] for item in stories[:RECENT_FORMS] if item.get("form")]
 
 
 class FocusSuggestion(Contract):
@@ -129,6 +146,7 @@ class TopicSuggestion(Contract):
 
     title: Topic
     reason: Text
+    form: str | None = None  # A FORMS id; None for a topic listed before forms existed.
 
 
 class DemandBody(Contract):
@@ -162,6 +180,8 @@ class DemandBody(Contract):
     focus_suggestions: tuple[FocusSuggestion, ...] = Field(default=(), max_length=2)
     # The story topic the student picked or wrote for this lesson; None not chosen yet.
     topic: Topic | None = None
+    # The form of the picked topic; None for the student's own topic (preparation picks one).
+    form: str | None = None
     topic_suggestions: tuple[TopicSuggestion, ...] = Field(default=(), max_length=4)
 
     @model_validator(mode="after")

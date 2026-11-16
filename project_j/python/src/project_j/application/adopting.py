@@ -17,6 +17,7 @@ from project_j.learning.contracts import (
     DemandBody,
     ProfileBody,
     challenge_of,
+    recent_forms,
 )
 from project_j.learning.maintenance import LEVELS
 from project_j.learning.onboarding import revised
@@ -25,6 +26,7 @@ from project_j.learning.planning import (
     apply_demand_draft,
     demand_request,
     difficulty_step,
+    fixed_wording,
     week_plan_after,
 )
 from project_j.platform.storage import (
@@ -95,6 +97,7 @@ class Adopting:
             course = self.lesson_course(learner_id, evaluation)
             step = difficulty(evaluation, course)
             self.models.require()
+            stories = self.recent_stories(learner_id)
             result = await self.models.run(
                 demand_request(
                     evaluation.body,
@@ -107,9 +110,10 @@ class Adopting:
                     catalog,
                     suggestion.body,
                     old.body,
-                    self.recent_titles(learner_id),
+                    [item["title"] for item in stories],
                     lesson_score_summary(self, learner_id, "planning"),
                     course=course,
+                    recent_forms=recent_forms(stories),
                 )
             )
             activity_id = evaluation.body["activity_id"]
@@ -155,6 +159,7 @@ class Adopting:
                     suggestion.ref,
                     plan_adjusted=adjusted is not None,
                     step=step,
+                    recent_forms=recent_forms(stories),
                 )
             except PlanningUnavailable as error:
                 log.warning("planning activity=%s rejected: %s", activity_id, error)
@@ -197,7 +202,8 @@ class Adopting:
                 baselines=baselines,
             )
             log.info(
-                "planning activity=%s goals=%s/%s direction=%s action=%s plan_effect=%s topics=%d",
+                "planning activity=%s goals=%s/%s direction=%s action=%s plan_effect=%s topics=%d "
+                "topic_forms=%d topics_dropped=%d fixed_wording=%d",
                 activity_id,
                 data.primary_goal.dimension_id,
                 data.auxiliary_goal.dimension_id,
@@ -205,6 +211,9 @@ class Adopting:
                 result.output.suggestion_action,
                 data.plan_effect,
                 len(data.topic_suggestions),
+                sum(item.form is not None for item in data.topic_suggestions),
+                len(result.output.topic_suggestions) - len(data.topic_suggestions),
+                fixed_wording(data),
             )
         body = demand[0].body
         release_rechecked(self, operation, learner_id, evaluation)
@@ -452,10 +461,20 @@ class Adopting:
             # A newer evaluation plans this demand again first; its topic would be dropped.
             log.info("focus refused reason=planning")
             raise Conflict("Jane is still planning the next lesson. Please wait.", demand.ref)
+        # A listed topic brings its form; the student's own topic leaves it to preparation.
+        form = next(
+            (
+                item.get("form")
+                for item in demand.body.get("topic_suggestions", [])
+                if item["title"] == topic.strip()
+            ),
+            None,
+        )
         chosen = DemandBody.model_validate(
             demand.body
             | {
                 "topic": topic.strip(),
+                "form": form,
                 "skill_focus": list(skills),
                 "skill_note": (note or "").strip() or None,
             }
@@ -505,8 +524,9 @@ class Adopting:
             )
         listed = chosen.topic in {item.title for item in chosen.topic_suggestions}
         log.info(
-            "focus chosen topic=%s skills=%d note=%s challenge=%s changed=%s",
+            "focus chosen topic=%s form=%s skills=%d note=%s challenge=%s changed=%s",
             "suggested" if listed else "own",
+            chosen.form or "none",
             len(skills),
             chosen.skill_note is not None,
             challenge or "kept",
@@ -539,6 +559,7 @@ class Adopting:
         }
         course = self.lesson_course(learner_id, evaluation)
         step = difficulty(evaluation, course)
+        stories = self.recent_stories(learner_id)
         request = demand_request(
             evaluation.body,
             self.store.read(body.state_ref, learner_id).body,
@@ -547,9 +568,10 @@ class Adopting:
             catalog,
             self.store.read(choice.suggestion_ref, learner_id).body,
             previous.model_dump(mode="json"),
-            self.recent_titles(learner_id),
+            [item["title"] for item in stories],
             lesson_score_summary(self, learner_id, "planning"),
             course=course,
+            recent_forms=recent_forms(stories),
         )
         self.models.require()
         result = await self.models.run(
@@ -577,6 +599,7 @@ class Adopting:
                 choice.suggestion_ref,
                 plan_adjusted=False,
                 step=step,
+                recent_forms=recent_forms(stories),
             )
         except PlanningUnavailable as error:
             log.warning("planning activity=%s rejected: %s", evaluation.body["activity_id"], error)

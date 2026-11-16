@@ -17,7 +17,7 @@ from project_j.contracts import RevisionRef
 from project_j.curriculum.corrections import active_restrictions, correction_restrictions
 from project_j.evaluation.scoring import recent_scores
 from project_j.learning.adoption import review_due
-from project_j.learning.contracts import SKILLS, challenge_of
+from project_j.learning.contracts import FORMS, SKILLS, challenge_of
 from project_j.learning.maintenance import review
 from project_j.learning.onboarding import (
     QUESTIONS,
@@ -341,7 +341,10 @@ def next_step(app, learner_id: str) -> dict:
                     for skill, (group, label, _) in SKILLS.items()
                 ],
                 "suggestions": list(demand.body.get("focus_suggestions", [])),
-                "topics": list(demand.body.get("topic_suggestions", [])),
+                "topics": [
+                    item | {"form_label": FORMS.get(item.get("form"), (None,))[0]}
+                    for item in demand.body.get("topic_suggestions", [])
+                ],
                 "challenge": challenge_of(account),  # How hard the story is (ADR-0023).
                 "targets": targets(account.get("lexile")),
             },

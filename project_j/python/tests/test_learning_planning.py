@@ -8,7 +8,7 @@ from support import LEARNER, complete_story, next_course, wait_jobs
 from project_j.application.documents import identity
 from project_j.application.progress import advance, retry
 from project_j.contracts import RevisionRef
-from project_j.learning.contracts import DemandBody
+from project_j.learning.contracts import FORMS, DemandBody
 from project_j.learning.maintenance import review
 from project_j.learning.planning import (
     PLANNING_INSTRUCTIONS,
@@ -374,7 +374,11 @@ def test_planning_lists_topics_for_the_student(application, monkeypatch, caplog)
     activity = taught(application)
     adapter = application.models.adapters["simulated"]
     original, seen = adapter.respond, []
-    topics = [{"title": f"Zelda angle {n}", "reason": f"Interest {n}"} for n in range(5)]
+    forms = ["letter", "dialogue", "diary", "fact_page", "how_to"]
+    topics = [
+        {"title": f"Zelda angle {n}", "reason": f"Interest {n}", "form": form}
+        for n, form in enumerate(forms)
+    ]
 
     def respond(request):
         reply = original(request)
@@ -390,7 +394,11 @@ def test_planning_lists_topics_for_the_student(application, monkeypatch, caplog)
     assert demand["topic_suggestions"] == topics[:4] and demand["topic"] is None
     assert seen[0].context["recent_titles"] == ["The Paper Bridge"]
     assert "topic_suggestions" in seen[0].instructions and "3–4个" in seen[0].instructions
-    assert "topics=4" in caplog.text
+    assert seen[0].context["recent_forms"] == []  # The library story names no form.
+    assert [item["form_id"] for item in seen[0].context["story_forms"]] == list(FORMS)
+    for words in ("form互不相同", "不是要延续的模板", "不写蓝思值"):
+        assert words in seen[0].instructions
+    assert "topics=4 topic_forms=4 topics_dropped=1 fixed_wording=" in caplog.text
     assert not any(item["title"] in caplog.text or item["reason"] in caplog.text for item in topics)
 
 
@@ -422,7 +430,45 @@ def test_a_long_topic_is_dropped_without_voiding_the_plan(application, monkeypat
 
     monkeypatch.setattr(adapter, "respond", respond)
     asyncio.run(application.adopt("adopt1", LEARNER, evaluation_of(application, activity)))
-    assert application.current(LEARNER, "demand").body["topic_suggestions"] == topics[1:]
+    kept = application.current(LEARNER, "demand").body["topic_suggestions"]
+    assert kept == [topics[1] | {"form": None}]
+
+
+def test_offered_topics_take_different_forms_not_the_recent_ones():
+    from project_j.learning.planning import TopicDraft, offered_topics
+
+    drafts = [
+        TopicDraft(title=title, reason="r", form=form)
+        for title, form in [
+            ("A", "letter"),
+            ("B", "letter"),  # The list already has a letter.
+            ("C", "diary"),  # A recent lesson was a diary.
+            ("D", "poem"),  # Not a known form: kept without one.
+            ("E", None),
+            ("F", "dialogue"),
+        ]
+    ]
+    kept = offered_topics(drafts, ["diary"])
+    assert [(item.title, item.form) for item in kept] == [
+        ("A", "letter"),
+        ("D", None),
+        ("E", None),
+        ("F", "dialogue"),
+    ]
+
+
+def test_fixed_wording_is_counted_not_refused(application):
+    from project_j.learning.planning import fixed_wording
+
+    body = DemandBody.model_validate(application.current(LEARNER, "demand").body)
+    worded = body.model_copy(
+        update={
+            "prerequisites": ("Use a short story near 219L.", "Keep the story open."),
+            "sampling_requirements": ("Ask what happens first and the three end steps.",),
+        }
+    )
+    assert fixed_wording(worded) == 2
+    assert fixed_wording(worded.model_copy(update={"prerequisites": ()})) == 1
 
 
 def test_a_plan_with_chinese_fails(application, monkeypatch, caplog):
@@ -631,3 +677,13 @@ def test_a_direction_against_the_rule_is_logged_and_not_saved(application, monke
 def test_planning_instructions_ask_for_targets_not_question_lists():
     assert "不写具体题目、题干、题数或题型分布" in PLANNING_INSTRUCTIONS
     assert "difficulty优先于suggestion里的方向" in PLANNING_INSTRUCTIONS
+
+
+def test_recent_stories_carry_title_form_and_text_and_log_only_counts(application, caplog):
+    taught(application)
+    caplog.set_level(logging.INFO, logger="project_j")
+    (story,) = application.recent_stories(LEARNER)
+    assert story["title"] == "The Paper Bridge" and story["form"] is None
+    assert "paper" in story["story"] and not story["story"].startswith("#")
+    assert "preparation recent stories=1 texts=1 forms=0" in caplog.text
+    assert story["story"][:40] not in caplog.text and "Paper Bridge" not in caplog.text

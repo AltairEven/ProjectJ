@@ -9,7 +9,7 @@ import { JobLine, Rows, useRun, type PageProps } from '../ui'
 
 type Skill = { skill_id: string, group: string, label: string }
 type Suggestion = { skill_id: string, reason: string }
-type Topic = { title: string, reason: string }
+type Topic = { title: string, reason: string, form_label?: string | null }
 
 // The topic and skills of the next lesson, chosen before Jane prepares it (preparation waits for this).
 function FocusPicker({ token, learner, refresh, subject }: Pick<PageProps, 'token' | 'learner' | 'refresh'> & { subject: Record<string, any> }) {
@@ -32,11 +32,11 @@ function FocusPicker({ token, learner, refresh, subject }: Pick<PageProps, 'toke
     void run(async () => { await api(token, 'focus', body) }, 'Saving your choice')
   }
   return <>
-    <p>{topics.length ? 'Jane found some topics from your interests and listed things you can practise. ' : 'Write a topic for this lesson, then tick what you want to practise. '}When you send it, Jane starts making the lesson.</p>
+    <p>{topics.length ? 'Jane found some topics from your interests, each as a different kind of text, and listed things you can practise. ' : 'Write a topic for this lesson, then tick what you want to practise. '}When you send it, Jane starts making the lesson.</p>
     <fieldset className="skills"><legend>{topics.length ? 'Topic (choose one)' : 'Topic'}</legend>
       {topics.map((item, index) => <label key={index} className="check">
         <input type="radio" name="topic" checked={choice === index} onChange={() => setChoice(index)} />
-        {item.title}<span className="tag">{item.reason}</span></label>)}
+        {item.form_label && <span className="tag">{item.form_label}</span>}{item.title}<span className="tag">{item.reason}</span></label>)}
       {topics.length > 0 && <label className="check"><input type="radio" name="topic" checked={choice === 'own'} onChange={() => setChoice('own')} />Something else:</label>}
       <input aria-label="My own topic" placeholder="Write what you want to read about" value={own} onFocus={() => setChoice('own')} onChange={event => setOwn(event.target.value)} /></fieldset>
     <fieldset className="skills"><legend>Story difficulty</legend>

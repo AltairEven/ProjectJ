@@ -44,6 +44,7 @@ def science_draft(context, evidence="He fills it with water."):
         "material_id": None,
         "title": "Sam's Cup",
         "story": NEW_STORY,
+        "story_form": "story",
         "reading_focus": "As you read, notice how the cup changes.",
         "lesson_type": "observation",
         "tasks": [
@@ -484,7 +485,7 @@ def test_study_preparation_writes_by_interests_and_maps_the_chosen_skill(
     asyncio.run(app.prepare("p1", learner))
     context = seen[0]
     assert context["library"] == [] and context["candidate"] is None and context["template"] is None
-    assert context["recent_titles"] == []
+    assert context["recent_stories"] == [] and context["recent_forms"] == []
     assert context["demand"]["skill_focus"][0]["label"] == "Past simple"
     assert context["demand"]["topic"] == "The Paper Bridge"
     assert ("topic", "The Paper Bridge") in [

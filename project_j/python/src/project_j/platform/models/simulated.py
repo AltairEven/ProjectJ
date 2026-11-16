@@ -168,6 +168,7 @@ class SimulatedAdapter:
                     {
                         "title": suggestion["material"]["title"],
                         "reason": "Simulated: the next library lesson.",
+                        "form": "story",
                     }
                 ],
                 "note": {

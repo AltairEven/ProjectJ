@@ -186,6 +186,7 @@ class CourseBody(Contract):
     vocabulary_used: tuple[str, ...] = ()  # Marked words the story reviews (design/learning).
     # One sentence on how this lesson's pictures look (ADR-0026); None: no pictures or older.
     picture_style: str | None = None
+    story_form: str | None = None  # A FORMS id; None for a library story or an older course.
     limitations: tuple[str, ...]
     resources: tuple[ResourceSpec, ...] = ()
 

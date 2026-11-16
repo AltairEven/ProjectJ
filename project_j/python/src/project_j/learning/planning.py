@@ -1,5 +1,7 @@
 """The planning model proposes the next demand and plan reviews; rules decide what applies."""
 
+import re
+from collections.abc import Sequence
 from typing import Literal
 
 from pydantic import Field
@@ -8,6 +10,7 @@ from project_j.contracts import Contract, RevisionRef
 from project_j.evaluation.assessment import ModelStepUnavailable
 from project_j.evaluation.scoring import SCORING
 from project_j.learning.contracts import (
+    FORMS,
     SKILLS,
     DemandBody,
     FocusSuggestion,
@@ -39,10 +42,15 @@ PLANNING_INSTRUCTIONS = (
     "加的那一步就撤回它，上一课没有加难度就比上一课再容易一级（换容易一级的变种、多一级支持或少一种难点，"
     "三者选一）；上一步是换目标时只在新目标内换容易一级；step为null时自己判断。"
     "difficulty优先于suggestion里的方向。变难指题目变难（变种、问法、帮助），故事难度由学生自选的档位"
-    "决定，不写更难或更长的故事。加难度或退回时，在prerequisites的第一项用一句话写清这一步具体改了什么。"
+    "决定，不写更难或更长的故事；prerequisites与sampling_requirements里不写蓝思值、课文难度或长度，"
+    "这些只由学生选的档位决定。加难度或退回时，在prerequisites的第一项用一句话写清这一步具体改了什么。"
     "lesson_tasks是本课每题的题型与变种。"
     "sampling_requirements写取样纪律与要收集的证据（练哪项能力、先取初答、帮助前后分开、要观察的条件），"
     "不写具体题目、题干、题数或题型分布；难度这一步可以点名一个变种或一种问法。题型、题数和问法由备课决定。"
+    "课文每课换形式（见story_forms），取证跟着形式走：事实有很多种（谁、什么、哪里、为什么、谁说了什么、"
+    "谁想要什么、东西是什么样、先后顺序），顺序只是其中一种，不写“先发生什么、接着发生什么、结尾三步”"
+    "这类固定问法。上下文demand里的措辞是上一课的安排，不是要延续的模板：目标不变时也重新写目标描述与"
+    "取样要求，不照抄。"
     "预算固定30分钟，不改预算，不把时间排满。"
     "scores是最近几节课按题型与能力的平均分（10分制，未知不计）与题数：参考它决定下节课的目标与加强方向；"
     "分数低不等于没学会，结合评价的依据与限制判断，题数少于3只作参考。"
@@ -55,6 +63,9 @@ PLANNING_INSTRUCTIONS = (
     "topic_suggestions给3–4个下一课短文的题材供学生挑选（学生也可以自己写）：title一句短标题，"
     "reason写为什么（如出自学生的哪项兴趣）；从profile.interests出发，可以延伸到相邻的方面，"
     "彼此要有区别；避开recent_titles里最近几课的题材；难度适合profile.lexile与本课目标。"
+    "每个题材带一种课文形式form（取story_forms里的form_id），title写成这种形式的题目"
+    "（如信写A Letter from…，对话写两个人在谈什么）：几个题材的form互不相同，"
+    "也不用recent_forms里最近两课用过的形式。"
     "所有写给学生的文字（goal_reason、suggestion_reason、plan_reason、note、各reason、title、"
     "new_capabilities的name与definition、gaps）一律用简单英文，不夹中文字或中文标点，"
     "用词和句长不超过profile.lexile（为null时按初学者写短句、常用词）。"
@@ -131,6 +142,7 @@ class TopicDraft(Contract):
 
     title: Text
     reason: Text
+    form: str | None = None
 
 
 class DemandDraft(Contract):
@@ -229,6 +241,7 @@ def demand_request(
     scores: dict | None = None,
     *,
     course: dict,
+    recent_forms: Sequence[str] = (),
 ) -> ModelRequest:
     material = suggestion["material"]
     step, reason = difficulty_step(evaluation, course)
@@ -254,6 +267,11 @@ def demand_request(
                 "gaps",
             ),
             "recent_titles": recent_titles,
+            "recent_forms": list(recent_forms),
+            "story_forms": [
+                {"form_id": form, "label": label, "hint": hint}
+                for form, (label, hint) in FORMS.items()
+            ],
             "scores": scores or {},
             "difficulty": {"step": step, "reason": reason},
             "lesson_tasks": lesson_tasks(course),
@@ -328,6 +346,7 @@ def apply_demand_draft(
     suggestion_ref: RevisionRef,
     plan_adjusted: bool,
     step: Step = None,
+    recent_forms: Sequence[str] = (),
 ) -> DemandBody:
     """The model's demand as a checked revision; an unknown or repeated goal voids the draft."""
     proposed = {item.dimension_id for item in draft.new_capabilities}
@@ -378,15 +397,40 @@ def apply_demand_draft(
         focus_suggestions=tuple(
             item for item in draft.focus_suggestions if item.skill_id in SKILLS
         )[:2],
-        # A title that does not fit is dropped, at most four; neither voids the plan.
-        topic_suggestions=tuple(
-            TopicSuggestion(title=item.title.strip(), reason=item.reason)
-            for item in draft.topic_suggestions
-            if 0 < len(item.title.strip()) <= 100
-        )[:4],
+        topic_suggestions=offered_topics(draft.topic_suggestions, recent_forms),
     )
     needed = needs_goal_confirmation(current, body)
     return body.model_copy(update={"goal_confirmation": "needed" if needed else None})
+
+
+def offered_topics(
+    topics: Sequence[TopicDraft], recent_forms: Sequence[str]
+) -> tuple[TopicSuggestion, ...]:
+    """At most four topics, each in another form; none of this voids the plan. A title that
+    does not fit, a form the list already has and a form of the last lessons are dropped; a
+    form the list does not know is kept as a topic without one (preparation picks)."""
+    taken, kept = set(recent_forms), []
+    for item in topics:
+        title, form = item.title.strip(), item.form if item.form in FORMS else None
+        if not 0 < len(title) <= 100 or form in taken:
+            continue
+        taken |= {form} - {None}
+        kept.append(TopicSuggestion(title=title, reason=item.reason, form=form))
+    return tuple(kept[:4])
+
+
+# Wording that fixes the story's shape or level instead of naming evidence; counted for the
+# diagnostics only, since a refused plan would stall the next lesson.
+FIXED_WORDING = re.compile(
+    r"what happens (first|next)|three (end )?steps|\b\d{2,4}L\b", re.IGNORECASE
+)
+
+
+def fixed_wording(body: DemandBody) -> int:
+    return sum(
+        bool(FIXED_WORDING.search(text))
+        for text in (*body.prerequisites, *body.sampling_requirements)
+    )
 
 
 def week_plan_after(draft: DemandDraft, plan: dict, catalog_ids: set[str]) -> PlanBody | None:

@@ -183,7 +183,7 @@ def test_dashboard_shows_the_next_step_and_retry_restarts_a_job(application):
 
 
 REASON = "上节课两处过去时用成了原形"
-TOPICS = [{"title": "塞尔达：滑翔伞飞过峡谷", "reason": "你说空闲时想玩塞尔达"}]
+TOPICS = [{"title": "塞尔达：滑翔伞飞过峡谷", "reason": "你说空闲时想玩塞尔达", "form": "letter"}]
 
 
 def waiting_demand(app, **extra):
@@ -228,7 +228,7 @@ def test_planned_demand_waits_for_the_focus_choice(application, caplog):
         assert step["kind"] == "focus"
         assert len(step["subject"]["options"]) == 13
         assert step["subject"]["suggestions"] == [{"skill_id": "past_simple", "reason": REASON}]
-        assert step["subject"]["topics"] == TOPICS
+        assert step["subject"]["topics"] == [TOPICS[0] | {"form_label": "Letter"}]
         assert advance(application, LEARNER) is None  # no preparation before the choice
         note, topic = "多练不规则动词", TOPICS[0]["title"]
         first = application.choose_focus("f1", LEARNER, demand.ref, topic, ["past_simple"], note)
@@ -237,7 +237,7 @@ def test_planned_demand_waits_for_the_focus_choice(application, caplog):
         chosen = application.current(LEARNER, "demand")
         assert chosen.revision == demand.revision + 1
         assert chosen.body["skill_focus"] == ["past_simple"] and chosen.body["skill_note"] == note
-        assert chosen.body["topic"] == topic
+        assert chosen.body["topic"] == topic and chosen.body["form"] == "letter"
         with pytest.raises(Conflict):
             application.choose_focus("f2", LEARNER, demand.ref, "别的", [], None)
         assert next_step(application, LEARNER)["kind"] == "none"
@@ -246,7 +246,7 @@ def test_planned_demand_waits_for_the_focus_choice(application, caplog):
         assert next_step(application, LEARNER)["kind"] == "course"
 
     asyncio.run(scenario())
-    assert "focus chosen topic=suggested skills=1 note=True" in caplog.text
+    assert "focus chosen topic=suggested form=letter skills=1 note=True" in caplog.text
     assert "不规则" not in caplog.text and REASON not in caplog.text and "塞尔达" not in caplog.text
 
 
@@ -257,7 +257,7 @@ def test_an_older_choice_without_topic_asks_again_and_takes_the_own_topic(applic
     assert step["kind"] == "focus" and step["subject"]["topics"] == []
     application.choose_focus("f1", LEARNER, demand.ref, "  我的狗  ", [], None)
     assert application.current(LEARNER, "demand").body["topic"] == "我的狗"
-    assert "focus chosen topic=own skills=0 note=False" in caplog.text
+    assert "focus chosen topic=own form=none skills=0 note=False" in caplog.text
     assert "我的狗" not in caplog.text
 
 

@@ -26,7 +26,7 @@ from project_j.preparation.drafting import (
     preparation_request,
     repair_request,
 )
-from project_j.preparation.folders import draft_of, story_path
+from project_j.preparation.folders import draft_of, lesson_of, story_path
 from project_j.preparation.packages import (
     COURSES,
     FIRST,
@@ -80,19 +80,42 @@ class Preparing:
         latest = max(facts, key=lambda fact: fact.occurred_at)
         return next_material(self.taught_source(learner_id, latest), self.read_sources(learner_id))
 
-    def recent_titles(self, learner_id: str, limit: int = 3) -> list[str]:
-        """The latest lessons' story titles, so the next one turns to another interest."""
-        titles = []
-        for fact in latest_facts(self, learner_id)[:limit]:
-            course = self.store.read(
-                RevisionRef.model_validate(fact.body["course_ref"]), learner_id
-            )
+    def recent_stories(self, learner_id: str, limit: int = 3) -> list[dict]:
+        """The latest lessons' titles, forms and texts, newest first, so the next text differs
+        in topic, form and wording; a text that cannot be read is None."""
+        stories, seen = [], set()
+        for fact in latest_facts(self, learner_id):
+            course_ref = RevisionRef.model_validate(fact.body["course_ref"])
+            if course_ref in seen:  # A retaken class is the same story.
+                continue
+            seen.add(course_ref)
+            course = self.store.read(course_ref, learner_id)
             material = self.store.read(
                 RevisionRef.model_validate(course.body["material_refs"][0]), learner_id
             )
-            if material.body.get("title"):
-                titles.append(material.body["title"])
-        return titles
+            if not material.body.get("title"):
+                continue
+            lesson = lesson_of(self, learner_id, course_ref)
+            try:
+                text = story_text(self.files.read_asset(lesson.body["story"])) if lesson else None
+            except ValueError:  # The lesson folder was moved or changed by hand.
+                text = None
+            stories.append(
+                {
+                    "title": material.body["title"],
+                    "form": course.body.get("story_form"),
+                    "story": text,
+                }
+            )
+            if len(stories) == limit:
+                break
+        log.info(
+            "preparation recent stories=%d texts=%d forms=%d",
+            len(stories),
+            sum(item["story"] is not None for item in stories),
+            sum(item["form"] is not None for item in stories),
+        )
+        return stories
 
     def calibration(self, learner_id: str) -> dict[str, float]:
         """Per task type, how long sealed classes actually took against the estimate."""
@@ -208,7 +231,7 @@ class Preparing:
                 list(library.values()) if simulated else [],
                 source if simulated else None,
                 template,
-                self.recent_titles(learner_id),
+                self.recent_stories(learner_id),
                 lesson_score_summary(self, learner_id, "preparation"),
                 level=story_level(profile.body, body.purpose == "placement"),
                 vocabulary=self.offered_vocabulary(
@@ -325,7 +348,7 @@ class Preparing:
                 list(library.values()) if self.models.simulates("preparation") else [],
                 source if self.models.simulates("preparation") else None,
                 None,
-                self.recent_titles(learner_id),
+                self.recent_stories(learner_id),
                 lesson_score_summary(self, learner_id, "preparation"),
                 level=story_level(profile.body, body.purpose == "placement"),
                 vocabulary=self.offered_vocabulary(
@@ -509,6 +532,8 @@ class Preparing:
                     offscreen_allowed=bool(request.context["profile"].get("materials")),
                     factors=factors,
                     level=level,
+                    recent_forms=request.context["recent_forms"],
+                    free_form=stage != "prepare",
                 )
             except DraftRejected as rejected:
                 codes = ",".join(dict.fromkeys(code for code, _ in rejected.problems))
@@ -524,7 +549,7 @@ class Preparing:
                 continue
             log.info(
                 "preparation drafted stage=%s attempt=%d material=%s tasks=%d read_aloud=%d "
-                "resources=%d focus=%d minutes=%d types=%d",
+                "resources=%d focus=%d minutes=%d types=%d form=%s chosen_by=%s",
                 stage,
                 attempt,
                 "library" if checked.source else "model",
@@ -534,6 +559,8 @@ class Preparing:
                 len(body.skill_focus or ()),
                 sum(checked.course.budget.values()),
                 len({task.purpose for task in checked.course.tasks}),
+                checked.course.story_form or "none",
+                "student" if body.form else "model",
             )
             return checked, draft
         raise AssertionError("unreachable")

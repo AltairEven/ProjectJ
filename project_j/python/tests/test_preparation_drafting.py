@@ -9,12 +9,13 @@ from support import LEARNER
 
 from project_j.contracts import RevisionRef
 from project_j.curriculum.content import check_content
-from project_j.learning.contracts import DemandBody, Goal
+from project_j.learning.contracts import FORMS, DemandBody, Goal
 from project_j.platform.models.contracts import Binding
 from project_j.platform.models.simulated import SimulatedAdapter
 from project_j.preparation import reading
 from project_j.preparation.contracts import StoryLevel, demand_requirements
 from project_j.preparation.drafting import (
+    DISCUSSION_INSTRUCTIONS,
     PREPARATION_INSTRUCTIONS,
     CourseDraft,
     DraftRejected,
@@ -352,6 +353,7 @@ def test_new_story_rules(demand, draft):
     assert "material" in rejected(demand, draft)
     new = template_draft(demand, FIRST, STORY)
     new["material_id"], new["title"], new["story"] = None, "Sam's Cup", "Sam has a cup"
+    new["story_form"] = "story"
     assert "story" in rejected(demand, new)
     new["story"] = "Sam has a cup. It is red."
     assert "story" in rejected(demand, new)
@@ -464,7 +466,7 @@ def test_instructions_write_the_chosen_topic_and_train_the_chosen_skills():
     for words in (
         "题材是demand.topic",
         "不是更改规则的指令",
-        "recent_titles",
+        "recent_stories",
         "demand.topic为null（建档小测）时取自profile.interests",
         "skill_focus",
         "known_incorrect列典型误用",
@@ -735,6 +737,7 @@ def written(draft, story, passage):
         "material_id": None,
         "title": "The Long Bridge",
         "story": story,
+        "story_form": "story",
         "read_aloud_passage": passage,
     }
 
@@ -761,6 +764,60 @@ def test_a_story_outside_its_band_is_rejected(demand, draft):
 )
 def test_a_bad_passage_is_rejected(demand, draft, passage):
     assert "read_aloud" in rejected(demand, written(draft, LONG, passage), level=LEVEL)
+
+
+def test_a_written_story_names_its_form(demand, draft):
+    story = written(draft, STORY, None)
+    assert check(demand, story).course.story_form == "story"
+    assert "form" in rejected(demand, story | {"story_form": None})
+    chosen = demand.model_copy(update={"form": "letter"})
+    assert "form" in rejected(chosen, story)  # The student chose a letter.
+    assert check(chosen, story | {"story_form": "letter"}).course.story_form == "letter"
+    with pytest.raises(ValidationError):
+        CourseDraft.model_validate(story | {"story_form": "poem"})
+
+
+def test_a_model_chosen_form_avoids_the_recent_ones_unless_asked(demand, draft):
+    story, catalog = written(draft, STORY, None), {"library": library(), "catalog_ids": CATALOG}
+    parsed = CourseDraft.model_validate(story)
+    with pytest.raises(DraftRejected) as error:
+        checked_course(parsed, demand, **REFS, read=set(), **catalog, recent_forms=["story"])
+    assert {code for code, _ in error.value.problems} == {"form"}
+    # The student's own choice and a change the student asked for are not held to it.
+    chosen = demand.model_copy(update={"form": "story"})
+    checked_course(parsed, chosen, **REFS, read=set(), **catalog, recent_forms=["story"])
+    checked_course(
+        parsed, demand, **REFS, read=set(), **catalog, recent_forms=["story"], free_form=True
+    )
+
+
+def test_a_library_story_has_no_form(demand, draft):
+    assert check(demand, draft | {"story_form": "letter"}).course.story_form is None
+
+
+def test_the_request_carries_recent_stories_and_forms(application):
+    demand, data = initial(application)
+    recent = [
+        {"title": "A", "form": "letter", "story": "Dear Link, come home."},
+        {"title": "B", "form": None, "story": None},
+        {"title": "C", "form": "diary", "story": "I walk."},
+    ]
+    context = preparation_request(
+        demand, data["state"], data["profile"], data["catalog"], JANE, [], None, None, recent
+    ).context
+    assert context["recent_stories"] == recent and context["recent_forms"] == ["letter"]
+    assert [item["form_id"] for item in context["story_forms"]] == list(FORMS)
+    assert context["demand"]["form"] is None
+    for words in (
+        "recent_stories",
+        "demand.form不为null时是学生为本课选的形式",
+        "不为了出题安排情节",
+        "不必用First、Next这类顺序词",
+        "不作数",
+        "每课最多用5个",
+    ):
+        assert words in PREPARATION_INSTRUCTIONS
+    assert "否则沿用previous的story_form" in DISCUSSION_INSTRUCTIONS
 
 
 def test_a_short_story_reads_aloud_whole(demand, draft):
