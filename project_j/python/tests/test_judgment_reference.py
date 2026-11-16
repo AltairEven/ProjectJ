@@ -70,8 +70,8 @@ def test_is_help_request(application, text, intent, purpose, expected):
 def test_reference_set_is_valid_against_the_course():
     reference, digest = load_reference(ROOT)
     assert validate(reference, reference_tasks(ROOT)) == []
-    assert len(digest) == 64 and len(reference.cases) == 55
-    assert reference.version == "2.1.0"
+    assert len(digest) == 64 and len(reference.cases) == 61
+    assert reference.version == "2.2.0"
 
 
 def test_reference_set_two_is_english():
@@ -261,7 +261,7 @@ def scripted_service(slow=(), invalid=()):
     cases = {
         key(reference_request(c, tasks[c.source, c.task_id]).context): c for c in reference.cases
     }
-    assert len(cases) == 55
+    assert len(cases) == 61
     service = ModelService.simulated()
 
     async def invoke(request, binding):
@@ -282,7 +282,7 @@ def test_run_reference_counts_failures(monkeypatch):
     monkeypatch.setattr(reference_module, "DEADLINE_SECONDS", 0.2)
     service = scripted_service(slow={"F1-variant-1"}, invalid={"B2-variant"})
     report = asyncio.run(run_reference(service, ROOT, repeats=2))
-    assert report["summary"]["total"] == 110 and report["summary"]["failed"] == 4
+    assert report["summary"]["total"] == 122 and report["summary"]["failed"] == 4
     assert report["summary"]["failed_cases"] == ["B2-variant", "F1-variant-1"]
     assert report["summary"]["all_passed"] is False
     failures = {r["failure"] for r in report["results"] if not r["passed"]}
@@ -309,7 +309,7 @@ def test_cli_writes_the_report(tmp_path, monkeypatch):
     monkeypatch.setattr(reference_module, "load_service", lambda files: scripted_service())
     assert main(["--run-id", "ref1", "--root", str(tmp_path)]) == 0
     saved = json.loads(report_path(tmp_path).read_text())
-    assert saved["summary"]["all_passed"] and saved["reference"]["cases"] == 55
+    assert saved["summary"]["all_passed"] and saved["reference"]["cases"] == 61
 
 
 def test_cli_refuses_existing_report(tmp_path, monkeypatch):
@@ -336,3 +336,23 @@ def test_cli_refuses_invalid_set(tmp_path, monkeypatch):
     monkeypatch.setattr(reference_module, "load_service", lambda files: service)
     assert main(["--run-id", "ref1", "--root", str(tmp_path)]) == 2
     assert not report_path(tmp_path).parent.exists()
+
+
+def test_exact_questions_alone_carry_the_extra_content_rule():
+    from project_j.classroom.judgment import ANSWER_INSTRUCTIONS
+
+    reference, _ = load_reference(ROOT)
+    tasks = reference_tasks(ROOT)
+    for case in reference.cases:
+        task = tasks[(case.source, case.task_id)]
+        request = reference_request(case, task)
+        assert (ANSWER_INSTRUCTIONS in request.instructions) == (task.purpose == "answer")
+    extra = {c.case_id: c.expected for c in reference.cases[55:]}
+    assert extra == {
+        "F1-extra-next": "incorrect",
+        "F1-extra-paragraph": "incorrect",
+        "F2-extra": "incorrect",
+        "B1-extra": "incorrect",
+        "F1-quote": "correct",
+        "B2-restate": "correct",
+    }

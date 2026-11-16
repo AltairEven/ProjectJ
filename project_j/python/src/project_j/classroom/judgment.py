@@ -45,6 +45,19 @@ OPEN_INSTRUCTIONS = (
 )
 
 
+# Sent with exact questions only, for the same reason. Without it an answer that copied the
+# answer line plus its neighbours was judged correct (lessons 7 and 8, 2026-11-16).
+ANSWER_INSTRUCTIONS = (
+    "task_purpose为answer时题目问的是一件具体的事：answer除了回答这个问题之外，还带上题目没有问的"
+    "其他故事内容（多抄的句子、别的事实）时judgment为incorrect，即使其中包含正确答案；"
+    "text请学生只说回答这个问题的那一部分，不指出哪一部分是对的。"
+    "以下都不算多余：复述题目里已经说到的事（题目问某件事发生时或之后怎样，回答先说这件事，"
+    "即使照抄故事里说它的那一句）、抄答案所在的整句或evidence的全部、"
+    "加The story says这类引出语并引用evidence。"
+    "这一条只管多出来的内容，不改变其他判断：回答笼统、无法确认指的是什么时仍是unclear。"
+)
+
+
 # A reading passes with at most this share of its words flagged: one weak phone flags a word and
 # the scorer is not calibrated, so a few flags are named, not failed (2026-10-28, ADR-0028).
 FLAGGED_SHARE = 0.1
@@ -98,7 +111,9 @@ def judgment_request(
     score = pronunciation.model_dump(mode="json") if pronunciation else None
     return ModelRequest(
         purpose="classroom_judgment",
-        instructions=INSTRUCTIONS + (OPEN_INSTRUCTIONS if item else ""),
+        instructions=INSTRUCTIONS
+        + (OPEN_INSTRUCTIONS if item else "")
+        + (ANSWER_INSTRUCTIONS if task.purpose == "answer" else ""),
         context={
             "task_purpose": task.purpose,
             "prompt": task.prompt,

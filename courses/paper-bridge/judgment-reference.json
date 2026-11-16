@@ -1,7 +1,7 @@
 {
-  "version": "2.1.0",
+  "version": "2.2.0",
   "course": "L-C2026-01-001",
-  "authored": "成人编写的虚构作答；预期逐句核对reading-main.md与reading-transfer.md 1.1.0；不依赖模型自评。1.1.0补开放问答（复述与谈看法）13题。2.0.0（2026年10月22日，ADR-0021全英文）：学生一律用英文作答，原中文与中英混合作答12题预期改为unclear并须提醒用英文（required_any为English），求助与含糊题作答改为英文，禁止词去掉中文，退出语改英文后F1-help-3必含词改为skip；新增英文拼错、听不懂题目求助、英文与中文报告4题。回应含任何中文字符即不通过。2.1.0（2026年10月28日，ADR-0028朗读按比例判定）：朗读由核心按评分定判断（标出的词不超过全段十分之一为correct），RA-mispronounced与RA-omitted只标一个词，预期改为correct并仍须点出该词；新增RA-many（标出6个词，超过53词的十分之一）预期incorrect。",
+  "authored": "成人编写的虚构作答；预期逐句核对reading-main.md与reading-transfer.md 1.1.0；不依赖模型自评。1.1.0补开放问答（复述与谈看法）13题。2.0.0（2026年10月22日，ADR-0021全英文）：学生一律用英文作答，原中文与中英混合作答12题预期改为unclear并须提醒用英文（required_any为English），求助与含糊题作答改为英文，禁止词去掉中文，退出语改英文后F1-help-3必含词改为skip；新增英文拼错、听不懂题目求助、英文与中文报告4题。回应含任何中文字符即不通过。2.1.0（2026年10月28日，ADR-0028朗读按比例判定）：朗读由核心按评分定判断（标出的词不超过全段十分之一为correct），RA-mispronounced与RA-omitted只标一个词，预期改为correct并仍须点出该词；新增RA-many（标出6个词，超过53词的十分之一）预期incorrect。2.2.0（2026年11月16日，回答带多余内容）：精确问答的回答除答案外还带题目没问的其他故事内容时预期incorrect，新增4题（多抄一句、抄整段，两课各有）；另加2题correct对照（先答再引原文、复述题目里已有的内容加全部依据）。原题与预期未改。",
   "cases": [
     {
       "case_id": "F1-correct",
@@ -678,6 +678,60 @@
         "table"
       ],
       "basis": "53词里标出6个，超过十分之一为incorrect；点出标出的词请学生再读，不报分数。"
+    },
+    {
+      "case_id": "F1-extra-next",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "She wants a bridge for her car. She puts two books on the table.",
+      "expected": "incorrect",
+      "basis": "答案句之外多抄了下一句；题目只问想做什么。"
+    },
+    {
+      "case_id": "F1-extra-paragraph",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "Mia has a toy car. She wants a bridge for her car. She puts two books on the table. There is a space between the books.",
+      "expected": "incorrect",
+      "basis": "抄了整段，没有指出哪一句回答问题。"
+    },
+    {
+      "case_id": "F2-extra",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-sequence",
+      "answer": "She folds a new piece of paper. She puts it on the same books. She tries the same car again.",
+      "expected": "incorrect",
+      "basis": "答案句之外多抄了后两句。"
+    },
+    {
+      "case_id": "B1-extra",
+      "category": "incorrect",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-first",
+      "answer": "He puts the small bus on the bridge. It stays on the paper. Ben takes the small bus off.",
+      "expected": "incorrect",
+      "basis": "答案句之外多抄了结果与取下两句；题目只问先试哪辆。"
+    },
+    {
+      "case_id": "F1-quote",
+      "category": "variant",
+      "source": "courses/paper-bridge/reading-main.md",
+      "task_id": "reading-fact",
+      "answer": "A bridge. The story says, \"She wants a bridge for her car.\"",
+      "expected": "correct",
+      "basis": "先回答再引原文那一句，不算多余：She wants a bridge for her car."
+    },
+    {
+      "case_id": "B2-restate",
+      "category": "variant",
+      "source": "courses/paper-bridge/reading-transfer.md",
+      "task_id": "reading-result",
+      "answer": "He puts the big bus on the bridge. The paper bends. The big bus falls.",
+      "expected": "correct",
+      "basis": "第一句复述题目里已有的内容（试大巴士），其余是全部依据：The paper bends. The big bus falls."
     }
   ]
 }
