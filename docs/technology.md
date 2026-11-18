@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.24.0；更新：2026年11月18日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
+版本：1.24.1；更新：2026年11月18日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -197,7 +197,7 @@ ADR-0018起，应用协调层的推进器（project_j/python/src/project_j/appli
 
 最小提案：真实合成验证时增加该候选的成人对照，要求只能交付Harness已批准文本、实际内容/首播范围可核对、取消和迟到可靠，并重新核对费用/数据覆盖；取得结果后向家长提出具体替换配置。当前不替换gpt-4o-mini-tts、不引入自主语音教师，阶段1仍以模拟合成交付验证同一接口。此提案尚待家长确认，候选官方推荐不表示J条件已满足。
 
-P0-R1按Opus工程审查采用安装后的project-j-probe/project-j-measure入口，不修改src搜索路径；Python版本由.python-version维护。pytest-socket负责禁网，httpx2为显式开发依赖；文档检查交remark/unified-engine/remark-validate-links官方API，未配远程origin时关闭其repository探测，仍检查本地文件与标题。初试remark-cli时审计发现其监听依赖含无补丁braces告警，故删除CLI及监听依赖；不降级、不强制跨主版本覆盖、不恢复自制链接规则。实际检查和有限审查范围见[交接](handoff.md#p0-r1-工具清理)。
+P0-R1按Opus工程审查采用安装后的project-j-probe/project-j-measure入口，不修改src搜索路径；Python版本由.python-version维护。pytest-socket负责禁网，httpx2为显式开发依赖；文档检查交remark/unified-engine/remark-validate-links官方API，未配远程origin时关闭其repository探测，仍检查本地文件与标题。初试remark-cli时审计发现其监听依赖含无补丁braces告警，故删除CLI及监听依赖；不降级、不恢复自制链接规则，跨主版本覆盖只在上游没有修复版而传递依赖有修复版时采用：2026年11月18日unified-engine 11.2.2（最新）仍依赖glob 10、minimatch 9（GHSA-3g3m-2fjr-6pw4、GHSA-g3hv-75wg-m249），web的package.json用overrides固定glob ^14.0.6、minimatch ^11.0.9，核对过引用方实际调用的接口（glob/hasMagic、minimatch与minimatch.match）、文档检查处理文件数不变，文档检查自测把坏链接放在只经通配符到达的文件里；上游依赖修复版后删掉overrides。实际检查和有限审查范围见[交接](handoff.md#p0-r1-工具清理)。
 
 ## P1隔离运行与生成工具
 

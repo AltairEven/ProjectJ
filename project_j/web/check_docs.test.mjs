@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-test('document check handles Markdown forms and rejects a broken link', () => {
+test('document check handles Markdown forms and rejects a broken link in a globbed file', () => {
   const root = mkdtempSync(join(tmpdir(), 'project-j-docs-'));
   try {
     const web = join(root, 'project_j/web');
@@ -34,7 +34,8 @@ test('document check handles Markdown forms and rejects a broken link', () => {
     });
     const valid = run();
     assert.equal(valid.status, 0, valid.stderr);
-    appendFileSync(fixture, '\n[Broken](missing.md)\n');
+    // design/ is only reached through a ** pattern, so this also proves the glob expansion.
+    appendFileSync(join(root, 'design', 'README.md'), '\n[Broken](missing.md)\n');
     const invalid = run();
     assert.equal(invalid.status, 1, invalid.stderr);
     assert.match(invalid.stderr, /missing\.md/);

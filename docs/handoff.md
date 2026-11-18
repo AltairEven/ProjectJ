@@ -1291,5 +1291,19 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 参考题集（用户同意后运行，`project-j-judge-reference --run-id judgment-ref-20261118`，课堂判断codex:gpt-6.2-sol:low:fast，题集2.2.0）：60/61通过，判断耗时中位3805毫秒、95分位5044毫秒（6.1最近一次122/122为4370/5470毫秒）；唯一不通过F1-mixed-2（中英混合作答，预期含糊并提醒用英文）为10秒截止超时，没有回应文字，不是判错。该题在6.1的11月16日两次运行中为3641–5869毫秒；本次其余各题除首题7092毫秒外均不超过5164毫秒。逐条阅读其余60条回应：标签与预期一致，含糊/中文/混合作答都提醒用英文，错答与求助只给定位提示或句框，未泄露答案词。
 - 补跑F1-mixed-2（`--run-id judgment-ref-20261118-mixed2 --case F1-mixed-2 --repeats 5`）：5/5通过，耗时6262/4082/3553/4249/3347毫秒，判断均为unclear，回应均提醒用英文并指向含“wants”的句子；首次超时判为偶发。整套60/61与补跑5/5合并，参考题集按验收规则通过。
 - 未验证：出图在新版运行时的表现；档位与Fast是否实际生效（回复不标明）；6.2在实际课堂中的判断效果与声音延迟。
-- 继续条件：6.2配置可用于正式学习；文档检查链的glob/minimatch告警另起批次处理。
-- 状态：依赖升级、离线检查、真实探测与参考题集（60/61＋超时题补跑5/5）完成，未提交。
+- 继续条件：6.2配置可用于正式学习；文档检查链的glob/minimatch告警见DEP-AUDIT-1。
+- 状态：依赖升级、离线检查、真实探测与参考题集（60/61＋超时题补跑5/5）完成，已提交de29536。
+
+## DEP-AUDIT-1 文档检查链的glob/minimatch告警
+
+- 负责人：Claude Opus（实现与集成）；参与者：无。发起：2026年11月18日用户要求处理CODEX-UP-1检查中web依赖审计报出的glob、minimatch告警。
+- 原因核对：GHSA-3g3m-2fjr-6pw4（glob >=9.0.0 <=14.0.1，修复版14.0.2）、GHSA-g3hv-75wg-m249（minimatch >=7.0.0 <11.0.1，修复版11.0.1），均为中等，2026-10-30公布。依赖路径unified-engine 11.2.2→glob 10.5.0→minimatch 9.0.9，及unified-engine→load-plugin 6.0.3→@npmcli/config 8.3.4→@npmcli/map-workspaces 3.0.6、@npmcli/package-json 5.2.1。unified-engine与load-plugin已是最新版，上游没有修复；npm audit给的修法是把unified-engine降到10.1.0、remark-validate-links降到12.1.1，不采用。
+- 实际改动：project_j/web/package.json加overrides固定glob ^14.0.6、minimatch ^11.0.9；package-lock.json只变glob一支（glob 14.0.6、minimatch 11.0.9、path-scurry 3.0.0、brace-expansion 5.0.13、balanced-match 4.0.4，新增@isaacs/nonrecursive-glob-match，删去glob 10自带命令行的31个包），其余依赖版本未动。check_docs.test.mjs把坏链接从显式列出的README.md改放到只经`design/**/*.md`到达的design/README.md，使自测同时证明通配符展开。docs/technology.md 1.24.1把原“不强制跨主版本覆盖”改为只在上游无修复版而传递依赖有修复版时采用，并记本次覆盖与删除条件。
+- 兼容核对：新版两包都同时提供ESM与CJS导出，Node要求20或≥22；引用方实际调用的`glob(pattern, {cwd})`、`hasMagic`、CJS的`require('glob').glob`、`minimatch`、`minimatch.match`与`{partial, windowsPathsNoEscape}`选项逐一在新版上运行通过；文档检查按原通配符处理150个文件，与git中对应Markdown数相同，0条消息。
+- 文件边界：project_j/web/package.json、project_j/web/package-lock.json、project_j/web/check_docs.test.mjs、docs/technology.md、本节（及CODEX-UP-1状态行）。
+- 验收条件：web依赖审计不再报glob、minimatch；登记检查全部通过；文档检查处理文件数不变。
+- 检查证据：三个sync、两个npm ci通过；npm audit：web/codegen为0，web不再报glob、minimatch；统一check通过（主工程883、评分39、合成15项pytest，前端与文档检查通过），UTC 2026-11-18T05:44:57.471571+00:00，工程摘要d1db60e3c4c7613a120358af5156b9aa99c18451c22fe095167382a0a1762315；project-j-probe与project-j-measure正常。
+- 未处理：web审计仍报picomatch高危（GHSA-fc5q-39xc-vjpf，<=4.0.7，2026-11-17更新），经vite 8.3.4→picomatch 4.0.7、tinyglobby、fdir、@vitejs/plugin-react共5项。picomatch最新版即4.0.7，没有修复版；npm给的修法是把vite降到6.2.7，不采用。picomatch只在本机构建与开发服务里匹配本项目自己的通配符，不处理学生或网络输入，接受至上游发布修复版。
+- 诊断日志：只改开发依赖与自测，没有运行链路，未加日志行。
+- 继续条件：picomatch发布修复版后升级并复跑审计；unified-engine等上游改用修复版glob/minimatch后删掉overrides。
+- 状态：完成，未提交。
