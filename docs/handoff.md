@@ -1275,3 +1275,21 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 未验证：真实课堂里的表现；参考题集只有纸桥两课四道题，“多余”与“合理补充”的边界在其他题上可能不同；每题只跑了两次。
 - 继续条件：用户下几课留意是否有合理回答被判成多余，有则补进参考题集。
 - 状态：实现与自测完成，用户要求审核后提交，已本地提交（2026年11月16日，提交号见Git记录）。
+
+## CODEX-UP-1 Codex SDK升级到0.169.1以取得gpt-6.2-sol
+
+- 负责人：Claude Opus（实现与集成）；参与者：无。发起：2026年11月18日用户在设置页把五个用途改为gpt-6.2-sol，探测被拒，用户确认在自己的Codex里能选6.2 sol后要求升级。
+- 原因核对（只读）：探测报告“not in the subscription model list”；同一ChatGPT账号（两边auth.json账号编号一致，未输出凭据）两分钟内拉取的模型列表，本项目codex-home（client_version 0.163.0）没有gpt-6.2-sol与gpt-6.2-astra，用户全局Codex（0.169.0）有。订阅服务按客户端版本给出模型列表。
+- 实际改动：pyproject.toml的`openai-codex`锁定0.163.0改为0.169.1，uv.lock只变openai-codex与openai-codex-cli-bin两项（0.169.1于2026-11-17发布）；docs/technology.md 1.23.2记新锁定版本与原因。适配器代码未改（适配器版本仍为3）。design/platform/models.md与ADR-0017里的0.163.0是当时的历史记录，不改。
+- 兼容核对（临时目录另建环境，不碰运行中的服务）：适配器用到的接口都在——`thread_start`与`turn`的参数、`CodexConfig`字段、`account/models/login_chatgpt/close`、各条目与回合字段、`TurnStatus`、错误种类值；`ImageGenerationThreadItem`在新版是`ResultThreadItem`的别名，type仍为imageGeneration，字段齐全。运行时特性`code_mode_host`、`shell_tool`、`unified_exec`、`apps`、`plugins`、`image_generation`仍在，`include_*_instructions`与`project_doc_max_bytes`配置键仍在；`features.skills`在旧版也不是特性名，与升级前相同。临时环境中tests/test_models_codex.py、test_models_init.py、test_probe_stack.py通过。
+- 文件边界：project_j/python/pyproject.toml、project_j/python/uv.lock、docs/technology.md、本节；补跑选项另加project_j/python/src/project_j/application/reference.py、tests/test_judgment_reference.py、docs/acceptance.md。
+- 验收条件：统一check通过；真实探测gpt-6.2-sol五个用途通过（模型在列表、所用档位与Fast层级列出、结构化输出、工具关闭、取消、图片输入）；课堂判断绑定改动后参考题集全部通过。
+- 检查证据：用户停服务后同步主工程（只换openai-codex与openai-codex-cli-bin两包）；登记的三个sync、两个npm ci通过；统一check通过（主工程880、评分39、合成15项pytest；前端与文档检查通过），UTC 2026-11-18T02:48:06.349055+00:00，工程摘要e69c47e4d883cab43956807d282d7a7f0bc7f9ed35bc14e249077547ccf4c3c3；project-j-probe与project-j-measure正常。npm audit：web/codegen为0；web报glob与minimatch两项中等告警（文档检查链remark-validate-links→unified-engine→glob，修复需破坏性升级unified-engine），package-lock本批未改，属新公布的告警，不在本批处理。
+- 补跑选项（用户同意只补跑超时那一题）：project-j-judge-reference加`--case <题号>`（可重复），只跑所选题，报告`reference.selected`记所选题号、摘要首行标“只跑了所选题目，不是整套结果”，题号不在题集时参数报错退出2、不调用模型；整套运行时selected为null。新增测试3项（只跑所选题且调用次数等于题数×重复、未知题号拒绝且不写报告、命令写出部分报告）。docs/technology.md 1.24.0补选项并把报告路径更正为实际的project_j/private/study/<run_id>/（原写adult_checks）；docs/acceptance.md 2.9.0补规则：个别题因超时等调用失败不通过时可只补跑该题不少于5次，全部通过才算该题通过，判错不靠补跑抵消。统一check通过（主工程883、评分39、合成15项pytest）。
+- 诊断日志：没有新链路（补跑选项只筛选题目，模型调用沿用原有链路），未加日志行。
+- 真实探测（用户在设置页执行，init.json记录UTC 2026-11-18T05:09:10）：gpt-6.2-sol在订阅模型列表中，结构化输出、看图、无工具调用、取消均verified；low/xhigh档位与Fast层级列表声明支持但回复不标明，记unverified；initialized为true，五个用途均无拒绝原因。三次探测调用输入10887/10887/10809 token，固定输入仍约1.1万，未因升级变化。
+- 参考题集（用户同意后运行，`project-j-judge-reference --run-id judgment-ref-20261118`，课堂判断codex:gpt-6.2-sol:low:fast，题集2.2.0）：60/61通过，判断耗时中位3805毫秒、95分位5044毫秒（6.1最近一次122/122为4370/5470毫秒）；唯一不通过F1-mixed-2（中英混合作答，预期含糊并提醒用英文）为10秒截止超时，没有回应文字，不是判错。该题在6.1的11月16日两次运行中为3641–5869毫秒；本次其余各题除首题7092毫秒外均不超过5164毫秒。逐条阅读其余60条回应：标签与预期一致，含糊/中文/混合作答都提醒用英文，错答与求助只给定位提示或句框，未泄露答案词。
+- 补跑F1-mixed-2（`--run-id judgment-ref-20261118-mixed2 --case F1-mixed-2 --repeats 5`）：5/5通过，耗时6262/4082/3553/4249/3347毫秒，判断均为unclear，回应均提醒用英文并指向含“wants”的句子；首次超时判为偶发。整套60/61与补跑5/5合并，参考题集按验收规则通过。
+- 未验证：出图在新版运行时的表现；档位与Fast是否实际生效（回复不标明）；6.2在实际课堂中的判断效果与声音延迟。
+- 继续条件：6.2配置可用于正式学习；文档检查链的glob/minimatch告警另起批次处理。
+- 状态：依赖升级、离线检查、真实探测与参考题集（60/61＋超时题补跑5/5）完成，未提交。

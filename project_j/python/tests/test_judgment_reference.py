@@ -17,6 +17,7 @@ from project_j.application.reference import (
     reference_request,
     reference_tasks,
     run_reference,
+    summary_lines,
     validate,
 )
 from project_j.classroom.harness import is_help_request
@@ -290,6 +291,19 @@ def test_run_reference_counts_failures(monkeypatch):
     assert report["source_type"] == "technical" and report["qualification"] == "not_granted"
 
 
+def test_run_reference_reruns_only_the_selected_cases():
+    service = scripted_service()
+    selected = frozenset({"F1-mixed-2"})
+    report = asyncio.run(run_reference(service, ROOT, repeats=3, case_ids=selected))
+    assert [r["case_id"] for r in report["results"]] == ["F1-mixed-2"] * 3
+    assert len(service.calls) == 3
+    assert report["reference"]["selected"] == ["F1-mixed-2"] and report["reference"]["cases"] == 61
+    assert "只跑了所选题目（F1-mixed-2），不是整套结果" in summary_lines(report, Path("r.json"))
+    full = asyncio.run(run_reference(scripted_service(), ROOT))
+    assert full["reference"]["selected"] is None
+    assert not any("所选题目" in line for line in summary_lines(full, Path("r.json")))
+
+
 def copy_courses(root):
     shutil.copytree(ROOT / "courses/paper-bridge", root / "courses/paper-bridge")
 
@@ -319,6 +333,24 @@ def test_cli_refuses_existing_report(tmp_path, monkeypatch):
     before = report_path(tmp_path).read_bytes()
     assert main(["--run-id", "ref1", "--root", str(tmp_path)]) == 2
     assert report_path(tmp_path).read_bytes() == before
+
+
+def test_cli_refuses_unknown_case(tmp_path, monkeypatch):
+    copy_courses(tmp_path)
+    monkeypatch.setattr(reference_module, "load_service", lambda files: scripted_service())
+    with pytest.raises(SystemExit) as exit_info:
+        main(["--run-id", "ref1", "--case", "no-such-case", "--root", str(tmp_path)])
+    assert exit_info.value.code == 2
+    assert not report_path(tmp_path).exists()
+
+
+def test_cli_writes_a_partial_report(tmp_path, monkeypatch):
+    copy_courses(tmp_path)
+    monkeypatch.setattr(reference_module, "load_service", lambda files: scripted_service())
+    args = ["--run-id", "ref1", "--case", "F1-mixed-2", "--repeats", "2", "--root", str(tmp_path)]
+    assert main(args) == 0
+    saved = json.loads(report_path(tmp_path).read_text())
+    assert saved["reference"]["selected"] == ["F1-mixed-2"] and saved["summary"]["total"] == 2
 
 
 def test_cli_refuses_invalid_set(tmp_path, monkeypatch):

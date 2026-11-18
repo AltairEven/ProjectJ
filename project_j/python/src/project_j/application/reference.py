@@ -194,8 +194,13 @@ def grade(
     return reasons
 
 
-async def run_reference(service: ModelService, root: Path, repeats: int = 1) -> dict:
-    """Sequential calls, no retry: a failure counts exactly as it would in class."""
+async def run_reference(
+    service: ModelService, root: Path, repeats: int = 1, case_ids: frozenset[str] = frozenset()
+) -> dict:
+    """Sequential calls, no retry: a failure counts exactly as it would in class.
+
+    case_ids reruns only those cases (to settle a failure); the report then says it is partial.
+    """
     reference, sha256 = load_reference(root)
     tasks = reference_tasks(root)
     if problems := validate(reference, tasks):
@@ -204,6 +209,8 @@ async def run_reference(service: ModelService, root: Path, repeats: int = 1) -> 
     adapter = service.adapters.get(binding.adapter)
     results = []
     for case in reference.cases:
+        if case_ids and case.case_id not in case_ids:
+            continue
         task = tasks[case.source, case.task_id]
         for repeat in range(1, repeats + 1):
             result = await service.run(reference_request(case, task))
@@ -244,6 +251,7 @@ async def run_reference(service: ModelService, root: Path, repeats: int = 1) -> 
             "version": reference.version,
             "sha256": sha256,
             "cases": len(reference.cases),
+            "selected": sorted(case_ids) or None,
         },
         "binding": binding.model_dump(),
         "adapter_version": adapter.version if adapter else None,
@@ -282,17 +290,21 @@ def summary_lines(report: dict, path: Path) -> list[str]:
         "（仅为判断耗时，不是声音延迟；报告不授予使用资格）",
         f"报告：{path}",
     ]
+    if selected := report["reference"]["selected"]:
+        lines.insert(1, f"只跑了所选题目（{'、'.join(selected)}），不是整套结果")
     return lines
 
 
-async def run_and_save(root: Path, path: Path, repeats: int) -> int:
+async def run_and_save(
+    root: Path, path: Path, repeats: int, case_ids: frozenset[str] = frozenset()
+) -> int:
     service = load_service(ModelFiles(root / "project_j/private/models"))
     try:
         if reasons := service.reasons("classroom_judgment"):
             print("课堂判断模型未就绪：" + "；".join(reasons))
             return 2
         try:
-            report = await run_reference(service, root, repeats)
+            report = await run_reference(service, root, repeats, case_ids)
         except ValueError as error:
             print(f"参考题集与课程不一致：{error}")
             return 2
@@ -313,6 +325,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--repeats", type=int, default=1)
+    parser.add_argument("--case", action="append", default=[], help="只跑这道题，可重复")
     parser.add_argument("--root", type=Path, default=PROJECT_ROOT, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if args.repeats < 1:
@@ -321,10 +334,13 @@ def main(argv: list[str] | None = None) -> int:
         check_run_id(args.run_id)
     except ValueError:
         parser.error("运行编号只能含字母、数字、-、_，最长64字符")
+    case_ids = frozenset(args.case)
+    if case_ids and (unknown := case_ids - {c.case_id for c in load_reference(args.root)[0].cases}):
+        parser.error("题集里没有这些题号：" + "、".join(sorted(unknown)))
     partition = args.root / "project_j/private/study"
     partition.mkdir(mode=0o700, parents=True, exist_ok=True)
     path = check_path(partition, f"{args.run_id}/judgment-reference.json")
     if path.exists():
         print("该运行编号已有参考题集报告，换一个运行编号。")
         return 2
-    return asyncio.run(run_and_save(args.root, path, args.repeats))
+    return asyncio.run(run_and_save(args.root, path, args.repeats, case_ids))
