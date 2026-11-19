@@ -1,0 +1,245 @@
+{
+  "courses/judgment-forms/fact-page.md": [
+    {
+      "task_id": "page-fact",
+      "dimension_id": "english.reading.facts",
+      "purpose": "answer",
+      "prompt": "Where does the lighthouse stand?",
+      "material_ref": {
+        "object_id": "judgment-reference",
+        "revision": 1
+      },
+      "evidence": "It stands on rocks near the sea.",
+      "acceptable_simulated": [
+        "On rocks near the sea."
+      ],
+      "incorrect_simulated": [
+        "In the middle of the sea."
+      ],
+      "supports": [
+        {
+          "text": "Look at the first part of the page. Find where it is.",
+          "help": {
+            "english.reading.facts": "light_prompt"
+          }
+        },
+        {
+          "text": "You can say: It stands on … near the …",
+          "help": {
+            "english.reading.facts": "scaffold",
+            "english.speaking.report": "scaffold"
+          }
+        }
+      ],
+      "exit_text": "That's OK. Let's skip this one for now."
+    },
+    {
+      "task_id": "page-action",
+      "dimension_id": "english.reading.facts",
+      "purpose": "answer",
+      "prompt": "What does the light do over the water? Use the action word from the page.",
+      "material_ref": {
+        "object_id": "judgment-reference",
+        "revision": 1
+      },
+      "evidence": "Its light shines far over the water.",
+      "acceptable_simulated": [
+        "It shines far over the water."
+      ],
+      "incorrect_simulated": [
+        "It turns off."
+      ],
+      "supports": [
+        {
+          "text": "Find the sentence about the water.",
+          "help": {
+            "english.reading.facts": "light_prompt"
+          }
+        },
+        {
+          "text": "You can say: It … far over the water. Use the page's word.",
+          "help": {
+            "english.reading.facts": "scaffold",
+            "english.speaking.report": "scaffold"
+          }
+        }
+      ],
+      "exit_text": "That's OK. Let's skip this one for now."
+    },
+    {
+      "task_id": "page-past",
+      "dimension_id": "english.reading.facts",
+      "purpose": "answer",
+      "prompt": "What did the keeper do every evening? Use the past form.",
+      "material_ref": {
+        "object_id": "judgment-reference",
+        "revision": 1
+      },
+      "evidence": "He climbed the stairs every evening.",
+      "acceptable_simulated": [
+        "He climbed the stairs."
+      ],
+      "incorrect_simulated": [
+        "He lit the lamp in the morning."
+      ],
+      "supports": [
+        {
+          "text": "Look at the part about long ago.",
+          "help": {
+            "english.reading.facts": "light_prompt"
+          }
+        },
+        {
+          "text": "You can say: He … the stairs. Past actions often end in -ed.",
+          "help": {
+            "english.reading.facts": "scaffold",
+            "english.speaking.report": "scaffold"
+          }
+        }
+      ],
+      "exit_text": "That's OK. Let's skip this one for now."
+    },
+    {
+      "task_id": "page-explain",
+      "dimension_id": "english.speaking.report",
+      "purpose": "open",
+      "prompt": "Tell me how a lighthouse helps ships. Say where it stands, what the light does at night, and why the ships stay safe.",
+      "material_ref": {
+        "object_id": "judgment-reference",
+        "revision": 1
+      },
+      "evidence": "It stands on rocks near the sea. At night, the lamp turns around and around. Its light shines far over the water. Ships see the light from a long way off. The light tells the ships, \"Rocks are here.\" The ships stay away from the rocks.",
+      "acceptable_simulated": [],
+      "supports": [
+        {
+          "text": "Start with where the lighthouse stands.",
+          "help": {
+            "english.speaking.report": "light_prompt"
+          }
+        },
+        {
+          "text": "You can say: It stands on … At night, the light … So the ships …",
+          "help": {
+            "english.reading.facts": "scaffold",
+            "english.speaking.report": "scaffold"
+          }
+        }
+      ],
+      "exit_text": "Let's stop this one here and go on.",
+      "open": {
+        "variant": "retell",
+        "points": [
+          "It stands on rocks near the sea.",
+          "At night, its light turns and shines far over the water.",
+          "Ships see the light and stay away from the rocks."
+        ],
+        "guidance": "Say all three parts in your own words: where it stands, what the light does at night, and why the ships stay safe. Word for word is not needed."
+      }
+    },
+    {
+      "task_id": "page-past-open",
+      "dimension_id": "english.speaking.report",
+      "purpose": "open",
+      "prompt": "Use the past form to tell what the keeper did long ago.",
+      "material_ref": {
+        "object_id": "judgment-reference",
+        "revision": 1
+      },
+      "evidence": "Long ago, a keeper lived in the lighthouse. He climbed the stairs every evening. He lit the lamp with oil.",
+      "acceptable_simulated": [],
+      "supports": [
+        {
+          "text": "Look at the part that starts with Long ago.",
+          "help": {
+            "english.speaking.report": "light_prompt"
+          }
+        },
+        {
+          "text": "You can say: Long ago, he … in the lighthouse. Every evening he …",
+          "help": {
+            "english.reading.facts": "scaffold",
+            "english.speaking.report": "scaffold"
+          }
+        }
+      ],
+      "exit_text": "Let's stop this one here and go on.",
+      "open": {
+        "variant": "retell",
+        "points": [
+          "He lived in the lighthouse.",
+          "He climbed the stairs every evening.",
+          "He lit the lamp with oil."
+        ],
+        "guidance": "Two of these, told in the past form, are enough: where he lived, what he climbed, and what he did with the lamp."
+      }
+    }
+  ],
+  "courses/judgment-forms/dialogue.md": [
+    {
+      "task_id": "talk-who",
+      "dimension_id": "english.reading.facts",
+      "purpose": "answer",
+      "prompt": "Who says, \"Can you fix it today?\"",
+      "material_ref": {
+        "object_id": "judgment-reference",
+        "revision": 1
+      },
+      "evidence": "Sam brings his bike to Mrs. Lee's shop. Sam: Can you fix it today?",
+      "acceptable_simulated": [
+        "Sam."
+      ],
+      "incorrect_simulated": [
+        "Mrs. Lee."
+      ],
+      "supports": [
+        {
+          "text": "Find the question in the talk. Look at the name before it.",
+          "help": {
+            "english.reading.facts": "light_prompt"
+          }
+        },
+        {
+          "text": "You can say: … says it.",
+          "help": {
+            "english.reading.facts": "scaffold",
+            "english.speaking.report": "scaffold"
+          }
+        }
+      ],
+      "exit_text": "That's OK. Let's skip this one for now."
+    },
+    {
+      "task_id": "talk-what",
+      "dimension_id": "english.reading.facts",
+      "purpose": "answer",
+      "prompt": "When Sam asks, \"How much is it?\", what does Mrs. Lee answer?",
+      "material_ref": {
+        "object_id": "judgment-reference",
+        "revision": 1
+      },
+      "evidence": "Mrs. Lee: It is five dollars.",
+      "acceptable_simulated": [
+        "Five dollars."
+      ],
+      "incorrect_simulated": [
+        "Four dollars."
+      ],
+      "supports": [
+        {
+          "text": "Find what Mrs. Lee says right after Sam's question.",
+          "help": {
+            "english.reading.facts": "light_prompt"
+          }
+        },
+        {
+          "text": "You can say: She says it is … dollars.",
+          "help": {
+            "english.reading.facts": "scaffold",
+            "english.speaking.report": "scaffold"
+          }
+        }
+      ],
+      "exit_text": "That's OK. Let's skip this one for now."
+    }
+  ]
+}

@@ -46,6 +46,9 @@ class SimulatedAdapter:
         # Picture checks to fail, one set per check: the 1-based pictures judged wrong.
         self.reject_pictures: list[set[int]] = []
 
+    async def listed(self) -> list[str]:
+        return [SIMULATED_MODEL]
+
     def respond(self, request: ModelRequest) -> dict | None:
         context = request.context
         if request.purpose == "evaluation":

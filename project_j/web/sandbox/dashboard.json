@@ -10121,5 +10121,30 @@
       ],
       "weight": 1
     }
-  ]
+  ],
+  "judgment_check": {
+    "state": "needs_rerun",
+    "binding": {
+      "adapter": "codex",
+      "model": "gpt-6.2-sol",
+      "effort": "low",
+      "tier": "fast"
+    },
+    "cases": 92,
+    "estimate_seconds": 368,
+    "rerun_cases": [
+      "F1-mixed-2",
+      "K4-complete"
+    ],
+    "report": {
+      "run_id": "judgment-ref-20261119T020500Z",
+      "captured_at": "2026-11-19T02:05:00+00:00",
+      "passed": 90,
+      "total": 92,
+      "median_ms": 3800,
+      "p95_ms": 5000,
+      "settled_by_rerun": false,
+      "failed": []
+    }
+  }
 }

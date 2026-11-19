@@ -1,7 +1,7 @@
 {
-  "version": "2.2.0",
+  "version": "2.3.1",
   "course": "L-C2026-01-001",
-  "authored": "成人编写的虚构作答；预期逐句核对reading-main.md与reading-transfer.md 1.1.0；不依赖模型自评。1.1.0补开放问答（复述与谈看法）13题。2.0.0（2026年10月22日，ADR-0021全英文）：学生一律用英文作答，原中文与中英混合作答12题预期改为unclear并须提醒用英文（required_any为English），求助与含糊题作答改为英文，禁止词去掉中文，退出语改英文后F1-help-3必含词改为skip；新增英文拼错、听不懂题目求助、英文与中文报告4题。回应含任何中文字符即不通过。2.1.0（2026年10月28日，ADR-0028朗读按比例判定）：朗读由核心按评分定判断（标出的词不超过全段十分之一为correct），RA-mispronounced与RA-omitted只标一个词，预期改为correct并仍须点出该词；新增RA-many（标出6个词，超过53词的十分之一）预期incorrect。2.2.0（2026年11月16日，回答带多余内容）：精确问答的回答除答案外还带题目没问的其他故事内容时预期incorrect，新增4题（多抄一句、抄整段，两课各有）；另加2题correct对照（先答再引原文、复述题目里已有的内容加全部依据）。原题与预期未改。",
+  "authored": "成人编写的虚构作答；预期逐句核对reading-main.md与reading-transfer.md 1.1.0；不依赖模型自评。1.1.0补开放问答（复述与谈看法）13题。2.0.0（2026年10月22日，ADR-0021全英文）：学生一律用英文作答，原中文与中英混合作答12题预期改为unclear并须提醒用英文（required_any为English），求助与含糊题作答改为英文，禁止词去掉中文，退出语改英文后F1-help-3必含词改为skip；新增英文拼错、听不懂题目求助、英文与中文报告4题。回应含任何中文字符即不通过。2.1.0（2026年10月28日，ADR-0028朗读按比例判定）：朗读由核心按评分定判断（标出的词不超过全段十分之一为correct），RA-mispronounced与RA-omitted只标一个词，预期改为correct并仍须点出该词；新增RA-many（标出6个词，超过53词的十分之一）预期incorrect。2.2.0（2026年11月16日，回答带多余内容）：精确问答的回答除答案外还带题目没问的其他故事内容时预期incorrect，新增4题（多抄一句、抄整段，两课各有）；另加2题correct对照（先答再引原文、复述题目里已有的内容加全部依据）。原题与预期未改。2.3.0（2026年11月19日，练习要求与新文体）：新增courses/judgment-forms两篇固定材料（知识页The Lighthouse、对话At the Bike Shop）与7道题；题目要求用页面的动作词或过去式，回答没用到、或要求的词形式用错时预期incorrect（practice类9题），另补知识页事实题、三要点解释题与对话“谁说的／答了什么”题，共31题、全套92题。作答与预期由开发代理起草并逐条复核，用户委托开发代理确认（2026年11月19日）。原题与预期未改。2.3.1（2026年11月19日，首轮真实运行gpt-6.2-astra后）：K2-wrong-content的禁止词原为over the water，是题目原文、复述不算泄露，改为shines far；talk-who的依据原只有问句一行，模型看不到“Sam推车来店里”，无法核对D1-role用角色称呼的回答，依据补上旁白一句。作答与预期未改。",
   "cases": [
     {
       "case_id": "F1-correct",
@@ -732,6 +732,324 @@
       "answer": "He puts the big bus on the bridge. The paper bends. The big bus falls.",
       "expected": "correct",
       "basis": "第一句复述题目里已有的内容（试大巴士），其余是全部依据：The paper bends. The big bus falls."
+    },
+    {
+      "case_id": "K1-correct",
+      "category": "correct",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-fact",
+      "answer": "It's on rocks near the sea.",
+      "expected": "correct",
+      "basis": "It stands on rocks near the sea."
+    },
+    {
+      "case_id": "K1-variant",
+      "category": "variant",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-fact",
+      "answer": "By the sea, on rocks.",
+      "expected": "correct",
+      "basis": "换了说法，意思一致：It stands on rocks near the sea."
+    },
+    {
+      "case_id": "K1-page-says",
+      "category": "variant",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-fact",
+      "answer": "The page says it stands on rocks near the sea.",
+      "expected": "correct",
+      "basis": "以The page says引出原文那一句，不算多余。"
+    },
+    {
+      "case_id": "K1-incorrect",
+      "category": "incorrect",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-fact",
+      "answer": "It stands in the middle of a town.",
+      "expected": "incorrect",
+      "forbidden": [
+        "rocks"
+      ],
+      "basis": "与原文矛盾：灯塔在海边的岩石上，不在城里。"
+    },
+    {
+      "case_id": "K1-extra",
+      "category": "incorrect",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-fact",
+      "answer": "It stands on rocks near the sea. At the top, there is a big lamp.",
+      "expected": "incorrect",
+      "basis": "答案句之外多抄了下一句；题目只问在哪儿。"
+    },
+    {
+      "case_id": "K2-correct",
+      "category": "practice",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-action",
+      "answer": "The light shines far over the water.",
+      "expected": "correct",
+      "basis": "用了页面的动作词shines，意思对。"
+    },
+    {
+      "case_id": "K2-no-word",
+      "category": "practice",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-action",
+      "answer": "It goes very far over the sea.",
+      "expected": "incorrect",
+      "forbidden": [
+        "shine"
+      ],
+      "basis": "意思对，但没用页面的动作词shines；请学生用页面的动作词再说，不说出那个词。"
+    },
+    {
+      "case_id": "K2-word-form",
+      "category": "practice",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-action",
+      "answer": "The light shine far over the water.",
+      "expected": "incorrect",
+      "forbidden": [
+        "shines"
+      ],
+      "basis": "用了shine，页面是shines：要求的词形式用错。"
+    },
+    {
+      "case_id": "K2-other-typo",
+      "category": "practice",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-action",
+      "answer": "It shines far over the watter.",
+      "expected": "correct",
+      "basis": "动作词shines用对；watter拼错不影响。"
+    },
+    {
+      "case_id": "K2-wrong-content",
+      "category": "practice",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-action",
+      "answer": "It shines on the houses in the town.",
+      "expected": "incorrect",
+      "forbidden": [
+        "shines far"
+      ],
+      "basis": "用了shines，但内容与原文不符：光照在远处的水面上，不是城里的房子。"
+    },
+    {
+      "case_id": "K3-correct",
+      "category": "practice",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-past",
+      "answer": "Every evening he climbed up the stairs.",
+      "expected": "correct",
+      "basis": "用了过去式climbed：He climbed the stairs every evening."
+    },
+    {
+      "case_id": "K3-base-form",
+      "category": "practice",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-past",
+      "answer": "He climb the stairs every evening.",
+      "expected": "incorrect",
+      "forbidden": [
+        "climbed"
+      ],
+      "basis": "用原形climb回答过去式要求，算没用到；请学生用过去式再说。"
+    },
+    {
+      "case_id": "K3-help",
+      "category": "help",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-past",
+      "answer": "Help me",
+      "expected": "help",
+      "forbidden": [
+        "climbed"
+      ],
+      "required_any": [
+        "long ago"
+      ],
+      "basis": "第一级支持：看讲long ago的那部分。"
+    },
+    {
+      "case_id": "K3-after-help",
+      "category": "after_help",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-past",
+      "answer": "He climbed the stairs every evening.",
+      "help_count": 1,
+      "expected": "correct",
+      "basis": "帮助后用过去式climbed答对。"
+    },
+    {
+      "case_id": "K4-complete",
+      "category": "correct",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-explain",
+      "answer": "It stands on rocks near the sea. At night the lamp turns and the light shines far over the water. The ships see it, so they know there are rocks and stay away.",
+      "expected": "correct",
+      "basis": "要点：在海边岩石上；夜里灯转、光照得远；船看到光、远离岩石。三部分都说到。"
+    },
+    {
+      "case_id": "K4-own-words",
+      "category": "variant",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-explain",
+      "answer": "The lighthouse is by the sea on some rocks. At night its big light goes round and round. Ships can see it from far away, so they don't hit the rocks.",
+      "expected": "correct",
+      "basis": "三部分都说到，用自己的话。"
+    },
+    {
+      "case_id": "K4-missing-one",
+      "category": "incorrect",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-explain",
+      "answer": "It is on rocks near the sea. At night the light goes around.",
+      "expected": "incorrect",
+      "basis": "缺“船为什么安全”这一部分；提示还缺什么。"
+    },
+    {
+      "case_id": "K4-short",
+      "category": "incorrect",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-explain",
+      "answer": "Light and rocks.",
+      "expected": "incorrect",
+      "basis": "只有几个词，三部分都没说清。"
+    },
+    {
+      "case_id": "K4-contradicts",
+      "category": "incorrect",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-explain",
+      "answer": "It stands in the town. The light is on in the day, and the ships go to the rocks.",
+      "expected": "incorrect",
+      "basis": "与原文矛盾：在海边岩石上、夜里亮、船远离岩石。"
+    },
+    {
+      "case_id": "K4-chinese",
+      "category": "chinese",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-explain",
+      "answer": "它在海边的石头上，晚上灯一直转，光照得很远，船看到了就不会撞上石头。",
+      "expected": "unclear",
+      "required_any": [
+        "English"
+      ],
+      "basis": "中文作答，三部分都对；判unclear，提醒用英文。"
+    },
+    {
+      "case_id": "K4-after-help",
+      "category": "after_help",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-explain",
+      "answer": "It stands on rocks near the sea. At night the light turns around and shines far. So the ships see it and stay away from the rocks.",
+      "help_count": 1,
+      "expected": "correct",
+      "basis": "帮助后按句框说出三部分。"
+    },
+    {
+      "case_id": "K5-correct",
+      "category": "practice",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-past-open",
+      "answer": "Long ago he lived in the lighthouse. Every evening he climbed the stairs and lit the lamp with oil.",
+      "expected": "correct",
+      "basis": "用过去式说了住在哪、爬楼梯、点灯。"
+    },
+    {
+      "case_id": "K5-no-form",
+      "category": "practice",
+      "source": "courses/judgment-forms/fact-page.md",
+      "task_id": "page-past-open",
+      "answer": "He lives in the lighthouse. Every evening he climbs the stairs and light the lamp.",
+      "expected": "incorrect",
+      "forbidden": [
+        "climbed",
+        "lived"
+      ],
+      "basis": "内容对，但都用现在时或原形，没用过去式；请学生用过去式再说。"
+    },
+    {
+      "case_id": "D1-correct",
+      "category": "correct",
+      "source": "courses/judgment-forms/dialogue.md",
+      "task_id": "talk-who",
+      "answer": "Sam says it.",
+      "expected": "correct",
+      "basis": "Sam: Can you fix it today?"
+    },
+    {
+      "case_id": "D1-role",
+      "category": "variant",
+      "source": "courses/judgment-forms/dialogue.md",
+      "task_id": "talk-who",
+      "answer": "The person who brings the bike.",
+      "expected": "correct",
+      "basis": "用角色称呼：推车来店里的是Sam（Sam brings his bike to Mrs. Lee's shop.）。"
+    },
+    {
+      "case_id": "D1-wrong-person",
+      "category": "incorrect",
+      "source": "courses/judgment-forms/dialogue.md",
+      "task_id": "talk-who",
+      "answer": "Mrs. Lee says it.",
+      "expected": "incorrect",
+      "forbidden": [
+        "Sam"
+      ],
+      "basis": "这句是Sam问的，Mrs. Lee是回答的人。"
+    },
+    {
+      "case_id": "D1-whole-talk",
+      "category": "incorrect",
+      "source": "courses/judgment-forms/dialogue.md",
+      "task_id": "talk-who",
+      "answer": "Sam: Hello. My bike has a flat tire. Mrs. Lee: Let me look. Yes, there is a small hole. Sam: Can you fix it today?",
+      "expected": "incorrect",
+      "basis": "抄了一段对话，没有说出是谁问的。"
+    },
+    {
+      "case_id": "D1-unclear",
+      "category": "unclear",
+      "source": "courses/judgment-forms/dialogue.md",
+      "task_id": "talk-who",
+      "answer": "I think that one.",
+      "expected": "unclear",
+      "forbidden": [
+        "Sam"
+      ],
+      "basis": "没有说出是谁。"
+    },
+    {
+      "case_id": "D2-correct",
+      "category": "correct",
+      "source": "courses/judgment-forms/dialogue.md",
+      "task_id": "talk-what",
+      "answer": "She says five dollars.",
+      "expected": "correct",
+      "basis": "Mrs. Lee: It is five dollars."
+    },
+    {
+      "case_id": "D2-quote-line",
+      "category": "variant",
+      "source": "courses/judgment-forms/dialogue.md",
+      "task_id": "talk-what",
+      "answer": "Mrs. Lee: It is five dollars.",
+      "expected": "correct",
+      "basis": "照抄答话那一句（含说话人），不算多余。"
+    },
+    {
+      "case_id": "D2-incorrect",
+      "category": "incorrect",
+      "source": "courses/judgment-forms/dialogue.md",
+      "task_id": "talk-what",
+      "answer": "She says it is four dollars.",
+      "expected": "incorrect",
+      "forbidden": [
+        "five"
+      ],
+      "basis": "原文是five dollars；four是取车的时间。"
     }
   ]
 }

@@ -35,8 +35,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from project_j.application.configuration import Settings
 from project_j.application.coordinator import Coordinator
 from project_j.application.progress import advance, jobs, next_step, retry, run
-from project_j.application.settings import probe as probe_models
-from project_j.application.settings import save_bindings, save_deadlines
+from project_j.application.reference import CHECKING, check_start, reference_job
+from project_j.application.settings import list_models, save_bindings, save_deadlines
 from project_j.classroom.harness import AllowedAction, DeliveryFeedback, Harness
 from project_j.contracts import Contract, Document, RevisionRef
 from project_j.evaluation.assessment import ModelStepUnavailable
@@ -79,6 +79,10 @@ class ParentRequest(Contract):
 
 class CourseConfirmRequest(ParentRequest):
     course_ref: RevisionRef
+
+
+class ReferenceRequest(Contract):
+    mode: Literal["full", "rerun"]
 
 
 class CourseStartRequest(CourseConfirmRequest):
@@ -331,6 +335,8 @@ class Dashboard(Contract):
     recent_scores: dict[str, JsonValue] = {}
     # Every marked word (active by weight, then mastered) for the vocabulary page.
     vocabulary: list[dict[str, JsonValue]] = []
+    # The reference-set state of the current classroom setup; None in simulation and in class.
+    judgment_check: dict[str, JsonValue] | None = None
     active: Snapshot | None = None
     note: str | None = None
 
@@ -483,9 +489,7 @@ def create_app(
                     await part.start()
                 except (ScorerUnavailable, SynthesizerUnavailable) as error:
                     log.warning("%s", error)
-        for adapter in app.state.coordinator.models.adapters.values():
-            if hasattr(adapter, "prewarm"):
-                await adapter.prewarm()
+        await app.state.coordinator.models.prewarm()
         learner = app.state.coordinator.learner_id
         chatting = next_step(app.state.coordinator, learner)["kind"] in {"lexile", "chat"}
         ahead = asyncio.create_task(say_chat_ahead(local[1])) if chatting else None
@@ -802,6 +806,8 @@ def create_app(
     async def start(request: CourseStartRequest):
         """Start when the student chooses (confirming and making resources if still needed)."""
         course = request.course_ref
+        if "reference" in controller().jobs:  # The check and a class would share one subscription.
+            raise Conflict(CHECKING)
         return background(
             request.learner_id,
             f"start:{course.object_id}:{course.revision}",
@@ -977,11 +983,22 @@ def create_app(
 
     @app.post("/api/settings/bindings", dependencies=[Depends(operator)])
     async def settings_bindings(request: BindingsRequest):
-        return save_bindings(controller(), request.purposes)
+        return await save_bindings(controller(), request.purposes)
 
-    @app.post("/api/settings/probe", dependencies=[Depends(operator)])
-    async def settings_probe():
-        return await probe_models(controller())
+    @app.post("/api/settings/reference", dependencies=[Depends(operator)], status_code=202)
+    async def settings_reference(request: ReferenceRequest):
+        """Run the judgment reference set, or rerun its failed calls, in the background."""
+        app_controller = controller()
+        case_ids, path = check_start(app_controller, request.mode)
+        return background(
+            app_controller.learner_id,
+            "reference",
+            lambda progress: reference_job(app_controller, request.mode, case_ids, path, progress),
+        )
+
+    @app.get("/api/settings/models", dependencies=[Depends(operator)])
+    async def settings_models():
+        return await list_models(controller())
 
     @app.get("/api/class/snapshot", response_model=Snapshot)
     async def snapshot(core: ClassCore):

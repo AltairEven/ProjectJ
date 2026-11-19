@@ -1683,10 +1683,65 @@
         }
       }
     },
-    "/api/settings/probe": {
+    "/api/settings/reference": {
       "post": {
-        "summary": "Settings Probe",
-        "operationId": "settings_probe_api_settings_probe_post",
+        "summary": "Settings Reference",
+        "description": "Run the judgment reference set, or rerun its failed calls, in the background.",
+        "operationId": "settings_reference_api_settings_reference_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferenceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/models": {
+      "get": {
+        "summary": "Settings Models",
+        "operationId": "settings_models_api_settings_models_get",
         "parameters": [
           {
             "name": "authorization",
@@ -3107,6 +3162,20 @@
             "title": "Vocabulary",
             "default": []
           },
+          "judgment_check": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Judgment Check"
+          },
           "active": {
             "anyOf": [
               {
@@ -4166,6 +4235,24 @@
         ],
         "title": "RecordingInput",
         "description": "One reading segment's recording; it goes only to pronunciation scoring (ADR-0014)."
+      },
+      "ReferenceRequest": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "full",
+              "rerun"
+            ],
+            "title": "Mode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "ReferenceRequest"
       },
       "ResourceRequest": {
         "properties": {

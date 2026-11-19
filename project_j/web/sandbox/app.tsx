@@ -39,7 +39,9 @@ const realFetch = window.fetch.bind(window)
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const path = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url
   if (!path.startsWith('/api/')) return realFetch(input, init)
-  const body = path === '/api/dashboard' ? { ...dashboard, next: nexts[chosen] ?? nexts[Object.keys(nexts)[0]], jobs: jobs[chosen] ?? [] } : {}
+  const body = path === '/api/dashboard' ? { ...dashboard, next: nexts[chosen] ?? nexts[Object.keys(nexts)[0]], jobs: jobs[chosen] ?? [] }
+    : path === '/api/settings/models' ? { models: { simulated: ['simulated-jane'], codex: ['gpt-6.2-sol', 'gpt-6.1-sol'] } }
+    : path === '/api/settings/reference' ? { job: 'reference' } : {}
   await new Promise(done => setTimeout(done, init?.method === 'POST' ? 600 : 50))
   return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } })
 }

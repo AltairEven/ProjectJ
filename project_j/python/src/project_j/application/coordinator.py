@@ -17,6 +17,7 @@ from project_j.application.evaluating import Evaluating
 from project_j.application.ledger import Ledger, Request, Step
 from project_j.application.preparing import Preparing
 from project_j.application.progress import advance, jobs, lesson_evaluations, next_step
+from project_j.application.reference import judgment_check
 from project_j.application.teaching import Teaching
 from project_j.application.vocabulary import Vocabulary
 from project_j.classroom.harness import Harness
@@ -81,6 +82,7 @@ class Coordinator(Preparing, Teaching, Vocabulary, Evaluating, Adopting):
         self.evaluation_jobs: dict[tuple, asyncio.Task] = {}
         # Background AI work by name (application/progress.py); failures wait for a retry.
         self.jobs: dict[str, asyncio.Task] = {}
+        self.probing = False  # A settings save is probing its candidate setup.
         self.job_failures: dict[str, str] = {}
         self.job_progress: dict[str, str] = {}
         self.evaluation_calls: list[dict] = []
@@ -315,6 +317,9 @@ class Coordinator(Preparing, Teaching, Vocabulary, Evaluating, Adopting):
             "recent_scores": recent_scores([doc.body for doc in evaluations]),
             # Every marked word with its rule-computed weight (design/learning/profile.md).
             "vocabulary": listing(self.vocabulary_record(learner_id)[1], datetime.now(UTC).date()),
+            "judgment_check": judgment_check(self.root, self.models)
+            if self.models.files is not None
+            else None,
         }
 
     def lost_activities(self, learner_id: str, documents: list[Document]) -> list[dict]:

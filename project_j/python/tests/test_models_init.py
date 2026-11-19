@@ -242,3 +242,15 @@ def test_digest_of_an_existing_record_stays_valid(root):
     assert files.digest({"codex": "3"}) == (
         "b41fc3e8b6748c85b320ce8fab0ed732b4fcce0b45a7ee39fd4058655077dfb6"
     )
+
+
+def test_probe_bindings_writes_nothing(root):
+    import asyncio
+
+    from project_j.platform.models.contracts import PURPOSES, Binding
+
+    files = ModelFiles(root)
+    medium = Binding(adapter="simulated", model="simulated-jane", effort="medium")
+    record = asyncio.run(init.probe_bindings(files, {p: medium for p in PURPOSES}))
+    assert record["initialized"] and "config_digest" not in record
+    assert files.init_record() is None and files.bindings() is None

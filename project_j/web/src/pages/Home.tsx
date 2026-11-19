@@ -3,7 +3,7 @@ import { api, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
 import { dateText } from '../dates'
 import { byNewest, CHALLENGES, challengeOption } from '../learning'
-import { chosenTopic, focusError, initialFocus, nextStepView } from '../next-step'
+import { chosenTopic, focusError, initialFocus, nextStepView, retriedOnHome } from '../next-step'
 import { endLabels } from '../report'
 import { JobLine, Rows, useRun, type PageProps } from '../ui'
 
@@ -75,8 +75,7 @@ export default function Home({ token, dashboard, learner, go, refresh }: PagePro
     {status}
     <section><h2>Working now</h2>
       {jobs.length ? <ul className="list jobs">{jobs.map(job => <li key={job.name}><JobLine job={job} />
-        {/* A failed confirm or start is retried from its course page. */}
-        {job.state === 'failed' && !job.name.startsWith('start:') && !job.name.startsWith('confirm:') &&
+        {retriedOnHome(job) &&
           <button className="quiet" disabled={busy} onClick={() => void retry(job.name)}>Try again</button>}</li>)}</ul>
         : <p>Nothing is running.</p>}</section>
     <section><h2>Last lesson</h2>{fact ? <>

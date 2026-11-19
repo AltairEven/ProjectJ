@@ -3,6 +3,7 @@ import { api, fileUrl, show, uid } from '../api'
 import type { Document as Doc } from '../client/types.gen'
 import { courseRows, latestFact, lessonOf, needsMaterials, previewLabels, previewOf, previewRank, resourcesOf, retakeOffered, storyLevelLine } from '../courses'
 import { discussionLines, resourceLines } from '../report'
+import { startNotice } from '../settings'
 import { JobLine, Rows, useRun, type PageProps } from '../ui'
 
 // Resource kinds with a connected generator: voice by local synthesis, the rest by the model.
@@ -71,6 +72,7 @@ function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & 
         void run(async () => { await api(token, 'course/confirm', body) }, 'Confirming') }}>Confirm</button></section>}
     {confirmed && (!taught || retaking) && <section><h2>{retaking ? 'Take this lesson again' : 'Start the class'}</h2>
       {(starting ?? confirming) && <JobLine job={(starting ?? confirming)!} />}
+      {startNotice(dashboard.judgment_check) && <p className="notice">{startNotice(dashboard.judgment_check)}</p>}
       {materials && <label className="check"><input type="checkbox" checked={ready} onChange={event => setReady(event.target.checked)} />
         Things are ready{content?.materials ? ` (${show(content.materials)})` : ''}</label>}
       {retaking && <p>Last time it stopped early. That record and its evaluation stay; this time it starts from the beginning, with the voice and pictures already made.</p>}

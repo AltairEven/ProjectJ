@@ -328,6 +328,12 @@ export type Dashboard = {
     vocabulary?: Array<{
         [key: string]: JsonValue;
     }>;
+    /**
+     * Judgment Check
+     */
+    judgment_check?: {
+        [key: string]: JsonValue;
+    } | null;
     active?: Snapshot | null;
     /**
      * Note
@@ -908,6 +914,16 @@ export type RecordingInput = {
      * Completion Trigger
      */
     completion_trigger?: 'explicit' | 'max_duration';
+};
+
+/**
+ * ReferenceRequest
+ */
+export type ReferenceRequest = {
+    /**
+     * Mode
+     */
+    mode: 'full' | 'rerun';
 };
 
 /**
@@ -2144,7 +2160,36 @@ export type SettingsBindingsApiSettingsBindingsPostResponses = {
     200: unknown;
 };
 
-export type SettingsProbeApiSettingsProbePostData = {
+export type SettingsReferenceApiSettingsReferencePostData = {
+    body: ReferenceRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/settings/reference';
+};
+
+export type SettingsReferenceApiSettingsReferencePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SettingsReferenceApiSettingsReferencePostError = SettingsReferenceApiSettingsReferencePostErrors[keyof SettingsReferenceApiSettingsReferencePostErrors];
+
+export type SettingsReferenceApiSettingsReferencePostResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
+};
+
+export type SettingsModelsApiSettingsModelsGetData = {
     body?: never;
     headers?: {
         /**
@@ -2154,19 +2199,19 @@ export type SettingsProbeApiSettingsProbePostData = {
     };
     path?: never;
     query?: never;
-    url: '/api/settings/probe';
+    url: '/api/settings/models';
 };
 
-export type SettingsProbeApiSettingsProbePostErrors = {
+export type SettingsModelsApiSettingsModelsGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SettingsProbeApiSettingsProbePostError = SettingsProbeApiSettingsProbePostErrors[keyof SettingsProbeApiSettingsProbePostErrors];
+export type SettingsModelsApiSettingsModelsGetError = SettingsModelsApiSettingsModelsGetErrors[keyof SettingsModelsApiSettingsModelsGetErrors];
 
-export type SettingsProbeApiSettingsProbePostResponses = {
+export type SettingsModelsApiSettingsModelsGetResponses = {
     /**
      * Successful Response
      */

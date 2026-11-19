@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { chosenTopic, focusError, inOnboarding, initialFocus, jobLines, nextStepView, pages } from '../src/next-step.ts'
+import { chosenTopic, focusError, inOnboarding, initialFocus, jobLines, nextStepView, pages, retriedOnHome } from '../src/next-step.ts'
 
 const kinds = ['lexile', 'chat', 'placement', 'profile', 'class', 'interrupted', 'decision', 'evaluation',
   'goal', 'focus', 'course', 'resources', 'waiting', 'none']
@@ -61,6 +61,14 @@ test('background jobs read as what the AI is doing, with the reason when one fai
     'Getting resources and starting: item 2/5', 'Confirming the lesson and getting resources: item 1/3',
     'Checking progress after your correction', 'Making the lesson failed: The lesson could not be made (it took too long)',
   ])
+  assert.deepEqual(jobLines([{ name: 'reference', state: 'running', progress: '12/92' }]), ['Checking classroom judgment: item 12/92'])
+})
+
+test('a failed job is retried on the home page unless its own page starts it again', () => {
+  const failed = name => ({ name, state: 'failed', reason: 'x' })
+  assert.equal(retriedOnHome(failed('evaluate:a1:2')), true)
+  assert.equal(retriedOnHome({ name: 'evaluate:a1:2', state: 'running' }), false)
+  for (const name of ['start:c1:2', 'confirm:c1:2', 'reference']) assert.equal(retriedOnHome(failed(name)), false, name)
 })
 
 test('onboarding lasts until the profile is confirmed, also while the AI works on it', () => {

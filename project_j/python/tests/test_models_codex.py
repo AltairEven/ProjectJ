@@ -104,10 +104,12 @@ class FakeThread:
 class FakeCodex:
     """Stands in for openai_codex.AsyncCodex; never launches the binary."""
 
-    def __init__(self, events=None, account=True, models=("gpt-6.1-sol",), hang=False, fast=True):
+    def __init__(
+        self, events=None, account=True, models=("gpt-6.1-sol",), hang=False, fast=True, hidden=()
+    ):
         self.events = events if events is not None else [message(GOOD), completed()]
         self.account_present, self.model_ids, self.hang = account, models, hang
-        self.fast = fast
+        self.fast, self.hidden = fast, hidden
         self.starts, self.turns, self.handles, self.closed = [], [], [], False
 
     def next_handle(self, input):
@@ -137,7 +139,7 @@ class FakeCodex:
                 "model": model_id,
                 "description": "",
                 "displayName": model_id,
-                "hidden": False,
+                "hidden": model_id in self.hidden,
                 "isDefault": True,
                 "defaultReasoningEffort": "medium",
                 "supportedReasoningEfforts": [
@@ -157,6 +159,11 @@ class FakeCodex:
 
 def adapter(fake, tmp_path):
     return CodexAdapter(tmp_path / "codex-home", factory=lambda workdir, image: fake)
+
+
+def test_listed_names_the_models_the_subscription_shows(tmp_path):
+    fake = FakeCodex(models=("gpt-6.2-sol", "gpt-6.1-sol", "gpt-inner"), hidden=("gpt-inner",))
+    assert asyncio.run(adapter(fake, tmp_path).listed()) == ["gpt-6.2-sol", "gpt-6.1-sol"]
 
 
 def test_each_call_is_an_isolated_read_only_ephemeral_thread(tmp_path):

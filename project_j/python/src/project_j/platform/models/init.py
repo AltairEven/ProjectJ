@@ -11,6 +11,7 @@ from project_j.platform.models.contracts import (
     PURPOSE_LABELS,
     PURPOSES,
     Binding,
+    Purpose,
     admission,
     item_label,
 )
@@ -32,10 +33,8 @@ def parse_binding(text: str) -> Binding:
     return check_binding(Binding(adapter=adapter, model=model, effort=effort, tier=tier))
 
 
-async def probe_all(files: ModelFiles) -> dict:
-    bindings = files.bindings()
-    if bindings is None:
-        raise ValueError("未配置默认模型，请先运行 project-j-init configure")
+async def probe_bindings(files: ModelFiles, bindings: dict[Purpose, Binding]) -> dict:
+    """Probe these bindings and judge admission; writes nothing (the caller decides)."""
     wanted: dict[tuple[str, str], tuple[set[str], set[str]]] = {}
     for binding in bindings.values():
         efforts, tiers = wanted.setdefault((binding.adapter, binding.model), (set(), set()))
@@ -62,13 +61,20 @@ async def probe_all(files: ModelFiles) -> dict:
             "binding": binding.model_dump(),
             "reasons": admission(report, purpose, binding.effort, binding.tier),
         }
-    record = {
-        "config_digest": files.digest(versions(bindings)),
+    return {
         "captured_at": datetime.now(UTC).isoformat(),
         "initialized": not any(item["reasons"] for item in purposes.values()),
         "reports": [report.model_dump(mode="json") for report in reports],
         "purposes": purposes,
     }
+
+
+async def probe_all(files: ModelFiles) -> dict:
+    bindings = files.bindings()
+    if bindings is None:
+        raise ValueError("未配置默认模型，请先运行 project-j-init configure")
+    record = {"config_digest": files.digest(versions(bindings))}
+    record |= await probe_bindings(files, bindings)
     files.save_init(record)
     return record
 

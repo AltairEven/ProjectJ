@@ -218,6 +218,10 @@ class CodexAdapter:
             shutil.rmtree(self._workdir, ignore_errors=True)
             self._workdir = None
 
+    async def listed(self) -> list[str]:
+        """The subscription's visible models now; the first page, as the probe reads it."""
+        return [m.id for m in (await self.codex().models()).data if not m.hidden]
+
     async def login(self, show) -> bool:
         handle = await self.codex().login_chatgpt()
         show(f"请在本机浏览器打开以下链接完成 ChatGPT 登录：\n{handle.auth_url}")

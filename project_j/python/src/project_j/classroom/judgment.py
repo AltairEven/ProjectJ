@@ -34,6 +34,16 @@ INSTRUCTIONS = (
     "也不说出evidence中能直接回答本题的词（可以使用allowed_supports里的说法）。"
     "correct时肯定学生，可以示范英语说法，但不再要求学生重说或改用英语再答，核心随后直接进入下一题。"
 )
+# Sent with exact and open questions: a practice prompt asks for a word or form, and an answer
+# that means the same without it is not the practice (2026-11-19, reference set 2.3.0).
+PRACTICE_RULE = (
+    "prompt明确要求用某个词或某种形式"
+    "（如“Use the action word from the page”“Use the past form”）时，"
+    "answer没有用到要求的词或形式、或要求的那个词本身形式用错（如该用drops却说drop），"
+    "judgment为incorrect，即使意思与依据一致；用原形回答过去式的要求也算没有用到；"
+    "text按题目的说法请学生用要求的词或形式再说一次，不说出那个词。"
+    "要求的词或形式用对了，其他地方的小拼写或语法错误仍算correct。"
+)
 # Sent with open questions only: added to every request, these rules made the real model judge
 # short unclear answers to other tasks as incorrect (QT-3 reference run, 13/18 against 18/18).
 OPEN_INSTRUCTIONS = (
@@ -42,7 +52,7 @@ OPEN_INSTRUCTIONS = (
     "与故事矛盾、离题、只有一两个词或缺少guidance要求的部分为incorrect，"
     "并在text里提示还缺什么，不替学生说出完整回答；无法确认意思为unclear；"
     "用中文作答按上面的规则判unclear并提醒用英文。"
-)
+) + PRACTICE_RULE
 
 
 # Sent with exact questions only, for the same reason. Without it an answer that copied the
@@ -55,7 +65,7 @@ ANSWER_INSTRUCTIONS = (
     "即使照抄故事里说它的那一句）、抄答案所在的整句或evidence的全部、"
     "加The story says这类引出语并引用evidence。"
     "这一条只管多出来的内容，不改变其他判断：回答笼统、无法确认指的是什么时仍是unclear。"
-)
+) + PRACTICE_RULE
 
 
 # A reading passes with at most this share of its words flagged: one weak phone flags a word and

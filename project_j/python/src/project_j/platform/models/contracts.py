@@ -213,6 +213,8 @@ class ModelAdapter(Protocol):
         self, model: str, efforts: tuple[Effort, ...], tiers: tuple[Tier, ...] = ()
     ) -> CapabilityReport: ...
 
+    async def listed(self) -> list[str]: ...  # Model ids offered now, for the settings page.
+
 
 def admission(
     report: CapabilityReport | None, purpose: Purpose, effort: Effort, tier: Tier = "default"

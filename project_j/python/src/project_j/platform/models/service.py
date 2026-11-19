@@ -64,6 +64,12 @@ class ModelService:
         report = adapter.report(SIMULATED_MODEL, ("low", "medium"))
         return cls({"simulated": adapter}, bindings, [report])
 
+    async def prewarm(self):
+        """Start the adapters' runtimes now, not inside the first in-class judgment."""
+        for adapter in self.adapters.values():
+            if hasattr(adapter, "prewarm"):
+                await adapter.prewarm()
+
     def deadlines(self) -> dict[DeadlineKey, int]:
         return self.files.deadlines() if self.files else dict(DEFAULT_DEADLINES)
 

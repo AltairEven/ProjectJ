@@ -2,9 +2,14 @@
 
 import argparse
 import asyncio
+import functools
 import hashlib
 import json
+import logging
+import time
+from collections.abc import Callable
 from datetime import UTC, datetime
+from importlib.metadata import version
 from math import ceil
 from pathlib import Path
 from statistics import mean, median
@@ -13,6 +18,8 @@ from typing import Literal
 from pydantic import Field
 
 from project_j.application.acceptance import fingerprint
+from project_j.application.progress import in_class
+from project_j.application.settings import FIXED
 from project_j.classroom.harness import is_help_request
 from project_j.classroom.judgment import ClassroomJudgment, judgment_request, method_context
 from project_j.contracts import Contract, RevisionRef
@@ -25,15 +32,30 @@ from project_j.platform.models.registry import load_service
 from project_j.platform.models.service import ModelService
 from project_j.platform.speech.contracts import PronunciationResult, WordScore
 from project_j.platform.speech.local import LIMITATIONS
-from project_j.platform.storage import check_run_id
+from project_j.platform.storage import Conflict, check_run_id
 from project_j.preparation.contracts import TaskDefinition
 from project_j.preparation.packages import COURSES, course_tasks, story_text
 from project_j.preparation.reading import words
 from project_j.teacher.methods import JANE
 
+log = logging.getLogger(__name__)
+
 REFERENCE = "courses/paper-bridge/judgment-reference.json"
+# Fixed text forms the courses lack (a fact page, a dialogue), for the reference set only.
+FORMS_TASKS = "courses/judgment-forms/tasks.json"
 PROJECT_ROOT = Path(__file__).resolve().parents[5]  # The build being checked, not --root.
 DEADLINE_SECONDS = 10  # The classroom's judgment deadline.
+REPORTS = "project_j/private/study"  # Each run's own folder: <run_id>/judgment-reference.json.
+SECONDS_PER_CASE = 4  # Rough page estimate of one judgment call.
+RUNNING = "AI work is running; run the check after it finishes."
+CLASS_RUNNING = "A class is running; run the check after it ends."
+NOT_PROBED = "The current setup has not passed the probe."
+NOTHING = "There is nothing to rerun."
+CHECKING = "The classroom judgment check is running; start after it finishes."
+
+
+class RunStopped(RuntimeError):
+    """The model service stopped answering (e.g. the service shut down); no report is written."""
 
 
 class PronunciationFixture(Contract):
@@ -55,6 +77,7 @@ class ReferenceCase(Contract):
         "after_help",
         "read_aloud",
         "report",
+        "practice",
     ]
     source: str
     task_id: str
@@ -83,6 +106,7 @@ def load_reference(root: Path) -> tuple[ReferenceSet, str]:
 def reference_tasks(root: Path) -> dict[tuple[str, str], TaskDefinition]:
     # The context never carries the material reference, so a fixed placeholder suffices.
     material = RevisionRef(object_id="judgment-reference", revision=1)
+    forms = json.loads((root / FORMS_TASKS).read_text())
     return {
         (source, task.task_id): task
         for source in COURSES
@@ -93,6 +117,10 @@ def reference_tasks(root: Path) -> dict[tuple[str, str], TaskDefinition]:
             PRIMARY_GOAL.dimension_id,
             AUXILIARY_GOAL.dimension_id,
         )
+    } | {
+        (source, task["task_id"]): TaskDefinition.model_validate(task)
+        for source, items in forms.items()
+        for task in items
     }
 
 
@@ -119,6 +147,9 @@ def validate(reference: ReferenceSet, tasks: dict[tuple[str, str], TaskDefinitio
         hits = [w for w in case.forbidden if w.casefold() in case.answer.casefold()]
         if hits:
             problems.append(f"{name}：禁止词出现在本题作答里：{'、'.join(hits)}")
+        asked = [w for w in case.forbidden if w.casefold() in task.prompt.casefold()]
+        if asked:
+            problems.append(f"{name}：禁止词出现在题目里，复述题目不算泄露：{'、'.join(asked)}")
     return problems
 
 
@@ -195,7 +226,11 @@ def grade(
 
 
 async def run_reference(
-    service: ModelService, root: Path, repeats: int = 1, case_ids: frozenset[str] = frozenset()
+    service: ModelService,
+    root: Path,
+    repeats: int = 1,
+    case_ids: frozenset[str] = frozenset(),
+    progress: Callable[[int, int], None] | None = None,
 ) -> dict:
     """Sequential calls, no retry: a failure counts exactly as it would in class.
 
@@ -207,15 +242,25 @@ async def run_reference(
         raise ValueError("；".join(problems))
     binding = service.bindings["classroom_judgment"]
     adapter = service.adapters.get(binding.adapter)
-    results = []
-    for case in reference.cases:
-        if case_ids and case.case_id not in case_ids:
-            continue
+    results, unavailable = [], 0
+    chosen = [case for case in reference.cases if not case_ids or case.case_id in case_ids]
+    for case in chosen:
         task = tasks[case.source, case.task_id]
         for repeat in range(1, repeats + 1):
             result = await service.run(reference_request(case, task))
             call = service.calls[-1]
             reasons = grade(case, task, result.output, result.failure)
+            # ponytail: two in a row means the runtime is gone (a restart kills it); one alone is
+            # a failed call, which a rerun settles.
+            unavailable = unavailable + 1 if result.failure == "unavailable" else 0
+            if unavailable == 2:
+                log.warning(
+                    "judgment reference stopped calls=%d reason=unavailable", len(results) + 1
+                )
+                raise RunStopped(
+                    "The model service stopped answering; the run ended without a report. "
+                    "Run it again."
+                )
             results.append(
                 {
                     "case_id": case.case_id,
@@ -232,6 +277,8 @@ async def run_reference(
                     **{k: call[k] for k in ("failure", "elapsed_ms", "request_id", "usage")},
                 }
             )
+            if progress:
+                progress(len(results), len(chosen) * repeats)
     timings = sorted(r["elapsed_ms"] for r in results if r["failure"] is None)
     categories = {}
     for result in results:
@@ -253,6 +300,7 @@ async def run_reference(
             "cases": len(reference.cases),
             "selected": sorted(case_ids) or None,
         },
+        "check_key": check_key(service),
         "binding": binding.model_dump(),
         "adapter_version": adapter.version if adapter else None,
         "simulated": adapter.simulated if adapter else None,
@@ -272,6 +320,145 @@ async def run_reference(
             "all_passed": passed == len(results),
         },
     }
+
+
+@functools.cache
+def request_digest() -> str:
+    """Every request the set sends, built by the code being checked; fixed while it runs."""
+    reference, _ = load_reference(PROJECT_ROOT)
+    tasks = reference_tasks(PROJECT_ROOT)
+    hasher = hashlib.sha256()
+    for case in reference.cases:
+        request = reference_request(case, tasks[case.source, case.task_id])
+        text = json.dumps([request.instructions, request.context], sort_keys=True)
+        hasher.update(text.encode())
+    return hasher.hexdigest()
+
+
+def check_key(service: ModelService) -> str:
+    """What a report was run against: the requests, the classroom binding, adapter and SDK."""
+    binding = service.bindings["classroom_judgment"]
+    adapter = service.adapters.get(binding.adapter)
+    parts = [
+        request_digest(),
+        binding.model_dump(),
+        adapter.version if adapter else None,
+        version("openai-codex"),
+    ]
+    return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
+
+
+def read_report(path: Path, key: str | None = None) -> dict | None:
+    """A report, or None for a half-written or foreign file (or, given a key, another setup's)."""
+    try:
+        text = path.read_text()
+        return json.loads(text) if key is None or key in text else None  # Parse only a match.
+    except OSError, ValueError:
+        return None
+
+
+def judged_wrong(result: dict) -> bool:
+    return any(not reason.startswith("model_failure:") for reason in result["reasons"])
+
+
+def judgment_check(root: Path, service: ModelService) -> dict | None:
+    """The reference-set state of the current classroom setup, from the reports under root."""
+    binding = service.bindings.get("classroom_judgment")
+    if binding is None:
+        return None
+    key, cases = check_key(service), len(load_reference(PROJECT_ROOT)[0].cases)
+    fulls = [
+        (report, path.parent)
+        for path in (root / REPORTS).glob("*/judgment-reference.json")
+        if (report := read_report(path, key))
+        and report.get("check_key") == key
+        and not report.get("reference", {}).get("selected")
+    ]
+    found = {
+        "state": "not_run",
+        "binding": binding.model_dump(),
+        "cases": cases,
+        "estimate_seconds": cases * SECONDS_PER_CASE,
+        "report": None,
+        "rerun_cases": [],
+    }
+    if not fulls:
+        return found
+    full, folder = max(fulls, key=lambda item: item[0]["captured_at"])
+    reruns = [r for p in sorted(folder.glob("rerun-*.json")) if (r := read_report(p))]
+    rerun_results = [result for rerun in reruns for result in rerun["results"]]
+    failed = [r for r in full["results"] if not r["passed"]]
+    failed += [r for r in rerun_results if judged_wrong(r)]
+    called = sorted({r["case_id"] for r in failed if not judged_wrong(r)})
+    settled = {
+        case_id
+        for rerun in reruns
+        for case_id in called
+        if any(r["passed"] for r in rerun["results"] if r["case_id"] == case_id)
+    }
+    remaining = [case_id for case_id in called if case_id not in settled]
+    state = "failed" if any(map(judged_wrong, failed)) else "needs_rerun" if remaining else "passed"
+    summary = full["summary"]
+    found |= {
+        "state": state,
+        "rerun_cases": remaining if state == "needs_rerun" else [],
+        "report": {
+            "run_id": folder.name,
+            "captured_at": full["captured_at"],
+            "passed": summary["passed"],
+            "total": summary["total"],
+            "median_ms": summary["judgment_ms"]["median"],
+            "p95_ms": summary["judgment_ms"]["p95"],
+            "settled_by_rerun": state == "passed" and bool(settled),
+            "failed": [
+                {k: r[k] for k in ("case_id", "reasons", "text")} for r in failed if judged_wrong(r)
+            ],
+        },
+    }
+    return found
+
+
+def check_start(app, mode: Literal["full", "rerun"]) -> tuple[frozenset[str], Path]:
+    """Refuse a run the page must not start; else the cases to run (none named: all) and the
+    report to write: a full run gets its own folder, a rerun sits beside the full report."""
+    if app.models.files is None:
+        raise Conflict(FIXED)
+    if in_class(app):
+        raise Conflict(CLASS_RUNNING)
+    if app.jobs:
+        raise Conflict(RUNNING)
+    if app.models.reasons("classroom_judgment"):
+        raise Conflict(NOT_PROBED)
+    reports = app.root / REPORTS
+    if mode == "full":
+        folder = reports / f"judgment-ref-{datetime.now(UTC):%Y%m%dT%H%M%SZ}"
+        return frozenset(), folder / "judgment-reference.json"
+    found = judgment_check(app.root, app.models)
+    if found is None or found["state"] != "needs_rerun":
+        raise Conflict(NOTHING)
+    folder = reports / found["report"]["run_id"]
+    rerun = folder / f"rerun-{len(list(folder.glob('rerun-*.json'))) + 1}.json"
+    return frozenset(found["rerun_cases"]), rerun
+
+
+async def reference_job(app, mode: str, case_ids: frozenset[str], path: Path, progress) -> None:
+    started = time.perf_counter()
+    # Each case once, a rerun too: a case that failed by a call passes when a rerun passes (user
+    # decision 2026-11-19, formerly five times: a slow model made reruns longer than the set).
+    report = await run_reference(app.models, PROJECT_ROOT, case_ids=case_ids, progress=progress)
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+    results, summary = report["results"], report["summary"]
+    log.info(
+        "judgment reference run mode=%s cases=%d passed=%d failed=%d model_failures=%d "
+        "elapsed_ms=%.0f",
+        mode,
+        len({r["case_id"] for r in results}),
+        summary["passed"],
+        summary["failed"],
+        sum(r["failure"] is not None for r in results),
+        (time.perf_counter() - started) * 1000,
+    )
 
 
 def summary_lines(report: dict, path: Path) -> list[str]:
@@ -307,6 +494,9 @@ async def run_and_save(
             report = await run_reference(service, root, repeats, case_ids)
         except ValueError as error:
             print(f"参考题集与课程不一致：{error}")
+            return 2
+        except RunStopped:
+            print("模型服务连续不可用（例如服务已关闭），运行已中止，未写报告。")
             return 2
     finally:
         for adapter in service.adapters.values():
