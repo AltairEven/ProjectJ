@@ -1,9 +1,11 @@
 """Expanded reading: a taken lesson's story written out as an English novel in the student's
 readings/ folder, step by step so a stop or a failure resumes where it was (ADR-0033).
 
-A book is files, not records: book.json (the run's state), pictures/ and book.epub. It is a
-background job named reading:<book>; a class start cancels it first. The lesson folder, the
-profile and the vocabulary box are only read.
+A book is files, not records: book.json (the run's state), pictures/ and book.epub. The
+student and Jane first agree an outline in rounds; only a confirmed outline is written, and a
+finished book grows by new chapters agreed the same way (ADR-0034). Each step is a background job
+named reading:<book>; a class start cancels it first. The lesson folder, the profile and the
+vocabulary box are only read.
 """
 
 import asyncio
@@ -13,7 +15,7 @@ import time
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import JsonValue
+from pydantic import JsonValue, model_validator
 
 from project_j.application.progress import in_class
 from project_j.contracts import Contract, RevisionRef
@@ -27,6 +29,7 @@ from project_j.preparation.expansion import (
     Outline,
     chapter_problems,
     chapter_request,
+    extended,
     outline_problems,
     outline_request,
     picture_request,
@@ -52,12 +55,22 @@ class BookRecord(Contract):
     lesson: str  # The lesson folder the story came from.
     challenge: str
     target: str | None
-    status: Literal["writing", "ready"]
-    outline: Outline | None = None
+    status: Literal["outlining", "writing", "ready"]
+    outline: Outline | None = None  # The confirmed outline the chapters follow.
+    proposal: Outline | None = None  # Under discussion: a new book's, or a finished one's next.
+    proposal_version: int = 0
     chapters: list[ChapterDraft] = []
     pictures: dict[int, Literal["pending", "drawn", "failed"]] = {}  # Each chapter's new one.
     revisions: int = 0
     calls: list[dict[str, JsonValue]] = []  # Per step: the binding and the checked config.
+
+    @model_validator(mode="before")
+    @classmethod
+    def first_version(cls, data):
+        """A first-version book stopped before its outline now waits for one to be agreed."""
+        if isinstance(data, dict) and data.get("status") == "writing" and not data.get("outline"):
+            return data | {"status": "outlining"}
+        return data
 
 
 def folder(book_id: str) -> str:
@@ -109,7 +122,7 @@ def book_targets(app, learner_id: str) -> dict[str, str]:
 
 
 def start_book(app, learner_id: str, course_ref: RevisionRef, challenge: str) -> str:
-    """Check and save a new book's first record; the background job then writes it."""
+    """Check and save a new book's first record; the background job then plans its outline."""
     guard(app)
     app.models.require()
     lesson = lesson_of(app, learner_id, course_ref)
@@ -130,7 +143,7 @@ def start_book(app, learner_id: str, course_ref: RevisionRef, challenge: str) ->
         lesson=lesson.body["folder"],
         challenge=challenge,
         target=target,
-        status="writing",
+        status="outlining",
     )
     save(app, record)
     log.info(
@@ -139,11 +152,119 @@ def start_book(app, learner_id: str, course_ref: RevisionRef, challenge: str) ->
     return book_id
 
 
-def retry_book(app, learner_id: str, book_id: str) -> None:
+def retry_book(app, learner_id: str, book_id: str) -> Literal["outlining", "writing"]:
+    """A book stopped while being written, or before its first outline: which job resumes it."""
     guard(app)
     app.models.require()
-    if load(app, book_id).status != "writing":
-        raise Conflict("This book is already done.")
+    record = load(app, book_id)
+    if record.status == "writing" or (record.status == "outlining" and record.proposal is None):
+        return record.status
+    raise Conflict("This book has nothing to retry.")
+
+
+def start_outline_round(app, learner_id: str, book_id: str, feedback: str) -> None:
+    """Check a round on the outline under discussion, or (finished book) on new chapters."""
+    if not feedback.strip():
+        raise ValueError("Write what should change in the outline.")
+    guard(app)
+    app.models.require()
+    record = load(app, book_id)
+    if not (record.status == "ready" or (record.status == "outlining" and record.proposal)):
+        raise Conflict("This book has no outline to discuss now.")
+    log.info(
+        "book outline start book=%s version=%d continuing=%s",
+        book_id,
+        record.proposal_version,
+        record.status == "ready",
+    )
+
+
+async def plan_outline(app, learner_id: str, book_id: str, feedback: str | None, progress) -> None:
+    """One round: the first outline, or the one under discussion (else the confirmed one) redone
+    by the feedback; after confirmed chapters only new ones are added. A failed round keeps the
+    last outline. The feedback is used once and kept nowhere."""
+    record = load(app, book_id)
+    story, pictures, course = source(app, learner_id, record)
+    _, vocabulary = app.vocabulary_record(learner_id)
+    active = [entry for entry in vocabulary.words if entry.status == "active"]
+    lemmas = [entry.lemma for entry in active]
+    words = [{"lemma": e.lemma, "part_of_speech": e.part_of_speech} for e in active]
+    confirmed = record.outline
+    kept = len(confirmed.chapters) if confirmed else 0
+    request = outline_request(
+        story,
+        record.target,
+        words,
+        shown(pictures),
+        course.get("picture_style") or "",
+        current=record.proposal or confirmed,
+        feedback=feedback,
+        fixed=kept,
+    )
+    ids = [item["picture"] for item in pictures]
+
+    def check(output: Outline):
+        return outline_problems(extended(output, confirmed), lemmas, ids, kept), []
+
+    output, entry = await ask(app, book_id, "outline", request, check)
+    outline = extended(output, confirmed)
+    version = record.proposal_version + 1
+    update = {"proposal": outline, "proposal_version": version, "calls": [*record.calls, entry]}
+    save(app, record.model_copy(update=update))
+    log.info(
+        "book outline book=%s version=%d chapters=%d continuing=%s",
+        book_id,
+        version,
+        len(outline.chapters),
+        confirmed is not None,
+    )
+
+
+def confirm_outline(app, learner_id: str, book_id: str) -> None:
+    """The outline under discussion becomes the book's; its chapters not yet written are next."""
+    guard(app)
+    app.models.require()
+    record = load(app, book_id)
+    if record.proposal is None:
+        raise Conflict("There is no outline to confirm.")
+    new = range(len(record.chapters) + 1, len(record.proposal.chapters) + 1)
+    update = {
+        "outline": record.proposal,
+        "proposal": None,
+        "proposal_version": 0,
+        "status": "writing",
+        "pictures": record.pictures | dict.fromkeys(new, "pending"),
+    }
+    save(app, record.model_copy(update=update))
+    log.info(
+        "book confirm book=%s chapters=%d new=%d", book_id, len(record.proposal.chapters), len(new)
+    )
+
+
+def discard_proposal(app, book_id: str) -> None:
+    """Drop the new chapters under discussion; the finished book stays as it is."""
+    guard(app)
+    record = load(app, book_id)
+    if record.status != "ready" or record.proposal is None:
+        raise Conflict("There are no new chapters to discard.")
+    save(app, record.model_copy(update={"proposal": None, "proposal_version": 0}))
+    app.job_failures.pop(JOB + book_id, None)  # A failed round of what is now discarded.
+    log.info("book discard book=%s", book_id)
+
+
+def start_drawing(app, learner_id: str, book_id: str) -> int:
+    """Mark a finished book's failed pictures to be drawn again; the writing job draws them.
+    Its book done log then counts what was drawn and what failed again."""
+    guard(app)
+    app.models.require()
+    record = load(app, book_id)
+    failed = [number for number, state in record.pictures.items() if state == "failed"]
+    if record.status != "ready" or not failed:
+        raise Conflict("This book has no missing pictures to draw.")
+    update = {"status": "writing", "pictures": record.pictures | dict.fromkeys(failed, "pending")}
+    save(app, record.model_copy(update=update))
+    log.info("book redraw start book=%s pictures=%d", book_id, len(failed))
+    return len(failed)
 
 
 async def ask(app, book_id: str, step: str, request, check):
@@ -234,36 +355,15 @@ def chapter_check(record: BookRecord, number: int):
     outline = record.outline
     words = outline.chapters[number - 1].words
     mine = [place.picture for place in outline.pictures if place.chapter == number]
-    return lambda draft: chapter_problems(draft, len(outline.chapters), words, mine)
+    return lambda draft: chapter_problems(draft, words, mine)
 
 
 async def write_book(app, learner_id: str, book_id: str, progress) -> None:
-    """Outline, then each chapter, then each pending picture, then the EPUB; every step saved."""
+    """The confirmed outline's chapters not yet written, then each pending picture, then the
+    EPUB; every step saved."""
     started = time.perf_counter()
     record = load(app, book_id)
-    story, pictures, course = source(app, learner_id, record)
-    if record.outline is None:
-        _, vocabulary = app.vocabulary_record(learner_id)
-        active = [entry for entry in vocabulary.words if entry.status == "active"]
-        lemmas = [entry.lemma for entry in active]
-        words = [{"lemma": e.lemma, "part_of_speech": e.part_of_speech} for e in active]
-        request = outline_request(
-            story, record.target, words, shown(pictures), course.get("picture_style") or ""
-        )
-        ids = [item["picture"] for item in pictures]
-        outline, entry = await ask(
-            app, book_id, "outline", request, lambda o: (outline_problems(o, lemmas, ids), [])
-        )
-        record = save(
-            app,
-            record.model_copy(
-                update={
-                    "outline": outline,
-                    "pictures": dict.fromkeys(range(1, len(outline.chapters) + 1), "pending"),
-                    "calls": [*record.calls, entry],
-                }
-            ),
-        )
+    story, pictures, _ = source(app, learner_id, record)
     planned = len(record.outline.chapters)
     total = 2 * planned + 2
 
@@ -329,12 +429,15 @@ def books(app) -> list[dict]:
         running = name in app.jobs
         planned = len(record.outline.chapters) if record.outline else None
         reason = app.job_failures.get(name)
-        if record.status == "ready":
-            state = "revising" if running else "ready"
+        if record.status == "outlining" and (running or record.proposal):
+            state = "outlining"  # Waiting for the student's next round or confirmation.
+        elif record.status == "ready":
+            state = "revising" if book_id in app.book_revising else "ready"
         elif running:
-            state = "writing" if planned is None or len(record.chapters) < planned else "drawing"
+            state = "writing" if len(record.chapters) < planned else "drawing"
         else:
             state, reason = "failed", reason or "stopped before it finished"
+        discussed = record.proposal or record.outline
         rows.append(
             {
                 "book_id": book_id,
@@ -347,6 +450,11 @@ def books(app) -> list[dict]:
                 "state": state,
                 "revising": app.book_revising.get(book_id) if running else None,
                 "reason": None if running else reason,
+                "outline": discussed.model_dump(mode="json") if discussed else None,
+                "version": record.proposal_version if record.proposal else None,
+                "continuing": record.status == "ready" and record.proposal is not None,
+                "missing_pictures": list(record.pictures.values()).count("failed"),
+                "downloadable": app.files.path(f"{folder(book_id)}/book.epub").is_file(),
             }
         )
     return rows

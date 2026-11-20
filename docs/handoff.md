@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.59.0；更新：2026年11月20日。
+版本：1.60.0；更新：2026年11月20日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -1364,3 +1364,16 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 继续条件：升级后原初始化记录因多了`reading`用途失效，须先在设置页对当前绑定点一次“Save and probe”（通过才切换），才能继续备课、上课等AI工作；不需要重跑课堂判断参考题集。
 - 状态：实现与离线检查完成，已本地提交（2026年11月20日，提交号见Git记录）；复审修改另一提交，同样只在本地。
 
+## BOOK-2 扩展阅读第二版：先讨论提纲再写书、按提纲续写、补画缺图（ADR-0034）
+
+- 负责人：Claude Opus（实现与集成）；参与者：无。发起：2026年11月20日用户读完第一版真实扩写的书后要求先定提纲、多轮讨论确认后再写，每章400–800词、总字数按章数，书完成后可续写；同时按真实验收结果去掉画图请求里的角色名、加补画缺图、设置页显示可读名称。设计docs/superpowers/specs/2026-11-20-extended-reading-outline-design.md（0.1.0，用户确认），计划docs/superpowers/plans/2026-11-20-extended-reading-outline.md（用户确认并经计划审查，在本会话内由开发代理逐任务实现，进度账本在本机.superpowers/sdd/）。
+- 实际改动：preparation/expansion.py：章数2–12、每章400–800词（去掉全书总词数与按章数平分）；提纲加`summary`，人物改为`{called, look}`（字段名不用`name`，因为模型请求拒绝上下文里出现身份键`name`），读入第一版记录时补缺省值、字符串人物当作只有外貌；核对加“外貌不得含任何人物名字”与续写核对`extension_problems`（已确认章、人物前缀、画风、原插图指派不变，至少加一章）；提纲请求带讨论中的提纲、修改意见与已确认章数；写章与改写指令要求严格按本章提纲情节；画图请求只放出场人物的外貌，插图描述里的人物名字整词换成外貌。application/books.py：状态加`outlining`、记录加`proposal`与`proposal_version`（第一版写到一半没有大纲的书读入时改为`outlining`）；新增`start_outline_round`、`plan_outline`（失败时上一版保留）、`confirm_outline`（新章插图记未画）、`discard_proposal`、`start_drawing`；`write_book`不再写大纲；`retry_book`返回要接着做的任务；主页行加`outline`、`version`、`continuing`、`missing_pictures`、`downloadable`。interface/api.py：`/api/books/expand`只出第一版提纲，新增`/api/books/outline`、`/confirm`、`/discard`（200同步）、`/pictures`，`/retry`按书的状态选任务，改写章号上限12。模拟适配器的提纲回答加概要与人物、可改一版或在末尾加一章。前端：books.ts加`outlineLine`与讨论中的状态文字；课程详情显示提纲（大致内容、各章“章名 — 情节”）、“What should change?”“Revise the outline”“Write the book from this outline”，完成的书有“Draw missing pictures”“Continue the story”→“Plan new chapters”，续写讨论另起一行“New chapters: Outline, version n”并可“Write the new chapters”或“Discard”，打包过的书任何状态都可下载，失败原因统一写“The last step failed: …”；设置页绑定行用`purposeLabels`显示可读名称；沙盒快照加讨论中的书与续写讨论中的书；OpenAPI与生成类型更新。设计同步：ADR-0034、main-page.md 2.12.0、preview-start.md 2.6.0、models.md 2.11.1、preparation/README.md 2.14.0、README 1.22.0。
+- 诊断日志：新增`book outline start book= version= continuing=`、`book outline book= version= chapters= continuing=`、`book confirm book= chapters= new=`、`book discard book=`、`book redraw start book= pictures=`（补画结果见随后的`book done`的`drawn=`/`failed=`）；一轮提纲的调用结果沿用`book step … step=outline result=…`。不记提纲、书名、大致内容、人物名字与外貌、修改意见（测试断言；模拟走查的服务日志里也查过没有）。
+- 检查证据：统一check通过（主工程985、评分39、合成15项pytest，OpenAPI导出、类型生成、TypeScript检查、前端回归、构建与文档检查通过；含审查修改），UTC 2026-11-20T15:54:10.971929+00:00，工程摘要1c996cd4aad544a42d9c0c29d6aa2213ece87143dd25bc584836aabfd3544d4b；project-j-probe与project-j-measure正常；依赖未改，本批未重跑三个sync、两个npm ci与npm audit。新增或改写测试：test_book_writing（章数边界、外貌不含名字、旧提纲可读、续写核对、每章400–800、提纲请求带讨论、画图请求无名字、插图只画出场人物、模拟回答过核对）、test_books（新书等提纲、多轮替换且意见不留、失败一轮保留上一版、开课停下一轮保留上一版、确认后按提纲写、不适用时拒绝、续写只写新章且旧章旧图不变、续写须安排新生词、放弃续写书不变、续写失败旧EPUB照样可下载、补画只画失败的且再失败仍记失败、旧格式书可列出下载改写补画续写、无大纲的旧书重试出提纲；原有测试改为先提纲确认再写）、test_books_api（经接口讨论、确认、续写、放弃；重试按状态选任务；补画与新接口的输入校验和令牌）、前端books.test.mjs与settings.test.mjs各一例。各新测试先失败后通过。
+- 模拟走查（本机，project_j/test，不进Git）：模拟运行book-check-2，真页面Expand→提纲第1版（此时没有下载按钮）→写意见得到第2版→确认写书→下载→看章节情节→续写讨论（可下载）→放弃→再续写→确认写第5章→把第2章插图手动记为失败→“Draw missing pictures”补画→下载；全部成功，截图、两本EPUB与服务日志在project_j/test/output/book-check-2/。模拟模型瞬时返回，进度文字只由单元测试覆盖。
+- 文件边界：project_j/python/src/project_j/{application/books,interface/api,platform/models/simulated,preparation/expansion}.py；project_j/python/tests/test_{book_writing,books,books_api}.py；project_j/web/src/{books,report}.ts、pages/{Courses,Settings}.tsx、client/（生成）、schema/openapi.json、sandbox/dashboard.json、tests/{books,settings}.test.mjs；decisions/ADR-0034.md及上列设计文档、本交接、README、规格与计划。
+- 验收条件：统一检查通过（已满足）；真实提纲讨论至少两轮后写书一次；续写一次；换网络后对2026年11月20日那本书补画缺图；看画图请求不写名字后审核拦截是否减少。
+- 未验证：真实模型的提纲讨论（意见能否被照做、章数增减、提纲与正文是否一致不偏题）、续写与补画；旧书补画（人物没有名字可换，可能仍被审核拦截）；沙盒快照的新状态未打开浏览器看。
+- 继续条件：用途与所需能力没变，升级后不需要重新探测，也不需要课堂判断参考题集；正在讨论或写到一半的第一版书升级后照常显示（没有大纲的按提纲讨论处理，点Retry出第一版提纲）。
+- 审查：开发代理在主会话自审两轮（常规审查，ponytail-review查冗余），按用户同意的待修改优化项改：①续写不再要求模型逐字照抄已确认部分，改由程序放回书名、已写章、人物、画风与原插图指派，只取新加的章与人物（`expansion.extended`，去掉`extension_problems`，“至少加一章”并入`outline_problems`的`kept`参数；第一版格式的书人物说明带名字时，模型“改正”它也不再导致续写失败）；②放弃续写时清掉这本书上一轮的失败原因；③人名换外貌时外貌按原文放入，不按正则替换串解析反斜杠；④前端去掉写作中书没有章数时的“Planning”死分支。①②③的测试先失败后通过。
+- 状态：实现、审查修改与离线检查完成，已本地提交（2026年11月20日，提交号见Git记录），未推送。

@@ -295,10 +295,20 @@ class SimulatedAdapter:
 
 
 def reading_reply(context: dict) -> dict:
-    """A fixed book that passes the checks: four chapters, the words dealt out in turn and every
-    original picture in chapter 1; a chapter long enough for its range, using its words, with
-    original pictures from paragraph 1 on and the new one last. A revision reads differently."""
+    """A fixed book that passes the checks: a first outline of four chapters, the words dealt out
+    in turn and every original picture in chapter 1; a later round revises its summary, or adds a
+    chapter with the words not yet placed. A chapter is long enough for its range, uses its words,
+    puts the original pictures from paragraph 1 on and the new one last. A revision reads
+    differently."""
     if context["kind"] == "outline":
+        if book := context["current"]:  # A later round: revised, or (fixed) new chapters added.
+            if not context["fixed"]:
+                return book | {"summary": book["summary"] + " Revised."}
+            placed = {word.lower() for chapter in book["chapters"] for word in chapter["words"]}
+            new = [w["lemma"] for w in context["words"] if w["lemma"].lower() not in placed]
+            number = len(book["chapters"]) + 1
+            added = {"title": f"Part {number}", "plot": "The story goes on.", "words": new}
+            return book | {"chapters": [*book["chapters"], added]}
         chapters = [
             {"title": f"Part {n}", "plot": "The story goes on.", "words": []} for n in range(4)
         ]
@@ -306,7 +316,8 @@ def reading_reply(context: dict) -> dict:
             chapters[index % 4]["words"].append(word["lemma"])
         return {
             "title": "The Longer Story",
-            "characters": ["Mia: a small girl in a red coat."],
+            "summary": "Mia walks home the long way in the rain.",
+            "characters": [{"called": "Mia", "look": "a small girl in a red coat"}],
             "style": context["style"] or "Soft watercolor, simple shapes.",
             "chapters": chapters,
             "pictures": [

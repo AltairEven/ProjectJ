@@ -36,9 +36,14 @@ from project_j.application.books import (
     BOOK_PATTERN,
     JOB,
     book_file,
+    confirm_outline,
+    discard_proposal,
+    plan_outline,
     retry_book,
     revise_chapter,
     start_book,
+    start_drawing,
+    start_outline_round,
     start_revision,
     write_book,
 )
@@ -76,6 +81,7 @@ from project_j.platform.storage import Conflict, SimulationStore, StorageBlocked
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.local import LocalSynthesizer, SynthesizerUnavailable
 from project_j.platform.tts.recorded import speak
+from project_j.preparation.expansion import Outline
 from project_j.preparation.lessons import confirm_resources, remake_broken
 from project_j.preparation.resources import choose_resource, remake_resource, resource_file
 
@@ -333,7 +339,11 @@ class BookRetry(Contract):
 
 
 class BookRevise(BookRetry):
-    chapter: int = Field(ge=1, le=6)
+    chapter: int = Field(ge=1, le=12)
+    feedback: str = Field(min_length=1, max_length=2000)
+
+
+class BookOutline(BookRetry):
     feedback: str = Field(min_length=1, max_length=2000)
 
 
@@ -347,9 +357,14 @@ class BookRow(Contract):
     words: int
     chapters: list[str]
     planned: int | None
-    state: Literal["writing", "drawing", "ready", "revising", "failed"]
+    state: Literal["outlining", "writing", "drawing", "ready", "revising", "failed"]
     revising: int | None = None  # The chapter being rewritten while state is "revising".
     reason: str | None
+    outline: Outline | None = None  # Under discussion if there is one, else the confirmed one.
+    version: int | None = None  # The round of the outline under discussion.
+    continuing: bool = False  # A finished book with new chapters under discussion.
+    missing_pictures: int = 0
+    downloadable: bool = False  # An EPUB is on disk, whatever the book is doing.
 
 
 class Dashboard(Contract):
@@ -807,21 +822,53 @@ def create_app(
     def book_job(learner_id: str, book_id: str, work) -> dict:
         return background(learner_id, JOB + book_id, work) | {"book_id": book_id}
 
-    @app.post("/api/books/expand", dependencies=[Depends(operator)], status_code=202)
-    async def book_expand(request: BookExpand):
-        app_controller, learner = controller(), request.learner_id
-        book = start_book(app_controller, learner, request.course_ref, request.challenge)
+    def outlining(learner: str, book: str, feedback: str | None = None) -> dict:
+        app_controller = controller()
+        return book_job(
+            learner,
+            book,
+            lambda progress: plan_outline(app_controller, learner, book, feedback, progress),
+        )
+
+    def writing(learner: str, book: str) -> dict:
+        app_controller = controller()
         return book_job(
             learner, book, lambda progress: write_book(app_controller, learner, book, progress)
         )
 
+    @app.post("/api/books/expand", dependencies=[Depends(operator)], status_code=202)
+    async def book_expand(request: BookExpand):
+        learner = request.learner_id
+        book = start_book(controller(), learner, request.course_ref, request.challenge)
+        return outlining(learner, book)
+
+    @app.post("/api/books/outline", dependencies=[Depends(operator)], status_code=202)
+    async def book_outline(request: BookOutline):
+        learner, book = request.learner_id, request.book_id
+        start_outline_round(controller(), learner, book, request.feedback)
+        return outlining(learner, book, request.feedback)
+
+    @app.post("/api/books/confirm", dependencies=[Depends(operator)], status_code=202)
+    async def book_confirm(request: BookRetry):
+        confirm_outline(controller(), request.learner_id, request.book_id)
+        return writing(request.learner_id, request.book_id)
+
+    @app.post("/api/books/discard", dependencies=[Depends(operator)])
+    async def book_discard(request: BookRetry):
+        discard_proposal(controller(), request.book_id)
+        return {"book_id": request.book_id}
+
+    @app.post("/api/books/pictures", dependencies=[Depends(operator)], status_code=202)
+    async def book_pictures(request: BookRetry):
+        start_drawing(controller(), request.learner_id, request.book_id)
+        return writing(request.learner_id, request.book_id)
+
     @app.post("/api/books/retry", dependencies=[Depends(operator)], status_code=202)
     async def book_retry(request: BookRetry):
-        app_controller, learner, book = controller(), request.learner_id, request.book_id
-        retry_book(app_controller, learner, book)
-        return book_job(
-            learner, book, lambda progress: write_book(app_controller, learner, book, progress)
-        )
+        learner, book = request.learner_id, request.book_id
+        if retry_book(controller(), learner, book) == "writing":
+            return writing(learner, book)
+        return outlining(learner, book)
 
     @app.post("/api/books/revise", dependencies=[Depends(operator)], status_code=202)
     async def book_revise(request: BookRevise):

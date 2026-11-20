@@ -7,12 +7,21 @@ export const booksOf = (course: RevisionRef, books: BookRow[]): BookRow[] =>
 
 /** "Title · 600L · 3,120 words · 5 chapters" when done; otherwise how far it is. */
 export function bookLine(book: BookRow): string {
+  if (book.state === 'outlining') {
+    return book.version ? [book.outline?.title, book.target, `Outline, version ${book.version}`].filter(Boolean).join(' · ') : 'Planning the outline'
+  }
   if (book.state === 'failed') return `Failed: ${book.reason ?? 'reason unknown'}`
   if (book.state === 'drawing') return 'Drawing pictures'
-  if (book.state === 'writing') return book.planned ? `Writing chapter ${book.chapters.length + 1} of ${book.planned}` : 'Planning'
+  if (book.state === 'writing') return `Writing chapter ${book.chapters.length + 1} of ${book.planned}`
   if (book.state === 'revising') return `${book.title} · Rewriting ${book.revising ? `chapter ${book.revising}` : 'a chapter'}`
   return [book.title, book.target, `${book.words.toLocaleString('en-US')} words`, `${book.chapters.length} chapters`]
     .filter(Boolean).join(' · ')
+}
+
+/** The outline being discussed (a new book's, or a finished book's new chapters): planned now, or waiting at its version; null when there is none. */
+export function outlineLine(book: BookRow, running: boolean): string | null {
+  if (running) return book.state === 'outlining' || book.state === 'ready' ? 'Planning the outline' : null
+  return book.state === 'outlining' || book.continuing ? `Outline, version ${book.version}` : null
 }
 
 /** Why a book cannot be started, retried or revised now; null when it can. */

@@ -170,7 +170,7 @@ export function discussionLines(preview: Body): [string, string][] {
   return [...rounds, ['Confirmed', confirmation ? `Yes (${dateTimeText(confirmation.confirmed_at)})` : 'Not yet']]
 }
 
-const purposeLabels: Record<string, string> = {
+export const purposeLabels: Record<string, string> = {
   planning: 'Planning', preparation: 'Lesson making', classroom_judgment: 'Class judgment', evaluation: 'Evaluation', vocabulary: 'Word meanings', reading: 'Expanded reading',
 }
 const itemLabels: Record<string, string> = {

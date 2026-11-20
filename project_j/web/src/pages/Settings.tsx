@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, saveFile, uid } from '../api'
 import { dateTimeText } from '../dates'
-import { modelLines } from '../report'
+import { modelLines, purposeLabels } from '../report'
 import { ADAPTERS, EFFORTS, TIERS, bindingRows, checkConfirm, checkLine, deadlineLabels, modelOptions, probeNotes, withCurrent, type BindingRow } from '../settings'
 import { JobLine, Rows, useRun, type PageProps } from '../ui'
 
@@ -48,7 +48,7 @@ export default function Settings({ token, dashboard, learner, refresh }: PagePro
     {configurable && <section><h2>Models</h2>
       {inClass && <p className="notice">A class is running; the model can be changed after it ends.</p>}
       {rows.map((row, index) => { const options = modelOptions(offered, row)
-        return <div className="row settings-row" key={row.purpose}><strong>{row.purpose}</strong>
+        return <div className="row settings-row" key={row.purpose}><strong>{purposeLabels[row.purpose] ?? row.purpose}</strong>
         <select disabled={inClass} value={row.adapter} onChange={event => setRow(index, 'adapter', event.target.value)}>{withCurrent(ADAPTERS, row.adapter).map(adapter => <option key={adapter}>{adapter}</option>)}</select>
         {options
           ? <select disabled={inClass} value={row.model} onChange={event => setRow(index, 'model', event.target.value)}>{options.map(model => <option key={model}>{model}</option>)}</select>

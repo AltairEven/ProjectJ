@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import io
+import json
 import logging
 import zipfile
 from dataclasses import replace
@@ -17,9 +18,14 @@ from project_j.application.books import (
     STOPPED,
     BookRecord,
     book_file,
+    confirm_outline,
+    discard_proposal,
+    plan_outline,
     retry_book,
     revise_chapter,
     start_book,
+    start_drawing,
+    start_outline_round,
     start_revision,
     stop_books,
     write_book,
@@ -102,7 +108,34 @@ def calls(app, monkeypatch, change=None):
     return seen
 
 
+TOO_SHORT = {
+    "title": "Too short",
+    "paragraphs": ["Mia ran."],
+    "pictures": [],
+    "new_picture_paragraph": 1,
+    "new_picture": "A girl.",
+}
+
+
+def plan(app, book, feedback=None):
+    asyncio.run(plan_outline(app, LEARNER, book, feedback, noop))
+
+
+def confirmed(app, course_ref, challenge="same") -> str:
+    """A new book whose first outline is planned and confirmed: ready to be written."""
+    book = start_book(app, LEARNER, course_ref, challenge)
+    plan(app, book)
+    confirm_outline(app, LEARNER, book)
+    return book
+
+
 def write(app, book):
+    """The whole flow: plan the first outline if there is none, confirm it, then write."""
+    record = load(app, book)
+    if record.status == "outlining":
+        if record.proposal is None:
+            plan(app, book)
+        confirm_outline(app, LEARNER, book)
     asyncio.run(write_book(app, LEARNER, book, noop))
 
 
@@ -300,7 +333,7 @@ def test_untaken_or_busy_lessons_are_refused(application, monkeypatch):
 def test_class_start_stops_the_book_and_retry_resumes(application, monkeypatch, caplog):
     app = application
     course_ref = taken(app)
-    book = start_book(app, LEARNER, course_ref, "same")
+    book = confirmed(app, course_ref)
 
     async def block(request, count):
         if request.context.get("number") == 3:
@@ -323,7 +356,7 @@ def test_class_start_stops_the_book_and_retry_resumes(application, monkeypatch, 
     assert len(load(app, book).chapters) == 2
     monkeypatch.undo()
     seen = calls(app, monkeypatch)
-    retry_book(app, LEARNER, book)
+    assert retry_book(app, LEARNER, book) == "writing"
     write(app, book)
     asked = [r.context.get("number") for r in seen if r.media is None]
     assert asked == [3, 4] and load(app, book).status == "ready"
@@ -549,7 +582,7 @@ def test_an_unreadable_book_record_is_skipped_not_the_home_page(application, cap
 def test_a_resumed_book_draws_only_the_pictures_not_yet_tried(application, monkeypatch):
     app = application
     course_ref = taken(app)
-    book = start_book(app, LEARNER, course_ref, "same")
+    book = confirmed(app, course_ref)
 
     async def first_fails_second_waits(request, count):
         drawn = [r for r in seen if r.media == "image"]
@@ -580,7 +613,7 @@ def test_the_done_log_counts_the_words_the_outline_planned(application, monkeypa
     app = application
     course_ref = taken(app)
     plant_words(app, ["lantern", "pebble", "meadow", "kettle"])
-    book = start_book(app, LEARNER, course_ref, "same")
+    book = confirmed(app, course_ref)
 
     async def block(request, count):
         if request.context.get("number") == 1:
@@ -602,3 +635,338 @@ def test_the_done_log_counts_the_words_the_outline_planned(application, monkeypa
     with caplog.at_level(logging.INFO, logger="project_j"):
         write(app, book)
     assert "offered=4 missing=0" in caplog.text  # the outline's words, not today's box
+
+
+def test_a_new_book_waits_for_the_outline(application, monkeypatch, caplog):
+    app = application
+    course_ref = taken(app)
+    seen = calls(app, monkeypatch)
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        book = start_book(app, LEARNER, course_ref, "same")
+        assert load(app, book).status == "outlining"
+        plan(app, book)
+    record = load(app, book)
+    assert record.proposal is not None and record.proposal_version == 1
+    assert record.outline is None and record.chapters == []
+    assert [r.context["kind"] for r in seen] == ["outline"]
+    assert not app.files.path(f"readings/{book}/book.epub").is_file()
+    assert f"book outline book={book} version=1 chapters=4 continuing=False" in caplog.text
+    assert "The Longer Story" not in caplog.text and "red coat" not in caplog.text
+    (row,) = book_rows(app)
+    assert row["state"] == "outlining" and row["version"] == 1
+    assert row["outline"]["title"] == "The Longer Story" and row["downloadable"] is False
+
+
+def test_rounds_replace_the_outline_and_keep_no_feedback(application, caplog):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+    plan(app, book)
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        start_outline_round(app, LEARNER, book, "Add a fox.")
+        plan(app, book, "Add a fox.")
+    record = load(app, book)
+    assert record.proposal_version == 2 and record.proposal.summary.endswith(" Revised.")
+    assert f"book outline start book={book} version=1 continuing=False" in caplog.text
+    assert f"book outline book={book} version=2 chapters=4 continuing=False" in caplog.text
+    assert "Add a fox" not in app.files.read(f"readings/{book}/book.json").decode()
+    assert "Add a fox" not in caplog.text
+
+
+def thirteen_chapters(app, monkeypatch):
+    """Every later outline round answers with 13 chapters."""
+    adapter = app.models.adapters["simulated"]
+
+    async def too_many(request, count):
+        if request.context.get("kind") == "outline" and request.context.get("current"):
+            reply = adapter.respond(request)
+            extra = [{"title": f"More {n}", "plot": "More.", "words": []} for n in range(13)]
+            return AdapterReply(data=reply | {"chapters": [*reply["chapters"], *extra][:13]})
+        return None
+
+    return calls(app, monkeypatch, too_many)
+
+
+def test_a_failed_round_keeps_the_last_outline(application, monkeypatch):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+    plan(app, book)
+    before = load(app, book).proposal
+    thirteen_chapters(app, monkeypatch)
+    start_outline_round(app, LEARNER, book, "Make it twenty chapters.")
+    with pytest.raises(books.BookFailed):
+        plan(app, book, "Make it twenty chapters.")
+    record = load(app, book)
+    assert record.proposal == before and record.proposal_version == 1
+
+
+def test_a_class_start_keeps_the_last_outline(application, monkeypatch):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+    plan(app, book)
+    before = load(app, book).proposal
+
+    async def block(request, count):
+        if request.context.get("feedback"):
+            await asyncio.sleep(3600)
+        return None
+
+    async def scenario():
+        seen = calls(app, monkeypatch, block)
+        job = lambda: plan_outline(app, LEARNER, book, "More.", noop)  # noqa: E731
+        run(app, LEARNER, f"reading:{book}", job)
+        while not seen:
+            await asyncio.sleep(0.01)
+        await stop_books(app)
+
+    asyncio.run(scenario())
+    assert app.job_failures[f"reading:{book}"] == STOPPED
+    record = load(app, book)
+    assert record.proposal == before and record.proposal_version == 1
+    (row,) = book_rows(app)
+    assert row["state"] == "outlining" and row["reason"] == STOPPED
+
+
+def test_confirming_writes_the_book_from_the_outline(application, monkeypatch, caplog):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+    plan(app, book)
+    proposal = load(app, book).proposal
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        confirm_outline(app, LEARNER, book)
+    record = load(app, book)
+    assert record.status == "writing" and record.outline == proposal and record.proposal is None
+    assert record.pictures == {1: "pending", 2: "pending", 3: "pending", 4: "pending"}
+    assert f"book confirm book={book} chapters=4 new=4" in caplog.text
+    seen = calls(app, monkeypatch)
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    asked = [r for r in seen if r.context.get("kind") == "chapter"]
+    assert len(asked) == 4
+    assert all(r.context["outline"] == proposal.model_dump(mode="json") for r in asked)
+    assert load(app, book).status == "ready"
+
+
+def test_a_round_or_confirm_is_refused_when_it_does_not_apply(application):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+    with pytest.raises(Conflict):  # no first outline yet: that is a retry, not a round
+        start_outline_round(app, LEARNER, book, "More.")
+    with pytest.raises(Conflict):
+        confirm_outline(app, LEARNER, book)
+    plan(app, book)
+    with pytest.raises(ValueError):
+        start_outline_round(app, LEARNER, book, "  ")
+    with pytest.raises(Conflict):  # a new book is never thrown away
+        discard_proposal(app, book)
+    confirm_outline(app, LEARNER, book)
+    with pytest.raises(Conflict):  # being written
+        start_outline_round(app, LEARNER, book, "More.")
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    with pytest.raises(Conflict):  # nothing is missing
+        start_drawing(app, LEARNER, book)
+    with pytest.raises(Conflict):  # nothing to confirm or discard
+        confirm_outline(app, LEARNER, book)
+    with pytest.raises(Conflict):
+        discard_proposal(app, book)
+
+
+def continue_story(app, book):
+    start_outline_round(app, LEARNER, book, "Go on.")
+    plan(app, book, "Go on.")
+
+
+def test_continuing_writes_only_the_new_chapters(application, monkeypatch, caplog):
+    app = application
+    book = ready_book(app)
+    before = load(app, book)
+    old = digests(app, f"readings/{book}/pictures")
+    continue_story(app, book)
+    record = load(app, book)
+    assert len(record.proposal.chapters) == 5 and len(record.chapters) == 4
+    (row,) = book_rows(app)
+    assert row["state"] == "ready" and row["continuing"] is True and row["version"] == 1
+    assert len(row["outline"]["chapters"]) == 5 and row["downloadable"] is True
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        confirm_outline(app, LEARNER, book)
+    record = load(app, book)
+    assert record.pictures == {1: "drawn", 2: "drawn", 3: "drawn", 4: "drawn", 5: "pending"}
+    assert f"book confirm book={book} chapters=5 new=1" in caplog.text
+    seen = calls(app, monkeypatch)
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    after = load(app, book)
+    assert after.chapters[:4] == before.chapters and len(after.chapters) == 5
+    assert [r.context["number"] for r in seen if r.context.get("kind") == "chapter"] == [5]
+    now = digests(app, f"readings/{book}/pictures")
+    assert {name: now[name] for name in old} == old and len(now) == 5
+    chapters = [n for n in epub_names(app, book) if n.startswith("OEBPS/chapter-")]
+    assert after.status == "ready" and len(chapters) == 5
+
+
+def test_continuation_must_place_words_added_since(application, monkeypatch):
+    app = application
+    book = ready_book(app)
+    plant_words(app, ["lantern"])
+    continue_story(app, book)
+    assert "lantern" in load(app, book).proposal.chapters[-1].words
+    discard_proposal(app, book)
+    adapter = app.models.adapters["simulated"]
+
+    async def drop(request, count):
+        if request.context.get("kind") == "outline":
+            reply = adapter.respond(request)
+            chapters = [
+                c | {"words": [w for w in c["words"] if w != "lantern"]} for c in reply["chapters"]
+            ]
+            return AdapterReply(data=reply | {"chapters": chapters})
+        return None
+
+    calls(app, monkeypatch, drop)
+    start_outline_round(app, LEARNER, book, "Go on.")
+    with pytest.raises(books.BookFailed):
+        plan(app, book, "Go on.")
+    assert load(app, book).proposal is None
+
+
+def test_discarding_a_continuation_leaves_the_book(application, caplog):
+    app = application
+    book = ready_book(app)
+    before, record = digests(app, f"readings/{book}"), load(app, book)
+    continue_story(app, book)
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        discard_proposal(app, book)
+    after = load(app, book)
+    assert after.chapters == record.chapters and after.outline == record.outline
+    assert after.proposal is None and after.status == "ready"
+    now = digests(app, f"readings/{book}")
+    assert {k: v for k, v in now.items() if k != "book.json"} == {
+        k: v for k, v in before.items() if k != "book.json"
+    }
+    (row,) = book_rows(app)
+    assert row["continuing"] is False and row["version"] is None
+    assert f"book discard book={book}" in caplog.text
+
+
+def test_a_failed_continuation_keeps_the_old_epub_downloadable(application, monkeypatch):
+    app = application
+    book = ready_book(app)
+    old = book_file(app, book)
+    continue_story(app, book)
+    confirm_outline(app, LEARNER, book)
+
+    async def short(request, count):
+        return AdapterReply(data=TOO_SHORT) if request.context.get("number") == 5 else None
+
+    calls(app, monkeypatch, short)
+    with pytest.raises(books.BookFailed):
+        asyncio.run(write_book(app, LEARNER, book, noop))
+    (row,) = book_rows(app)
+    assert row["state"] == "failed" and row["downloadable"] is True
+    assert book_file(app, book) == old
+
+
+def test_drawing_missing_pictures_redraws_only_the_failed(application, monkeypatch, caplog):
+    app = application
+    adapter = app.models.adapters["simulated"]
+    original, images, failing = adapter.invoke, [], [1, 3]
+
+    async def invoke(request, binding):
+        if request.media == "image":
+            images.append(request)
+            if len(images) in failing:
+                return AdapterReply(data=None, failure="unavailable")
+        return await original(request, binding)
+
+    monkeypatch.setattr(adapter, "invoke", invoke)
+    book = ready_book(app)
+    assert load(app, book).pictures == {1: "failed", 2: "drawn", 3: "failed", 4: "drawn"}
+    assert book_rows(app)[0]["missing_pictures"] == 2
+    images.clear()
+    failing.clear()
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        assert start_drawing(app, LEARNER, book) == 2
+        assert load(app, book).status == "writing"
+        asyncio.run(write_book(app, LEARNER, book, noop))
+    record = load(app, book)
+    assert len(images) == 2 and record.status == "ready"
+    assert record.pictures == {1: "drawn", 2: "drawn", 3: "drawn", 4: "drawn"}
+    assert len([n for n in epub_names(app, book) if n.startswith("OEBPS/images/")]) == 4
+    assert f"book redraw start book={book} pictures=2" in caplog.text
+    books.save(app, record.model_copy(update={"pictures": record.pictures | {2: "failed"}}))
+    images.clear()
+    failing.append(1)  # the redraw fails again
+    assert start_drawing(app, LEARNER, book) == 1
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    assert load(app, book).pictures[2] == "failed"
+
+
+def test_an_old_format_book_still_works(application, monkeypatch):
+    app = application
+    book = ready_book(app)
+    data = json.loads(app.files.read(f"readings/{book}/book.json"))
+    outline = {k: v for k, v in data["outline"].items() if k != "summary"}
+    data["outline"] = outline | {"characters": ["Mia: a small girl in a red coat."]}
+    data = {k: v for k, v in data.items() if k not in ("proposal", "proposal_version")}
+    data["pictures"]["2"] = "failed"
+    app.files.put(f"readings/{book}/book.json", json.dumps(data))
+    (row,) = book_rows(app)
+    assert row["state"] == "ready" and row["missing_pictures"] == 1
+    assert book_file(app, book)[:2] == b"PK"
+    start_revision(app, LEARNER, book, 1, "Shorter.")
+    revise(app, book, 1, "Shorter.")
+    assert start_drawing(app, LEARNER, book) == 1
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    continue_story(app, book)
+    confirm_outline(app, LEARNER, book)
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    record = load(app, book)
+    assert len(record.chapters) == 5 and record.pictures[2] == "drawn"
+    assert record.status == "ready"
+
+
+def test_an_old_book_without_an_outline_plans_one_on_retry(application):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+    data = json.loads(app.files.read(f"readings/{book}/book.json"))
+    app.files.put(f"readings/{book}/book.json", json.dumps(data | {"status": "writing"}))
+    assert load(app, book).status == "outlining"
+    assert retry_book(app, LEARNER, book) == "outlining"
+    plan(app, book)
+    assert load(app, book).proposal_version == 1
+
+
+def test_a_continuation_that_rewrites_the_kept_part_is_put_back(application, monkeypatch):
+    app = application
+    book = ready_book(app)
+    data = json.loads(app.files.read(f"readings/{book}/book.json"))
+    old = data["outline"] | {"characters": ["Mia: a small girl in a red coat."]}
+    app.files.put(f"readings/{book}/book.json", json.dumps(data | {"outline": old}))
+    before = load(app, book).outline
+    adapter = app.models.adapters["simulated"]
+
+    async def tidy(request, count):  # The model "fixes" the old character and chapter 1.
+        if request.context.get("kind") == "outline":
+            reply = adapter.respond(request)
+            first = reply["chapters"][0] | {"plot": "Something else happens."}
+            return AdapterReply(
+                data=reply
+                | {
+                    "title": "A New Name",
+                    "characters": [{"called": "Mia", "look": "a small girl in a red coat"}],
+                    "chapters": [first, *reply["chapters"][1:]],
+                }
+            )
+        return None
+
+    calls(app, monkeypatch, tidy)
+    continue_story(app, book)
+    proposal = load(app, book).proposal
+    assert proposal.chapters[:4] == before.chapters and len(proposal.chapters) == 5
+    assert proposal.characters == before.characters and proposal.title == before.title
+
+
+def test_discarding_clears_the_last_failure(application):
+    app = application
+    book = ready_book(app)
+    continue_story(app, book)
+    app.job_failures[f"reading:{book}"] = "The outline step failed: unavailable."
+    discard_proposal(app, book)
+    assert book_rows(app)[0]["reason"] is None

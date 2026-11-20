@@ -10175,7 +10175,50 @@
       "planned": 4,
       "state": "ready",
       "revising": null,
-      "reason": null
+      "reason": null,
+      "outline": {
+        "title": "The Bridge in the Rain",
+        "summary": "Mia rebuilds the river bridge with Dad after a storm.",
+        "characters": [
+          {
+            "called": "Mia",
+            "look": "a small girl in a yellow raincoat"
+          }
+        ],
+        "style": "Soft watercolor, simple shapes.",
+        "chapters": [
+          {
+            "title": "The River at Dawn",
+            "plot": "Mia finds the old bridge gone after the night's rain.",
+            "words": []
+          },
+          {
+            "title": "Planks and Rope",
+            "plot": "She and Dad gather planks and rope from the shed.",
+            "words": []
+          },
+          {
+            "title": "The Storm Comes",
+            "plot": "Wind shakes the half-built bridge and they wait it out.",
+            "words": []
+          },
+          {
+            "title": "Across",
+            "plot": "Mia carries her toy car over the new bridge.",
+            "words": []
+          },
+          {
+            "title": "The Fox on the Bank",
+            "plot": "A fox watches Mia test the bridge at night.",
+            "words": []
+          }
+        ],
+        "pictures": []
+      },
+      "version": 1,
+      "continuing": true,
+      "missing_pictures": 1,
+      "downloadable": true
     },
     {
       "book_id": "lesson-001-2026-10-24-20261120T093000Z",
@@ -10194,7 +10237,45 @@
       "planned": 4,
       "state": "writing",
       "revising": null,
-      "reason": null
+      "reason": null,
+      "outline": {
+        "title": "The Long Crossing",
+        "summary": "Mia crosses the valley alone.",
+        "characters": [
+          {
+            "called": "Mia",
+            "look": "a small girl in a yellow raincoat"
+          }
+        ],
+        "style": "Soft watercolor, simple shapes.",
+        "chapters": [
+          {
+            "title": "Morning",
+            "plot": "Mia sets out early.",
+            "words": []
+          },
+          {
+            "title": "The Rope",
+            "plot": "She ties the rope.",
+            "words": []
+          },
+          {
+            "title": "Wind",
+            "plot": "The wind rises.",
+            "words": []
+          },
+          {
+            "title": "Home",
+            "plot": "She gets home.",
+            "words": []
+          }
+        ],
+        "pictures": []
+      },
+      "version": null,
+      "continuing": false,
+      "missing_pictures": 0,
+      "downloadable": false
     },
     {
       "book_id": "lesson-001-2026-10-24-20261120T090000Z",
@@ -10211,7 +10292,103 @@
       "planned": 5,
       "state": "failed",
       "revising": null,
-      "reason": "stopped because a class started"
+      "reason": "stopped because a class started",
+      "outline": {
+        "title": "The Bridge Again",
+        "summary": "Mia tests a paper bridge.",
+        "characters": [
+          {
+            "called": "Mia",
+            "look": "a small girl in a yellow raincoat"
+          }
+        ],
+        "style": "Soft watercolor, simple shapes.",
+        "chapters": [
+          {
+            "title": "Morning",
+            "plot": "Mia wakes to rain.",
+            "words": []
+          },
+          {
+            "title": "Paper",
+            "plot": "She folds paper.",
+            "words": []
+          },
+          {
+            "title": "Books",
+            "plot": "She stacks books.",
+            "words": []
+          },
+          {
+            "title": "The Car",
+            "plot": "The car rolls.",
+            "words": []
+          },
+          {
+            "title": "Again",
+            "plot": "She tries again.",
+            "words": []
+          }
+        ],
+        "pictures": []
+      },
+      "version": null,
+      "continuing": false,
+      "missing_pictures": 0,
+      "downloadable": false
+    },
+    {
+      "book_id": "lesson-001-2026-10-24-20261120T101500Z",
+      "course_ref": {
+        "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+        "revision": 1
+      },
+      "title": null,
+      "target": "550L",
+      "words": 0,
+      "chapters": [],
+      "planned": null,
+      "state": "outlining",
+      "revising": null,
+      "reason": null,
+      "outline": {
+        "title": "The Paper Bridge",
+        "summary": "Mia learns why a folded paper bridge holds her car when a flat one does not.",
+        "characters": [
+          {
+            "called": "Mia",
+            "look": "a small girl in a yellow raincoat"
+          }
+        ],
+        "style": "Soft watercolor, simple shapes.",
+        "chapters": [
+          {
+            "title": "A Bridge for the Car",
+            "plot": "Mia wants her toy car to cross the gap between two books.",
+            "words": []
+          },
+          {
+            "title": "The Paper Bends",
+            "plot": "Her first paper bridge bends and the car falls.",
+            "words": []
+          },
+          {
+            "title": "Folding",
+            "plot": "She folds the paper and tries again.",
+            "words": []
+          },
+          {
+            "title": "It Holds",
+            "plot": "The folded bridge holds; she draws both bridges for Dad.",
+            "words": []
+          }
+        ],
+        "pictures": []
+      },
+      "version": 2,
+      "continuing": false,
+      "missing_pictures": 0,
+      "downloadable": false
     }
   ],
   "book_targets": {

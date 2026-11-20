@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { bookLine, booksOf, expandBlocked, levelled } from '../src/books.ts'
+import { bookLine, booksOf, expandBlocked, levelled, outlineLine } from '../src/books.ts'
 
 const row = (extra = {}) => ({
   book_id: 'b', course_ref: { object_id: 'c1', revision: 2 }, title: null, target: null, words: 0,
@@ -9,7 +9,6 @@ const row = (extra = {}) => ({
 const dash = (extra = {}) => ({ jobs: [], active: null, ...extra })
 
 test('book lines say where each book stands', () => {
-  assert.equal(bookLine(row()), 'Planning')
   assert.equal(bookLine(row({ planned: 5, chapters: ['a', 'b'] })), 'Writing chapter 3 of 5')
   assert.equal(bookLine(row({ state: 'drawing', planned: 4 })), 'Drawing pictures')
   assert.equal(bookLine(row({ state: 'revising', title: 'T', revising: 2 })), 'T · Rewriting chapter 2')
@@ -37,4 +36,18 @@ test('expanding waits for a class, a book or the check', () => {
 test('without a Lexile there is no difficulty to choose', () => {
   assert.equal(levelled({}), false)
   assert.equal(levelled({ same: '500L', little: '550L' }), true)
+})
+
+test('outline states read as a discussion', () => {
+  const outline = { title: 'T', summary: 'S', characters: [], style: 's', chapters: [{ title: 'A', plot: 'p', words: [] }], pictures: [] }
+  assert.equal(bookLine(row({ state: 'outlining', outline, version: 2, target: '269L' })), 'T · 269L · Outline, version 2')
+  assert.equal(bookLine(row({ state: 'outlining', outline, version: 1 })), 'T · Outline, version 1')
+  assert.equal(bookLine(row({ state: 'outlining' })), 'Planning the outline')
+  assert.equal(outlineLine(row({ state: 'outlining', outline, version: 2 }), false), 'Outline, version 2')
+  assert.equal(outlineLine(row({ state: 'outlining' }), true), 'Planning the outline')
+  assert.equal(outlineLine(row({ state: 'ready', outline, continuing: true, version: 1 }), true), 'Planning the outline')
+  assert.equal(outlineLine(row({ state: 'ready', outline, continuing: true, version: 1 }), false), 'Outline, version 1')
+  assert.equal(outlineLine(row({ state: 'ready', outline }), true), 'Planning the outline')
+  assert.equal(outlineLine(row({ state: 'ready', outline }), false), null)
+  assert.equal(outlineLine(row({ state: 'revising', outline }), true), null)
 })

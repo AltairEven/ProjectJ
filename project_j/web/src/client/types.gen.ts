@@ -164,6 +164,24 @@ export type BookExpand = {
 };
 
 /**
+ * BookOutline
+ */
+export type BookOutline = {
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    /**
+     * Book Id
+     */
+    book_id: string;
+    /**
+     * Feedback
+     */
+    feedback: string;
+};
+
+/**
  * BookRetry
  */
 export type BookRetry = {
@@ -233,7 +251,7 @@ export type BookRow = {
     /**
      * State
      */
-    state: 'writing' | 'drawing' | 'ready' | 'revising' | 'failed';
+    state: 'outlining' | 'writing' | 'drawing' | 'ready' | 'revising' | 'failed';
     /**
      * Revising
      */
@@ -242,6 +260,37 @@ export type BookRow = {
      * Reason
      */
     reason: string | null;
+    outline?: Outline | null;
+    /**
+     * Version
+     */
+    version?: number | null;
+    /**
+     * Continuing
+     */
+    continuing?: boolean;
+    /**
+     * Missing Pictures
+     */
+    missing_pictures?: number;
+    /**
+     * Downloadable
+     */
+    downloadable?: boolean;
+};
+
+/**
+ * Character
+ */
+export type Character = {
+    /**
+     * Called
+     */
+    called: string;
+    /**
+     * Look
+     */
+    look: string;
 };
 
 /**
@@ -866,6 +915,54 @@ export type NextStep = {
 };
 
 /**
+ * Outline
+ */
+export type Outline = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * Characters
+     */
+    characters: Array<Character>;
+    /**
+     * Style
+     */
+    style: string;
+    /**
+     * Chapters
+     */
+    chapters: Array<OutlineChapter>;
+    /**
+     * Pictures
+     */
+    pictures: Array<PicturePlace>;
+};
+
+/**
+ * OutlineChapter
+ */
+export type OutlineChapter = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Plot
+     */
+    plot: string;
+    /**
+     * Words
+     */
+    words: Array<string>;
+};
+
+/**
  * ParentRequest
  */
 export type ParentRequest = {
@@ -877,6 +974,20 @@ export type ParentRequest = {
      * Learner Id
      */
     learner_id?: string;
+};
+
+/**
+ * PicturePlace
+ */
+export type PicturePlace = {
+    /**
+     * Picture
+     */
+    picture: string;
+    /**
+     * Chapter
+     */
+    chapter: number;
 };
 
 /**
@@ -1608,6 +1719,122 @@ export type BookExpandApiBooksExpandPostErrors = {
 export type BookExpandApiBooksExpandPostError = BookExpandApiBooksExpandPostErrors[keyof BookExpandApiBooksExpandPostErrors];
 
 export type BookExpandApiBooksExpandPostResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
+};
+
+export type BookOutlineApiBooksOutlinePostData = {
+    body: BookOutline;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/books/outline';
+};
+
+export type BookOutlineApiBooksOutlinePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookOutlineApiBooksOutlinePostError = BookOutlineApiBooksOutlinePostErrors[keyof BookOutlineApiBooksOutlinePostErrors];
+
+export type BookOutlineApiBooksOutlinePostResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
+};
+
+export type BookConfirmApiBooksConfirmPostData = {
+    body: BookRetry;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/books/confirm';
+};
+
+export type BookConfirmApiBooksConfirmPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookConfirmApiBooksConfirmPostError = BookConfirmApiBooksConfirmPostErrors[keyof BookConfirmApiBooksConfirmPostErrors];
+
+export type BookConfirmApiBooksConfirmPostResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
+};
+
+export type BookDiscardApiBooksDiscardPostData = {
+    body: BookRetry;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/books/discard';
+};
+
+export type BookDiscardApiBooksDiscardPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookDiscardApiBooksDiscardPostError = BookDiscardApiBooksDiscardPostErrors[keyof BookDiscardApiBooksDiscardPostErrors];
+
+export type BookDiscardApiBooksDiscardPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type BookPicturesApiBooksPicturesPostData = {
+    body: BookRetry;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/books/pictures';
+};
+
+export type BookPicturesApiBooksPicturesPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookPicturesApiBooksPicturesPostError = BookPicturesApiBooksPicturesPostErrors[keyof BookPicturesApiBooksPicturesPostErrors];
+
+export type BookPicturesApiBooksPicturesPostResponses = {
     /**
      * Successful Response
      */

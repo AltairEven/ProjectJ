@@ -1,6 +1,6 @@
 # 课程详情、修改与开始
 
-文档版本：2.5.1；更新：2026年11月20日（扩展阅读，2.5.1同日补改写进度与无蓝思值；[ADR-0033](../../decisions/ADR-0033.md)）；范围：逻辑设计，按[ADR-0018](../../decisions/ADR-0018.md)实施中。
+文档版本：2.6.0；更新：2026年11月20日（扩展阅读，2.5.1同日补改写进度与无蓝思值；[ADR-0033](../../decisions/ADR-0033.md)；2.6.0同日：先讨论提纲、续写与补画缺图，[ADR-0034](../../decisions/ADR-0034.md)）；范围：逻辑设计，按[ADR-0018](../../decisions/ADR-0018.md)实施中。
 
 课程详情内容由preparation从实际课程/核验生成，interface负责呈现与学生的修改意见、确认操作，classroom/platform核对本次开课。三者各有来源，不由界面勾选覆盖就绪依据。
 
@@ -45,7 +45,7 @@ flowchart TD
 
 ## 扩展阅读
 
-已上或已评价的课（含建档小测）在课程详情多一块“Expand this story”（[ADR-0033](../../decisions/ADR-0033.md)，设计见docs/superpowers/specs/2026-11-20-extended-reading-design.md）：选四档难度之一（Same as my level、A little harder、Challenge、Harder，各写目标蓝思值，默认第一档、不写回学习资料；学习资料还没有蓝思值时不显示难度，按原文难度写），按“Expand”后AI在后台把这篇课文扩写成一本分章英文小说（2000–4000词、4–6章，生词盒全部生词各用一次以上，原课静态插图放进对应章节、每章另画一张新插图）。本课的书逐本列出：写作中显示“Planning”“Writing chapter n of m”“Drawing pictures”与进度条，改写时显示“Rewriting chapter n”，失败写明原因并可“Retry”（从没写完的一步接着做），完成的书显示书名、目标值、词数与章数，可“Download EPUB”（带令牌取回后保存，传到手机用阅读器读），展开章节后每章可“Revise”：写修改意见，只改写这一章并重新打包，修改意见只用于这次请求、不保存。没上过的课不能扩写（先读长篇会提前知道题目答案）。课堂进行中、有扩写或改写在运行、或参考题集在运行时不能扩写、重试或改写；扩写进行中开课时先取消扩写再开课，记失败“stopped because a class started”。扩写书不进入评价、学习状态与生词掌握，原课程文件夹不改。
+已上或已评价的课（含建档小测）在课程详情多一块“Expand this story”（[ADR-0033](../../decisions/ADR-0033.md)、[ADR-0034](../../decisions/ADR-0034.md)，设计见docs/superpowers/specs/2026-11-20-extended-reading-design.md与docs/superpowers/specs/2026-11-20-extended-reading-outline-design.md）：选四档难度之一（Same as my level、A little harder、Challenge、Harder，各写目标蓝思值，默认第一档、不写回学习资料；学习资料还没有蓝思值时不显示难度，按原文难度写），按“Expand”后Jane在后台先出一份提纲（进度“Planning the outline”），书显示“书名 · 目标值 · Outline, version n”，下面是故事大致内容与各章“章名 — 情节”；学生在“What should change?”写意见按“Revise the outline”得到新一版（可多轮，只留最新一版，意见不保存），按“Write the book from this outline”才把提纲写成一本分章英文小说（2–12章、每章400–800词，生词盒全部生词各用一次以上，原课静态插图放进对应章节、每章另画一张新插图）。写作中显示“Writing chapter n of m”“Drawing pictures”与进度条，改写时显示“Rewriting chapter n”，失败写明原因并可“Retry”（还没有提纲时重出第一版提纲，否则从没写完的一步接着做）；讨论或完成的书上一轮失败时显示“The last step failed: 原因”。完成的书显示书名、目标值、词数与章数，展开章节后每章显示“章名 — 情节”并可“Revise”：写修改意见，只在这一章的提纲情节之内改写并重新打包，修改意见只用于这次请求、不保存；有画失败的插图时可“Draw missing pictures”只重画那几张；“Continue the story”写下接着发生什么、按“Plan new chapters”在提纲末尾讨论新章（显示“New chapters: Outline, version n”与新章情节，可“Revise the outline”“Write the new chapters”或“Discard”），确认后只写新章，已写的章不动。打包过的书在任何状态都可“Download EPUB”（带令牌取回后保存，传到手机用阅读器读），续写写到一半或失败时下载的是上一次打包的完整版。没上过的课不能扩写（先读长篇会提前知道题目答案）。课堂进行中、有书的任务在运行、或参考题集在运行时不能发起这些操作；书的任务进行中开课时先取消再开课，记失败“stopped because a class started”（讨论的一轮被停时上一版提纲保留）。扩写书不进入评价、学习状态与生词掌握，原课程文件夹不改。
 
 ## 范围与缺口
 

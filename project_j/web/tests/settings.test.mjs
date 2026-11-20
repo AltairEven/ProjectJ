@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { bindingRows, checkConfirm, checkLine, deadlineLabels, modelOptions, probeNotes, startNotice, withCurrent } from '../src/settings.ts'
+import { purposeLabels } from '../src/report.ts'
+import { PURPOSES, bindingRows, checkConfirm, checkLine, deadlineLabels, modelOptions, probeNotes, startNotice, withCurrent } from '../src/settings.ts'
 
 const binding = (effort, tier = 'default') => ({ adapter: 'codex', model: 'gpt-6.1-sol', effort, tier })
 const models = {
@@ -81,4 +82,9 @@ test('the course page notes a setup that has not passed, without stopping the cl
   assert.equal(startNotice(judged('passed', { passed: 92, total: 92 })), null)
   assert.equal(startNotice(null), null)
   assert.equal(startNotice(undefined), null)
+})
+
+test('every model use has a readable name', () => {
+  assert.equal(purposeLabels.reading, 'Expanded reading')
+  for (const purpose of PURPOSES) assert.ok(purposeLabels[purpose], purpose)
 })

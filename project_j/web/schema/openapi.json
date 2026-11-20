@@ -497,6 +497,222 @@
         }
       }
     },
+    "/api/books/outline": {
+      "post": {
+        "summary": "Book Outline",
+        "operationId": "book_outline_api_books_outline_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookOutline"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/confirm": {
+      "post": {
+        "summary": "Book Confirm",
+        "operationId": "book_confirm_api_books_confirm_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookRetry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/discard": {
+      "post": {
+        "summary": "Book Discard",
+        "operationId": "book_discard_api_books_discard_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookRetry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/pictures": {
+      "post": {
+        "summary": "Book Pictures",
+        "operationId": "book_pictures_api_books_pictures_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookRetry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/books/retry": {
       "post": {
         "summary": "Book Retry",
@@ -3093,6 +3309,34 @@
         ],
         "title": "BookExpand"
       },
+      "BookOutline": {
+        "properties": {
+          "learner_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "book_id": {
+            "type": "string",
+            "pattern": "^[a-z]+-\\d{3}-\\d{4}-\\d{2}-\\d{2}-\\d{8}T\\d{6}Z$",
+            "title": "Book Id"
+          },
+          "feedback": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Feedback"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "book_id",
+          "feedback"
+        ],
+        "title": "BookOutline"
+      },
       "BookRetry": {
         "properties": {
           "learner_id": {
@@ -3129,7 +3373,7 @@
           },
           "chapter": {
             "type": "integer",
-            "maximum": 6.0,
+            "maximum": 12.0,
             "minimum": 1.0,
             "title": "Chapter"
           },
@@ -3205,6 +3449,7 @@
           "state": {
             "type": "string",
             "enum": [
+              "outlining",
               "writing",
               "drawing",
               "ready",
@@ -3234,6 +3479,42 @@
               }
             ],
             "title": "Reason"
+          },
+          "outline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Outline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "continuing": {
+            "type": "boolean",
+            "title": "Continuing",
+            "default": false
+          },
+          "missing_pictures": {
+            "type": "integer",
+            "title": "Missing Pictures",
+            "default": 0
+          },
+          "downloadable": {
+            "type": "boolean",
+            "title": "Downloadable",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -3251,6 +3532,26 @@
         ],
         "title": "BookRow",
         "description": "A book made from one lesson, as the course page lists it (application/books.py)."
+      },
+      "Character": {
+        "properties": {
+          "called": {
+            "type": "string",
+            "title": "Called"
+          },
+          "look": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Look"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "called",
+          "look"
+        ],
+        "title": "Character"
       },
       "ChatRequest": {
         "properties": {
@@ -4368,6 +4669,85 @@
         ],
         "title": "NextStep"
       },
+      "Outline": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "characters": {
+            "items": {
+              "$ref": "#/components/schemas/Character"
+            },
+            "type": "array",
+            "title": "Characters"
+          },
+          "style": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Style"
+          },
+          "chapters": {
+            "items": {
+              "$ref": "#/components/schemas/OutlineChapter"
+            },
+            "type": "array",
+            "title": "Chapters"
+          },
+          "pictures": {
+            "items": {
+              "$ref": "#/components/schemas/PicturePlace"
+            },
+            "type": "array",
+            "title": "Pictures"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "summary",
+          "characters",
+          "style",
+          "chapters",
+          "pictures"
+        ],
+        "title": "Outline"
+      },
+      "OutlineChapter": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title"
+          },
+          "plot": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Plot"
+          },
+          "words": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Words"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "plot",
+          "words"
+        ],
+        "title": "OutlineChapter"
+      },
       "ParentRequest": {
         "properties": {
           "request_id": {
@@ -4388,6 +4768,26 @@
           "request_id"
         ],
         "title": "ParentRequest"
+      },
+      "PicturePlace": {
+        "properties": {
+          "picture": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Picture"
+          },
+          "chapter": {
+            "type": "integer",
+            "title": "Chapter"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "picture",
+          "chapter"
+        ],
+        "title": "PicturePlace"
       },
       "PlaybackReport": {
         "properties": {
