@@ -2,6 +2,7 @@
 one chapter at a time. The shapes the model returns, the requests and the rule checks; the run and
 the files are application/books.py (ADR-0033)."""
 
+from dataclasses import replace
 from math import ceil, floor
 
 from pydantic import Field
@@ -153,16 +154,16 @@ def outline_request(
     return text_request(OUTLINE_INSTRUCTIONS, context, Outline)
 
 
-def chapter_context(
+def chapter_request(
     outline: Outline,
     story: str,
     written: list[ChapterDraft],
     number: int,
     target: str | None,
     pictures: list[dict],
-) -> dict:
+) -> ModelRequest:
     mine = {place.picture for place in outline.pictures if place.chapter == number}
-    return {
+    context = {
         "kind": "chapter",
         "outline": outline.model_dump(mode="json"),
         "story": story,
@@ -173,17 +174,6 @@ def chapter_context(
         "pictures": [item for item in pictures if item["picture"] in mine],
         "target": target,
     }
-
-
-def chapter_request(
-    outline: Outline,
-    story: str,
-    written: list[ChapterDraft],
-    number: int,
-    target: str | None,
-    pictures: list[dict],
-) -> ModelRequest:
-    context = chapter_context(outline, story, written, number, target, pictures)
     return text_request(CHAPTER_INSTRUCTIONS, context)
 
 
@@ -196,14 +186,15 @@ def revision_request(
     target: str | None,
     pictures: list[dict],
 ) -> ModelRequest:
-    context = chapter_context(outline, story, chapters[: number - 1], number, target, pictures)
-    context |= {
+    """The chapter's own request, plus its current text, the chapters after it and the feedback."""
+    first = chapter_request(outline, story, chapters[: number - 1], number, target, pictures)
+    context = first.context | {
         "kind": "revision",
         "current": chapters[number - 1].model_dump(mode="json"),
         "later": [draft.model_dump(mode="json") for draft in chapters[number:]],
         "feedback": feedback,
     }
-    return text_request(REVISION_INSTRUCTIONS, context)
+    return replace(first, instructions=REVISION_INSTRUCTIONS, context=context)
 
 
 def picture_request(outline: Outline, draft: ChapterDraft) -> ModelRequest:

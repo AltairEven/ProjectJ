@@ -235,6 +235,10 @@ export type BookRow = {
      */
     state: 'writing' | 'drawing' | 'ready' | 'revising' | 'failed';
     /**
+     * Revising
+     */
+    revising?: number | null;
+    /**
      * Reason
      */
     reason: string | null;

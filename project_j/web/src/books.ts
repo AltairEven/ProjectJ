@@ -10,7 +10,7 @@ export function bookLine(book: BookRow): string {
   if (book.state === 'failed') return `Failed: ${book.reason ?? 'reason unknown'}`
   if (book.state === 'drawing') return 'Drawing pictures'
   if (book.state === 'writing') return book.planned ? `Writing chapter ${book.chapters.length + 1} of ${book.planned}` : 'Planning'
-  if (book.state === 'revising') return `${book.title} · Rewriting a chapter`
+  if (book.state === 'revising') return `${book.title} · Rewriting ${book.revising ? `chapter ${book.revising}` : 'a chapter'}`
   return [book.title, book.target, `${book.words.toLocaleString('en-US')} words`, `${book.chapters.length} chapters`]
     .filter(Boolean).join(' · ')
 }
@@ -23,3 +23,6 @@ export function expandBlocked(dashboard: Pick<Dashboard, 'jobs' | 'active'>): st
   if (running.includes('reference')) return 'The reference check is running; wait until it is done.'
   return null
 }
+
+/** Difficulty steps exist only with a Lexile in the profile; without one a book keeps the story's own level. */
+export const levelled = (targets: Record<string, string>): boolean => Object.keys(targets).length > 0

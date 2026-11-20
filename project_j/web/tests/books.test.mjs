@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { bookLine, booksOf, expandBlocked } from '../src/books.ts'
+import { bookLine, booksOf, expandBlocked, levelled } from '../src/books.ts'
 
 const row = (extra = {}) => ({
   book_id: 'b', course_ref: { object_id: 'c1', revision: 2 }, title: null, target: null, words: 0,
@@ -12,6 +12,7 @@ test('book lines say where each book stands', () => {
   assert.equal(bookLine(row()), 'Planning')
   assert.equal(bookLine(row({ planned: 5, chapters: ['a', 'b'] })), 'Writing chapter 3 of 5')
   assert.equal(bookLine(row({ state: 'drawing', planned: 4 })), 'Drawing pictures')
+  assert.equal(bookLine(row({ state: 'revising', title: 'T', revising: 2 })), 'T · Rewriting chapter 2')
   assert.equal(bookLine(row({ state: 'revising', title: 'T' })), 'T · Rewriting a chapter')
   assert.equal(bookLine(row({ state: 'failed', reason: 'stopped because a class started' })),
     'Failed: stopped because a class started')
@@ -31,4 +32,9 @@ test('expanding waits for a class, a book or the check', () => {
   assert.ok(expandBlocked(dash({ jobs: [{ name: 'reference', state: 'running' }] })))
   assert.ok(expandBlocked(dash({ active: { activity_id: 'a' } })))
   assert.equal(expandBlocked(dash({ jobs: [{ name: 'reading:x', state: 'failed' }, { name: 'evaluate:a', state: 'running' }] })), null)
+})
+
+test('without a Lexile there is no difficulty to choose', () => {
+  assert.equal(levelled({}), false)
+  assert.equal(levelled({ same: '500L', little: '550L' }), true)
 })

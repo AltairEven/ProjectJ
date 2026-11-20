@@ -25,3 +25,13 @@ export async function fileUrl(token: string, path: string): Promise<string> {
   if (!response.ok) throw requestFailure(response.status, 'The file did not come back.')
   return URL.createObjectURL(await response.blob())
 }
+
+// A file fetched with the bearer token and saved through the browser's download.
+export async function saveFile(token: string, path: string, name: string): Promise<void> {
+  const url = await fileUrl(token, path)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = name
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}

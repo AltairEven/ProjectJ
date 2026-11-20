@@ -221,6 +221,41 @@ def test_missing_words_after_the_repair_still_finish(application, monkeypatch, c
     assert "missing=1" in caplog.text and "result=repaired" in caplog.text
 
 
+@pytest.mark.parametrize("repair", ["no reply", "too short"])
+def test_a_failed_repair_for_missing_words_keeps_the_first_draft(
+    application, monkeypatch, caplog, repair
+):
+    app = application
+    course_ref = taken(app)
+    plant_words(app, ["lantern", "pebble", "meadow", "kettle"])
+    adapter = app.models.adapters["simulated"]
+    first = {}
+
+    async def forget_then_fail(request, count):
+        context = request.context
+        if context.get("kind") != "chapter" or "pebble" not in context["words"]:
+            return None
+        if "rejected" not in context:  # The first draft: fine but for one word.
+            words = [w for w in context["words"] if w != "pebble"]
+            first[context["number"]] = adapter.respond(
+                replace(request, context=context | {"words": words})
+            )
+            return AdapterReply(data=first[context["number"]])
+        if repair == "no reply":
+            return AdapterReply(data=None, failure="unavailable")
+        return AdapterReply(data=first[context["number"]] | {"paragraphs": ["Mia ran."]})
+
+    calls(app, monkeypatch, forget_then_fail)
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        book = start_book(app, LEARNER, course_ref, "same")
+        write(app, book)
+    record = load(app, book)
+    ((number, draft),) = first.items()
+    assert record.status == "ready"
+    assert record.chapters[number - 1].model_dump() == draft
+    assert f"step=chapter:{number} result=kept_first" in caplog.text and "missing=1" in caplog.text
+
+
 def test_a_failed_picture_leaves_that_chapter_without_one(application, monkeypatch, caplog):
     app = application
     course_ref = taken(app)
@@ -418,6 +453,32 @@ def test_a_failed_or_stopped_revision_leaves_the_book_as_it_was(application, mon
     assert digests(app, f"readings/{book}") == before
     (row,) = book_rows(app)
     assert row["state"] == "ready" and row["reason"] == STOPPED
+
+
+def test_a_running_revision_names_its_chapter(application, monkeypatch):
+    app = application
+    book = ready_book(app)
+
+    async def block(request, count):
+        if request.context.get("kind") == "revision":
+            await asyncio.sleep(3600)
+        return None
+
+    async def scenario():
+        seen = calls(app, monkeypatch, block)
+        start_revision(app, LEARNER, book, 3, "Shorter.")
+        job = lambda: revise_chapter(app, LEARNER, book, 3, "Shorter.", noop)  # noqa: E731
+        run(app, LEARNER, f"reading:{book}", job)
+        while not seen:
+            await asyncio.sleep(0.01)
+        (row,) = book_rows(app)
+        await stop_books(app)
+        return row
+
+    row = asyncio.run(scenario())
+    assert row["state"] == "revising" and row["revising"] == 3
+    (row,) = book_rows(app)
+    assert row["state"] == "ready" and row["revising"] is None
 
 
 def test_a_failed_new_picture_drops_the_old_one(application, monkeypatch):

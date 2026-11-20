@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, uid } from '../api'
+import { api, saveFile, uid } from '../api'
 import { dateTimeText } from '../dates'
 import { modelLines } from '../report'
 import { ADAPTERS, EFFORTS, TIERS, bindingRows, checkConfirm, checkLine, deadlineLabels, modelOptions, probeNotes, withCurrent, type BindingRow } from '../settings'
@@ -31,10 +31,7 @@ export default function Settings({ token, dashboard, learner, refresh }: PagePro
   const sealErrors = Object.keys(dashboard.seal_errors ?? {})
   const exportRecords = () => { const requestId = uid(); void run(async () => {
     const data = await api<{ path: string }>(token, 'export', { request_id: requestId, learner_id: learner })
-    const response = await fetch(`/api/export-file?path=${encodeURIComponent(data.path)}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
-    if (!response.ok) throw new Error('The export did not come back')
-    const url = URL.createObjectURL(await response.blob()); const anchor = document.createElement('a')
-    anchor.href = url; anchor.download = `project-j-${dashboard.realm}.json`; anchor.click(); URL.revokeObjectURL(url)
+    await saveFile(token, `/api/export-file?path=${encodeURIComponent(data.path)}`, `project-j-${dashboard.realm}.json`)
   }, 'Exporting') }
   return <>
     {status}

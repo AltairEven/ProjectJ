@@ -3213,6 +3213,17 @@
             ],
             "title": "State"
           },
+          "revising": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revising"
+          },
           "reason": {
             "anyOf": [
               {

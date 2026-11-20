@@ -148,20 +148,22 @@ def retry_book(app, learner_id: str, book_id: str) -> None:
 
 async def ask(app, book_id: str, step: str, request, check):
     """One text call and at most one repair. check(output) -> (problems, missing words): only
-    problems fail after the repair. Returns (output, missing words, call entry)."""
+    problems fail. A first draft short only of words stays when its repair fails or comes back
+    with problems, since missing words alone never fail. Returns (output, call entry)."""
     started = time.perf_counter()
-    outcome = "ok"
+    outcome, first = "ok", None
     for attempt in range(2):
         result = await app.models.run(request)
-        if result.failure:
-            outcome = f"failed failure={result.failure}"
+        hard, missing = check(result.output) if result.failure is None else ([], [])
+        if result.failure is None and not hard and (not missing or attempt):
             break
-        hard, missing = check(result.output)
-        if not hard and (not missing or attempt):
+        if attempt or result.failure:
+            if first is not None:
+                result, outcome = first, "kept_first"
+            else:
+                outcome = f"failed failure={result.failure or 'checks'}"
             break
-        if attempt:
-            outcome = "failed failure=checks"
-            break
+        first = None if hard else result
         unused = [f"use these words: {', '.join(missing)}"] if missing else []
         request = repair_request(request, result.output, hard + unused)
         outcome = "repaired"
@@ -173,9 +175,9 @@ async def ask(app, book_id: str, step: str, request, check):
     entry = {
         "step": step,
         "binding": result.binding.model_dump() if result.binding else None,
-        "actual": {name: check.model_dump() for name, check in result.actual.items()},
+        "actual": {name: item.model_dump() for name, item in result.actual.items()},
     }
-    return result.output, missing, entry
+    return result.output, entry
 
 
 async def draw(
@@ -249,7 +251,7 @@ async def write_book(app, learner_id: str, book_id: str, progress) -> None:
             story, record.target, words, shown(pictures), course.get("picture_style") or ""
         )
         ids = [item["picture"] for item in pictures]
-        outline, _, entry = await ask(
+        outline, entry = await ask(
             app, book_id, "outline", request, lambda o: (outline_problems(o, lemmas, ids), [])
         )
         record = save(
@@ -273,7 +275,7 @@ async def write_book(app, learner_id: str, book_id: str, progress) -> None:
         request = chapter_request(
             record.outline, story, record.chapters, number, record.target, shown(pictures)
         )
-        draft, _, entry = await ask(
+        draft, entry = await ask(
             app, book_id, f"chapter:{number}", request, chapter_check(record, number)
         )
         update = {"chapters": [*record.chapters, draft], "calls": [*record.calls, entry]}
@@ -343,6 +345,7 @@ def books(app) -> list[dict]:
                 "chapters": [chapter.title for chapter in record.chapters],
                 "planned": planned,
                 "state": state,
+                "revising": app.book_revising.get(book_id) if running else None,
                 "reason": None if running else reason,
             }
         )
@@ -365,6 +368,17 @@ def start_revision(app, learner_id: str, book_id: str, chapter: int, feedback: s
 async def revise_chapter(
     app, learner_id: str, book_id: str, chapter: int, feedback: str, progress
 ) -> None:
+    """The revision job: while it runs, the course page names the chapter being rewritten."""
+    app.book_revising[book_id] = chapter
+    try:
+        await rewrite(app, learner_id, book_id, chapter, feedback, progress)
+    finally:
+        app.book_revising.pop(book_id, None)
+
+
+async def rewrite(
+    app, learner_id: str, book_id: str, chapter: int, feedback: str, progress
+) -> None:
     """Rewrite one chapter by the student's feedback and draw its new picture, all in memory;
     then write the picture, the EPUB and the record with no wait between, so a stop or a failure
     before that leaves the book as it was. The feedback is used once and kept nowhere."""
@@ -375,7 +389,7 @@ async def revise_chapter(
     request = revision_request(
         record.outline, story, record.chapters, chapter, feedback, record.target, shown(pictures)
     )
-    draft, _, entry = await ask(
+    draft, entry = await ask(
         app, book_id, f"revision:{chapter}", request, chapter_check(record, chapter)
     )
     progress(1, 2)

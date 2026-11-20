@@ -348,6 +348,7 @@ class BookRow(Contract):
     chapters: list[str]
     planned: int | None
     state: Literal["writing", "drawing", "ready", "revising", "failed"]
+    revising: int | None = None  # The chapter being rewritten while state is "revising".
     reason: str | None
 
 

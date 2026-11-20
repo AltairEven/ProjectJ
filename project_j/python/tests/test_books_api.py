@@ -6,7 +6,7 @@ import logging
 
 from fastapi.testclient import TestClient
 from support import LEARNER, settle
-from test_books import calls, load, noop, taken
+from test_books import calls, digests, load, noop, taken
 
 from project_j.application.books import STOPPED, start_book, write_book
 from project_j.application.configuration import Settings
@@ -71,11 +71,12 @@ def test_starting_a_class_stops_the_book_first(application, monkeypatch, caplog)
     app = application
     course_ref = taken(app)
     book = start_book(app, LEARNER, course_ref, "same")
-    opened = []
+    opened, files = [], []
     start = app.start
 
     def watched_start(*args, **kwargs):
         opened.append([name for name in app.jobs if name.startswith("reading:")])
+        files.append(digests(app, f"readings/{book}"))
         return start(*args, **kwargs)
 
     monkeypatch.setattr(app, "start", watched_start)
@@ -95,6 +96,7 @@ def test_starting_a_class_stops_the_book_first(application, monkeypatch, caplog)
     with caplog.at_level(logging.INFO, logger="project_j"):
         asyncio.run(scenario())
     assert opened == [[]]  # the book had stopped before the class opened
+    assert files == [digests(app, f"readings/{book}")]  # and wrote nothing after
     assert app.job_failures[f"reading:{book}"] == STOPPED
     assert app.store.active_activity_id  # the class is open
     assert f"book stopped book={book} reason=class" in caplog.text

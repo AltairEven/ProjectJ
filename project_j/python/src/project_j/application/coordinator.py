@@ -86,6 +86,7 @@ class Coordinator(Preparing, Teaching, Vocabulary, Evaluating, Adopting):
         self.probing = False  # A settings save is probing its candidate setup.
         self.job_failures: dict[str, str] = {}
         self.job_progress: dict[str, str] = {}
+        self.book_revising: dict[str, int] = {}  # Book -> the chapter being rewritten.
         self.evaluation_calls: list[dict] = []
         self.pending_seals: dict[str, Document] = {}
 

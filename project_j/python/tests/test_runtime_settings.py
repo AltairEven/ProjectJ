@@ -402,6 +402,19 @@ def test_running_ai_work_keeps_its_model(study):
 # --- The settings page picks a model from what each adapter offers now ---
 
 
+def test_a_book_being_written_keeps_the_model_and_holds_the_check(study):
+    app, _ = study
+    app.jobs["reading:lesson-001-2026-10-28-20261120T101500Z"] = object()  # ADR-0033
+    with TestClient(create_app(Settings(), app)) as client:
+        refused = client.post(
+            "/api/settings/bindings", headers=auth(app), json={"purposes": PURPOSES_MEDIUM}
+        )
+        assert refused.status_code == 409 and refused.json()["message"] == BUSY
+        checked = run_check(client, app, "full")
+        assert checked.status_code == 409 and checked.json()["message"] == reference.RUNNING
+    app.jobs.clear()
+
+
 def test_models_endpoint_lists_what_each_adapter_offers(study, caplog):
     app, _ = study
     caplog.set_level(logging.INFO, logger="project_j")

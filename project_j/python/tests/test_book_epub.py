@@ -64,3 +64,12 @@ def test_epub_layout_and_metadata():
 def test_a_picture_that_is_not_png_jpeg_or_webp_is_refused():
     with pytest.raises(ValueError):
         build_epub("b1", "T", [Page("One", ["Text."], {1: b"GIF89a"})], NOW)
+
+
+def test_control_characters_a_model_slips_in_do_not_break_the_xhtml():
+    data = build_epub("b1", "Ti\x00tle", [Page("One\x0b", ["A\x01 B\tC\x1f."], {})], NOW)
+    with opened(data) as book:
+        chapter = book.read("OEBPS/chapter-1.xhtml")
+        ET.fromstring(chapter)  # parses as XML
+        assert "<h1>One</h1><p>A B\tC.</p>" in chapter.decode()
+        assert ET.fromstring(book.read("OEBPS/content.opf")).find(f".//{DC}title").text == "Title"

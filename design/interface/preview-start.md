@@ -1,6 +1,6 @@
 # 课程详情、修改与开始
 
-文档版本：2.5.0；更新：2026年11月20日（扩展阅读，[ADR-0033](../../decisions/ADR-0033.md)）；范围：逻辑设计，按[ADR-0018](../../decisions/ADR-0018.md)实施中。
+文档版本：2.5.1；更新：2026年11月20日（扩展阅读，2.5.1同日补改写进度与无蓝思值；[ADR-0033](../../decisions/ADR-0033.md)）；范围：逻辑设计，按[ADR-0018](../../decisions/ADR-0018.md)实施中。
 
 课程详情内容由preparation从实际课程/核验生成，interface负责呈现与学生的修改意见、确认操作，classroom/platform核对本次开课。三者各有来源，不由界面勾选覆盖就绪依据。
 
@@ -45,7 +45,7 @@ flowchart TD
 
 ## 扩展阅读
 
-已上或已评价的课（含建档小测）在课程详情多一块“Expand this story”（[ADR-0033](../../decisions/ADR-0033.md)，设计见docs/superpowers/specs/2026-11-20-extended-reading-design.md）：选四档难度之一（Same as my level、A little harder、Challenge、Harder，各写目标蓝思值，默认第一档、不写回学习资料），按“Expand”后AI在后台把这篇课文扩写成一本分章英文小说（2000–4000词、4–6章，生词盒全部生词各用一次以上，原课静态插图放进对应章节、每章另画一张新插图）。本课的书逐本列出：写作中显示“Planning”“Writing chapter n of m”“Drawing pictures”与进度条，失败写明原因并可“Retry”（从没写完的一步接着做），完成的书显示书名、目标值、词数与章数，可“Download EPUB”（带令牌取回后保存，传到手机用阅读器读），展开章节后每章可“Revise”：写修改意见，只改写这一章并重新打包，修改意见只用于这次请求、不保存。没上过的课不能扩写（先读长篇会提前知道题目答案）。课堂进行中、有扩写或改写在运行、或参考题集在运行时不能扩写、重试或改写；扩写进行中开课时先取消扩写再开课，记失败“stopped because a class started”。扩写书不进入评价、学习状态与生词掌握，原课程文件夹不改。
+已上或已评价的课（含建档小测）在课程详情多一块“Expand this story”（[ADR-0033](../../decisions/ADR-0033.md)，设计见docs/superpowers/specs/2026-11-20-extended-reading-design.md）：选四档难度之一（Same as my level、A little harder、Challenge、Harder，各写目标蓝思值，默认第一档、不写回学习资料；学习资料还没有蓝思值时不显示难度，按原文难度写），按“Expand”后AI在后台把这篇课文扩写成一本分章英文小说（2000–4000词、4–6章，生词盒全部生词各用一次以上，原课静态插图放进对应章节、每章另画一张新插图）。本课的书逐本列出：写作中显示“Planning”“Writing chapter n of m”“Drawing pictures”与进度条，改写时显示“Rewriting chapter n”，失败写明原因并可“Retry”（从没写完的一步接着做），完成的书显示书名、目标值、词数与章数，可“Download EPUB”（带令牌取回后保存，传到手机用阅读器读），展开章节后每章可“Revise”：写修改意见，只改写这一章并重新打包，修改意见只用于这次请求、不保存。没上过的课不能扩写（先读长篇会提前知道题目答案）。课堂进行中、有扩写或改写在运行、或参考题集在运行时不能扩写、重试或改写；扩写进行中开课时先取消扩写再开课，记失败“stopped because a class started”。扩写书不进入评价、学习状态与生词掌握，原课程文件夹不改。
 
 ## 范围与缺口
 

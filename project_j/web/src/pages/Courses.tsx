@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import { api, fileUrl, show, uid } from '../api'
-import { bookLine, booksOf, expandBlocked } from '../books'
+import { api, fileUrl, saveFile, show, uid } from '../api'
+import { bookLine, booksOf, expandBlocked, levelled } from '../books'
 import type { BookRow, Document as Doc, RevisionRef } from '../client/types.gen'
 import { courseRows, latestFact, lessonOf, needsMaterials, previewLabels, previewOf, previewRank, resourcesOf, retakeOffered, storyLevelLine } from '../courses'
 import { CHALLENGES, challengeOption } from '../learning'
@@ -24,21 +24,15 @@ function Expand({ token, dashboard, learner, courseRef, busy, run }: Pick<PagePr
   const blocked = expandBlocked(dashboard)
   const targets = dashboard.book_targets ?? {}
   const running = (book: BookRow) => (dashboard.jobs ?? []).find(job => job.name === `reading:${book.book_id}` && job.state === 'running')
-  const download = (book: BookRow) => async () => {
-    const url = await fileUrl(token, `/api/books/file?${new URLSearchParams({ book_id: book.book_id })}`)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${book.book_id}.epub`
-    link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 10_000)
-  }
+  const download = (book: BookRow) => () => saveFile(token, `/api/books/file?${new URLSearchParams({ book_id: book.book_id })}`, `${book.book_id}.epub`)
   const books = booksOf(courseRef, dashboard.books ?? [])
   return <section><h2>Expand this story</h2>
     <p>Jane writes this story out as a short novel with pictures, using your saved words, to read on your phone.</p>
-    <fieldset><legend>Difficulty</legend>{CHALLENGES.map(([name]) => <label key={name} className="check">
+    {levelled(targets) ? <fieldset><legend>Difficulty</legend>{CHALLENGES.map(([name]) => <label key={name} className="check">
       <input type="radio" name="book-challenge" checked={challenge === name} onChange={() => setChallenge(name)} />{challengeOption(name, targets[name])}</label>)}</fieldset>
+      : <p className="hint">Your profile has no Lexile yet, so the book keeps the story's own level.</p>}
     {blocked && <p className="notice">{blocked}</p>}
-    <button disabled={busy || !!blocked} onClick={() => { const body = { learner_id: learner, course_ref: courseRef, challenge }
+    <button disabled={busy || !!blocked} onClick={() => { const body = { learner_id: learner, course_ref: courseRef, challenge: levelled(targets) ? challenge : 'same' }
       void run(async () => { await api(token, 'books/expand', body) }, 'Starting the book') }}>Expand</button>
     {books.length > 0 && <><h3>Books from this story</h3><ul>{books.map(book => {
       const job = running(book)

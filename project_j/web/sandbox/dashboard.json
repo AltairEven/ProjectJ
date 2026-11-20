@@ -10174,6 +10174,7 @@
       ],
       "planned": 4,
       "state": "ready",
+      "revising": null,
       "reason": null
     },
     {
@@ -10192,6 +10193,7 @@
       ],
       "planned": 4,
       "state": "writing",
+      "revising": null,
       "reason": null
     },
     {
@@ -10208,6 +10210,7 @@
       ],
       "planned": 5,
       "state": "failed",
+      "revising": null,
       "reason": "stopped because a class started"
     }
   ],
