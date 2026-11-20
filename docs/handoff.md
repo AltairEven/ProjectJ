@@ -1,8 +1,10 @@
 # 开发交接记录
 
-版本：1.57.0；更新：2026年11月14日。
+版本：1.57.1；更新：2026年11月20日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
+
+2026年11月20日首次推送远端仓库（GitHub）后，按用户决定改写了历史，把docs/superpowers移出版本库（只留本机）：本记录里2026年10月18日及以后的提交号都已失效，按提交说明与日期查找对应的新提交。
 
 自2026年10月13日[DOC-C1](#doc-c1-共建协作规则更新)起，GPT与Opus不再要求互相审查。此前批次中的审查角色、请求和“待审查/待复审”等表述保留为当时的历史记录，不构成当前继续条件；已有审查证据和发现的问题仍按实际范围保留，不补写未取得的审查通过。当前P1-R3已完成修复与自测，后续隔离模拟调试和测试由Opus接续，按[TEST-C1](#test-c1-调试与测试规范)的目录与规则进行。
 
@@ -649,7 +651,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## SELF-1 定位改为AI自学助理（文档）
 
-- 状态：文档改写完成，用户说“提交”后与SELF-2至SELF-4一起本地提交为f1982b3（2026年10月20日）。用户决定把定位改为AI自学助理、只保留一个主交互页面，头脑风暴后采用[设计说明](superpowers/specs/2026-10-20-self-study-assistant-design.md)与[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)，选择在本会话逐个任务实现、最终审查由主会话自做、不提交直至用户要求。决定见[ADR-0018](../decisions/ADR-0018.md)。
+- 状态：文档改写完成，用户说“提交”后与SELF-2至SELF-4一起本地提交为f1982b3（2026年10月20日）。用户决定把定位改为AI自学助理、只保留一个主交互页面，头脑风暴后采用设计说明（docs/superpowers/specs/2026-10-20-self-study-assistant-design.md）与实施计划（docs/superpowers/plans/2026-10-20-self-study-assistant.md），选择在本会话逐个任务实现、最终审查由主会话自做、不提交直至用户要求。决定见[ADR-0018](../decisions/ADR-0018.md)。
 - 负责人/集成：Claude Opus；起点8a9326b。
 - 文件边界：decisions/ADR-0018.md（新增）、AGENTS.md、README.md、design/shared/README.md、design/interface/parent-workbench.md改名为main-page.md及指向它的链接，以及计划Task 2、3列出的文档。
 - 改动：新增ADR-0018；AGENTS 1.30.0（定位、入口改为`--study`与`project-j-reset`、去掉儿童入口与成人检查条目，开发协作语境的“家长”改为“用户”）；README 1.18.0；docs/product 2.0.0、mvp 2.0.0、roadmap 1.14.0（阶段4、5由“自学助理改版与自用”取代）、acceptance 2.0.0（儿童试教门槛取消，“进入儿童试教的前提”只留标题供ADR-0011引用，新增正式学习空间一节）、technology 1.13.0（正式学习入口；课后评价、规划、备课各节的接口路径待SELF-2完成后改写）；design/shared/README 1.5.0（当前阶段、数据权威与术语规则）与business-contracts 1.5.0（数据空间simulation/study，来源simulated/student/technical）；interface README 2.0.0、main-page 2.0.0（由parent-workbench.md改名重写）、roles-devices 2.0.0、preview-start 2.0.0、feedback-reports 2.0.0、student-classroom 1.1.0；learning profile 2.0.0（学习资料与建档）、plan-review 1.2.0、updates 2.0.0、handoffs 1.7.2；preparation README 2.0.0、parent-preview 2.0.0（课程详情）、readiness 2.0.0；evaluation inputs-feedback 2.0.0、reports-revisions 2.0.0；platform configuration-permissions 2.0.0（数据外发范围、数据空间与清空）、realtime-voice 2.4.1。
@@ -659,7 +661,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## SELF-2 AI自学助理改版（后端）
 
-- 状态：实现与自测完成，已本地提交f1982b3（2026年10月20日）。按[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)Task 4–11在本会话逐个任务实现；最终审查由主会话自做（SELF-4后）。
+- 状态：实现与自测完成，已本地提交f1982b3（2026年10月20日）。按实施计划（docs/superpowers/plans/2026-10-20-self-study-assistant.md）Task 4–11在本会话逐个任务实现；最终审查由主会话自做（SELF-4后）。
 - 负责人/集成：Claude Opus；起点8a9326b（与SELF-1同一工作区，未提交）。
 - 文件边界：project_j/python/src/project_j/{application/{coordinator,progress（新增）,ledger,configuration,reference}.py, learning/{contracts,planning,maintenance,adoption,catalog,onboarding（新增）}.py, preparation/{drafting,packages,resources,materials}.py, evaluation/assessment.py, classroom/{harness,judgment}.py, interface/{api,submission}.py, platform/{storage,files,reset（新增）}.py, platform/models/simulated.py, platform/migrations/versions/0001_simulation.py, contracts.py, paths.py}；project_j/python/pyproject.toml（`project-j-reset`）；project_j/scripts/check.py（结束语）；tests：新增test_{study（由test_adult_check改名）,reset,progress,roles,evaluation_flow,goal_confirmation,onboarding,confirm_and_start}.py，改support.py、fixtures/p1a_initial.json及调用旧接口的测试；project_j/web/src/{App.tsx,report.ts}（只为编译与路径，SELF-3重写）、web/tests/report.test.mjs、web/schema/openapi.json与web/src/client（生成）；docs/technology.md 1.13.0（后台推进、评价、规划、建档、备课各节改写）。
 - 实现要点：
@@ -678,7 +680,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 
 ## SELF-3 主页面与全屏课堂（前端）
 
-- 状态：实现与自测完成，已本地提交f1982b3（2026年10月20日）。按[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)Task 12–15在本会话逐个任务实现。
+- 状态：实现与自测完成，已本地提交f1982b3（2026年10月20日）。按实施计划（docs/superpowers/plans/2026-10-20-self-study-assistant.md）Task 12–15在本会话逐个任务实现。
 - 负责人/集成：Claude Opus；与SELF-1、SELF-2同一工作区。
 - 文件边界：project_j/web/src/{App.tsx（只剩外壳）,Classroom.tsx（由旧学生页迁入）,api.ts,ui.tsx,next-step.ts,onboarding.ts,courses.ts,learning.ts,report.ts,request.ts,speaker.ts,recording.ts,cancellation.ts,style.css}、web/src/pages/{Home,Onboarding,State,Plan,Courses,Evaluations,Settings}.tsx（新增）、web/index.html、web/package.json（描述）；web/tests/{next-step,onboarding,courses,learning}.test.mjs（新增）、report.test.mjs、speaker.test.mjs；project_j/README.md、README.md 1.19.0（实施状态）；interface/api.py课中主页提示一句。
 - 实现要点：

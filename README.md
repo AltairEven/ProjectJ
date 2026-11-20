@@ -17,7 +17,7 @@ J是AI自学助理（[ADR-0018](decisions/ADR-0018.md)）：学生在一个主�
 
 ## 实施状态
 
-0.1成人实验原型已删除（[ADR-0012](decisions/ADR-0012.md)），历史代码只读查阅本地Git标签prototype-0.1。[本机应用](project_j/README.md)已有模拟与真实两种提供者：备课、教学资源、课堂、本机发音评分与合成、课后评价、学习规划与复盘均已接真实模型并有隔离检查与成人调试记录（见[交接](docs/handoff.md)）。2026年10月20日定位改为AI自学助理（[ADR-0018](decisions/ADR-0018.md)），按[实施计划](docs/superpowers/plans/2026-10-20-self-study-assistant.md)改为单一主页面（左侧导航、主页只给一件下一步、全屏课堂）、建档与正式学习空间，后台任务由AI自动推进；教学效果与长期使用未验证。GPT与Opus按[共建规则](AGENTS.md#共建协作)分工、自测和交接。
+0.1成人实验原型已删除（[ADR-0012](decisions/ADR-0012.md)），历史代码只读查阅本地Git标签prototype-0.1。[本机应用](project_j/README.md)已有模拟与真实两种提供者：备课、教学资源、课堂、本机发音评分与合成、课后评价、学习规划与复盘均已接真实模型并有隔离检查与成人调试记录（见[交接](docs/handoff.md)）。2026年10月20日定位改为AI自学助理（[ADR-0018](decisions/ADR-0018.md)），按实施计划（docs/superpowers/plans/2026-10-20-self-study-assistant.md）改为单一主页面（左侧导航、主页只给一件下一步、全屏课堂）、建档与正式学习空间，后台任务由AI自动推进；教学效果与长期使用未验证。GPT与Opus按[共建规则](AGENTS.md#共建协作)分工、自测和交接。
 
 ## 目录
 

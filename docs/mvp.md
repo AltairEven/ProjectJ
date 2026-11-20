@@ -1,6 +1,6 @@
 # Project J 最小可用版本
 
-版本：2.2.0；更新：2026年10月22日；状态：范围按[ADR-0018](../decisions/ADR-0018.md)改为AI自学助理，按[实施计划](superpowers/plans/2026-10-20-self-study-assistant.md)实现中。
+版本：2.2.0；更新：2026年10月22日；状态：范围按[ADR-0018](../decisions/ADR-0018.md)改为AI自学助理，按实施计划（docs/superpowers/plans/2026-10-20-self-study-assistant.md）实现中。
 
 首个可用版本在当前电脑上，由学生本人完成建档，并循环完成“备课 → 上课 → 评价认可 → 下一课”。以[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)贯穿八模块和应用协调层（阅读时按[术语规则](../design/shared/README.md#术语规则)），每个模块先提供支撑这条闭环的最小能力。
 
