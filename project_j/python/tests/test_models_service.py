@@ -89,13 +89,14 @@ def test_simulated_service_is_initialized_and_marked_simulated():
         status["purposes"]["classroom_judgment"]["binding"]
         == Binding(adapter="simulated", model="simulated-jane", effort="low").model_dump()
     )
-    # Five purposes in workflow order; all but the classroom default to medium.
+    # Six purposes in workflow order; all but the classroom default to medium.
     assert list(status["purposes"]) == [
         "planning",
         "preparation",
         "classroom_judgment",
         "evaluation",
         "vocabulary",
+        "reading",
     ]
     efforts = {p: item["binding"]["effort"] for p, item in status["purposes"].items()}
     assert efforts == {
@@ -104,6 +105,7 @@ def test_simulated_service_is_initialized_and_marked_simulated():
         "classroom_judgment": "low",
         "evaluation": "medium",
         "vocabulary": "low",
+        "reading": "medium",
     }
 
 

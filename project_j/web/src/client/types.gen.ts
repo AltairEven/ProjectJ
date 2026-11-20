@@ -149,6 +149,98 @@ export type BindingsRequest = {
 };
 
 /**
+ * BookExpand
+ */
+export type BookExpand = {
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    course_ref: RevisionRef;
+    /**
+     * Challenge
+     */
+    challenge?: 'same' | 'little' | 'challenge' | 'harder';
+};
+
+/**
+ * BookRetry
+ */
+export type BookRetry = {
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    /**
+     * Book Id
+     */
+    book_id: string;
+};
+
+/**
+ * BookRevise
+ */
+export type BookRevise = {
+    /**
+     * Learner Id
+     */
+    learner_id?: string;
+    /**
+     * Book Id
+     */
+    book_id: string;
+    /**
+     * Chapter
+     */
+    chapter: number;
+    /**
+     * Feedback
+     */
+    feedback: string;
+};
+
+/**
+ * BookRow
+ *
+ * A book made from one lesson, as the course page lists it (application/books.py).
+ */
+export type BookRow = {
+    /**
+     * Book Id
+     */
+    book_id: string;
+    course_ref: RevisionRef;
+    /**
+     * Title
+     */
+    title: string | null;
+    /**
+     * Target
+     */
+    target: string | null;
+    /**
+     * Words
+     */
+    words: number;
+    /**
+     * Chapters
+     */
+    chapters: Array<string>;
+    /**
+     * Planned
+     */
+    planned: number | null;
+    /**
+     * State
+     */
+    state: 'writing' | 'drawing' | 'ready' | 'revising' | 'failed';
+    /**
+     * Reason
+     */
+    reason: string | null;
+};
+
+/**
  * ChatRequest
  */
 export type ChatRequest = {
@@ -334,6 +426,16 @@ export type Dashboard = {
     judgment_check?: {
         [key: string]: JsonValue;
     } | null;
+    /**
+     * Books
+     */
+    books?: Array<BookRow>;
+    /**
+     * Book Targets
+     */
+    book_targets?: {
+        [key: string]: string;
+    };
     active?: Snapshot | null;
     /**
      * Note
@@ -1473,6 +1575,127 @@ export type ResourceDownloadApiResourceFileGetErrors = {
 export type ResourceDownloadApiResourceFileGetError = ResourceDownloadApiResourceFileGetErrors[keyof ResourceDownloadApiResourceFileGetErrors];
 
 export type ResourceDownloadApiResourceFileGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type BookExpandApiBooksExpandPostData = {
+    body: BookExpand;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/books/expand';
+};
+
+export type BookExpandApiBooksExpandPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookExpandApiBooksExpandPostError = BookExpandApiBooksExpandPostErrors[keyof BookExpandApiBooksExpandPostErrors];
+
+export type BookExpandApiBooksExpandPostResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
+};
+
+export type BookRetryApiBooksRetryPostData = {
+    body: BookRetry;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/books/retry';
+};
+
+export type BookRetryApiBooksRetryPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookRetryApiBooksRetryPostError = BookRetryApiBooksRetryPostErrors[keyof BookRetryApiBooksRetryPostErrors];
+
+export type BookRetryApiBooksRetryPostResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
+};
+
+export type BookReviseApiBooksRevisePostData = {
+    body: BookRevise;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/books/revise';
+};
+
+export type BookReviseApiBooksRevisePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookReviseApiBooksRevisePostError = BookReviseApiBooksRevisePostErrors[keyof BookReviseApiBooksRevisePostErrors];
+
+export type BookReviseApiBooksRevisePostResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
+};
+
+export type BookDownloadApiBooksFileGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query: {
+        /**
+         * Book Id
+         */
+        book_id: string;
+    };
+    url: '/api/books/file';
+};
+
+export type BookDownloadApiBooksFileGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookDownloadApiBooksFileGetError = BookDownloadApiBooksFileGetErrors[keyof BookDownloadApiBooksFileGetErrors];
+
+export type BookDownloadApiBooksFileGetResponses = {
     /**
      * Successful Response
      */

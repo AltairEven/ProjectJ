@@ -60,6 +60,7 @@ class ModelService:
             "classroom_judgment": Binding(adapter="simulated", model=SIMULATED_MODEL, effort="low"),
             "evaluation": medium,
             "vocabulary": Binding(adapter="simulated", model=SIMULATED_MODEL, effort="low"),
+            "reading": medium,
         }
         report = adapter.report(SIMULATED_MODEL, ("low", "medium"))
         return cls({"simulated": adapter}, bindings, [report])

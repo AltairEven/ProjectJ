@@ -12,7 +12,7 @@ export const pages: [Page, string][] = [
 const jobNames: Record<string, string> = {
   prepare: 'Making the lesson', evaluate: 'Evaluating', adopt: 'Updating progress and plan', summarize: 'Writing your profile', review: 'Reviewing the plan',
   start: 'Getting resources and starting', confirm: 'Confirming the lesson and getting resources', remake: 'Remaking broken resources', recheck: 'Checking progress after your correction', vocabulary: 'Looking up a word',
-  reference: 'Checking classroom judgment',
+  reference: 'Checking classroom judgment', reading: 'Writing a book',
 }
 
 function jobLine({ name, state, reason, progress }: Job): string {
@@ -23,9 +23,9 @@ function jobLine({ name, state, reason, progress }: Job): string {
 
 export const jobLines = (jobs: Job[]): string[] => jobs.map(jobLine)
 
-/** A failed confirm, start or reference check is started again from its own page, not the home page. */
+/** A failed confirm, start, book or reference check is started again from its own page, not the home page. */
 export const retriedOnHome = ({ name, state }: Job): boolean =>
-  state === 'failed' && !['start:', 'confirm:'].some(prefix => name.startsWith(prefix)) && name !== 'reference'
+  state === 'failed' && !['start:', 'confirm:', 'reading:'].some(prefix => name.startsWith(prefix)) && name !== 'reference'
 
 type Go = { action: string, page: Target, detail?: string }
 const views: Record<string, (subject: Subject) => { title: string, action?: string, page: Target, detail?: string, also?: Go }> = {

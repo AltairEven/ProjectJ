@@ -102,3 +102,25 @@ def test_parent_facing_reasons_use_english_names():
     assert "Model: failed" in reasons and "Structured output: not supported" in reasons
     assert "Effort low: not probed" in reasons
     assert not any("structured_output" in r or "effort:" in r for r in reasons)
+
+
+def test_reading_purpose_is_known_and_needs_what_preparation_needs():
+    from project_j.platform.models.contracts import PURPOSE_LABELS, PURPOSES, REQUIRED, ImageNote
+
+    assert "reading" in PURPOSES and PURPOSE_LABELS["reading"] == "Expanded reading"
+    assert REQUIRED["reading"] == REQUIRED["preparation"]
+    ModelRequest("reading", "x", {}, ImageNote, deadline_key="preparation_drafting")
+
+
+def test_reading_without_its_own_binding_uses_the_default(tmp_path):
+    from project_j.platform.models.config import ModelFiles
+
+    files = ModelFiles(tmp_path)
+    files.write(
+        "config.json",
+        {
+            "default": {"adapter": "simulated", "model": "m", "effort": "xhigh"},
+            "purposes": {"preparation": {"adapter": "simulated", "model": "p", "effort": "low"}},
+        },
+    )
+    assert files.bindings()["reading"].model == "m"

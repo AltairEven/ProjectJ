@@ -171,7 +171,7 @@ export function discussionLines(preview: Body): [string, string][] {
 }
 
 const purposeLabels: Record<string, string> = {
-  planning: 'Planning', preparation: 'Lesson making', classroom_judgment: 'Class judgment', evaluation: 'Evaluation', vocabulary: 'Word meanings',
+  planning: 'Planning', preparation: 'Lesson making', classroom_judgment: 'Class judgment', evaluation: 'Evaluation', vocabulary: 'Word meanings', reading: 'Expanded reading',
 }
 const itemLabels: Record<string, string> = {
   auth: 'Sign-in', model: 'Model', structured_output: 'Structured output', cancellation: 'Cancel', image_input: 'Image input', audio: 'Audio',

@@ -116,3 +116,8 @@ test('a chosen topic that is no longer listed is no topic, not a crash', () => {
 test('remaking broken resources reads as such (ADR-0027)', () => {
   assert.deepEqual(jobLines([{ name: 'remake:c1:2', state: 'running', progress: '1/1' }]), ['Remaking broken resources: item 1/1'])
 })
+
+test('a failed book is retried from its lesson page, not home, and its job has a name', () => {
+  assert.equal(retriedOnHome({ name: 'reading:x', state: 'failed' }), false)
+  assert.deepEqual(jobLines([{ name: 'reading:lesson-001', state: 'running', reason: null, progress: '3/10' }]), ['Writing a book: item 3/10'])
+})

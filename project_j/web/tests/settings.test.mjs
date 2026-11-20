@@ -21,9 +21,9 @@ test('the seven waiting-time keys have labels', () => {
   assert.equal(deadlineLabels.preparation_image, 'Preparation: pictures')
 })
 
-test('binding rows list the five purposes in order, missing ones blank', () => {
+test('binding rows list the six purposes in order, missing ones blank', () => {
   const rows = bindingRows(models)
-  assert.deepEqual(rows.map(row => row.purpose), ['planning', 'preparation', 'classroom_judgment', 'evaluation', 'vocabulary'])
+  assert.deepEqual(rows.map(row => row.purpose), ['planning', 'preparation', 'classroom_judgment', 'evaluation', 'vocabulary', 'reading'])
   assert.deepEqual(rows[3], { purpose: 'evaluation', adapter: 'codex', model: 'gpt-6.1-sol', effort: 'xhigh', tier: 'default' })
   assert.deepEqual(rows[2].tier, 'fast')
   assert.deepEqual(rows[1], { purpose: 'preparation', adapter: '', model: '', effort: '', tier: '' })

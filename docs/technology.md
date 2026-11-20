@@ -1,6 +1,6 @@
 # Project J 最小版本技术选型
 
-版本：1.26.0；更新：2026年11月19日；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
+版本：1.27.0；更新：2026年11月20日（扩写用途reading与扩展阅读接口，[ADR-0033](../decisions/ADR-0033.md)）；状态：实施基线已采用；模拟与真实提供者均已实现，按[ADR-0018](../decisions/ADR-0018.md)改为单一主页面与正式学习空间（实施中）。
 
 采用本机浏览器、模块化Python后端和本地数据库，保留八个业务模块及应用协调层的职责。选型服务于[E2E01](../design/shared/end-to-end-cases.md#e2e01-正常完成与下一课准备)的完整实现，范围见[最小版本](mvp.md)，阶段与验收见[路线](roadmap.md)和[标准](acceptance.md)。本文件不改变[业务合同](../design/shared/business-contracts.md)，涉及继续条件的缺口按其[共同阻断标准](../design/shared/business-contracts.md#关键阻断的共同标准)处理。
 
@@ -100,7 +100,7 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python projec
 project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-init status
 ```
 
-五个用途（planning学习规划、preparation备课、classroom_judgment课堂判断、evaluation课后评价、vocabulary生词释义；vocabulary未单独配置时取课堂判断的绑定）先取默认绑定，再按`--purpose 用途=适配器:模型:档位[:fast]`逐项覆盖，可各绑不同适配器。末尾`:fast`选Fast层级，目前只有Codex适配器提供，对应订阅列表中的priority层级（标称2倍速度、额度消耗增加）；SDK不回报每轮实际层级，记未核实。OpenAI API直连适配器与`set-key`已删除（[ADR-0019](../decisions/ADR-0019.md)），只有Codex订阅与模拟两个适配器。
+六个用途（planning学习规划、preparation备课、classroom_judgment课堂判断、evaluation课后评价、vocabulary生词释义、reading扩写课外读物；vocabulary未单独配置时取课堂判断的绑定，reading未单独配置时取默认绑定）先取默认绑定，再按`--purpose 用途=适配器:模型:档位[:fast]`逐项覆盖，可各绑不同适配器。末尾`:fast`选Fast层级，目前只有Codex适配器提供，对应订阅列表中的priority层级（标称2倍速度、额度消耗增加）；SDK不回报每轮实际层级，记未核实。OpenAI API直连适配器与`set-key`已删除（[ADR-0019](../decisions/ADR-0019.md)），只有Codex订阅与模拟两个适配器。
 
 Codex适配器使用官方Python SDK `openai-codex`（锁定0.169.1，随包附带同版本codex运行时；订阅服务按客户端版本给出模型列表，2026年11月18日0.163.0拿不到gpt-6.2-sol而升级），在本机启动`codex app-server`；login打开ChatGPT浏览器登录，登录状态存于`project_j/private/models/codex-home/`，不读也不改家长全局的`~/.codex`。每次调用开一个不留存的新会话，空临时目录、只读沙箱、拒绝全部提权，以中性基础指令替换Codex自带的代理提示词，用途指令作开发者指令，按pydantic严格JSON结构输出，档位按绑定逐轮传入；配置覆盖关闭记忆、历史、项目说明文档、网页搜索、分析统计、shell工具、应用、插件、技能及环境/权限/应用/协作说明（后几项据真实运行实测：去掉插件与技能注入后输入不再逐次增长，剩余约1.1万token为运行时自带内容）。返回条目出现任何工具调用即记“工具”明确不符而失败。取消与超时会请求服务端中断该轮。SDK不回报每轮实际模型与档位，二者记未核实；探针以订阅模型列表核对模型与所声明的档位，记录鉴权、结构化输出、工具关闭、取消、图片输入与耗时。
 
@@ -203,7 +203,9 @@ P0-R1按Opus工程审查采用安装后的project-j-probe/project-j-measure入�
 
 ## P1隔离运行与生成工具
 
-模型绑定与各类调用的等待时长都在`project_j/private/models/config.json`（[ADR-0025](../decisions/ADR-0025.md)）：`default`/`purposes`是用途绑定，`deadlines`按七个键给秒数（课堂判断10、查词60、评价600、规划180、备课起草1200、备课图片300、备课动画600为默认，1到3600的整数；缺项或非法用默认并记日志）。模型服务在每次调用时读秒数，服务层等待与Codex适配器内部超时用同一个数，课堂核心在每次提交时读课堂判断的秒数，所以设置页保存后下一次调用就生效，课中也一样。设置页经`POST /api/settings/deadlines`保存七个秒数（课中允许）、`POST /api/settings/bindings`保存五个用途的绑定：先用候选绑定运行与`project-j-init probe`相同的探测、不写文件（`init.probe_bindings`），全部用途通过准入且其间没有开课或后台AI工作开始，才写入配置与探测记录、重载绑定、关闭旧适配器的运行时并预热新的；探测异常返回409只带异常种类，有用途未通过返回409列出原因并注明当前配置不变，探测期间开课或开始后台工作返回409不切换，同一时间只允许一次保存在探测（[ADR-0032](../decisions/ADR-0032.md)）；课中与后台AI工作进行中409；当前配置失效时（如适配器升级）用相同绑定再保存一次即重新探测；`GET /api/settings/models`列出已建适配器当前提供的模型（Codex为订阅模型列表第一页中未隐藏的`id`，与探测读的同一份；每个适配器限10秒，取不到的不列入并只记异常种类；课中409、后台AI工作进行中也可读），设置页据此把适配器与模型做成下拉选择，列表里没有已保存的模型时仍保留它，某适配器没有列表时模型退回手填（四个下拉都把不在选项里的当前值、包括空值放在最前，显示的就是将保存的值）；主页数据的`models`带`deadlines`、`deadline_defaults`与`configurable`。模拟入口不读该文件、期限用默认值，模拟数据空间的设置接口返回409。课堂判断绑定改动后仍须重跑参考题集；ChatGPT登录仍只在命令行。
+模型绑定与各类调用的等待时长都在`project_j/private/models/config.json`（[ADR-0025](../decisions/ADR-0025.md)）：`default`/`purposes`是用途绑定，`deadlines`按七个键给秒数（课堂判断10、查词60、评价600、规划180、备课起草1200、备课图片300、备课动画600为默认，1到3600的整数；缺项或非法用默认并记日志）。模型服务在每次调用时读秒数，服务层等待与Codex适配器内部超时用同一个数，课堂核心在每次提交时读课堂判断的秒数，所以设置页保存后下一次调用就生效，课中也一样。设置页经`POST /api/settings/deadlines`保存七个秒数（课中允许）、`POST /api/settings/bindings`保存六个用途的绑定：先用候选绑定运行与`project-j-init probe`相同的探测、不写文件（`init.probe_bindings`），全部用途通过准入且其间没有开课或后台AI工作开始，才写入配置与探测记录、重载绑定、关闭旧适配器的运行时并预热新的；探测异常返回409只带异常种类，有用途未通过返回409列出原因并注明当前配置不变，探测期间开课或开始后台工作返回409不切换，同一时间只允许一次保存在探测（[ADR-0032](../decisions/ADR-0032.md)）；课中与后台AI工作进行中409；当前配置失效时（如适配器升级）用相同绑定再保存一次即重新探测；`GET /api/settings/models`列出已建适配器当前提供的模型（Codex为订阅模型列表第一页中未隐藏的`id`，与探测读的同一份；每个适配器限10秒，取不到的不列入并只记异常种类；课中409、后台AI工作进行中也可读），设置页据此把适配器与模型做成下拉选择，列表里没有已保存的模型时仍保留它，某适配器没有列表时模型退回手填（四个下拉都把不在选项里的当前值、包括空值放在最前，显示的就是将保存的值）；主页数据的`models`带`deadlines`、`deadline_defaults`与`configurable`。模拟入口不读该文件、期限用默认值，模拟数据空间的设置接口返回409。课堂判断绑定改动后仍须重跑参考题集；ChatGPT登录仍只在命令行。
+
+扩展阅读（[ADR-0033](../decisions/ADR-0033.md)）：`POST /api/books/expand`（`course_ref`与难度档位`challenge`，默认same）只对已上过、有课程文件夹的课受理，立即返回`202 {"job": "reading:<书>", "book_id"}`，后台按`reading`用途先写大纲、再逐章写、每章画一张新插图，最后用标准库`zipfile`打包EPUB 3；文字调用沿用`preparation_drafting`期限，新插图沿用`preparation_image`，不另设期限键。书写在`<运行目录>/readings/<课程文件夹名>-<UTC时间>/`（`book.json`、`pictures/`、`book.epub`），每步写入都经上课检查，导出迁移与清空自动包括。`POST /api/books/retry`从没写完的一步接着做，`POST /api/books/revise`（章号与1–2000字符的修改意见）只改写一章，`GET /api/books/file?book_id=`带令牌下载EPUB（`application/epub+zip`，不缓存）。课中、已有扩写或改写在运行、参考题集在运行时拒绝；开课先取消扩写并等它退出再开课，记失败“stopped because a class started”。扩写也是后台任务，期间设置页拒绝换模型、参考题集拒绝运行、自动推进等它跑完。主页数据新增`books`（每本一行：书名、目标值、词数、章名、状态与原因）与`book_targets`。加`reading`用途后原初始化记录失效，升级后在设置页“Save and probe”一次；不需要重跑课堂判断参考题集。
 
 FastAPI单后端仅监听127.0.0.1，Vite产物和固定材料在课堂开始前读入内存；课堂中的数据库/固定文件/导出/备份访问禁止。家长临时访问能力和单活动学生访问能力分开，学生不获取简报/答案/帮助分支。配置由pydantic-settings载入PROJECT_J_前缀，默认不读.env，提供者和数据空间固定模拟；设置课堂low/课后medium只说明目标配置，不冒称真实请求参数已生效。
 

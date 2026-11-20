@@ -443,6 +443,222 @@
         }
       }
     },
+    "/api/books/expand": {
+      "post": {
+        "summary": "Book Expand",
+        "operationId": "book_expand_api_books_expand_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookExpand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/retry": {
+      "post": {
+        "summary": "Book Retry",
+        "operationId": "book_retry_api_books_retry_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookRetry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/revise": {
+      "post": {
+        "summary": "Book Revise",
+        "operationId": "book_revise_api_books_revise_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookRevise"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/file": {
+      "get": {
+        "summary": "Book Download",
+        "operationId": "book_download_api_books_file_get",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z]+-\\d{3}-\\d{4}-\\d{2}-\\d{2}-\\d{8}T\\d{6}Z$",
+              "title": "Book Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/vocabulary/audio": {
       "get": {
         "summary": "Vocabulary Audio",
@@ -2832,7 +3048,8 @@
                 "preparation",
                 "classroom_judgment",
                 "evaluation",
-                "vocabulary"
+                "vocabulary",
+                "reading"
               ]
             },
             "type": "object",
@@ -2845,6 +3062,184 @@
           "purposes"
         ],
         "title": "BindingsRequest"
+      },
+      "BookExpand": {
+        "properties": {
+          "learner_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "course_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "challenge": {
+            "type": "string",
+            "enum": [
+              "same",
+              "little",
+              "challenge",
+              "harder"
+            ],
+            "title": "Challenge",
+            "default": "same"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "course_ref"
+        ],
+        "title": "BookExpand"
+      },
+      "BookRetry": {
+        "properties": {
+          "learner_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "book_id": {
+            "type": "string",
+            "pattern": "^[a-z]+-\\d{3}-\\d{4}-\\d{2}-\\d{2}-\\d{8}T\\d{6}Z$",
+            "title": "Book Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "book_id"
+        ],
+        "title": "BookRetry"
+      },
+      "BookRevise": {
+        "properties": {
+          "learner_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Learner Id",
+            "default": "fictional-L1"
+          },
+          "book_id": {
+            "type": "string",
+            "pattern": "^[a-z]+-\\d{3}-\\d{4}-\\d{2}-\\d{2}-\\d{8}T\\d{6}Z$",
+            "title": "Book Id"
+          },
+          "chapter": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 1.0,
+            "title": "Chapter"
+          },
+          "feedback": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Feedback"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "book_id",
+          "chapter",
+          "feedback"
+        ],
+        "title": "BookRevise"
+      },
+      "BookRow": {
+        "properties": {
+          "book_id": {
+            "type": "string",
+            "title": "Book Id"
+          },
+          "course_ref": {
+            "$ref": "#/components/schemas/RevisionRef"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "words": {
+            "type": "integer",
+            "title": "Words"
+          },
+          "chapters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Chapters"
+          },
+          "planned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "writing",
+              "drawing",
+              "ready",
+              "revising",
+              "failed"
+            ],
+            "title": "State"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "book_id",
+          "course_ref",
+          "title",
+          "target",
+          "words",
+          "chapters",
+          "planned",
+          "state",
+          "reason"
+        ],
+        "title": "BookRow",
+        "description": "A book made from one lesson, as the course page lists it (application/books.py)."
       },
       "ChatRequest": {
         "properties": {
@@ -3175,6 +3570,22 @@
               }
             ],
             "title": "Judgment Check"
+          },
+          "books": {
+            "items": {
+              "$ref": "#/components/schemas/BookRow"
+            },
+            "type": "array",
+            "title": "Books",
+            "default": []
+          },
+          "book_targets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Book Targets",
+            "default": {}
           },
           "active": {
             "anyOf": [

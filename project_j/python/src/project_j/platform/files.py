@@ -15,8 +15,8 @@ from project_j.paths import check_path
 from project_j.platform.storage import REALMS, SimulationStore, canonical, digest
 
 # The only trees files are written to inside a run (the student's directory).
-LESSONS, DRAFTS, VOCABULARY = "lessons", "drafts", "vocabulary"
-TREES = (LESSONS, DRAFTS, VOCABULARY)
+LESSONS, DRAFTS, VOCABULARY, READINGS = "lessons", "drafts", "vocabulary", "readings"
+TREES = (LESSONS, DRAFTS, VOCABULARY, READINGS)
 
 
 def file_stem(name: str) -> str:
@@ -59,8 +59,19 @@ class PrivateFiles:
         path = check_path(self.store.run, relative)
         parts = path.relative_to(self.store.run.resolve()).parts
         if len(parts) < 2 or parts[0] not in TREES:
-            raise ValueError("files live only in lessons/, drafts/ and vocabulary/")
+            raise ValueError("files live only in lessons/, drafts/, vocabulary/ and readings/")
         return path
+
+    def read(self, relative: str) -> bytes | None:
+        """A named file's bytes, or None when it does not exist."""
+        self.store.ensure_idle()
+        path = self.path(relative)
+        return path.read_bytes() if path.is_file() else None
+
+    def folders(self, tree: str) -> list[str]:
+        """The folder names directly in one tree, sorted."""
+        root = self.store.run / tree
+        return sorted(p.name for p in root.iterdir() if p.is_dir()) if root.is_dir() else []
 
     def put(self, relative: str, content: bytes | str) -> dict:
         """Write a named file (replacing it unless it already holds these bytes)."""

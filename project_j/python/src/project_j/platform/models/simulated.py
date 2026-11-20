@@ -103,6 +103,8 @@ class SimulatedAdapter:
                     for item in context["words"]
                 ]
             }
+        if request.purpose == "reading":
+            return reading_reply(context)
         if request.purpose == "preparation":
             if context.get("kind") == "check":
                 failing = self.reject_pictures.pop(0) if self.reject_pictures else set()
@@ -290,3 +292,46 @@ class SimulatedAdapter:
         self, model: str, efforts: tuple[Effort, ...], tiers: tuple[Tier, ...] = ()
     ) -> CapabilityReport:
         return self.report(model, efforts)
+
+
+def reading_reply(context: dict) -> dict:
+    """A fixed book that passes the checks: four chapters, the words dealt out in turn and every
+    original picture in chapter 1; a chapter long enough for its range, using its words, with
+    original pictures from paragraph 1 on and the new one last. A revision reads differently."""
+    if context["kind"] == "outline":
+        chapters = [
+            {"title": f"Part {n}", "plot": "The story goes on.", "words": []} for n in range(4)
+        ]
+        for index, word in enumerate(context["words"]):
+            chapters[index % 4]["words"].append(word["lemma"])
+        return {
+            "title": "The Longer Story",
+            "characters": ["Mia: a small girl in a red coat."],
+            "style": context["style"] or "Soft watercolor, simple shapes.",
+            "chapters": chapters,
+            "pictures": [
+                {"picture": item["picture"], "chapter": 1} for item in context["pictures"]
+            ],
+        }
+    line = (
+        "Mia stopped by the window and listened to the rain."  # 10 words
+        if context["kind"] == "revision"
+        else "Mia walked on and looked at the hills again."  # 9 words
+    )
+    low = context["range"][0]
+    words = " ".join(f"She thought about the {word}." for word in context["words"])
+    paragraphs, count = [words] if words else [], 5 * len(context["words"])
+    while count < low or len(paragraphs) <= len(context["pictures"]):
+        paragraphs.append(" ".join([line] * 5))
+        count += 5 * len(line.split())
+    return {
+        "title": f"Chapter {context['number']}"
+        + (", Again" if context["kind"] == "revision" else ""),
+        "paragraphs": paragraphs,
+        "pictures": [
+            {"picture": item["picture"], "paragraph": n}
+            for n, item in enumerate(context["pictures"], start=1)
+        ],
+        "new_picture_paragraph": len(paragraphs),
+        "new_picture": "Mia by the window in the rain.",
+    }

@@ -1,14 +1,67 @@
 import { useRef, useState } from 'react'
 import { api, fileUrl, show, uid } from '../api'
-import type { Document as Doc } from '../client/types.gen'
+import { bookLine, booksOf, expandBlocked } from '../books'
+import type { BookRow, Document as Doc, RevisionRef } from '../client/types.gen'
 import { courseRows, latestFact, lessonOf, needsMaterials, previewLabels, previewOf, previewRank, resourcesOf, retakeOffered, storyLevelLine } from '../courses'
+import { CHALLENGES, challengeOption } from '../learning'
+import { jobProgress } from '../progress'
 import { discussionLines, resourceLines } from '../report'
 import { startNotice } from '../settings'
-import { JobLine, Rows, useRun, type PageProps } from '../ui'
+import { JobLine, Progress, Rows, useRun, type PageProps } from '../ui'
 
 // Resource kinds with a connected generator: voice by local synthesis, the rest by the model.
 const generatable = ['audio', 'image', 'animation']
 type Resource = { resource_id: string, kind: string, purpose: string, versions?: unknown[], adopted_version?: number | null }
+type Run = ReturnType<typeof useRun>['run']
+
+/** A taken lesson's story written out as a book for the phone (application/books.py): start one, follow it, download, retry or rewrite a chapter. */
+function Expand({ token, dashboard, learner, courseRef, busy, run }: Pick<PageProps, 'token' | 'dashboard' | 'learner'>
+  & { courseRef: RevisionRef, busy: boolean, run: Run }) {
+  const [challenge, setChallenge] = useState('same')
+  const [opened, setOpened] = useState('')
+  const [revising, setRevising] = useState<{ book: string, chapter: number } | null>(null)
+  const [feedback, setFeedback] = useState('')
+  const blocked = expandBlocked(dashboard)
+  const targets = dashboard.book_targets ?? {}
+  const running = (book: BookRow) => (dashboard.jobs ?? []).find(job => job.name === `reading:${book.book_id}` && job.state === 'running')
+  const download = (book: BookRow) => async () => {
+    const url = await fileUrl(token, `/api/books/file?${new URLSearchParams({ book_id: book.book_id })}`)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${book.book_id}.epub`
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  }
+  const books = booksOf(courseRef, dashboard.books ?? [])
+  return <section><h2>Expand this story</h2>
+    <p>Jane writes this story out as a short novel with pictures, using your saved words, to read on your phone.</p>
+    <fieldset><legend>Difficulty</legend>{CHALLENGES.map(([name]) => <label key={name} className="check">
+      <input type="radio" name="book-challenge" checked={challenge === name} onChange={() => setChallenge(name)} />{challengeOption(name, targets[name])}</label>)}</fieldset>
+    {blocked && <p className="notice">{blocked}</p>}
+    <button disabled={busy || !!blocked} onClick={() => { const body = { learner_id: learner, course_ref: courseRef, challenge }
+      void run(async () => { await api(token, 'books/expand', body) }, 'Starting the book') }}>Expand</button>
+    {books.length > 0 && <><h3>Books from this story</h3><ul>{books.map(book => {
+      const job = running(book)
+      return <li key={book.book_id}>
+        {job ? <Progress label={bookLine(book)} {...jobProgress(job.progress)} /> : <p className={book.state === 'failed' ? 'notice' : undefined}>{bookLine(book)}</p>}
+        {book.state === 'ready' && book.reason && <p className="notice">The last rewrite failed: {book.reason}</p>}
+        <div className="row">
+          {book.state === 'ready' && <button className="quiet" disabled={busy} onClick={() => void run(download(book))}>Download EPUB</button>}
+          {book.state === 'ready' && <button className="quiet" onClick={() => setOpened(opened === book.book_id ? '' : book.book_id)}>{opened === book.book_id ? 'Hide chapters' : 'Chapters'}</button>}
+          {book.state === 'failed' && <button disabled={busy || !!blocked} onClick={() => { const body = { learner_id: learner, book_id: book.book_id }
+            void run(async () => { await api(token, 'books/retry', body) }, 'Retrying the book') }}>Retry</button>}
+        </div>
+        {book.state === 'ready' && opened === book.book_id && <ol>{book.chapters.map((title, index) => {
+          const chapter = index + 1, here = revising?.book === book.book_id && revising.chapter === chapter
+          return <li key={chapter}>{title} <button className="quiet" disabled={busy || !!blocked} onClick={() => { setRevising({ book: book.book_id, chapter }); setFeedback('') }}>Revise</button>
+            {here && <><label>What should change in this chapter?<textarea maxLength={2000} value={feedback} onChange={event => setFeedback(event.target.value)} /></label>
+              <button disabled={busy || !!blocked || !feedback.trim()} onClick={() => { const body = { learner_id: learner, book_id: book.book_id, chapter, feedback: feedback.trim() }
+                void run(async () => { await api(token, 'books/revise', body); setRevising(null); setFeedback('') }, 'Rewriting the chapter') }}>Rewrite this chapter</button></>}</li>
+        })}</ol>}
+      </li>
+    })}</ul></>}
+  </section>
+}
 
 function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & { course: Doc }) {
   const { busy, run, status } = useRun(refresh)
@@ -81,6 +134,7 @@ function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & 
         const body = { request_id: uid(), learner_id: learner, course_ref: courseRef, materials_ready: materials && ready }
         void run(async () => { await api(token, 'course/start', body) }, 'Starting') }}>{starting?.state === 'failed' ? 'Try again' : retaking ? 'Take it again' : 'Start'}</button></section>}
     {taught && fact && <section><h2>You took this lesson</h2><button className="quiet" onClick={() => go('evaluations', String(fact.body.activity_id))}>Read the evaluation</button></section>}
+    {taught && <Expand token={token} dashboard={dashboard} learner={learner} courseRef={courseRef} busy={busy} run={run} />}
     {confirmed && preview && <section><h2>Resources</h2>
       {lesson && <p>Confirmed. The lesson folder is {String(lesson.body.folder)}.</p>}
       {remaking && <JobLine job={remaking} />}

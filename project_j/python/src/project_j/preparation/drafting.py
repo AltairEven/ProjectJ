@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from dataclasses import replace
 from typing import Literal, NamedTuple, get_args
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from project_j.contracts import Contract, RevisionRef
 from project_j.english import chinese
@@ -337,7 +337,8 @@ def discussion_request(
     )
 
 
-def repair_request(first: ModelRequest, draft: CourseDraft, problems: list[str]) -> ModelRequest:
+def repair_request(first: ModelRequest, draft: BaseModel, problems: list[str]) -> ModelRequest:
+    """The first request again with the rejected reply and its problems (courses and books)."""
     return replace(
         first,
         instructions=first.instructions + REPAIR_INSTRUCTIONS,

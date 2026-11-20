@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.57.1；更新：2026年11月20日。
+版本：1.58.0；更新：2026年11月20日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -1349,3 +1349,17 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 文案（用户要求）：已有报告时整套运行按钮显示“Run all <n> questions again”，避免在通过状态下被当成补跑；未运行时仍为“Run the reference set”。提交前登记检查全部通过（主工程916、评分39、合成15项pytest，前端与文档检查通过，npm audit两处为0），UTC 2026-11-19T06:23:43.082155+00:00，工程摘要3a0dc779e337d7c18092716111e5b9206692f3d705a4dfe53363f330f9af4bde。
 - 提交：与SET-PICK-1部分文件两批都改过（settings.py、api.py、Settings.tsx、settings.ts、生成类型、沙盒、main-page.md、technology.md），按用户要求合为一个本地提交。
 - 状态：三部分完成，已本地提交（2026年11月19日，与SET-PICK-1同一提交，提交号见Git记录）。
+
+## BOOK-1 扩展阅读：已上过的课文扩写成分章英文小说，EPUB下载到手机（ADR-0033）
+
+- 负责人：Claude Opus（实现与集成）；参与者：无。发起：2026年11月20日用户要求把精彩的短文扩写成长篇课外读物，在手机上读；设计docs/superpowers/specs/2026-11-20-extended-reading-design.md（0.5.0，经两次设计审查，用户确认），计划docs/superpowers/plans/2026-11-20-extended-reading.md（用户确认，在本会话内由开发代理逐任务实现）。
+- 实际改动：模型用途加`reading`（标签Expanded reading，所需能力同备课，模拟绑定medium，没有单独绑定时用默认绑定）；platform/files.py加`readings`树、`read`与`folders`；新增preparation/expansion.py（大纲与章节的输出结构、请求、核对；章词数`ceil(2000/章数)`–`floor(4000/章数)`，生词判断用`used_vocabulary`）、preparation/epub.py（标准库`zipfile`打包EPUB 3，文字转义，图片类型复用`visuals.image_type`）、application/books.py（开始、写书、重试、改写一章、列表、开课取消、下载；书的记录在`readings/<课程文件夹名>-<UTC>/book.json`）；drafting.repair_request的参数放宽为任意结构供书复用；模拟适配器加`reading`回答；interface/api.py加`POST /api/books/expand|retry|revise`、`GET /api/books/file`与主页数据`books`、`book_targets`；teaching.confirm_and_start在打开课堂前`await stop_books`；前端新增web/src/books.ts与课程详情的“Expand this story”块，next-step给`reading:`任务命名并不在主页重试；沙盒快照加`reading`绑定、三种状态的书与目标值；OpenAPI与生成类型更新。设计同步：ADR-0033、main-page.md 2.11.0、preview-start.md 2.5.0、models.md 2.11.0、preparation/README.md 2.13.0、technology.md 1.27.0、README 1.21.0。
+- 诊断日志：`book start book= lesson= challenge= target=`、`book step book= step=outline|chapter:<n>|revision:<n> result=ok|repaired|failed failure=… ms=`、`book picture book= chapter= result=drawn|failed ms=`、`book done book= chapters= words= offered= missing= drawn= failed= epub_bytes= ms=`、`book revise start`、`book revised … picture= epub_bytes= ms=`、`book stopped book= reason=class`、`book download book= bytes=`（完成行的`offered=`为大纲分到各章的生词数）、`book unreadable book= error=`；沿用`job start/done/failed name=reading:…`。不记正文、书名、章名、大纲、人物外貌、插图描述、生词与修改意见（测试断言）。
+- 检查证据：统一check通过（主工程954、评分39、合成15项pytest，OpenAPI导出、类型生成、TypeScript检查、前端回归、构建与文档检查通过），UTC 2026-11-20T07:35:16.406329+00:00，工程摘要07ff773fd88df894fbc2edf8eb4701584a0592b13ec5343a0507c4b28292abee；project-j-probe与project-j-measure正常。依赖未改，本批未重跑三个sync、两个npm ci与npm audit。新增测试：test_book_writing（核对规则、请求、模拟回答过核对）、test_book_epub（结构、元数据、转义、图片类型）、test_books（成书且原课程文件夹、学习资料与生词盒不变；全部生词进大纲；一章不合格只重写这一章；连续不合格失败并保留已写章；只缺生词照样成书；插图失败；未上过或忙时拒绝；开课取消与续写；失败插图续做不重画；原插图进对应章；无插图无画风；无蓝思值；下载拒绝坏编号；改写只改一章、失败或被取消书不变、插图失败删旧图、拒绝条件、中文意见；坏记录不拖垮主页）、test_books_api（后台扩写、下载、改写、重试409、第二本409、开课先停书、令牌与输入校验）、前端books.test.mjs与next-step新增一例。
+- 审查：开发代理在主会话自审两轮（常规审查，ponytail-review查冗余）；按常规审查补了坏记录跳过（测试先失败后通过）、失败插图续做不重画与两条日志断言；用户要求后按待修改优化项清单改：新插图固定存为`pictures/chapter-<n>`（不带后缀，EPUB按文件头判断类型），调用记录直接写在模型调用辅助函数里，蓝思值读取并入`book_targets`，前端改用生成类型`RevisionRef`，完成日志的`offered=`改为大纲分到各章的生词数（续写时不再随当时的生词盒变化）；新增测试“完成日志按大纲计生词数”，先失败后通过。“主页每次刷新读全部书的记录”按原建议等书多了再改。
+- 文件边界：project_j/python/src/project_j/{application/{books,coordinator,teaching},interface/api,platform/{files,models/{contracts,service,simulated}},preparation/{expansion,epub,drafting}}.py；project_j/python/tests/test_{book_writing,book_epub,books,books_api,models_contracts,models_init,models_service,runtime_settings,integration_fixes,resource_files}.py；project_j/web/src/{books,next-step,settings,report}.ts、pages/Courses.tsx、client/（生成）、schema/openapi.json、sandbox/dashboard.json、tests/{books,next-step,settings}.test.mjs；decisions/ADR-0033.md及上列设计文档、本交接、README、规格与计划。
+- 验收条件：统一检查通过（已满足）；真实扩写一次并修改一章一次，记录大纲与各章耗时、重写次数与插图成败；EPUB传到手机，“图书”App能打开、目录正确、插图显示、长按能查词典。
+- 未验证：真实模型扩写与改写（耗时、核对通过率、生词写进去是否自然）；EPUB在“图书”App的打开、目录、插图（含WebP原插图）与查词典；沙盒里课程详情三种状态与修改框的显示（未打开浏览器看）。
+- 继续条件：升级后原初始化记录因多了`reading`用途失效，须先在设置页对当前绑定点一次“Save and probe”（通过才切换），才能继续备课、上课等AI工作；不需要重跑课堂判断参考题集。
+- 状态：实现与离线检查完成，已本地提交（2026年11月20日，提交号见Git记录）。
+

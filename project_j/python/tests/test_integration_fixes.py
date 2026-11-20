@@ -40,6 +40,7 @@ def test_the_start_record_keeps_the_bindings_and_voice_actually_in_use(applicati
             "classroom_judgment": high.model_copy(update={"effort": "low"}),
             "evaluation": high,
             "vocabulary": high.model_copy(update={"effort": "low"}),
+            "reading": high,
         },
         [adapter.report(SIMULATED_MODEL, ("low", "high"))],
     )

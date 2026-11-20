@@ -32,6 +32,16 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import Field, JsonValue, ValidationError, model_validator
 from sqlalchemy.exc import SQLAlchemyError
 
+from project_j.application.books import (
+    BOOK_PATTERN,
+    JOB,
+    book_file,
+    retry_book,
+    revise_chapter,
+    start_book,
+    start_revision,
+    write_book,
+)
 from project_j.application.configuration import Settings
 from project_j.application.coordinator import Coordinator
 from project_j.application.progress import advance, jobs, next_step, retry, run
@@ -311,6 +321,36 @@ class JobRetry(Contract):
     name: str = Field(min_length=1, max_length=300)
 
 
+class BookExpand(Contract):
+    learner_id: str = Field(default="fictional-L1", pattern=LEARNER_PATTERN)
+    course_ref: RevisionRef
+    challenge: Challenge = "same"
+
+
+class BookRetry(Contract):
+    learner_id: str = Field(default="fictional-L1", pattern=LEARNER_PATTERN)
+    book_id: str = Field(pattern=BOOK_PATTERN)
+
+
+class BookRevise(BookRetry):
+    chapter: int = Field(ge=1, le=6)
+    feedback: str = Field(min_length=1, max_length=2000)
+
+
+class BookRow(Contract):
+    """A book made from one lesson, as the course page lists it (application/books.py)."""
+
+    book_id: str
+    course_ref: RevisionRef
+    title: str | None
+    target: str | None
+    words: int
+    chapters: list[str]
+    planned: int | None
+    state: Literal["writing", "drawing", "ready", "revising", "failed"]
+    reason: str | None
+
+
 class Dashboard(Contract):
     realm: Literal["simulation", "study"] = "simulation"
     learner_id: str = "fictional-L1"
@@ -337,6 +377,9 @@ class Dashboard(Contract):
     vocabulary: list[dict[str, JsonValue]] = []
     # The reference-set state of the current classroom setup; None in simulation and in class.
     judgment_check: dict[str, JsonValue] | None = None
+    # Books made from taken lessons and each story-difficulty step's target Lexile.
+    books: list[BookRow] = []
+    book_targets: dict[str, str] = {}
     active: Snapshot | None = None
     note: str | None = None
 
@@ -759,6 +802,48 @@ def create_app(
 
             run(app_controller, learner_id, name, lambda: work(progress))
         return {"job": name}
+
+    def book_job(learner_id: str, book_id: str, work) -> dict:
+        return background(learner_id, JOB + book_id, work) | {"book_id": book_id}
+
+    @app.post("/api/books/expand", dependencies=[Depends(operator)], status_code=202)
+    async def book_expand(request: BookExpand):
+        app_controller, learner = controller(), request.learner_id
+        book = start_book(app_controller, learner, request.course_ref, request.challenge)
+        return book_job(
+            learner, book, lambda progress: write_book(app_controller, learner, book, progress)
+        )
+
+    @app.post("/api/books/retry", dependencies=[Depends(operator)], status_code=202)
+    async def book_retry(request: BookRetry):
+        app_controller, learner, book = controller(), request.learner_id, request.book_id
+        retry_book(app_controller, learner, book)
+        return book_job(
+            learner, book, lambda progress: write_book(app_controller, learner, book, progress)
+        )
+
+    @app.post("/api/books/revise", dependencies=[Depends(operator)], status_code=202)
+    async def book_revise(request: BookRevise):
+        app_controller, learner, book = controller(), request.learner_id, request.book_id
+        start_revision(app_controller, learner, book, request.chapter, request.feedback)
+        return book_job(
+            learner,
+            book,
+            lambda progress: revise_chapter(
+                app_controller, learner, book, request.chapter, request.feedback, progress
+            ),
+        )
+
+    @app.get("/api/books/file", dependencies=[Depends(operator)])
+    async def book_download(book_id: Annotated[str, Query(pattern=BOOK_PATTERN)]):
+        return Response(
+            book_file(controller(), book_id),
+            media_type="application/epub+zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{book_id}.epub"',
+                "Cache-Control": "no-store",
+            },
+        )
 
     @app.get("/api/vocabulary/audio", dependencies=[Depends(operator)])
     async def vocabulary_audio(

@@ -7,7 +7,7 @@ export const deadlineLabels: Record<string, string> = {
   preparation_image_check: 'Preparation: picture checks',
 }
 
-export const PURPOSES = ['planning', 'preparation', 'classroom_judgment', 'evaluation', 'vocabulary'] as const
+export const PURPOSES = ['planning', 'preparation', 'classroom_judgment', 'evaluation', 'vocabulary', 'reading'] as const
 export const ADAPTERS = ['codex', 'simulated'] as const  // mirrors ADAPTERS in platform/models/registry.py
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh'] as const
 export const TIERS = ['default', 'fast'] as const

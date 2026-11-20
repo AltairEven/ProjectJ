@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from project_j.application.acceptance import simulation_evidence
 from project_j.application.adopting import Adopting
+from project_j.application.books import book_targets, books
 from project_j.application.documents import document, identity, publication
 from project_j.application.evaluating import Evaluating
 from project_j.application.ledger import Ledger, Request, Step
@@ -320,6 +321,8 @@ class Coordinator(Preparing, Teaching, Vocabulary, Evaluating, Adopting):
             "judgment_check": judgment_check(self.root, self.models)
             if self.models.files is not None
             else None,
+            "books": books(self),
+            "book_targets": book_targets(self, learner_id),
         }
 
     def lost_activities(self, learner_id: str, documents: list[Document]) -> list[dict]:

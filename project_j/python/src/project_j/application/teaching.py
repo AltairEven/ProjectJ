@@ -5,6 +5,7 @@ import logging
 
 from sqlalchemy.exc import SQLAlchemyError
 
+from project_j.application.books import stop_books
 from project_j.application.documents import document, identity, publication, successor
 from project_j.application.ledger import Request
 from project_j.application.preparing import STALE_COURSE
@@ -53,6 +54,7 @@ class Teaching:
             if failed:
                 raise Conflict(f"Resources not ready: {', '.join(failed)}. You can try again.")
             confirm_resources(self, f"{request_id}:resources", learner_id, course_ref)
+        await stop_books(self)  # A book being written stops before the class opens.
         result = self.start(f"{request_id}:start", learner_id, course_ref, materials_ready)
         if result["decision"] != f"allow_{self.store.realm}":
             reason = result.get("reason") or ", ".join(result.get("missing", ()))

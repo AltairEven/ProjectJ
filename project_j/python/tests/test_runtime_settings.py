@@ -164,12 +164,11 @@ from project_j.application.coordinator import Coordinator  # noqa: E402
 from project_j.application.settings import BUSY  # noqa: E402
 from project_j.interface.api import create_app  # noqa: E402
 from project_j.platform.models import simulated as sim  # noqa: E402
+from project_j.platform.models.contracts import PURPOSES  # noqa: E402
 from project_j.platform.storage import SimulationStore  # noqa: E402
 
 MEDIUM = {"adapter": "simulated", "model": "simulated-jane", "effort": "medium", "tier": "default"}
-PURPOSES_MEDIUM = {
-    p: MEDIUM for p in ("planning", "preparation", "classroom_judgment", "evaluation", "vocabulary")
-}
+PURPOSES_MEDIUM = dict.fromkeys(PURPOSES, MEDIUM)
 
 
 def auth(app):

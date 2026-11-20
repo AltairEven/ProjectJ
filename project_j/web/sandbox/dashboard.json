@@ -9867,6 +9867,15 @@
           "tier": "default"
         },
         "reasons": []
+      },
+      "reading": {
+        "binding": {
+          "adapter": "simulated",
+          "model": "simulated-jane",
+          "effort": "medium",
+          "tier": "default"
+        },
+        "reasons": []
       }
     },
     "reports": [
@@ -10146,5 +10155,66 @@
       "settled_by_rerun": false,
       "failed": []
     }
+  },
+  "books": [
+    {
+      "book_id": "lesson-001-2026-10-24-20261120T081500Z",
+      "course_ref": {
+        "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+        "revision": 1
+      },
+      "title": "The Bridge in the Rain",
+      "target": "500L",
+      "words": 3120,
+      "chapters": [
+        "The River at Dawn",
+        "Planks and Rope",
+        "The Storm Comes",
+        "Across"
+      ],
+      "planned": 4,
+      "state": "ready",
+      "reason": null
+    },
+    {
+      "book_id": "lesson-001-2026-10-24-20261120T093000Z",
+      "course_ref": {
+        "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+        "revision": 1
+      },
+      "title": "The Long Crossing",
+      "target": "600L",
+      "words": 1480,
+      "chapters": [
+        "Morning",
+        "The Rope",
+        "Wind"
+      ],
+      "planned": 4,
+      "state": "writing",
+      "reason": null
+    },
+    {
+      "book_id": "lesson-001-2026-10-24-20261120T090000Z",
+      "course_ref": {
+        "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+        "revision": 1
+      },
+      "title": "The Bridge Again",
+      "target": "550L",
+      "words": 640,
+      "chapters": [
+        "Morning"
+      ],
+      "planned": 5,
+      "state": "failed",
+      "reason": "stopped because a class started"
+    }
+  ],
+  "book_targets": {
+    "same": "500L",
+    "little": "550L",
+    "challenge": "600L",
+    "harder": "650L"
   }
 }
