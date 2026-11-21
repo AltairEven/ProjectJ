@@ -1,6 +1,6 @@
 # 开发交接记录
 
-版本：1.60.0；更新：2026年11月20日。
+版本：1.61.0；更新：2026年11月21日。
 
 GPT Sol与Claude Opus共用的批次记录，协作规则见[AGENTS](../AGENTS.md#共建协作)。每批一节，只记范围、负责人/参与者、集成、文件、验收、自测证据、状态和接续；业务规则引用权威文件，不在此复制。当前负责人维护本批内容，协作者按明确文件边界接续；同一文件同一时间只由一位模型修改。不设固定审查者或待互审门槛。
 
@@ -1372,6 +1372,7 @@ GPT已审查98f2495..04dcdaa，结果见下方；Opus为P1-R1主实现者，不�
 - 检查证据：统一check通过（主工程985、评分39、合成15项pytest，OpenAPI导出、类型生成、TypeScript检查、前端回归、构建与文档检查通过；含审查修改），UTC 2026-11-20T15:54:10.971929+00:00，工程摘要1c996cd4aad544a42d9c0c29d6aa2213ece87143dd25bc584836aabfd3544d4b；project-j-probe与project-j-measure正常；依赖未改，本批未重跑三个sync、两个npm ci与npm audit。新增或改写测试：test_book_writing（章数边界、外貌不含名字、旧提纲可读、续写核对、每章400–800、提纲请求带讨论、画图请求无名字、插图只画出场人物、模拟回答过核对）、test_books（新书等提纲、多轮替换且意见不留、失败一轮保留上一版、开课停下一轮保留上一版、确认后按提纲写、不适用时拒绝、续写只写新章且旧章旧图不变、续写须安排新生词、放弃续写书不变、续写失败旧EPUB照样可下载、补画只画失败的且再失败仍记失败、旧格式书可列出下载改写补画续写、无大纲的旧书重试出提纲；原有测试改为先提纲确认再写）、test_books_api（经接口讨论、确认、续写、放弃；重试按状态选任务；补画与新接口的输入校验和令牌）、前端books.test.mjs与settings.test.mjs各一例。各新测试先失败后通过。
 - 模拟走查（本机，project_j/test，不进Git）：模拟运行book-check-2，真页面Expand→提纲第1版（此时没有下载按钮）→写意见得到第2版→确认写书→下载→看章节情节→续写讨论（可下载）→放弃→再续写→确认写第5章→把第2章插图手动记为失败→“Draw missing pictures”补画→下载；全部成功，截图、两本EPUB与服务日志在project_j/test/output/book-check-2/。模拟模型瞬时返回，进度文字只由单元测试覆盖。
 - 文件边界：project_j/python/src/project_j/{application/books,interface/api,platform/models/simulated,preparation/expansion}.py；project_j/python/tests/test_{book_writing,books,books_api}.py；project_j/web/src/{books,report}.ts、pages/{Courses,Settings}.tsx、client/（生成）、schema/openapi.json、sandbox/dashboard.json、tests/{books,settings}.test.mjs；decisions/ADR-0034.md及上列设计文档、本交接、README、规格与计划。
+- 真实补画（正式学习，第一版格式的书lesson-005-2026-11-02-20261120T085350Z，2026年11月20日UTC两次）：第一次重画5张约177秒，第2、5章画成，第1、3、4章失败；第二次重画3张约115秒，第4章画成，第1、3章仍失败。失败都是Codex日志里的`moderation_blocked`、`moderation_stage: output`（图画好后被拒），没有网络被拒；同样的请求重画结果不同，第二次画成的第4章主角就是游戏角色本身。用户判断与角色无关，不改画图提示词（2026年11月21日，一度加入的“人物外貌写成原创形象”已回退、未提交）；剩下的缺图靠再点“Draw missing pictures”。
 - 验收条件：统一检查通过（已满足）；真实提纲讨论至少两轮后写书一次；续写一次；换网络后对2026年11月20日那本书补画缺图；看画图请求不写名字后审核拦截是否减少。
 - 未验证：真实模型的提纲讨论（意见能否被照做、章数增减、提纲与正文是否一致不偏题）、续写与补画；旧书补画（人物没有名字可换，可能仍被审核拦截）；沙盒快照的新状态未打开浏览器看。
 - 继续条件：用途与所需能力没变，升级后不需要重新探测，也不需要课堂判断参考题集；正在讨论或写到一半的第一版书升级后照常显示（没有大纲的按提纲讨论处理，点Retry出第一版提纲）。
