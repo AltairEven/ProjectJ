@@ -214,6 +214,11 @@ def test_failed_synthesis_keeps_the_preview(application, monkeypatch):
         ("quota", "the picture limit is used up or busy"),
         ("incomplete", "no picture came back"),
         ("config_mismatch", "the model used a tool other than drawing"),
+        ("moderated", "the safety system blocked the picture"),
+        (
+            "network_blocked",
+            r"the picture service refused this network \(IP not authorized\); try another network",
+        ),
     ],
 )
 def test_failed_drawing_names_the_model_failure(application, monkeypatch, failure, text):

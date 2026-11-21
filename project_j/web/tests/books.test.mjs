@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { bookLine, booksOf, bookTitle, bookView, changesLine, draftActions, expandBlocked, levelled, neighbours, outlineLine, shelfItem } from '../src/books.ts'
+import { bookLine, booksOf, bookTitle, bookView, changesLine, coverHue, coverOf, draftActions, expandBlocked, levelled, missingLine, neighbours, outlineLine, shelfItem } from '../src/books.ts'
 
 const row = (extra = {}) => ({
   book_id: 'b', course_ref: { object_id: 'c1', revision: 2 }, title: null, target: null, words: 0,
@@ -14,6 +14,7 @@ test('book lines say where each book stands', () => {
   assert.equal(bookLine(row({ state: 'drawing', planned: 4 })), 'Drawing pictures')
   assert.equal(bookLine(row({ state: 'revising', title: 'T', revising: 2 })), 'Rewriting chapter 2')
   assert.equal(bookLine(row({ state: 'revising', title: 'T' })), 'Rewriting a chapter')
+  assert.equal(bookLine(row({ state: 'covering', title: 'T' })), 'Redrawing the cover')
   assert.equal(bookLine(row({ state: 'failed', reason: 'stopped because a class started' })),
     'Failed: stopped because a class started')
   const ready = row({ state: 'ready', title: 'T', target: '600L', words: 3120, chapters: ['1', '2', '3', '4', '5'] })
@@ -74,6 +75,8 @@ test('unsaved changes are listed, or none yet', () => {
   assert.equal(changesLine({ rewritten: [2], added: 1, drawn: 2 }), 'chapter 2 rewritten, 1 new chapter, 2 new pictures')
   assert.equal(changesLine({ rewritten: [2, 3], added: 2, drawn: 1 }), 'chapters 2, 3 rewritten, 2 new chapters, 1 new picture')
   assert.equal(changesLine({ rewritten: [], added: 0, drawn: 0 }), 'No changes yet')
+  assert.equal(changesLine({ rewritten: [], added: 0, drawn: 0, cover: true }), 'new cover')
+  assert.equal(changesLine({ rewritten: [2], added: 0, drawn: 1, cover: true }), 'chapter 2 rewritten, 1 new picture, new cover')
 })
 
 test('save, discard and preview show and work only when they apply', () => {
@@ -81,6 +84,8 @@ test('save, discard and preview show and work only when they apply', () => {
   assert.deepEqual(draftActions(row({ state: 'ready', continuing: true, draft: true, chapters: ['a'], saved: SAVED })),
     { reason: 'Write or discard the new chapters first', revert: true, preview: true })
   assert.deepEqual(draftActions(row({ state: 'writing', draft: true })), { reason: 'Wait until it is written', revert: false, preview: false })
+  assert.equal(draftActions(row({ state: 'revising', draft: true, chapters: ['a'] })).reason, 'Wait until the chapter is rewritten')
+  assert.equal(draftActions(row({ state: 'covering', draft: true, chapters: ['a'] })).reason, 'Wait until the cover is drawn')
   assert.deepEqual(draftActions(row({ state: 'ready', draft: true, chapters: ['a'] })), { reason: null, revert: false, preview: true })
 })
 
@@ -99,4 +104,36 @@ test('a bookshelf address names its view and book', () => {
   assert.equal(bookView('look:x'), null)
   assert.equal(bookView('read:'), null)
   assert.equal(bookView(undefined), null)
+})
+
+test("the plain cover's colour is fixed per book", () => {
+  const a = 'lesson-001-2026-10-24-20261119T120000Z', b = 'lesson-001-2026-10-24-20261120T081500Z'
+  assert.equal(coverHue(a), coverHue(a))
+  for (const id of [a, b, '']) assert.ok(Number.isInteger(coverHue(id)) && coverHue(id) >= 0 && coverHue(id) < 360)
+  assert.notEqual(coverHue(a), coverHue(b))
+  // Books of one lesson differ only in the time they were started: their colours must still be far apart.
+  const shelf = ['20261119T120000Z', '20261120T081500Z', '20261120T093000Z', '20261120T090000Z', '20261120T101500Z', '20261120T110000Z']
+    .map(time => coverHue(`lesson-001-2026-10-24-${time}`))
+  for (const [i, x] of shelf.entries()) for (const y of shelf.slice(i + 1)) {
+    const gap = Math.abs(x - y)
+    assert.ok(Math.min(gap, 360 - gap) >= 15, `${x}° and ${y}° look alike`)
+  }
+})
+
+test('each mode shows its own cover version', () => {
+  const edited = row({ saved: { ...SAVED, cover: 1 }, cover: 2, draft: true })
+  assert.deepEqual(coverOf(edited, 'read'), { draft: false, version: 1 })
+  assert.deepEqual(coverOf(edited, 'edit'), { draft: true, version: 2 })
+  assert.deepEqual(coverOf(row({ saved: { ...SAVED, cover: 1 }, cover: 1 }), 'edit'), { draft: false, version: 1 })
+  assert.deepEqual(coverOf({ ...edited, cover: 3 }, 'edit'), { draft: true, version: 3 })  // redrawn: fetched again
+  assert.equal(coverOf(row({ saved: SAVED }), 'read'), null)
+  assert.equal(coverOf(row({ saved: { ...SAVED, cover: null }, cover: null, draft: true }), 'edit'), null)
+  assert.equal(coverOf(row(), 'read'), null)
+})
+
+test('missing pictures say how many and why the last one was not drawn', () => {
+  assert.equal(missingLine(row({ state: 'ready', missing_pictures: 0 })), null)
+  assert.equal(missingLine(row({ state: 'ready', missing_pictures: 1 })), '1 picture not drawn')
+  assert.equal(missingLine(row({ state: 'ready', missing_pictures: 3, picture_failure: 'the safety system blocked the picture' })),
+    '3 pictures not drawn: the safety system blocked the picture')
 })

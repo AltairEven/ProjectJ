@@ -42,11 +42,13 @@ from project_j.application.books import (
     delete_book,
     discard_proposal,
     plan_outline,
+    redraw_cover,
     retry_book,
     revert_book,
     revise_chapter,
     save_book,
     start_book,
+    start_cover,
     start_drawing,
     start_outline_round,
     start_revision,
@@ -358,6 +360,7 @@ class SavedBook(Contract):
     title: str
     words: int
     chapters: int
+    cover: int | None = None  # Changes when the cover is redrawn; None: no cover drawn.
 
 
 class BookChanges(Contract):
@@ -366,6 +369,7 @@ class BookChanges(Contract):
     rewritten: list[int]
     added: int
     drawn: int
+    cover: bool = False  # Its cover was drawn since the save.
 
 
 class BookPlace(Contract):
@@ -397,13 +401,15 @@ class BookRow(Contract):
     words: int
     chapters: list[str]
     planned: int | None
-    state: Literal["outlining", "writing", "drawing", "ready", "revising", "failed"]
+    state: Literal["outlining", "writing", "drawing", "ready", "revising", "covering", "failed"]
     revising: int | None = None  # The chapter being rewritten while state is "revising".
     reason: str | None
     outline: Outline | None = None  # Under discussion if there is one, else the confirmed one.
     version: int | None = None  # The round of the outline under discussion.
     continuing: bool = False  # A finished book with new chapters under discussion.
-    missing_pictures: int = 0
+    missing_pictures: int = 0  # The cover counts when it failed or was never drawn.
+    picture_failure: str | None = None  # Why the last picture was not drawn, until a redraw.
+    cover: int | None = None  # As SavedBook.cover, for the draft when there is one.
     saved: SavedBook | None = None  # None until the first save: then it can be read and downloaded.
     draft: bool = False  # Edits wait in the draft until saved or discarded.
     changes: BookChanges | None = None  # Only for a saved book with a draft.
@@ -905,6 +911,16 @@ def create_app(
         start_drawing(controller(), request.learner_id, request.book_id)
         return writing(request.learner_id, request.book_id)
 
+    @app.post("/api/books/cover", dependencies=[Depends(operator)], status_code=202)
+    async def book_cover(request: BookRetry):
+        app_controller, learner, book = controller(), request.learner_id, request.book_id
+        start_cover(app_controller, learner, book)
+        return book_job(
+            learner,
+            book,
+            lambda progress: redraw_cover(app_controller, learner, book, progress),
+        )
+
     @app.post("/api/books/retry", dependencies=[Depends(operator)], status_code=202)
     async def book_retry(request: BookRetry):
         learner, book = request.learner_id, request.book_id
@@ -949,6 +965,7 @@ def create_app(
         draft: bool = False,
         chapter: Annotated[int | None, Query(ge=1, le=12)] = None,
         picture: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
+        cover: bool = False,
         learner_id: Annotated[str | None, Query(pattern=LEARNER_PATTERN)] = None,
     ):
         app_controller = controller()
@@ -959,6 +976,7 @@ def create_app(
             draft,
             chapter,
             picture,
+            cover,
         )
         return Response(data, media_type=media_type, headers={"Cache-Control": "no-store"})
 

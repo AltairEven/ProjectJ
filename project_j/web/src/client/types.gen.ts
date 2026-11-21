@@ -166,6 +166,10 @@ export type BookChanges = {
      * Drawn
      */
     drawn: number;
+    /**
+     * Cover
+     */
+    cover?: boolean;
 };
 
 /**
@@ -320,7 +324,7 @@ export type BookRow = {
     /**
      * State
      */
-    state: 'outlining' | 'writing' | 'drawing' | 'ready' | 'revising' | 'failed';
+    state: 'outlining' | 'writing' | 'drawing' | 'ready' | 'revising' | 'covering' | 'failed';
     /**
      * Revising
      */
@@ -342,6 +346,14 @@ export type BookRow = {
      * Missing Pictures
      */
     missing_pictures?: number;
+    /**
+     * Picture Failure
+     */
+    picture_failure?: string | null;
+    /**
+     * Cover
+     */
+    cover?: number | null;
     saved?: SavedBook | null;
     /**
      * Draft
@@ -1345,6 +1357,10 @@ export type SavedBook = {
      * Chapters
      */
     chapters: number;
+    /**
+     * Cover
+     */
+    cover?: number | null;
 };
 
 /**
@@ -1932,6 +1948,35 @@ export type BookPicturesApiBooksPicturesPostResponses = {
     202: unknown;
 };
 
+export type BookCoverApiBooksCoverPostData = {
+    body: BookRetry;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/books/cover';
+};
+
+export type BookCoverApiBooksCoverPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookCoverApiBooksCoverPostError = BookCoverApiBooksCoverPostErrors[keyof BookCoverApiBooksCoverPostErrors];
+
+export type BookCoverApiBooksCoverPostResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
+};
+
 export type BookRetryApiBooksRetryPostData = {
     body: BookRetry;
     headers?: {
@@ -2143,6 +2188,10 @@ export type BookPictureFileApiBooksPictureGetData = {
          * Picture
          */
         picture?: string | null;
+        /**
+         * Cover
+         */
+        cover?: boolean;
         /**
          * Learner Id
          */

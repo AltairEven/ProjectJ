@@ -1,7 +1,10 @@
 import asyncio
 import base64
+import contextlib
 import json
 import logging
+import sqlite3
+import time
 
 import pytest
 from openai_codex import ImageInput, TextInput
@@ -114,6 +117,59 @@ def test_codex_image_limit_is_quota(tmp_path):
 def test_codex_without_an_image_is_incomplete(tmp_path):
     fake = FakeCodex(events=[message(NOTE), completed()])
     assert asyncio.run(adapter(fake, tmp_path).invoke(DRAW, BINDING)).failure == "incomplete"
+
+
+# Seen in the runtime's own log (2026-11-21): the image tool's error never reaches the client,
+# only an ERROR row whose body names the turn; the request ID in it is made up here.
+IP_ERROR = (
+    "dispatch{thread.id=th turn.id=tu}: error=image generation failed: http 401 Unauthorized: "
+    'Some("{\\n  \\"error\\": {\\n    \\"message\\": \\"Your IP is not authorized to make '
+    'this request.\\",\\n    \\"type\\": \\"invalid_request_error\\"\\n  }\\n}")'
+)
+SAFETY_ERROR = (
+    "dispatch{thread.id=th turn.id=tu}: error=image generation failed: http 400 Bad Request: "
+    'Some("{\\n  \\"error\\": {\\n    \\"message\\": \\"Your request was rejected by the '
+    "safety system. If you believe this is an error, contact us and include the request ID "
+    '00000000-0000-0000-0000-000000000000.\\",\\n    '
+    '\\"code\\": \\"moderation_blocked\\"\\n  }\\n}")'
+)
+
+
+def runtime_log(home, body):
+    """The runtime's log database with one image-tool error row, its columns as seen."""
+    home.mkdir(parents=True)
+    with contextlib.closing(sqlite3.connect(home / "logs_2.sqlite")) as db:
+        db.execute(
+            "CREATE TABLE logs (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, "
+            "ts_nanos INTEGER NOT NULL, level TEXT NOT NULL, target TEXT NOT NULL, "
+            "feedback_log_body TEXT, thread_id TEXT)"
+        )
+        db.execute(
+            "INSERT INTO logs (ts, ts_nanos, level, target, feedback_log_body) "
+            "VALUES (?, 0, 'ERROR', 'codex_core::tools::router', ?)",
+            (int(time.time()), body),
+        )
+        db.commit()
+
+
+@pytest.mark.parametrize(
+    ("body", "kind", "lookup"),
+    [
+        (IP_ERROR, "network_blocked", "network_blocked"),
+        (SAFETY_ERROR, "moderated", "moderated"),
+        (IP_ERROR.replace("turn.id=tu", "turn.id=other"), "incomplete", "none"),
+        (None, "incomplete", "unreadable"),  # No log database: nothing to tell.
+    ],
+    ids=["network", "safety", "another turn", "no log"],
+)
+def test_codex_names_why_the_image_tool_drew_nothing(tmp_path, caplog, body, kind, lookup):
+    caplog.set_level(logging.INFO, logger="project_j")
+    if body:
+        runtime_log(tmp_path / "codex-home", body)
+    fake = FakeCodex(events=[message(NOTE), completed()])
+    assert asyncio.run(adapter(fake, tmp_path).invoke(DRAW, BINDING)).failure == kind
+    assert f"codex image error lookup={lookup} ms=" in caplog.text
+    assert "authorized" not in caplog.text and "safety" not in caplog.text
 
 
 def test_codex_image_request_refuses_other_tools(tmp_path):

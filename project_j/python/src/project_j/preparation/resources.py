@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from project_j.application.documents import document, identity, publication, successor
 from project_j.contracts import Document, RevisionRef
 from project_j.platform.files import stems
+from project_j.platform.models.contracts import FAILURE_TEXT
 from project_j.platform.storage import Conflict
 from project_j.platform.tts.contracts import SynthesisFailed
 from project_j.platform.tts.recorded import encode_wav
@@ -47,6 +48,8 @@ MODEL_TEXT = {
     "quota": "the picture limit is used up or busy",
     "incomplete": "no picture came back",
     "config_mismatch": "the model used a tool other than drawing",
+    "network_blocked": FAILURE_TEXT["network_blocked"],
+    "moderated": FAILURE_TEXT["moderated"],
 }
 # Each checked picture is drawn at most three times: the first time and two redraws.
 ROUNDS = 3

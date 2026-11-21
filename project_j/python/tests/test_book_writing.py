@@ -1,5 +1,7 @@
 """Expanded reading: the model's outline and chapter shapes, requests and checks (pure)."""
 
+import json
+
 from project_j.platform.models.simulated import SimulatedAdapter
 from project_j.preparation.expansion import (
     ChapterDraft,
@@ -10,6 +12,7 @@ from project_j.preparation.expansion import (
     Placement,
     chapter_problems,
     chapter_request,
+    cover_request,
     extended,
     outline_problems,
     outline_request,
@@ -17,6 +20,7 @@ from project_j.preparation.expansion import (
     revision_request,
     unnamed,
 )
+from project_j.preparation.materials import COVER_IMAGE_INSTRUCTIONS
 
 FILLER = "Mia walked on along the quiet road and looked at the hills."  # 12 words
 
@@ -232,3 +236,28 @@ def test_simulated_reading_replies_pass_the_checks():
     revised = ChapterDraft.model_validate(adapter.respond(request))
     assert revised != written[1]
     assert chapter_problems(revised, book.chapters[1].words, []) == ([], [])
+
+
+def test_a_cover_request_names_no_one_and_no_title():
+    book = outline(title="The Long Rain").model_copy(
+        update={"summary": "Mia walks home in the rain with Mia's dog."}
+    )
+    request = cover_request(book)
+    assert request.purpose == "reading" and request.media == "image"
+    assert request.deadline_key == "preparation_image"
+    assert request.instructions == COVER_IMAGE_INSTRUCTIONS
+    assert "Mia" not in request.context["content"]
+    assert "a small girl in a red coat" in request.context["content"]
+    assert "The Long Rain" not in json.dumps(request.context)
+    assert request.context["style"] == "Soft watercolor."
+    assert request.context["purpose"] == "the cover of this book"
+
+
+def test_a_first_version_outline_still_gets_a_cover_request():
+    book = outline().model_copy(
+        update={
+            "summary": "",
+            "characters": [Character(called="", look="a small girl in a red coat")],
+        }
+    )
+    assert cover_request(book).context["content"] == "Characters: a small girl in a red coat"

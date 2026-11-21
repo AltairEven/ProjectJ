@@ -11,6 +11,7 @@ import contextlib
 import json
 import logging
 import shutil
+import sqlite3
 import tempfile
 import time
 from datetime import UTC, datetime
@@ -107,6 +108,33 @@ IMAGE_LISTINGS = {
 QUIET_ITEMS = {"userMessage", "agentMessage", "reasoning", "plan", "contextCompaction"}
 # Subscription service tier ids; the default tier sends none.
 SERVICE_TIERS = {"fast": "priority"}
+
+
+# Seen on the real runtime (2026-11-21): when the image tool fails, the client gets no error item,
+# the turn just ends without a picture. The runtime's own log keeps one ERROR row whose body names
+# the turn and carries the service's reply; it is written seconds before the turn ends.
+RUNTIME_LOG = "logs_2.sqlite"
+IMAGE_ERRORS = {"IP is not authorized": "network_blocked", "moderation_blocked": "moderated"}
+
+
+def image_error(home: Path, turn_id: str, since: float) -> str:
+    """Why the image tool drew nothing in this turn, from the runtime's log; read only, and
+    incomplete when it does not say. Only the kind leaves here, never the logged reply."""
+    started = time.perf_counter()
+    try:
+        uri = f"{(home / RUNTIME_LOG).as_uri()}?mode=ro"
+        with contextlib.closing(sqlite3.connect(uri, uri=True, timeout=1)) as db:
+            rows = db.execute(
+                "SELECT feedback_log_body FROM logs WHERE ts >= ? AND level = 'ERROR' "
+                "AND instr(feedback_log_body, ?) AND instr(feedback_log_body, ?)",
+                (int(since), f"turn.id={turn_id}", "image generation failed"),
+            ).fetchall()
+        kinds = (kind for (body,) in rows for text, kind in IMAGE_ERRORS.items() if text in body)
+        found = next(kinds, "none")
+    except sqlite3.Error:
+        found = "unreadable"
+    log.info("codex image error lookup=%s ms=%.0f", found, (time.perf_counter() - started) * 1000)
+    return "incomplete" if found in ("none", "unreadable") else found
 
 
 def codex_config(home: Path, workdir: Path, image: bool = False) -> CodexConfig:
@@ -264,7 +292,7 @@ class CodexAdapter:
             actual["service_tier"] = ConfigCheck(
                 requested=binding.tier, actual=None, status="unverified"
             )
-        handle, begun = None, time.perf_counter()
+        handle, begun, since = None, time.perf_counter(), time.time()
         try:
             async with asyncio.timeout(timeout):
                 codex = self.codex(image=bool(media))
@@ -305,12 +333,12 @@ class CodexAdapter:
         if any(item.failure is not None for item in images):
             return AdapterReply(data=None, failure="quota", actual=actual)
         pictures = tuple(picture(item) for item in images) if media else ()
-        if (
-            turn is None
-            or turn.status is not TurnStatus.completed
-            or text is None
-            or (media and not any(pictures))
-        ):
+        if turn is None or turn.status is not TurnStatus.completed:
+            return AdapterReply(data=None, failure="incomplete", actual=actual)
+        if media and not any(pictures):
+            failure = await asyncio.to_thread(image_error, self.home, turn.id, since)
+            return AdapterReply(data=None, failure=failure, actual=actual)
+        if text is None:
             return AdapterReply(data=None, failure="incomplete", actual=actual)
         try:
             data = output.model_validate_json(text).model_dump()

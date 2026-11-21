@@ -713,6 +713,60 @@
         }
       }
     },
+    "/api/books/cover": {
+      "post": {
+        "summary": "Book Cover",
+        "operationId": "book_cover_api_books_cover_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookRetry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/books/retry": {
       "post": {
         "summary": "Book Retry",
@@ -1108,6 +1162,16 @@
                 }
               ],
               "title": "Picture"
+            }
+          },
+          {
+            "name": "cover",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cover"
             }
           },
           {
@@ -3640,6 +3704,11 @@
           "drawn": {
             "type": "integer",
             "title": "Drawn"
+          },
+          "cover": {
+            "type": "boolean",
+            "title": "Cover",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -3913,6 +3982,7 @@
               "drawing",
               "ready",
               "revising",
+              "covering",
               "failed"
             ],
             "title": "State"
@@ -3969,6 +4039,28 @@
             "type": "integer",
             "title": "Missing Pictures",
             "default": 0
+          },
+          "picture_failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Picture Failure"
+          },
+          "cover": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover"
           },
           "saved": {
             "anyOf": [
@@ -5762,6 +5854,17 @@
           "chapters": {
             "type": "integer",
             "title": "Chapters"
+          },
+          "cover": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover"
           }
         },
         "additionalProperties": false,

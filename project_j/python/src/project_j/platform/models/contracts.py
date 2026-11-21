@@ -37,6 +37,8 @@ Failure = Literal[
     "config_mismatch",
     "unavailable",
     "not_initialized",
+    "network_blocked",  # The picture service refused this network (seen as an IP refusal).
+    "moderated",  # The picture service's safety system blocked the picture.
 ]
 LABELS = {
     "verified": "verified",
@@ -245,6 +247,10 @@ FAILURE_TEXT = {
     "refused": "the model refused",
     "incomplete": "the reply was incomplete",
     "invalid_output": "the reply did not fit the format",
+    "network_blocked": (
+        "the picture service refused this network (IP not authorized); try another network"
+    ),
+    "moderated": "the safety system blocked the picture",
 }
 
 

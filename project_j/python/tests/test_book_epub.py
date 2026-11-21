@@ -73,3 +73,38 @@ def test_control_characters_a_model_slips_in_do_not_break_the_xhtml():
         ET.fromstring(chapter)  # parses as XML
         assert "<h1>One</h1><p>A B\tC.</p>" in chapter.decode()
         assert ET.fromstring(book.read("OEBPS/content.opf")).find(f".//{DC}title").text == "Title"
+
+
+def test_a_cover_comes_first_and_is_marked():
+    data = build_epub("b1", "T", [Page("One", ["A."], {})], NOW, cover=solid_png())
+    with opened(data) as book:
+        names = set(book.namelist())
+        assert "OEBPS/images/cover.png" in names
+        opf = ET.fromstring(book.read("OEBPS/content.opf"))
+        items = list(opf.find(f"{OPF}manifest"))
+        (image,) = [i for i in items if i.get("href") == "images/cover.png"]
+        assert image.get("properties") == "cover-image"
+        metas = [m for m in opf.find(f"{OPF}metadata").iter(f"{OPF}meta") if m.get("name")]
+        assert [(m.get("name"), m.get("content")) for m in metas] == [("cover", image.get("id"))]
+        hrefs = {i.get("id"): i.get("href") for i in items}
+        spine = [hrefs[ref.get("idref")] for ref in opf.find(f"{OPF}spine")]
+        assert spine == ["cover.xhtml", "chapter-1.xhtml"]
+        page = book.read("OEBPS/cover.xhtml")
+        ET.fromstring(page)  # parses as XML
+        assert b"images/cover.png" in page
+        assert b"cover.xhtml" not in book.read("OEBPS/nav.xhtml")
+
+
+def test_no_cover_leaves_the_book_as_before():
+    data = build_epub("b1", "T", [Page("One", ["A."], {1: solid_png()})], NOW, cover=None)
+    with opened(data) as book:
+        assert not [name for name in book.namelist() if "cover" in name]
+        opf = book.read("OEBPS/content.opf")
+        assert b"cover" not in opf
+        spine = [ref.get("idref") for ref in ET.fromstring(opf).find(f"{OPF}spine")]
+        assert spine == ["c1"]  # the book opens on its first chapter
+
+
+def test_a_cover_that_is_not_png_jpeg_or_webp_is_refused():
+    with pytest.raises(ValueError):
+        build_epub("b1", "T", [Page("One", ["Text."], {})], NOW, cover=b"GIF89a")

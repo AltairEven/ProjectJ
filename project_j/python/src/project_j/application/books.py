@@ -21,7 +21,9 @@ from pydantic import JsonValue, model_validator
 
 from project_j.application.progress import in_class
 from project_j.contracts import Contract, RevisionRef
+from project_j.evaluation.assessment import FAILURE_TEXT
 from project_j.learning.onboarding import profile
+from project_j.platform.models.contracts import ModelRequest
 from project_j.platform.storage import Conflict
 from project_j.platform.visuals import image_type
 from project_j.preparation.difficulty import targets
@@ -32,6 +34,7 @@ from project_j.preparation.expansion import (
     Outline,
     chapter_problems,
     chapter_request,
+    cover_request,
     extended,
     outline_problems,
     outline_request,
@@ -40,6 +43,7 @@ from project_j.preparation.expansion import (
 )
 from project_j.preparation.folders import lesson_of
 from project_j.preparation.reading import words as count_words
+from project_j.preparation.resources import MODEL_TEXT
 
 log = logging.getLogger(__name__)
 BOOK_PATTERN = r"^[a-z]+-\d{3}-\d{4}-\d{2}-\d{2}-\d{8}T\d{6}Z$"
@@ -64,6 +68,9 @@ class BookRecord(Contract):
     proposal_version: int = 0
     chapters: list[ChapterDraft] = []
     pictures: dict[int, Literal["pending", "drawn", "failed"]] = {}  # Each chapter's new one.
+    # The cover, drawn last; a record from before covers has none, so it counts as missing.
+    cover: Literal["pending", "drawn", "failed"] = "failed"
+    covers: int = 0  # Covers drawn so far: a draft unlike its saved book has a new one.
     revisions: int = 0
     calls: list[dict[str, JsonValue]] = []  # Per step: the binding and the checked config.
 
@@ -122,6 +129,8 @@ def editable(app, book_id: str) -> None:
     for number, state in record.pictures.items():
         if state == "drawn" and (data := app.files.read(picture_path(book_id, number, False))):
             app.files.put(picture_path(book_id, number), data)
+    if record.cover == "drawn" and (data := app.files.read(cover_path(book_id, False))):
+        app.files.put(cover_path(book_id), data)
     save(app, record)
     log.info("book draft book=%s from=saved", book_id)
 
@@ -181,6 +190,7 @@ def start_book(app, learner_id: str, course_ref: RevisionRef, challenge: str) ->
         challenge=challenge,
         target=target,
         status="outlining",
+        cover="pending",
     )
     save(app, record)
     log.info(
@@ -292,19 +302,25 @@ def discard_proposal(app, book_id: str) -> None:
 
 
 def start_drawing(app, learner_id: str, book_id: str) -> int:
-    """Mark a finished book's failed pictures to be drawn again; the writing job draws them.
-    Its book done log then counts what was drawn and what failed again."""
+    """Mark a finished book's failed pictures, its cover too, to be drawn again; the writing job
+    draws them, the cover last. Its book done log then counts what was drawn and failed again."""
     guard(app)
     app.models.require()
     record = current(app, book_id)
     failed = [number for number, state in record.pictures.items() if state == "failed"]
-    if record.status != "ready" or not failed:
+    count = len(failed) + (record.cover == "failed")
+    if record.status != "ready" or not count:
         raise Conflict("This book has no missing pictures to draw.")
     editable(app, book_id)
-    update = {"status": "writing", "pictures": record.pictures | dict.fromkeys(failed, "pending")}
+    update = {
+        "status": "writing",
+        "pictures": record.pictures | dict.fromkeys(failed, "pending"),
+        "cover": "pending" if record.cover == "failed" else record.cover,
+    }
     save(app, record.model_copy(update=update))
-    log.info("book redraw start book=%s pictures=%d", book_id, len(failed))
-    return len(failed)
+    app.book_picture_failures.pop(book_id, None)
+    log.info("book redraw start book=%s pictures=%d", book_id, count)
+    return count
 
 
 async def ask(app, book_id: str, step: str, request, check):
@@ -341,25 +357,34 @@ async def ask(app, book_id: str, step: str, request, check):
     return result.output, entry
 
 
-async def draw(
-    app, book_id: str, outline: Outline, draft: ChapterDraft, number: int
-) -> bytes | None:
+async def draw(app, book_id: str, request: ModelRequest, picture: str) -> bytes | None:
+    """One picture: picture names it in the log, chapter-<n> or cover. A failure's reason, as
+    course pictures word it, stays for the book's page until a new drawing starts."""
     started = time.perf_counter()
-    result = await app.models.run(picture_request(outline, draft))
-    picture = result.media[0] if result.failure is None else None
+    result = await app.models.run(request)
+    data = result.media[0] if result.failure is None else None
+    if failure := result.failure:
+        app.book_picture_failures[book_id] = MODEL_TEXT.get(failure) or FAILURE_TEXT.get(
+            failure, failure
+        )
     log.info(
-        "book picture book=%s chapter=%d result=%s ms=%.0f",
+        "book picture book=%s picture=%s result=%s%s ms=%.0f",
         book_id,
-        number,
-        "drawn" if picture else "failed",
+        picture,
+        "drawn" if data else "failed",
+        f" failure={result.failure}" if result.failure else "",
         (time.perf_counter() - started) * 1000,
     )
-    return picture
+    return data
 
 
 def picture_path(book_id: str, number: int, draft: bool = True) -> str:
     """A chapter's new picture; no suffix, as the EPUB types pictures by their own header."""
     return f"{folder(book_id, draft)}/pictures/chapter-{number}"
+
+
+def cover_path(book_id: str, draft: bool = True) -> str:
+    return f"{folder(book_id, draft)}/pictures/cover"
 
 
 def source(app, learner_id: str, record: BookRecord):
@@ -388,7 +413,8 @@ def epub(app, record: BookRecord, pictures: list[dict]) -> bytes:
                 picture_path(record.book_id, number)
             )
         pages.append(Page(chapter.title, chapter.paragraphs, placed))
-    return build_epub(record.book_id, record.outline.title, pages, datetime.now(UTC))
+    cover = app.files.read(cover_path(record.book_id)) if record.cover == "drawn" else None
+    return build_epub(record.book_id, record.outline.title, pages, datetime.now(UTC), cover)
 
 
 def chapter_check(record: BookRecord, number: int):
@@ -405,10 +431,11 @@ async def write_book(app, learner_id: str, book_id: str, progress) -> None:
     record = load(app, book_id)
     story, pictures, _ = source(app, learner_id, record)
     planned = len(record.outline.chapters)
-    total = 2 * planned + 1
+    total = 2 * planned + 2
 
     def done() -> int:
-        return 1 + len(record.chapters) + sum(s != "pending" for s in record.pictures.values())
+        drawn = sum(s != "pending" for s in [*record.pictures.values(), record.cover])
+        return 1 + len(record.chapters) + drawn
 
     progress(done(), total)
     for number in range(len(record.chapters) + 1, planned + 1):
@@ -424,11 +451,17 @@ async def write_book(app, learner_id: str, book_id: str, progress) -> None:
     for number, state in record.pictures.items():
         if state != "pending":
             continue
-        picture = await draw(app, book_id, record.outline, record.chapters[number - 1], number)
+        request = picture_request(record.outline, record.chapters[number - 1])
+        picture = await draw(app, book_id, request, f"chapter-{number}")
         if picture:
             app.files.put(picture_path(book_id, number), picture)
         pictures_now = record.pictures | {number: "drawn" if picture else "failed"}
         record = save(app, record.model_copy(update={"pictures": pictures_now}))
+        progress(done(), total)
+    # The cover last, and before the book is marked ready: a stop in between leaves the book
+    # being written, so Retry draws it (drawing missing pictures only takes failed ones).
+    if record.cover == "pending":
+        record = save(app, record.model_copy(update=await drawn_cover(app, record)))
         progress(done(), total)
     record = save(app, record.model_copy(update={"status": "ready"}))
     missing = sum(
@@ -438,7 +471,8 @@ async def write_book(app, learner_id: str, book_id: str, progress) -> None:
     # Offered: the words the outline spread over the chapters (every active word at its run).
     offered = {word.lower() for chapter in record.outline.chapters for word in chapter.words}
     log.info(
-        "book done book=%s chapters=%d words=%d offered=%d missing=%d drawn=%d failed=%d ms=%.0f",
+        "book done book=%s chapters=%d words=%d offered=%d missing=%d drawn=%d failed=%d "
+        "cover=%s ms=%.0f",
         book_id,
         planned,
         book_words(record),
@@ -446,12 +480,23 @@ async def write_book(app, learner_id: str, book_id: str, progress) -> None:
         missing,
         states.count("drawn"),
         states.count("failed"),
+        record.cover,
         (time.perf_counter() - started) * 1000,
     )
 
 
+async def drawn_cover(app, record: BookRecord) -> dict:
+    """Draw the cover; a drawn one is written to the draft before its record says so."""
+    picture = await draw(app, record.book_id, cover_request(record.outline), "cover")
+    if not picture:
+        return {"cover": "failed"}
+    app.files.put(cover_path(record.book_id), picture)
+    return {"cover": "drawn", "covers": record.covers + 1}
+
+
 def changes(saved: BookRecord, draft: BookRecord) -> dict:
-    """What the draft changed: the chapters rewritten, how many were added, new pictures drawn."""
+    """What the draft changed: the chapters rewritten, how many were added, new pictures drawn,
+    and whether its cover was drawn since the save."""
     kept = len(saved.chapters)
     pairs = zip(saved.chapters, draft.chapters, strict=False)  # A draft never has fewer.
     rewritten = [n for n, (old, new) in enumerate(pairs, start=1) if old != new]
@@ -459,7 +504,17 @@ def changes(saved: BookRecord, draft: BookRecord) -> dict:
         state == "drawn" and (n in rewritten or n > kept or saved.pictures.get(n) != "drawn")
         for n, state in draft.pictures.items()
     )
-    return {"rewritten": rewritten, "added": len(draft.chapters) - kept, "drawn": drawn}
+    return {
+        "rewritten": rewritten,
+        "added": len(draft.chapters) - kept,
+        "drawn": drawn,
+        "cover": draft.covers != saved.covers,
+    }
+
+
+def shown_cover(record: BookRecord) -> int | None:
+    """Which cover the page shows: a count that changes when it is redrawn; None for none."""
+    return record.covers if record.cover == "drawn" else None
 
 
 def books(app) -> list[dict]:
@@ -483,7 +538,13 @@ def books(app) -> list[dict]:
         if record.status == "outlining" and (running or record.proposal):
             state = "outlining"  # Waiting for the student's next round or confirmation.
         elif record.status == "ready":
-            state = "revising" if book_id in app.book_revising else "ready"
+            state = (
+                "revising"
+                if book_id in app.book_revising
+                else "covering"
+                if book_id in app.book_covering
+                else "ready"
+            )
         elif running:
             state = "writing" if len(record.chapters) < planned else "drawing"
         else:
@@ -504,11 +565,14 @@ def books(app) -> list[dict]:
                 "outline": discussed.model_dump(mode="json") if discussed else None,
                 "version": record.proposal_version if record.proposal else None,
                 "continuing": record.status == "ready" and record.proposal is not None,
-                "missing_pictures": list(record.pictures.values()).count("failed"),
+                "missing_pictures": [*record.pictures.values(), record.cover].count("failed"),
+                "picture_failure": app.book_picture_failures.get(book_id),
+                "cover": shown_cover(record),
                 "saved": {
                     "title": kept.outline.title,
                     "words": book_words(kept),
                     "chapters": len(kept.chapters),
+                    "cover": shown_cover(kept),
                 }
                 if kept
                 else None,
@@ -561,7 +625,7 @@ async def rewrite(
         app, book_id, f"revision:{chapter}", request, chapter_check(record, chapter)
     )
     progress(1, 2)
-    picture = await draw(app, book_id, record.outline, draft, chapter)
+    picture = await draw(app, book_id, picture_request(record.outline, draft), f"chapter-{chapter}")
     chapters = [draft if n == chapter else c for n, c in enumerate(record.chapters, start=1)]
     record = record.model_copy(
         update={
@@ -583,6 +647,39 @@ async def rewrite(
         "drawn" if picture else "failed",
         (time.perf_counter() - started) * 1000,
     )
+
+
+def start_cover(app, learner_id: str, book_id: str) -> None:
+    """Check a redraw of a finished book's cover; the job draws it into the draft."""
+    guard(app)
+    app.models.require()
+    if current(app, book_id).status != "ready":
+        raise Conflict("Only a finished book can have its cover redrawn.")
+    editable(app, book_id)
+    log.info("book cover start book=%s", book_id)
+
+
+async def redraw_cover(app, learner_id: str, book_id: str, progress) -> None:
+    """The redraw job: a new cover goes to the draft only once it is drawn, so a failure or a
+    stop leaves the cover the draft had; a save makes it the book's."""
+    app.book_covering.add(book_id)
+    started = time.perf_counter()
+    try:
+        record = load(app, book_id)
+        progress(0, 1)
+        update = await drawn_cover(app, record)
+        log.info(
+            "book cover redrawn book=%s result=%s ms=%.0f",
+            book_id,
+            update["cover"],
+            (time.perf_counter() - started) * 1000,
+        )
+        if update["cover"] == "failed":
+            raise BookFailed(f"The cover step failed: {app.book_picture_failures[book_id]}.")
+        save(app, record.model_copy(update=update))
+        progress(1, 1)
+    finally:
+        app.book_covering.discard(book_id)
 
 
 async def stop_books(app) -> None:
@@ -616,7 +713,10 @@ def save_book(app, learner_id: str, book_id: str) -> None:
         else s
         for n, s in record.pictures.items()
     }
-    record = record.model_copy(update={"pictures": states})
+    cover = record.cover
+    if cover == "drawn" and not app.files.path(cover_path(book_id)).is_file():
+        cover = "failed"
+    record = record.model_copy(update={"pictures": states, "cover": cover})
     _, pictures, _ = source(app, learner_id, record)
     data = epub(app, record, pictures)
     for number in range(1, len(record.chapters) + 1):
@@ -626,14 +726,19 @@ def save_book(app, learner_id: str, book_id: str) -> None:
             )
         else:
             app.files.remove(picture_path(book_id, number, False))
+    if cover == "drawn":
+        app.files.put(cover_path(book_id, False), app.files.read(cover_path(book_id)))
+    else:
+        app.files.remove(cover_path(book_id, False))
     app.files.put(f"{folder(book_id, False)}/book.epub", data)
     app.files.put(f"{folder(book_id, False)}/book.json", record.model_dump_json(indent=2) + "\n")
     app.files.remove_tree(folder(book_id))
     log.info(
-        "book save book=%s chapters=%d pictures=%d epub_bytes=%d ms=%.0f",
+        "book save book=%s chapters=%d pictures=%d cover=%s epub_bytes=%d ms=%.0f",
         book_id,
         len(record.chapters),
         list(record.pictures.values()).count("drawn"),
+        cover,
         len(data),
         (time.perf_counter() - started) * 1000,
     )
@@ -648,6 +753,7 @@ def revert_book(app, book_id: str) -> None:
         raise Conflict("There are no changes to discard.")
     app.files.remove_tree(folder(book_id))
     app.job_failures.pop(JOB + book_id, None)  # A failed step of the draft now gone.
+    app.book_picture_failures.pop(book_id, None)  # So is why its pictures failed.
     log.info("book revert book=%s", book_id)
 
 
@@ -671,6 +777,7 @@ async def delete_book(app, book_id: str) -> None:
         app.files.remove(path)
     app.files.remove_tree(root)  # Its emptied folders and anything else left in it.
     app.job_failures.pop(name, None)
+    app.book_picture_failures.pop(book_id, None)
     log.info(
         "book delete book=%s saved=%s draft=%s stopped=%s",
         book_id,
@@ -699,16 +806,26 @@ def book_content(app, book_id: str, draft: bool) -> dict:
 
 
 def book_picture(
-    app, learner_id: str, book_id: str, draft: bool, chapter: int | None, picture: str | None
+    app,
+    learner_id: str,
+    book_id: str,
+    draft: bool,
+    chapter: int | None,
+    picture: str | None,
+    cover: bool = False,
 ) -> tuple[bytes, str]:
     """One picture, looked up only in the book's own list: a chapter's new one by the chapter,
-    an original by the id a written chapter places. The request never names a path."""
+    an original by the id a written chapter places, or the cover. The request never names a
+    path."""
     checked(book_id)
-    if (chapter is None) == (picture is None):
-        raise ValueError("Give a chapter or a picture.")
+    if [chapter is not None, picture is not None, cover].count(True) != 1:
+        raise ValueError("Give a chapter, a picture or the cover.")
     record = load(app, book_id, draft)
     data = None
-    if chapter is not None:
+    if cover:
+        if record.cover == "drawn":
+            data = app.files.read(cover_path(book_id, draft))
+    elif chapter is not None:
         if 1 <= chapter <= len(record.chapters) and record.pictures.get(chapter) == "drawn":
             data = app.files.read(picture_path(book_id, chapter, draft))
     elif any(place.picture == picture for c in record.chapters for place in c.pictures):

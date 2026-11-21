@@ -41,19 +41,39 @@ def xhtml(title: str, body: str) -> str:
     )
 
 
-def build_epub(identifier: str, title: str, pages: list[Page], modified: datetime) -> bytes:
+def suffix(kind: str) -> str:
+    return "jpg" if kind == "jpeg" else kind
+
+
+def build_epub(
+    identifier: str, title: str, pages: list[Page], modified: datetime, cover: bytes | None = None
+) -> bytes:
+    """With a cover: the reader's library shows it (cover-image, and the older meta) and the
+    book opens on a page of it, which the contents leave out."""
     files: dict[str, bytes] = {}
     items = [
         '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>'
     ]
-    spine, links = [], []
+    spine, links, meta = [], [], ""
+    if cover:
+        kind = image_type(cover)
+        href = f"images/cover.{suffix(kind)}"
+        files[href] = cover
+        files["cover.xhtml"] = xhtml(title, f'<p><img src="{href}" alt="Cover"/></p>').encode()
+        items.append(
+            f'<item id="cover-image" href="{href}" media-type="image/{kind}" '
+            'properties="cover-image"/>'
+        )
+        items.append('<item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>')
+        spine.append('<itemref idref="cover"/>')
+        meta = '<meta name="cover" content="cover-image"/>'
     for number, page in enumerate(pages, start=1):
         body = [f"<h1>{text(page.title)}</h1>"]
         for paragraph, words in enumerate(page.paragraphs, start=1):
             body.append(f"<p>{text(words)}</p>")
             if picture := page.pictures.get(paragraph):
                 kind = image_type(picture)
-                href = f"images/c{number}-p{paragraph}.{'jpg' if kind == 'jpeg' else kind}"
+                href = f"images/c{number}-p{paragraph}.{suffix(kind)}"
                 files[href] = picture
                 items.append(
                     f'<item id="i{number}-{paragraph}" href="{href}" media-type="image/{kind}"/>'
@@ -73,7 +93,7 @@ def build_epub(identifier: str, title: str, pages: list[Page], modified: datetim
         '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
         f'<dc:identifier id="id">urn:project-j:{text(identifier)}</dc:identifier>'
         f"<dc:title>{text(title)}</dc:title><dc:language>en</dc:language>"
-        f'<meta property="dcterms:modified">{stamp}</meta></metadata>'
+        f'<meta property="dcterms:modified">{stamp}</meta>{meta}</metadata>'
         f"<manifest>{''.join(items)}</manifest><spine>{''.join(spine)}</spine></package>"
     ).encode()
     buffer = io.BytesIO()

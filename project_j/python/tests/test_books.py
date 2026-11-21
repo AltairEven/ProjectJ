@@ -7,6 +7,7 @@ import io
 import json
 import logging
 import os
+import re
 import shutil
 import zipfile
 from dataclasses import replace
@@ -27,11 +28,13 @@ from project_j.application.books import (
     delete_book,
     discard_proposal,
     plan_outline,
+    redraw_cover,
     retry_book,
     revert_book,
     revise_chapter,
     save_book,
     start_book,
+    start_cover,
     start_drawing,
     start_outline_round,
     start_revision,
@@ -182,7 +185,7 @@ def test_a_taken_lesson_becomes_a_ready_book(application, caplog):
     assert record.calls and record.calls[0]["step"] == "outline"
     names = epub_names(app, book)
     assert "OEBPS/chapter-1.xhtml" in names and "mimetype" == names[0]
-    assert len([n for n in names if n.startswith("OEBPS/images/")]) == len(record.chapters)
+    assert len([n for n in names if n.startswith("OEBPS/images/")]) == len(record.chapters) + 1
     assert digests(app, folder) == before  # the lesson folder is untouched
     assert app.store.current(identity(LEARNER, "profile"), LEARNER).body == profile_before
     assert app.vocabulary_record(LEARNER)[1] == vocabulary_before  # the book counts nothing
@@ -334,8 +337,8 @@ def test_a_failed_picture_leaves_that_chapter_without_one(application, monkeypat
         write(app, book)
     record = load(app, book)
     assert record.status == "ready" and record.pictures[1] == "failed"
-    assert f"book picture book={book} chapter=1 result=failed" in caplog.text
-    assert f"book picture book={book} chapter=2 result=drawn" in caplog.text
+    assert f"book picture book={book} picture=chapter-1 result=failed" in caplog.text
+    assert f"book picture book={book} picture=chapter-2 result=drawn" in caplog.text
     save_book(app, LEARNER, book)
     names = epub_names(app, book)
     assert not any(n.startswith("OEBPS/images/c1-") for n in names)
@@ -642,7 +645,8 @@ def test_a_resumed_book_draws_only_the_pictures_not_yet_tried(application, monke
     seen = calls(app, monkeypatch)
     retry_book(app, LEARNER, book)
     write(app, book)
-    assert len(seen) == 3 and all(r.media == "image" for r in seen)  # chapters 2-4 only
+    assert len(seen) == 4 and all(r.media == "image" for r in seen)  # chapters 2-4, the cover
+    assert is_cover(seen[-1])
     assert load(app, book).pictures == {1: "failed", 2: "drawn", 3: "drawn", 4: "drawn"}
 
 
@@ -835,7 +839,7 @@ def test_continuing_writes_only_the_new_chapters(application, monkeypatch, caplo
     assert digests(app, f"books/{book}/pictures") == old  # the saved book waits for a save
     save_book(app, LEARNER, book)
     now = digests(app, f"books/{book}/pictures")
-    assert {name: now[name] for name in old} == old and len(now) == 5
+    assert {name: now[name] for name in old} == old and len(now) == 6  # a new chapter's
     chapters = [n for n in epub_names(app, book) if n.startswith("OEBPS/chapter-")]
     assert after.status == "ready" and len(chapters) == 5
 
@@ -925,7 +929,7 @@ def test_drawing_missing_pictures_redraws_only_the_failed(application, monkeypat
     assert len(images) == 2 and record.status == "ready"
     assert record.pictures == {1: "drawn", 2: "drawn", 3: "drawn", 4: "drawn"}
     save_book(app, LEARNER, book)
-    assert len([n for n in epub_names(app, book) if n.startswith("OEBPS/images/")]) == 4
+    assert len([n for n in epub_names(app, book) if n.startswith("OEBPS/images/")]) == 5  # cover
     assert f"book redraw start book={book} pictures=2" in caplog.text
     failed = record.model_copy(update={"pictures": record.pictures | {2: "failed"}})
     app.files.put(f"books/{book}/book.json", failed.model_dump_json())
@@ -1135,6 +1139,7 @@ def test_shelf_rows_show_the_saved_version_and_the_draft(application):
         "title": record.outline.title,
         "words": books.book_words(record),
         "chapters": len(record.chapters),
+        "cover": 1,
     }
     assert row["draft"] is False and row["changes"] is None
     revised(app, book)
@@ -1142,7 +1147,7 @@ def test_shelf_rows_show_the_saved_version_and_the_draft(application):
     confirm_outline(app, LEARNER, book)
     asyncio.run(write_book(app, LEARNER, book, noop))
     (row,) = book_rows(app)
-    assert row["changes"] == {"rewritten": [2], "added": 1, "drawn": 2}
+    assert row["changes"] == {"rewritten": [2], "added": 1, "drawn": 2, "cover": False}
     assert len(row["chapters"]) == len(record.chapters) + 1 and row["draft"] is True
     assert row["saved"]["chapters"] == len(record.chapters)
 
@@ -1204,9 +1209,14 @@ def test_pictures_come_only_from_the_books_own_list(application, monkeypatch):
     with pytest.raises(LookupError):  # the draft's new picture failed
         book_picture(app, LEARNER, book, True, 1, None)
     assert book_picture(app, LEARNER, book, False, 1, None)[0][:4] == b"\x89PNG"
-    for chapter, picture in ((1, "pond"), (None, None)):
+    for draft in (False, True):
+        data, media = book_picture(app, LEARNER, book, draft, None, None, cover=True)
+        assert data[:4] == b"\x89PNG" and media == "image/png"
+    for chapter, picture, cover in ((1, "pond", False), (None, None, False), (1, None, True)):
         with pytest.raises(ValueError):
-            book_picture(app, LEARNER, book, False, chapter, picture)
+            book_picture(app, LEARNER, book, False, chapter, picture, cover=cover)
+    with pytest.raises(ValueError):
+        book_picture(app, LEARNER, book, False, None, "pond", cover=True)
     with pytest.raises(ValueError):
         book_content(app, "../x", draft=False)
 
@@ -1220,6 +1230,8 @@ def test_reading_is_refused_in_class(application):
             book_content(app, book, draft=False)
         with pytest.raises(StorageBlocked):
             book_picture(app, LEARNER, book, False, 1, None)
+        with pytest.raises(StorageBlocked):
+            book_picture(app, LEARNER, book, False, None, None, cover=True)
     finally:
         app.store.active_activity_id = None
 
@@ -1349,3 +1361,318 @@ def test_a_delete_failing_midway_leaves_the_book_on_the_shelf(application, monke
     monkeypatch.undo()
     asyncio.run(delete_book(app, book))
     assert book_rows(app) == [] and not app.files.path(f"books/{book}").exists()
+
+
+def is_cover(request) -> bool:
+    return request.media == "image" and request.context.get("purpose") == "the cover of this book"
+
+
+def cover_digest(app, book, draft=True):
+    data = app.files.read(f"books/{book}/{'draft/' if draft else ''}pictures/cover")
+    return None if data is None else hashlib.sha256(data).hexdigest()
+
+
+def fail_cover(app, monkeypatch):
+    async def change(request, count):
+        return AdapterReply(data=None, failure="unavailable") if is_cover(request) else None
+
+    return calls(app, monkeypatch, change)
+
+
+def test_the_cover_is_drawn_last(application, monkeypatch, caplog):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+    assert load(app, book).cover == "pending"
+    seen = calls(app, monkeypatch)
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        write(app, book)
+    images = [r for r in seen if r.media == "image"]
+    assert is_cover(images[-1]) and not any(is_cover(r) for r in images[:-1])
+    record = load(app, book)
+    assert record.cover == "drawn" and record.covers == 1
+    assert app.files.read(f"books/{book}/draft/pictures/cover")[:4] == b"\x89PNG"
+    assert f"book picture book={book} picture=cover result=drawn" in caplog.text
+    done = next(line for line in caplog.text.splitlines() if f"book done book={book}" in line)
+    assert "cover=drawn" in done
+    assert record.outline.title not in caplog.text
+    assert not record.outline.summary or record.outline.summary not in caplog.text
+
+
+def test_a_failed_cover_does_not_fail_the_book(application, monkeypatch, caplog):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+    fail_cover(app, monkeypatch)
+    write(app, book)
+    record = load(app, book)
+    assert record.status == "ready" and record.cover == "failed" and record.covers == 0
+    (row,) = book_rows(app)
+    assert row["missing_pictures"] == 1 and row["cover"] is None
+    monkeypatch.undo()
+    seen = calls(app, monkeypatch)
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        assert start_drawing(app, LEARNER, book) == 1
+    assert f"book redraw start book={book} pictures=1" in caplog.text
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    assert [is_cover(r) for r in seen] == [True]
+    assert load(app, book).cover == "drawn" and book_rows(app)[0]["cover"] == 1
+
+
+def test_continuing_revising_and_drawing_pictures_keep_the_cover(application, monkeypatch):
+    app = application
+    book = ready_book(app)
+    before = cover_digest(app, book, draft=False)
+    seen = calls(app, monkeypatch)
+    revised(app, book)
+    continue_story(app, book)
+    confirm_outline(app, LEARNER, book)
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    record = load(app, book)
+    books.save(app, record.model_copy(update={"pictures": record.pictures | {1: "failed"}}))
+    assert start_drawing(app, LEARNER, book) == 1
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    assert seen and not any(is_cover(r) for r in seen)
+    assert cover_digest(app, book) == before and load(app, book).covers == 1
+
+
+def test_an_old_record_without_a_cover_counts_it_missing(application):
+    app = application
+    book = ready_book(app)
+    path = f"books/{book}/book.json"
+    data = json.loads(app.files.read(path))
+    del data["cover"], data["covers"]
+    app.files.put(path, json.dumps(data))
+    app.files.remove(f"books/{book}/pictures/cover")
+    assert saved(app, book).cover == "failed"
+    (row,) = book_rows(app)
+    assert row["missing_pictures"] == 1 and row["saved"]["cover"] is None
+    assert start_drawing(app, LEARNER, book) == 1
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    assert load(app, book).cover == "drawn"
+
+
+def test_saving_carries_the_cover_into_the_book_and_the_epub(application, caplog):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+    write(app, book)
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        save_book(app, LEARNER, book)
+    line = next(line for line in caplog.text.splitlines() if f"book save book={book}" in line)
+    assert "cover=drawn" in line
+    assert cover_digest(app, book, draft=False) is not None
+    names = epub_names(app, book)
+    assert "OEBPS/images/cover.png" in names and "OEBPS/cover.xhtml" in names
+    start_revision(app, LEARNER, book, 1, "More rain.")
+    assert cover_digest(app, book) == cover_digest(app, book, draft=False)
+
+
+def test_a_drawn_cover_missing_from_disk_is_saved_as_missing(application):
+    app = application
+    book = ready_book(app)
+    start_revision(app, LEARNER, book, 1, "More rain.")
+    app.files.remove(f"books/{book}/draft/pictures/cover")
+    with pytest.raises(LookupError):
+        book_picture(app, LEARNER, book, True, None, None, cover=True)
+    save_book(app, LEARNER, book)
+    assert saved(app, book).cover == "failed"
+    assert app.files.read(f"books/{book}/pictures/cover") is None
+    assert "OEBPS/cover.xhtml" not in epub_names(app, book)
+    assert book_rows(app)[0]["missing_pictures"] == 1
+
+
+def test_a_stop_before_the_cover_keeps_it_pending_and_retry_draws_it(application, monkeypatch):
+    app = application
+    book = confirmed(app, taken(app))
+
+    async def block(request, count):
+        if is_cover(request):
+            await asyncio.sleep(3600)
+        return None
+
+    async def scenario():
+        seen = calls(app, monkeypatch, block)
+        run(app, LEARNER, f"reading:{book}", lambda: write_book(app, LEARNER, book, noop))
+        async with asyncio.timeout(10):  # the cover is asked for once the pictures are drawn
+            while not any(is_cover(r) for r in seen):
+                await asyncio.sleep(0.01)
+        await stop_books(app)
+
+    asyncio.run(scenario())
+    record = load(app, book)
+    assert record.status == "writing" and record.cover == "pending"
+    assert book_rows(app)[0]["state"] == "failed"
+    monkeypatch.undo()
+    assert retry_book(app, LEARNER, book) == "writing"
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    record = load(app, book)
+    assert record.status == "ready" and record.cover == "drawn"
+
+
+def redraw(app, book):
+    start_cover(app, LEARNER, book)
+    asyncio.run(redraw_cover(app, LEARNER, book, noop))
+
+
+def blue_cover(app, monkeypatch):
+    async def change(request, count):
+        if is_cover(request):
+            return AdapterReply(data={"description": "Blue."}, media=(solid_png((0, 0, 255)),))
+        return None
+
+    return calls(app, monkeypatch, change)
+
+
+def test_redrawing_the_cover_changes_only_the_draft_until_saved(application, monkeypatch, caplog):
+    app = application
+    book = ready_book(app)
+    before, epub_before = cover_digest(app, book, draft=False), book_file(app, book)
+    blue_cover(app, monkeypatch)
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        redraw(app, book)
+    record = load(app, book)
+    assert record.cover == "drawn" and record.covers == 2
+    assert app.files.read(f"books/{book}/draft/pictures/cover") == solid_png((0, 0, 255))
+    assert cover_digest(app, book, draft=False) == before and book_file(app, book) == epub_before
+    (row,) = book_rows(app)
+    assert row["changes"]["cover"] is True and row["cover"] == 2 and row["saved"]["cover"] == 1
+    assert f"book cover start book={book}" in caplog.text
+    assert f"book cover redrawn book={book} result=drawn" in caplog.text
+    save_book(app, LEARNER, book)
+    assert app.files.read(f"books/{book}/pictures/cover") == solid_png((0, 0, 255))
+    (row,) = book_rows(app)
+    assert row["saved"]["cover"] == 2 and row["changes"] is None
+
+
+def test_a_failed_or_stopped_cover_redraw_keeps_the_old_cover(application, monkeypatch, caplog):
+    app = application
+    book = ready_book(app)
+    before = cover_digest(app, book, draft=False)
+    fail_cover(app, monkeypatch)
+
+    async def failing():
+        start_cover(app, LEARNER, book)
+        run(app, LEARNER, f"reading:{book}", lambda: redraw_cover(app, LEARNER, book, noop))
+        while f"reading:{book}" in app.jobs:
+            await asyncio.sleep(0.01)
+
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        asyncio.run(failing())
+    assert f"book cover redrawn book={book} result=failed" in caplog.text
+    (row,) = book_rows(app)
+    assert row["state"] == "ready" and "cover" in row["reason"]
+    assert cover_digest(app, book) == before and load(app, book).covers == 1
+    monkeypatch.undo()
+
+    async def block(request, count):
+        if is_cover(request):
+            await asyncio.sleep(3600)
+        return None
+
+    async def stopped():
+        seen = calls(app, monkeypatch, block)
+        start_cover(app, LEARNER, book)
+        run(app, LEARNER, f"reading:{book}", lambda: redraw_cover(app, LEARNER, book, noop))
+        async with asyncio.timeout(10):
+            while not any(is_cover(r) for r in seen):
+                await asyncio.sleep(0.01)
+        (row,) = book_rows(app)
+        await stop_books(app)
+        return row
+
+    assert asyncio.run(stopped())["state"] == "covering"
+    (row,) = book_rows(app)
+    assert row["state"] == "ready" and row["reason"] == STOPPED
+    assert cover_digest(app, book) == before and load(app, book).cover == "drawn"
+    monkeypatch.undo()
+    redraw(app, book)
+    assert load(app, book).covers == 2
+
+
+BLOCKED = "the picture service refused this network (IP not authorized); try another network"
+
+
+def test_a_picture_not_drawn_says_why(application, monkeypatch, caplog):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+
+    async def blocked(request, count):
+        return AdapterReply(data=None, failure="network_blocked") if request.media else None
+
+    calls(app, monkeypatch, blocked)
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        write(app, book)
+    (row,) = book_rows(app)
+    assert row["missing_pictures"] == len(load(app, book).pictures) + 1  # with the cover
+    assert row["picture_failure"] == BLOCKED
+    line = f"book picture book={book} picture=cover result=failed failure=network_blocked"
+    assert line in caplog.text
+    with pytest.raises(books.BookFailed, match=rf"The cover step failed: {re.escape(BLOCKED)}\."):
+        asyncio.run(redraw_cover(app, LEARNER, book, noop))
+    monkeypatch.undo()
+    start_drawing(app, LEARNER, book)
+    assert book_rows(app)[0]["picture_failure"] is None  # A new drawing clears the last reason.
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    (row,) = book_rows(app)
+    assert row["missing_pictures"] == 0 and row["picture_failure"] is None
+
+
+def test_redrawing_the_cover_keeps_why_other_pictures_are_missing(application, monkeypatch):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+
+    async def chapters_blocked(request, count):
+        blocked = request.media and not is_cover(request)
+        return AdapterReply(data=None, failure="network_blocked") if blocked else None
+
+    calls(app, monkeypatch, chapters_blocked)
+    write(app, book)
+    start_cover(app, LEARNER, book)
+    asyncio.run(redraw_cover(app, LEARNER, book, noop))
+    (row,) = book_rows(app)
+    assert row["missing_pictures"] == len(load(app, book).pictures)  # the cover is drawn
+    assert row["picture_failure"] == BLOCKED
+
+
+def test_discarding_the_draft_drops_why_its_pictures_failed(application, monkeypatch):
+    app = application
+    book = ready_book(app)
+
+    async def blocked(request, count):
+        return AdapterReply(data=None, failure="network_blocked") if request.media else None
+
+    calls(app, monkeypatch, blocked)
+    revised(app, book)
+    assert book_rows(app)[0]["picture_failure"] == BLOCKED
+    revert_book(app, book)
+    assert book_rows(app)[0]["picture_failure"] is None
+
+
+def test_redrawing_the_cover_is_refused_unless_the_book_is_ready(application, monkeypatch):
+    app = application
+    book = confirmed(app, taken(app))
+    with pytest.raises(Conflict):  # being written
+        start_cover(app, LEARNER, book)
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    save_book(app, LEARNER, book)
+
+    async def other_book_running():
+        other = asyncio.get_running_loop().create_future()
+        app.jobs["reading:another"] = other
+        try:
+            with pytest.raises(Conflict):
+                start_cover(app, LEARNER, book)
+        finally:
+            del app.jobs["reading:another"]
+            other.cancel()
+
+    asyncio.run(other_book_running())
+    app.store.active_activity_id = "class"
+    try:
+        with pytest.raises(StorageBlocked):  # the class closes the books, as for every edit
+            start_cover(app, LEARNER, book)
+    finally:
+        app.store.active_activity_id = None
+    before = cover_digest(app, book, draft=False)
+    redraw(app, book)
+    revert_book(app, book)
+    assert cover_digest(app, book, draft=False) == before and saved(app, book).covers == 1
+    assert not has_draft(app, book)

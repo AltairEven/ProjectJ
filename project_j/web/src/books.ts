@@ -16,6 +16,7 @@ export function bookLine(book: BookRow): string {
   if (book.state === 'drawing') return 'Drawing pictures'
   if (book.state === 'writing') return `Writing chapter ${book.chapters.length + 1} of ${book.planned}`
   if (book.state === 'revising') return `Rewriting ${book.revising ? `chapter ${book.revising}` : 'a chapter'}`
+  if (book.state === 'covering') return 'Redrawing the cover'
   return joined([book.target, count(book.words, 'word'), count(book.chapters.length, 'chapter')])
 }
 
@@ -29,20 +30,45 @@ export function shelfItem(book: BookRow, mode: ShelfMode): { line: string, opens
   return { line: joined([book.target, count(book.saved.words, 'word'), count(book.saved.chapters, 'chapter')]), opens: 'read', unsaved: false }
 }
 
-/** "chapter 2 rewritten, 1 new chapter, 2 new pictures": what a save would put into the book. */
-export function changesLine({ rewritten, added, drawn }: BookChanges): string {
+/** "chapter 2 rewritten, 1 new chapter, 2 new pictures, new cover": what a save would put into the book. */
+export function changesLine({ rewritten, added, drawn, cover }: BookChanges): string {
   const parts = [
     rewritten.length ? `${rewritten.length === 1 ? 'chapter' : 'chapters'} ${rewritten.join(', ')} rewritten` : '',
     added ? count(added, 'new chapter') : '',
     drawn ? count(drawn, 'new picture') : '',
+    cover ? 'new cover' : '',
   ].filter(Boolean)
   return parts.length ? parts.join(', ') : 'No changes yet'
+}
+
+/** "2 pictures not drawn: <why the last one failed>" beside Draw missing pictures; null when none is missing. */
+export function missingLine(book: BookRow): string | null {
+  if (!book.missing_pictures) return null
+  const line = `${count(book.missing_pictures, 'picture')} not drawn`
+  return book.picture_failure ? `${line}: ${book.picture_failure}` : line
+}
+
+/** The plain cover's hue (0-359), fixed for a book: shown until its cover is drawn and fetched. FNV-1a spreads
+ * books of one lesson (ids that differ only in a few digits of their start time) round the colour wheel. */
+export const coverHue = (bookId: string): number =>
+  [...bookId].reduce((hash, c) => Math.imul(hash ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261) % 360
+
+/** The cover a shelf mode shows: Read the saved book's, Edit the draft's (else the saved one's).
+ * The version changes when it is redrawn, so the page fetches it again; null: the plain cover. */
+export function coverOf(book: BookRow, mode: ShelfMode): { draft: boolean, version: number } | null {
+  const version = mode === 'read' ? book.saved?.cover : book.cover
+  if (version === null || version === undefined) return null
+  return { draft: mode === 'edit' && !!book.draft, version }
 }
 
 /** The draft's buttons: why Save waits (null: it can be saved), whether there is a saved book to go back to, whether a chapter can be previewed. */
 export function draftActions(book: BookRow): { reason: string | null, revert: boolean, preview: boolean } | null {
   if (!book.draft) return null
-  const reason = book.continuing ? 'Write or discard the new chapters first' : book.state === 'ready' ? null : 'Wait until it is written'
+  const reason = book.continuing ? 'Write or discard the new chapters first'
+    : book.state === 'ready' ? null
+    : book.state === 'revising' ? 'Wait until the chapter is rewritten'
+    : book.state === 'covering' ? 'Wait until the cover is drawn'
+    : 'Wait until it is written'
   return { reason, revert: !!book.saved, preview: book.chapters.length > 0 }
 }
 

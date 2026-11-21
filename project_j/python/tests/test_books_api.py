@@ -314,3 +314,30 @@ def test_delete_through_the_route(application):
         assert post(client, app, "delete", {"book_id": book}).json() == {"book_id": book}
         assert client.get("/api/dashboard", headers=headers(app)).json()["books"] == []
         assert post(client, app, "delete", {"book_id": book}).status_code == 404
+
+
+def test_cover_routes(application):
+    app = application
+    book = ready_book(app)
+    with TestClient(create_app(Settings(), app)) as client:
+        h = headers(app)
+        cover = f"/api/books/picture?book_id={book}&cover=true"
+        reply = client.get(cover, headers=h)
+        assert reply.status_code == 200 and reply.headers["content-type"] == "image/png"
+        assert client.get(f"{cover}&draft=true", headers=h).status_code == 404  # no draft
+        assert client.get(f"{cover}&chapter=1", headers=h).status_code == 400
+        assert row_of(client, app)["cover"] == 1
+        reply = post(client, app, "cover", {"book_id": book})
+        assert reply.status_code == 202 and reply.json()["job"] == f"reading:{book}"
+        assert reply.json()["book_id"] == book
+        settle(app)
+        row = row_of(client, app)
+        assert row["cover"] == 2 and row["saved"]["cover"] == 1 and row["changes"]["cover"]
+        assert client.get(f"{cover}&draft=true", headers=h).status_code == 200
+        assert post(client, app, "cover", {"book_id": "../x"}).status_code == 422
+        assert client.post("/api/books/cover", json={"book_id": book}).status_code == 401
+        app.store.active_activity_id = "class"
+        try:
+            assert client.get(cover, headers=h).status_code == 423
+        finally:
+            app.store.active_activity_id = None

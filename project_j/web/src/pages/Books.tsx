@@ -1,6 +1,6 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useState, type CSSProperties } from 'react'
 import { api, fileUrl, saveFile } from '../api'
-import { bookLine, bookTitle, bookView, changesLine, draftActions, expandBlocked, neighbours, outlineLine, shelfItem, type ShelfMode } from '../books'
+import { bookLine, bookTitle, bookView, changesLine, coverHue, coverOf, draftActions, expandBlocked, missingLine, neighbours, outlineLine, shelfItem, type ShelfMode } from '../books'
 import type { BookContent, BookPlace, BookRow } from '../client/types.gen'
 import { courseRows } from '../courses'
 import { jobProgress } from '../progress'
@@ -8,6 +8,25 @@ import { Progress, useRun, type PageProps } from '../ui'
 
 const download = (token: string, book: BookRow) => () =>
   saveFile(token, `/api/books/file?${new URLSearchParams({ book_id: book.book_id })}`, `${book.book_id}.epub`)
+
+/** A book's cover as a shelf mode shows it (ADR-0036): the drawn picture once it has come, else a plain
+ * cover in the book's own colour with its title. Hidden from screen readers: the title next to it names the book. */
+function Cover({ token, learner, book, mode, small }: Pick<PageProps, 'token' | 'learner'> & { book: BookRow, mode: ShelfMode, small?: boolean }) {
+  const shown = coverOf(book, mode)
+  const [url, setUrl] = useState<string>()
+  const id = book.book_id, draft = shown?.draft, version = shown?.version
+  useEffect(() => {
+    if (version === undefined) return
+    let live = true, made: string | undefined
+    const query = new URLSearchParams({ book_id: id, draft: String(draft), cover: 'true', learner_id: learner })
+    void fileUrl(token, `/api/books/picture?${query}`).then(next => {
+      if (live) { made = next; setUrl(next) } else URL.revokeObjectURL(next)
+    }, () => {})  // A cover that does not come back stays plain.
+    return () => { live = false; if (made) URL.revokeObjectURL(made); setUrl(undefined) }
+  }, [token, learner, id, draft, version])
+  return <span className={small ? 'cover small' : 'cover'} style={{ '--hue': coverHue(id) } as CSSProperties} aria-hidden="true">
+    {url ? <img src={url} alt="" onError={() => setUrl(undefined)} /> : <span>{bookTitle(book)}</span>}</span>
+}
 
 /** The books from taken lessons (application/books.py, ADR-0035): Read opens a saved book or downloads it, Edit opens any book's edit page or deletes it. */
 function Shelf({ token, dashboard, learner, go, refresh }: PageProps) {
@@ -22,9 +41,11 @@ function Shelf({ token, dashboard, learner, go, refresh }: PageProps) {
     {books.length ? <ul className="shelf">{books.map(book => {
       const item = shelfItem(book, mode)
       const lesson = lessons.find(row => row.object_id === book.course_ref.object_id)?.title
+      const cover = <><Cover token={token} learner={learner} book={book} mode={mode} /><span className="title">{bookTitle(book)}</span></>
       return <li key={book.book_id}>
-        <div className="row">{item.opens ? <button className="link" onClick={() => go('books', `${item.opens}:${book.book_id}`)}>{bookTitle(book)}</button>
-          : <span className="greyed">{bookTitle(book)}</span>}{item.unsaved && <span className="tag">Unsaved changes</span>}</div>
+        {item.opens ? <button className="shelf-book" onClick={() => go('books', `${item.opens}:${book.book_id}`)}>{cover}</button>
+          : <div className="shelf-book greyed">{cover}</div>}
+        {item.unsaved && <span className="tag">Unsaved changes</span>}
         <p className={item.opens ? undefined : 'greyed'}>{item.line}</p>
         {lesson && <p className="hint">From: {lesson}</p>}
         {item.opens === 'read' && <button className="quiet" disabled={busy} aria-label={`Download EPUB of ${bookTitle(book)}`}
@@ -116,10 +137,12 @@ function Editor({ token, dashboard, learner, go, refresh, book }: PageProps & { 
   // The outline still to agree: a new book's whole one, or only the new chapters of a continuation.
   const discussed = !job && outline && (book.state === 'outlining' || book.continuing) ? outline : null
   const first = book.continuing ? book.chapters.length : 0
-  const actions = draftActions(book)
+  const actions = draftActions(book), missing = book.state === 'ready' ? missingLine(book) : null
   return <>
     <button className="quiet" onClick={() => go('books')}>← Bookshelf</button>
     <section><h2>{bookTitle(book)}</h2>
+      <div className="row"><Cover token={token} learner={learner} book={book} mode="edit" small />
+        {book.state === 'ready' && <button className="quiet" disabled={stop} onClick={() => send('cover', 'Redrawing the cover')}>Redraw the cover</button>}</div>
       {status}
       {actions && <>
         <p>{book.saved ? `Unsaved changes: ${book.changes ? changesLine(book.changes) : 'No changes yet'}` : 'Not saved yet: it goes on the shelf to read once you save it.'}</p>
@@ -147,7 +170,8 @@ function Editor({ token, dashboard, learner, go, refresh, book }: PageProps & { 
         </div></>}
       <div className="row">
         {book.state === 'ready' && <button className="quiet" onClick={() => setOpened(!opened)}>{opened ? 'Hide chapters' : 'Chapters'}</button>}
-        {book.state === 'ready' && !!book.missing_pictures && <button className="quiet" disabled={stop} onClick={() => send('pictures', 'Drawing missing pictures')}>Draw missing pictures</button>}
+        {missing && <button className="quiet" disabled={stop} onClick={() => send('pictures', 'Drawing missing pictures')}>Draw missing pictures</button>}
+        {missing && <span className="hint">{missing}</span>}
         {book.state === 'ready' && !book.continuing && <button className="quiet" disabled={stop} onClick={() => setExtending(!extending)}>Continue the story</button>}
         {book.state === 'failed' && <button disabled={stop} onClick={() => send('retry', 'Retrying the book')}>Retry</button>}
       </div>

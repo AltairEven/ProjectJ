@@ -11,7 +11,7 @@ from project_j.contracts import Contract
 from project_j.english import chinese
 from project_j.platform.models.contracts import ImageNote, ModelRequest
 from project_j.preparation.drafting import used_vocabulary
-from project_j.preparation.materials import STORY_IMAGE_INSTRUCTIONS
+from project_j.preparation.materials import COVER_IMAGE_INSTRUCTIONS, STORY_IMAGE_INSTRUCTIONS
 from project_j.preparation.reading import words as count_words
 
 CHAPTERS = (2, 12)
@@ -276,6 +276,31 @@ def unnamed(text: str, characters: list[Character]) -> str:
                 rf"\b{re.escape(person.called)}\b", lambda _, look=person.look: look, text
             )
     return text
+
+
+def cover_request(outline: Outline) -> ModelRequest:
+    """The book's cover, drawn last: the story and everyone's looks in the book's style, with no
+    one named and no title (a title in the request tends to be drawn as letters)."""
+    content = " ".join(
+        [
+            unnamed(outline.summary, outline.characters),
+            "Characters:",
+            *(p.look for p in outline.characters),
+        ]
+    )
+    context = {
+        "purpose": "the cover of this book",
+        "content": content.strip(),
+        "style": outline.style,
+    }
+    return ModelRequest(
+        "reading",
+        COVER_IMAGE_INSTRUCTIONS,
+        context,
+        ImageNote,
+        deadline_key="preparation_image",
+        media="image",
+    )
 
 
 def picture_request(outline: Outline, draft: ChapterDraft) -> ModelRequest:

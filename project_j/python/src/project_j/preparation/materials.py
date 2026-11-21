@@ -25,6 +25,12 @@ STORY_IMAGE_INSTRUCTIONS = (
     + LOOK
     + "不加文字，不画真实人物或品牌；画完后在description里用一句简单英文说明画了什么。"
 )
+COVER_IMAGE_INSTRUCTIONS = (
+    "为一本英文小说画封面插图。竖版构图，主体清楚、放在画面中部；按purpose与content画这本书的主要人物和故事，"
+    + LOOK
+    + "不加任何文字，不写书名，不画真实人物或品牌；"
+    "画完后在description里用一句简单英文说明画了什么。"
+)
 TASK_IMAGE_INSTRUCTIONS = (
     "为学生的一道看图题画一张图，这张图是题目的一部分。按purpose与content画，" + LOOK + "可以画出"
     "questions要考的东西，但不写出答案文字，不画出后续题的答案，不画真实人物或品牌；"
