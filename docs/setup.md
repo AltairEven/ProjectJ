@@ -1,6 +1,6 @@
 # Project J 开发环境搭建
 
-版本：1.2.1；更新：2026年11月10日。
+版本：1.2.2；更新：2026年11月21日（导出含扩写的书`books/`，[ADR-0035](../decisions/ADR-0035.md)）。
 
 在一台新Mac上从零搭好开发与正式学习环境，或从旧电脑迁移过来。本文只排顺序；登记检查以[AGENTS](../AGENTS.md)为准，初始化细节与继续条件见[技术选型](technology.md)，两者与本文不一致时以它们为准。所有命令都从仓库根运行。
 
@@ -71,7 +71,7 @@ project_j/scripts/uv.sh run --offline --locked --project project_j/python projec
 project_j/scripts/uv.sh run --offline --locked --project project_j/python project-j-transfer import --run-id me ~/Desktop/me.tar.gz
 ```
 
-导出文件含数据库、`lessons/`（课程文件夹）、`drafts/`（未确认资源的课）、`vocabulary/`（生词发音）里的全部文件及其SHA-256清单，只本人可读；里面是你的作答与评价，不加密，自己保存，不要放进仓库或上传共享。服务运行时导出会拒绝。导入只建一个新的运行编号：新电脑上已有me（例如已经启动过并建档）就拒绝，确认不要那份后在服务停止时用project-j-reset清空再导入；导入先放在暂存目录，全部核对通过才改名为me，失败时me不受影响。
+导出文件含数据库、`lessons/`（课程文件夹）、`drafts/`（未确认资源的课）、`vocabulary/`（生词发音）、`books/`（扩写的书）里的全部文件及其SHA-256清单，只本人可读；里面是你的作答与评价，不加密，自己保存，不要放进仓库或上传共享。服务运行时导出会拒绝。导入只建一个新的运行编号：新电脑上已有me（例如已经启动过并建档）就拒绝，确认不要那份后在服务停止时用project-j-reset清空再导入；导入先放在暂存目录，全部核对通过才改名为me，失败时me不受影响。旧版本导出的包里书在`readings/`，导入后自动改为`books/`。
 
 ## 6. 启动
 

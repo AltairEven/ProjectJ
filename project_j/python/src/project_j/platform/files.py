@@ -1,8 +1,9 @@
-"""Named files of the student's lessons, drafts and words, and idle-boundary export/backup;
-no credentials or audio archive (ADR-0027)."""
+"""Named files of the student's lessons, drafts, words and books, and idle-boundary
+export/backup; no credentials or audio archive (ADR-0027)."""
 
 import hashlib
 import json
+import logging
 import os
 import re
 import shutil
@@ -14,9 +15,10 @@ from project_j.contracts import Document
 from project_j.paths import check_path
 from project_j.platform.storage import REALMS, SimulationStore, canonical, digest
 
+log = logging.getLogger(__name__)
 # The only trees files are written to inside a run (the student's directory).
-LESSONS, DRAFTS, VOCABULARY, READINGS = "lessons", "drafts", "vocabulary", "readings"
-TREES = (LESSONS, DRAFTS, VOCABULARY, READINGS)
+LESSONS, DRAFTS, VOCABULARY, BOOKS = "lessons", "drafts", "vocabulary", "books"
+TREES = (LESSONS, DRAFTS, VOCABULARY, BOOKS)
 
 
 def file_stem(name: str) -> str:
@@ -50,16 +52,65 @@ def private_write(path: Path, content: bytes):
         temporary.unlink(missing_ok=True)
 
 
+def move_readings(run: Path) -> None:
+    """Upgrade (ADR-0035): readings/ becomes books/, and each book still in the old shape gets a
+    saved version (it has an EPUB: finished, unpainted pictures failed, no outline under
+    discussion) and/or a draft (no EPUB, or not finished, or discussing new chapters). A book
+    already sorted out no longer matches, so this runs on every opening and changes it once."""
+    old, new = run / "readings", run / BOOKS
+    moved = drafts = 0
+    if old.is_dir():
+        if new.exists():
+            log.warning("books migration skipped: readings and books both exist")
+        else:
+            old.rename(new)
+            moved = sum(1 for path in new.iterdir() if path.is_dir())
+    for folder in sorted(p for p in new.iterdir() if p.is_dir()) if new.is_dir() else ():
+        record_file, draft, pictures = folder / "book.json", folder / "draft", folder / "pictures"
+        if (draft / "book.json").is_file() or not record_file.is_file():
+            continue  # Already has its draft, or is no book.
+        try:
+            record = json.loads(record_file.read_bytes())
+            if not isinstance(record, dict):
+                raise ValueError("not a record")
+        except ValueError as error:  # One broken book must not stop the program from opening.
+            log.warning("book unreadable book=%s error=%s", folder.name, type(error).__name__)
+            continue
+        epub = (folder / "book.epub").is_file()
+        if epub and record.get("status") == "ready" and not record.get("proposal"):
+            continue  # Already a saved version.
+        # The draft first (pictures, then the record), so an interruption loses nothing.
+        for picture in sorted(pictures.glob("[!.]*")) if pictures.is_dir() else ():
+            private_write(draft / "pictures" / picture.name, picture.read_bytes())
+        private_write(draft / "book.json", record_file.read_bytes())
+        if epub:
+            states = record.get("pictures") or {}
+            saved = record | {
+                "status": "ready",
+                "proposal": None,
+                "proposal_version": 0,
+                "pictures": {n: "failed" if s == "pending" else s for n, s in states.items()},
+            }
+            private_write(record_file, (json.dumps(saved, indent=2) + "\n").encode())
+        else:
+            shutil.rmtree(pictures, ignore_errors=True)
+            record_file.unlink()
+        drafts += 1
+    if moved or drafts:
+        log.info("books migration books=%d drafts=%d", moved, drafts)
+
+
 class PrivateFiles:
     def __init__(self, store: SimulationStore):
         self.store = store
+        move_readings(store.run)
 
     def path(self, relative: str) -> Path:
         """A path in one of the run's trees, below its root; anything else is refused."""
         path = check_path(self.store.run, relative)
         parts = path.relative_to(self.store.run.resolve()).parts
         if len(parts) < 2 or parts[0] not in TREES:
-            raise ValueError("files live only in lessons/, drafts/, vocabulary/ and readings/")
+            raise ValueError("files live only in lessons/, drafts/, vocabulary/ and books/")
         return path
 
     def read(self, relative: str) -> bytes | None:

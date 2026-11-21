@@ -6,7 +6,7 @@ import logging
 
 from fastapi.testclient import TestClient
 from support import LEARNER, settle
-from test_books import calls, confirmed, digests, load, noop, taken, write
+from test_books import calls, confirmed, digests, load, noop, ready_book, taken, write
 
 from project_j.application.books import STOPPED, write_book
 from project_j.application.configuration import Settings
@@ -47,6 +47,7 @@ def test_expand_runs_in_the_background_and_downloads(application, caplog):
         assert row["state"] == "ready" and row["book_id"] == book
         assert row["course_ref"] == course_ref.model_dump() and row["target"] == "550L"
         assert dashboard["book_targets"]["harder"] == "650L"
+        assert post(client, app, "save", {"book_id": book}).json() == {"book_id": book}
         with caplog.at_level(logging.INFO, logger="project_j"):
             file = client.get(f"/api/books/file?book_id={book}", headers=headers(app))
         assert file.status_code == 200 and file.content[:2] == b"PK"
@@ -90,7 +91,7 @@ def test_starting_a_class_stops_the_book_first(application, monkeypatch, caplog)
 
     def watched_start(*args, **kwargs):
         opened.append([name for name in app.jobs if name.startswith("reading:")])
-        files.append(digests(app, f"readings/{book}"))
+        files.append(digests(app, f"books/{book}"))
         return start(*args, **kwargs)
 
     monkeypatch.setattr(app, "start", watched_start)
@@ -110,7 +111,7 @@ def test_starting_a_class_stops_the_book_first(application, monkeypatch, caplog)
     with caplog.at_level(logging.INFO, logger="project_j"):
         asyncio.run(scenario())
     assert opened == [[]]  # the book had stopped before the class opened
-    assert files == [digests(app, f"readings/{book}")]  # and wrote nothing after
+    assert files == [digests(app, f"books/{book}")]  # and wrote nothing after
     assert app.job_failures[f"reading:{book}"] == STOPPED
     assert app.store.active_activity_id  # the class is open
     assert f"book stopped book={book} reason=class" in caplog.text
@@ -152,15 +153,16 @@ def test_expand_discuss_confirm_and_continue_through_the_routes(application):
         settle(app)
         row = row_of(client, app)
         assert row["state"] == "outlining" and row["version"] == 1
-        assert row["outline"]["title"] == "The Longer Story" and row["downloadable"] is False
+        assert row["outline"]["title"] == "The Longer Story" and row["saved"] is None
         reply = post(client, app, "outline", {"book_id": book, "feedback": "Add a fox."})
         assert reply.status_code == 202 and reply.json()["job"] == f"reading:{book}"
         settle(app)
         assert row_of(client, app)["version"] == 2
         assert post(client, app, "confirm", {"book_id": book}).status_code == 202
         settle(app)
+        assert post(client, app, "save", {"book_id": book}).status_code == 200
         row = row_of(client, app)
-        assert row["state"] == "ready" and row["downloadable"] is True
+        assert row["state"] == "ready" and row["saved"] is not None
         assert (
             client.get(f"/api/books/file?book_id={book}", headers=headers(app)).status_code == 200
         )
@@ -236,3 +238,79 @@ def test_pictures_route_redraws_and_new_routes_check_input(application, monkeypa
             )
             assert post(client, app, route, body).status_code == 422
             assert client.post(f"/api/books/{route}", json=body).status_code == 401
+
+
+def test_save_read_and_revert_through_the_routes(application):
+    app = application
+    course_ref = taken(app)
+    with TestClient(create_app(Settings(), app)) as client:
+        h = headers(app)
+        book = post(client, app, "expand", {"course_ref": course_ref.model_dump()}).json()[
+            "book_id"
+        ]
+        settle(app)
+        post(client, app, "confirm", {"book_id": book})
+        settle(app)
+        assert client.get(f"/api/books/content?book_id={book}", headers=h).status_code == 404
+        picture = f"/api/books/picture?book_id={book}&chapter=1"
+        assert client.get(picture, headers=h).status_code == 404
+        assert client.get(f"{picture}&draft=true", headers=h).status_code == 200
+        assert post(client, app, "save", {"book_id": book}).status_code == 200
+        content = client.get(f"/api/books/content?book_id={book}", headers=h).json()
+        assert len(content["chapters"]) == row_of(client, app)["saved"]["chapters"]
+        assert content["title"] == row_of(client, app)["saved"]["title"]
+        reply = client.get(picture, headers=h)
+        assert reply.status_code == 200 and reply.headers["content-type"] == "image/png"
+        assert reply.headers["cache-control"] == "no-store" and reply.content[:4] == b"\x89PNG"
+        revise = {"book_id": book, "chapter": 2, "feedback": "Longer."}
+        assert post(client, app, "revise", revise).status_code == 202
+        settle(app)
+        row = row_of(client, app)
+        assert row["draft"] is True and row["changes"]["rewritten"] == [2]
+        draft = client.get(f"/api/books/content?book_id={book}&draft=true", headers=h).json()
+        assert draft["chapters"][1]["title"] == "Chapter 2, Again"
+        saved = client.get(f"/api/books/content?book_id={book}", headers=h).json()
+        assert saved["chapters"][1]["title"] != "Chapter 2, Again"
+        assert post(client, app, "revert", {"book_id": book}).json() == {"book_id": book}
+        assert row_of(client, app)["draft"] is False
+
+
+def test_reading_routes_check_input_and_the_class(application):
+    app = application
+    book = ready_book(app)  # saved, no draft
+    with TestClient(create_app(Settings(), app)) as client:
+        h = headers(app)
+        assert client.get(f"/api/books/content?book_id={book}").status_code == 401
+        assert client.get("/api/books/content?book_id=../x", headers=h).status_code == 422
+        picture = f"/api/books/picture?book_id={book}"
+        assert client.get(f"{picture}&chapter=0", headers=h).status_code == 422
+        assert client.get(f"{picture}&chapter=1&picture=pond", headers=h).status_code == 400
+        assert client.get(picture, headers=h).status_code == 400
+        assert client.get(f"{picture}&picture=ghost", headers=h).status_code == 404
+        assert post(client, app, "revert", {"book_id": book}).status_code == 409
+        assert post(client, app, "save", {"book_id": book}).status_code == 409
+        for route in ("save", "revert"):
+            assert post(client, app, route, {"book_id": "../x"}).status_code == 422
+            assert client.post(f"/api/books/{route}", json={"book_id": book}).status_code == 401
+        app.store.active_activity_id = "class"
+        try:
+            assert client.get(f"/api/books/content?book_id={book}", headers=h).status_code == 423
+            assert client.get(f"{picture}&chapter=1", headers=h).status_code == 423
+        finally:
+            app.store.active_activity_id = None
+
+
+def test_delete_through_the_route(application):
+    app = application
+    book = ready_book(app)
+    with TestClient(create_app(Settings(), app)) as client:
+        assert post(client, app, "delete", {"book_id": "../x"}).status_code == 422
+        assert client.post("/api/books/delete", json={"book_id": book}).status_code == 401
+        app.store.active_activity_id = "class"
+        try:
+            assert post(client, app, "delete", {"book_id": book}).status_code == 423
+        finally:
+            app.store.active_activity_id = None
+        assert post(client, app, "delete", {"book_id": book}).json() == {"book_id": book}
+        assert client.get("/api/dashboard", headers=headers(app)).json()["books"] == []
+        assert post(client, app, "delete", {"book_id": book}).status_code == 404

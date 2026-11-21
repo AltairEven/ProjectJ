@@ -3,6 +3,7 @@ import { api } from './api'
 import Classroom from './Classroom'
 import type { Dashboard } from './client/types.gen'
 import { inOnboarding, pages, type Page, type Target } from './next-step'
+import Books from './pages/Books'
 import Courses from './pages/Courses'
 import Evaluations from './pages/Evaluations'
 import Home from './pages/Home'
@@ -14,7 +15,7 @@ import Vocabulary from './pages/Vocabulary'
 import type { PageProps } from './ui'
 
 const views: Record<Page | 'onboarding', (props: PageProps) => React.ReactNode> = {
-  home: Home, state: State, plan: Plan, courses: Courses, evaluations: Evaluations, vocabulary: Vocabulary, settings: Settings, onboarding: Onboarding,
+  home: Home, state: State, plan: Plan, courses: Courses, evaluations: Evaluations, vocabulary: Vocabulary, books: Books, settings: Settings, onboarding: Onboarding,
 }
 
 function Shell({ token, page, detail }: { token: string, page: Page, detail?: string }) {

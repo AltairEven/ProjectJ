@@ -112,6 +112,13 @@ progress:indeterminate::-webkit-progress-bar { background: transparent; }
 .preview dt { font-weight: 700; color: var(--muted); }
 .preview dd { margin: 0; }
 .list { list-style: none; padding: 0; margin: 0; }
+/* Bookshelf: one book a row; a book never saved is greyed until its first save. The reader keeps lines short. */
+.shelf { list-style: none; padding: 0; margin: 0; }
+.shelf li { padding: 12px 0; border-top: 1px solid var(--rule); }
+.shelf p { margin: 4px 0; }
+.greyed { color: var(--muted); }
+.reader article { max-width: 40em; line-height: 1.6; }
+.reader article img { display: block; max-width: 100%; margin: 12px 0; border-radius: 4px; }
 .list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--rule); }
 .jobs li { display: block; border-top: 0; padding: 0; }
 .steps { display: flex; flex-wrap: wrap; gap: 8px 22px; padding-left: 20px; color: var(--muted); }

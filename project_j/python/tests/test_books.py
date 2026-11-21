@@ -1,10 +1,13 @@
-"""Expanded reading: a taken lesson becomes a book in readings/, chapter by chapter."""
+"""Expanded reading: a taken lesson becomes a book in books/, chapter by chapter; every edit goes
+to its draft and only a save replaces the saved book (ADR-0035)."""
 
 import asyncio
 import hashlib
 import io
 import json
 import logging
+import os
+import shutil
 import zipfile
 from dataclasses import replace
 from datetime import date
@@ -17,12 +20,17 @@ from project_j.application import books
 from project_j.application.books import (
     STOPPED,
     BookRecord,
+    book_content,
     book_file,
+    book_picture,
     confirm_outline,
+    delete_book,
     discard_proposal,
     plan_outline,
     retry_book,
+    revert_book,
     revise_chapter,
+    save_book,
     start_book,
     start_drawing,
     start_outline_round,
@@ -38,7 +46,7 @@ from project_j.application.progress import run
 from project_j.contracts import RevisionRef
 from project_j.learning.vocabulary import LookedUp, VocabularyBody, update_after_lesson
 from project_j.platform.models.contracts import AdapterReply, solid_png
-from project_j.platform.storage import Conflict, SaveKey
+from project_j.platform.storage import Conflict, SaveKey, StorageBlocked
 from project_j.preparation.difficulty import targets
 from project_j.preparation.folders import lesson_of
 
@@ -56,11 +64,20 @@ def taken(app) -> RevisionRef:
 
 
 def load(app, book: str) -> BookRecord:
-    return BookRecord.model_validate_json(app.files.read(f"readings/{book}/book.json"))
+    """The draft if there is one, else the saved book."""
+    return books.current(app, book)
+
+
+def saved(app, book: str) -> BookRecord:
+    return BookRecord.model_validate_json(app.files.read(f"books/{book}/book.json"))
+
+
+def has_draft(app, book: str) -> bool:
+    return app.files.path(f"books/{book}/draft").exists()
 
 
 def epub_names(app, book: str) -> list[str]:
-    with zipfile.ZipFile(io.BytesIO(app.files.read(f"readings/{book}/book.epub"))) as epub:
+    with zipfile.ZipFile(io.BytesIO(app.files.read(f"books/{book}/book.epub"))) as epub:
         return epub.namelist()
 
 
@@ -71,6 +88,12 @@ def digests(app, folder: str) -> dict[str, str]:
         for path in sorted(root.rglob("*"))
         if path.is_file()
     }
+
+
+def saved_digests(app, book: str) -> dict[str, str]:
+    """The saved book's files, not its draft."""
+    found = digests(app, f"books/{book}")
+    return {name: value for name, value in found.items() if not name.startswith("draft/")}
 
 
 def lesson_folder(app, course_ref) -> str:
@@ -149,6 +172,9 @@ def test_a_taken_lesson_becomes_a_ready_book(application, caplog):
     with caplog.at_level(logging.INFO, logger="project_j"):
         book = start_book(app, LEARNER, course_ref, "little")
         write(app, book)
+        with pytest.raises(LookupError):  # only a saved book is downloaded
+            book_file(app, book)
+        save_book(app, LEARNER, book)
     record = load(app, book)
     assert record.status == "ready" and 4 <= len(record.chapters) <= 6
     assert record.target == targets("500L")["little"] and record.lesson == folder
@@ -161,7 +187,8 @@ def test_a_taken_lesson_becomes_a_ready_book(application, caplog):
     assert app.store.current(identity(LEARNER, "profile"), LEARNER).body == profile_before
     assert app.vocabulary_record(LEARNER)[1] == vocabulary_before  # the book counts nothing
     assert f"book start book={book}" in caplog.text and "challenge=little" in caplog.text
-    assert f"book done book={book}" in caplog.text and "epub_bytes=" in caplog.text
+    assert f"book done book={book}" in caplog.text
+    assert f"book save book={book}" in caplog.text and "epub_bytes=" in caplog.text
     assert "The Longer Story" not in caplog.text and "red coat" not in caplog.text  # no text
     (row,) = book_rows(app)
     assert row["state"] == "ready" and row["title"] == "The Longer Story"
@@ -309,6 +336,7 @@ def test_a_failed_picture_leaves_that_chapter_without_one(application, monkeypat
     assert record.status == "ready" and record.pictures[1] == "failed"
     assert f"book picture book={book} chapter=1 result=failed" in caplog.text
     assert f"book picture book={book} chapter=2 result=drawn" in caplog.text
+    save_book(app, LEARNER, book)
     names = epub_names(app, book)
     assert not any(n.startswith("OEBPS/images/c1-") for n in names)
     assert any(n.startswith("OEBPS/images/c2-") for n in names)
@@ -369,7 +397,7 @@ def test_original_pictures_go_into_their_chapters(application, monkeypatch):
     lesson = lesson_of(app, LEARNER, course_ref).body
     resource = {"resource_id": "pond", "kind": "image", "audience": "student", "stage": "story"}
     resource |= {"paragraph": 1, "content": "a pond at dawn"}
-    asset = app.files.put("readings/source/pond.png", solid_png()) | {"media_type": "image/png"}
+    asset = app.files.put("lessons/source/pond.png", solid_png()) | {"media_type": "image/png"}
     found = books.originals(
         course | {"resources": [*course["resources"], resource]},
         lesson | {"files": lesson["files"] | {"pond": asset}},
@@ -384,6 +412,7 @@ def test_original_pictures_go_into_their_chapters(application, monkeypatch):
     assert seen[0].context["pictures"] == [
         {"picture": "pond", "paragraph": 1, "content": "a pond at dawn"}
     ]
+    save_book(app, LEARNER, book)
     names = epub_names(app, book)
     assert "OEBPS/images/c1-p1.png" in names  # the original, chapter 1 paragraph 1
 
@@ -421,8 +450,10 @@ def test_book_file_refuses_bad_ids(application):
 
 
 def ready_book(app) -> str:
+    """A written and saved book, with no draft."""
     book = start_book(app, LEARNER, taken(app), "same")
     write(app, book)
+    save_book(app, LEARNER, book)
     return book
 
 
@@ -433,7 +464,7 @@ def revise(app, book, chapter, feedback):
 def test_revising_changes_only_that_chapter(application, monkeypatch, caplog):
     app = application
     book = ready_book(app)
-    before, epub_before = load(app, book), app.files.read(f"readings/{book}/book.epub")
+    before, epub_before = load(app, book), book_file(app, book)
     seen = calls(app, monkeypatch)
     with caplog.at_level(logging.INFO, logger="project_j"):
         start_revision(app, LEARNER, book, 2, "Make it longer.")
@@ -444,7 +475,7 @@ def test_revising_changes_only_that_chapter(application, monkeypatch, caplog):
     assert after.outline == before.outline and after.status == "ready"
     others = [c for i, c in enumerate(after.chapters) if i != 1]
     assert others == [c for i, c in enumerate(before.chapters) if i != 1]
-    assert app.files.read(f"readings/{book}/book.epub") != epub_before
+    assert book_file(app, book) == epub_before  # the saved book waits for a save
     assert [r.context.get("kind") for r in seen] == ["revision", None]  # then its new picture
     assert seen[1].context["paragraph"] == after.chapters[1].paragraphs[-1]
     assert after.pictures[2] == "drawn"
@@ -457,15 +488,16 @@ def test_revising_changes_only_that_chapter(application, monkeypatch, caplog):
 def test_a_failed_or_stopped_revision_leaves_the_book_as_it_was(application, monkeypatch):
     app = application
     book = ready_book(app)
-    before = digests(app, f"readings/{book}")
+    before, record = saved_digests(app, book), saved(app, book)
 
     async def fail(request, count):
         return AdapterReply(data=None, failure="timeout")
 
     calls(app, monkeypatch, fail)
+    start_revision(app, LEARNER, book, 2, "Make it longer.")
     with pytest.raises(books.BookFailed):
         revise(app, book, 2, "Make it longer.")
-    assert digests(app, f"readings/{book}") == before
+    assert saved_digests(app, book) == before and load(app, book) == record
     monkeypatch.undo()
 
     async def block(request, count):
@@ -483,7 +515,7 @@ def test_a_failed_or_stopped_revision_leaves_the_book_as_it_was(application, mon
         await stop_books(app)
 
     asyncio.run(scenario())
-    assert digests(app, f"readings/{book}") == before
+    assert saved_digests(app, book) == before and load(app, book) == record
     (row,) = book_rows(app)
     assert row["state"] == "ready" and row["reason"] == STOPPED
 
@@ -514,7 +546,7 @@ def test_a_running_revision_names_its_chapter(application, monkeypatch):
     assert row["state"] == "ready" and row["revising"] is None
 
 
-def test_a_failed_new_picture_drops_the_old_one(application, monkeypatch):
+def test_saving_replaces_the_saved_pictures(application, monkeypatch):
     app = application
     book = ready_book(app)
 
@@ -522,11 +554,16 @@ def test_a_failed_new_picture_drops_the_old_one(application, monkeypatch):
         return AdapterReply(data=None, failure="unavailable") if request.media else None
 
     calls(app, monkeypatch, no_picture)
+    start_revision(app, LEARNER, book, 1, "More rain.")
     revise(app, book, 1, "More rain.")
     record = load(app, book)
     assert record.pictures[1] == "failed" and record.revisions == 1
-    assert app.files.read(f"readings/{book}/pictures/chapter-1") is None
-    assert app.files.read(f"readings/{book}/pictures/chapter-2")[:4] == b"\x89PNG"  # one name
+    assert app.files.read(f"books/{book}/draft/pictures/chapter-1") is None
+    assert app.files.read(f"books/{book}/draft/pictures/chapter-2")[:4] == b"\x89PNG"
+    assert app.files.read(f"books/{book}/pictures/chapter-1") is not None  # saved one stays
+    save_book(app, LEARNER, book)
+    assert app.files.read(f"books/{book}/pictures/chapter-1") is None
+    assert app.files.read(f"books/{book}/pictures/chapter-2")[:4] == b"\x89PNG"  # one name
     assert not any(n.startswith("OEBPS/images/c1-") for n in epub_names(app, book))
 
 
@@ -572,7 +609,7 @@ def test_an_unreadable_book_record_is_skipped_not_the_home_page(application, cap
     app = application
     book = ready_book(app)
     broken = "lesson-001-2026-10-28-20261120T101500Z"
-    app.files.put(f"readings/{broken}/book.json", '{"old": "shape"}')
+    app.files.put(f"books/{broken}/book.json", '{"old": "shape"}')
     with caplog.at_level(logging.WARNING, logger="project_j"):
         rows = book_rows(app)
     assert [row["book_id"] for row in rows] == [book]
@@ -649,12 +686,12 @@ def test_a_new_book_waits_for_the_outline(application, monkeypatch, caplog):
     assert record.proposal is not None and record.proposal_version == 1
     assert record.outline is None and record.chapters == []
     assert [r.context["kind"] for r in seen] == ["outline"]
-    assert not app.files.path(f"readings/{book}/book.epub").is_file()
+    assert not app.files.path(f"books/{book}/book.epub").is_file()
     assert f"book outline book={book} version=1 chapters=4 continuing=False" in caplog.text
     assert "The Longer Story" not in caplog.text and "red coat" not in caplog.text
     (row,) = book_rows(app)
     assert row["state"] == "outlining" and row["version"] == 1
-    assert row["outline"]["title"] == "The Longer Story" and row["downloadable"] is False
+    assert row["outline"]["title"] == "The Longer Story" and row["saved"] is None
 
 
 def test_rounds_replace_the_outline_and_keep_no_feedback(application, caplog):
@@ -668,7 +705,7 @@ def test_rounds_replace_the_outline_and_keep_no_feedback(application, caplog):
     assert record.proposal_version == 2 and record.proposal.summary.endswith(" Revised.")
     assert f"book outline start book={book} version=1 continuing=False" in caplog.text
     assert f"book outline book={book} version=2 chapters=4 continuing=False" in caplog.text
-    assert "Add a fox" not in app.files.read(f"readings/{book}/book.json").decode()
+    assert "Add a fox" not in app.files.read(f"books/{book}/draft/book.json").decode()
     assert "Add a fox" not in caplog.text
 
 
@@ -778,13 +815,13 @@ def test_continuing_writes_only_the_new_chapters(application, monkeypatch, caplo
     app = application
     book = ready_book(app)
     before = load(app, book)
-    old = digests(app, f"readings/{book}/pictures")
+    old = digests(app, f"books/{book}/pictures")
     continue_story(app, book)
     record = load(app, book)
     assert len(record.proposal.chapters) == 5 and len(record.chapters) == 4
     (row,) = book_rows(app)
     assert row["state"] == "ready" and row["continuing"] is True and row["version"] == 1
-    assert len(row["outline"]["chapters"]) == 5 and row["downloadable"] is True
+    assert len(row["outline"]["chapters"]) == 5 and row["saved"] is not None
     with caplog.at_level(logging.INFO, logger="project_j"):
         confirm_outline(app, LEARNER, book)
     record = load(app, book)
@@ -795,7 +832,9 @@ def test_continuing_writes_only_the_new_chapters(application, monkeypatch, caplo
     after = load(app, book)
     assert after.chapters[:4] == before.chapters and len(after.chapters) == 5
     assert [r.context["number"] for r in seen if r.context.get("kind") == "chapter"] == [5]
-    now = digests(app, f"readings/{book}/pictures")
+    assert digests(app, f"books/{book}/pictures") == old  # the saved book waits for a save
+    save_book(app, LEARNER, book)
+    now = digests(app, f"books/{book}/pictures")
     assert {name: now[name] for name in old} == old and len(now) == 5
     chapters = [n for n in epub_names(app, book) if n.startswith("OEBPS/chapter-")]
     assert after.status == "ready" and len(chapters) == 5
@@ -829,23 +868,20 @@ def test_continuation_must_place_words_added_since(application, monkeypatch):
 def test_discarding_a_continuation_leaves_the_book(application, caplog):
     app = application
     book = ready_book(app)
-    before, record = digests(app, f"readings/{book}"), load(app, book)
+    before, record = saved_digests(app, book), load(app, book)
     continue_story(app, book)
     with caplog.at_level(logging.INFO, logger="project_j"):
         discard_proposal(app, book)
     after = load(app, book)
     assert after.chapters == record.chapters and after.outline == record.outline
     assert after.proposal is None and after.status == "ready"
-    now = digests(app, f"readings/{book}")
-    assert {k: v for k, v in now.items() if k != "book.json"} == {
-        k: v for k, v in before.items() if k != "book.json"
-    }
+    assert saved_digests(app, book) == before
     (row,) = book_rows(app)
     assert row["continuing"] is False and row["version"] is None
     assert f"book discard book={book}" in caplog.text
 
 
-def test_a_failed_continuation_keeps_the_old_epub_downloadable(application, monkeypatch):
+def test_a_failed_continuation_leaves_the_saved_book(application, monkeypatch):
     app = application
     book = ready_book(app)
     old = book_file(app, book)
@@ -859,7 +895,7 @@ def test_a_failed_continuation_keeps_the_old_epub_downloadable(application, monk
     with pytest.raises(books.BookFailed):
         asyncio.run(write_book(app, LEARNER, book, noop))
     (row,) = book_rows(app)
-    assert row["state"] == "failed" and row["downloadable"] is True
+    assert row["state"] == "failed" and row["saved"] is not None
     assert book_file(app, book) == old
 
 
@@ -888,9 +924,11 @@ def test_drawing_missing_pictures_redraws_only_the_failed(application, monkeypat
     record = load(app, book)
     assert len(images) == 2 and record.status == "ready"
     assert record.pictures == {1: "drawn", 2: "drawn", 3: "drawn", 4: "drawn"}
+    save_book(app, LEARNER, book)
     assert len([n for n in epub_names(app, book) if n.startswith("OEBPS/images/")]) == 4
     assert f"book redraw start book={book} pictures=2" in caplog.text
-    books.save(app, record.model_copy(update={"pictures": record.pictures | {2: "failed"}}))
+    failed = record.model_copy(update={"pictures": record.pictures | {2: "failed"}})
+    app.files.put(f"books/{book}/book.json", failed.model_dump_json())
     images.clear()
     failing.append(1)  # the redraw fails again
     assert start_drawing(app, LEARNER, book) == 1
@@ -901,12 +939,12 @@ def test_drawing_missing_pictures_redraws_only_the_failed(application, monkeypat
 def test_an_old_format_book_still_works(application, monkeypatch):
     app = application
     book = ready_book(app)
-    data = json.loads(app.files.read(f"readings/{book}/book.json"))
+    data = json.loads(app.files.read(f"books/{book}/book.json"))
     outline = {k: v for k, v in data["outline"].items() if k != "summary"}
     data["outline"] = outline | {"characters": ["Mia: a small girl in a red coat."]}
     data = {k: v for k, v in data.items() if k not in ("proposal", "proposal_version")}
     data["pictures"]["2"] = "failed"
-    app.files.put(f"readings/{book}/book.json", json.dumps(data))
+    app.files.put(f"books/{book}/book.json", json.dumps(data))
     (row,) = book_rows(app)
     assert row["state"] == "ready" and row["missing_pictures"] == 1
     assert book_file(app, book)[:2] == b"PK"
@@ -925,8 +963,8 @@ def test_an_old_format_book_still_works(application, monkeypatch):
 def test_an_old_book_without_an_outline_plans_one_on_retry(application):
     app = application
     book = start_book(app, LEARNER, taken(app), "same")
-    data = json.loads(app.files.read(f"readings/{book}/book.json"))
-    app.files.put(f"readings/{book}/book.json", json.dumps(data | {"status": "writing"}))
+    data = json.loads(app.files.read(f"books/{book}/draft/book.json"))
+    app.files.put(f"books/{book}/draft/book.json", json.dumps(data | {"status": "writing"}))
     assert load(app, book).status == "outlining"
     assert retry_book(app, LEARNER, book) == "outlining"
     plan(app, book)
@@ -936,9 +974,9 @@ def test_an_old_book_without_an_outline_plans_one_on_retry(application):
 def test_a_continuation_that_rewrites_the_kept_part_is_put_back(application, monkeypatch):
     app = application
     book = ready_book(app)
-    data = json.loads(app.files.read(f"readings/{book}/book.json"))
+    data = json.loads(app.files.read(f"books/{book}/book.json"))
     old = data["outline"] | {"characters": ["Mia: a small girl in a red coat."]}
-    app.files.put(f"readings/{book}/book.json", json.dumps(data | {"outline": old}))
+    app.files.put(f"books/{book}/book.json", json.dumps(data | {"outline": old}))
     before = load(app, book).outline
     adapter = app.models.adapters["simulated"]
 
@@ -970,3 +1008,344 @@ def test_discarding_clears_the_last_failure(application):
     app.job_failures[f"reading:{book}"] = "The outline step failed: unavailable."
     discard_proposal(app, book)
     assert book_rows(app)[0]["reason"] is None
+
+
+def revised(app, book, chapter=2):
+    """A saved book with one chapter rewritten in its draft."""
+    start_revision(app, LEARNER, book, chapter, "Longer.")
+    revise(app, book, chapter, "Longer.")
+    return load(app, book).chapters[chapter - 1]
+
+
+def test_a_new_book_is_only_a_draft_until_saved(application, caplog):
+    app = application
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        book = start_book(app, LEARNER, taken(app), "same")
+        write(app, book)
+        assert not app.files.path(f"books/{book}/book.json").exists()
+        with pytest.raises(LookupError):
+            book_file(app, book)
+        draft = load(app, book)
+        save_book(app, LEARNER, book)
+    assert saved(app, book) == draft and book_file(app, book)[:2] == b"PK"
+    assert not has_draft(app, book)
+    assert f"book draft book={book} from=new" in caplog.text
+    assert f"book save book={book} chapters={len(draft.chapters)} pictures=4" in caplog.text
+    assert "epub_bytes=" in caplog.text and draft.outline.title not in caplog.text
+
+
+def test_editing_a_saved_book_changes_only_its_draft(application, caplog):
+    app = application
+    book = ready_book(app)
+    before, record, epub = saved_digests(app, book), saved(app, book), book_file(app, book)
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        chapter = revised(app, book)
+    assert saved_digests(app, book) == before and chapter != record.chapters[1]
+    assert f"book draft book={book} from=saved" in caplog.text
+    save_book(app, LEARNER, book)
+    assert saved(app, book).chapters[1] == chapter and book_file(app, book) != epub
+    assert not has_draft(app, book)
+
+
+def test_reverting_drops_the_draft_and_keeps_the_book(application, caplog):
+    app = application
+    book = ready_book(app)
+    before = saved_digests(app, book)
+    revised(app, book)
+    app.job_failures[f"reading:{book}"] = "The revision:2 step failed: timeout."
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        revert_book(app, book)
+    assert saved_digests(app, book) == before and not has_draft(app, book)
+    assert f"reading:{book}" not in app.job_failures and book_rows(app)[0]["reason"] is None
+    assert f"book revert book={book}" in caplog.text
+
+
+def test_reverting_needs_a_saved_book_with_a_draft(application):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+    write(app, book)
+    with pytest.raises(Conflict):  # never saved: nothing to go back to
+        revert_book(app, book)
+    assert has_draft(app, book)
+    save_book(app, LEARNER, book)
+    with pytest.raises(Conflict):  # saved, no draft
+        revert_book(app, book)
+
+
+def test_saving_waits_for_the_writing_and_the_new_chapters(application):
+    app = application
+    book = ready_book(app)
+    with pytest.raises(Conflict, match="There are no changes to save"):
+        save_book(app, LEARNER, book)
+    continue_story(app, book)
+    with pytest.raises(Conflict, match="Write or discard the new chapters first"):
+        save_book(app, LEARNER, book)
+    confirm_outline(app, LEARNER, book)
+    with pytest.raises(Conflict, match="Wait until it is written"):
+        save_book(app, LEARNER, book)
+    app.jobs["reading:x"] = None
+    with pytest.raises(Conflict, match="A book is being written"):
+        save_book(app, LEARNER, book)
+    del app.jobs["reading:x"]
+
+
+def test_discarding_the_new_chapters_keeps_the_other_changes(application):
+    app = application
+    book = ready_book(app)
+    chapter = revised(app, book)
+    continue_story(app, book)
+    discard_proposal(app, book)
+    assert load(app, book).proposal is None and load(app, book).chapters[1] == chapter
+    save_book(app, LEARNER, book)
+    assert saved(app, book).chapters[1] == chapter
+
+
+def test_a_save_that_fails_midway_completes_on_the_next_save(application, monkeypatch):
+    app = application
+    book = ready_book(app)
+    revised(app, book)
+    put = app.files.put
+
+    def failing(relative, content):
+        if relative == f"books/{book}/book.json":
+            raise OSError("disk full")
+        return put(relative, content)
+
+    monkeypatch.setattr(app.files, "put", failing)
+    with pytest.raises(OSError):
+        save_book(app, LEARNER, book)
+    assert has_draft(app, book)
+    monkeypatch.undo()
+    draft = load(app, book)
+    save_book(app, LEARNER, book)
+    assert saved(app, book) == draft and not has_draft(app, book)
+
+
+def test_shelf_rows_show_the_saved_version_and_the_draft(application):
+    app = application
+    book = start_book(app, LEARNER, taken(app), "same")
+    write(app, book)
+    (row,) = book_rows(app)
+    assert row["saved"] is None and row["draft"] is True and row["changes"] is None
+    assert "downloadable" not in row
+    save_book(app, LEARNER, book)
+    record = saved(app, book)
+    (row,) = book_rows(app)
+    assert row["saved"] == {
+        "title": record.outline.title,
+        "words": books.book_words(record),
+        "chapters": len(record.chapters),
+    }
+    assert row["draft"] is False and row["changes"] is None
+    revised(app, book)
+    continue_story(app, book)
+    confirm_outline(app, LEARNER, book)
+    asyncio.run(write_book(app, LEARNER, book, noop))
+    (row,) = book_rows(app)
+    assert row["changes"] == {"rewritten": [2], "added": 1, "drawn": 2}
+    assert len(row["chapters"]) == len(record.chapters) + 1 and row["draft"] is True
+    assert row["saved"]["chapters"] == len(record.chapters)
+
+
+def test_reading_returns_only_written_chapters(application, monkeypatch, caplog):
+    app = application
+    book = confirmed(app, taken(app))
+
+    async def short(request, count):
+        return AdapterReply(data=TOO_SHORT) if request.context.get("number") == 3 else None
+
+    calls(app, monkeypatch, short)
+    with pytest.raises(books.BookFailed):
+        asyncio.run(write_book(app, LEARNER, book, noop))
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        content = book_content(app, book, draft=True)
+    record = load(app, book)
+    assert [c["title"] for c in content["chapters"]] == [c.title for c in record.chapters]
+    assert len(content["chapters"]) == 2 and content["title"] == record.outline.title
+    with pytest.raises(LookupError):  # never saved
+        book_content(app, book, draft=False)
+    assert f"book read book={book} version=draft chapters=2" in caplog.text
+    assert record.outline.title not in caplog.text
+    monkeypatch.undo()
+    retry_book(app, LEARNER, book)
+    write(app, book)
+    save_book(app, LEARNER, book)
+    record = saved(app, book)
+    pages = book_content(app, book, draft=False)["chapters"]
+    for page, chapter in zip(pages, record.chapters, strict=True):
+        assert page["title"] == chapter.title and page["paragraphs"] == chapter.paragraphs
+        assert page["pictures"] == [{"paragraph": chapter.new_picture_paragraph, "picture": None}]
+
+
+def test_pictures_come_only_from_the_books_own_list(application, monkeypatch):
+    app = application
+    course_ref = taken(app)
+    asset = app.files.put("lessons/source/pond.png", solid_png()) | {"media_type": "image/png"}
+    pond = {"picture": "pond", "paragraph": 1, "content": "a pond at dawn", "asset": asset}
+    monkeypatch.setattr(books, "originals", lambda course, lesson: [pond])
+    book = start_book(app, LEARNER, course_ref, "same")
+    write(app, book)
+    save_book(app, LEARNER, book)
+    pages = book_content(app, book, draft=False)["chapters"]
+    assert {"paragraph": 1, "picture": "pond"} in pages[0]["pictures"]
+    assert book_picture(app, LEARNER, book, False, None, "pond") == (solid_png(), "image/png")
+    data, media = book_picture(app, LEARNER, book, False, 1, None)
+    assert data[:4] == b"\x89PNG" and media == "image/png"
+    for chapter, picture in ((None, "../../lessons/source/pond.png"), (None, "ghost"), (99, None)):
+        with pytest.raises(LookupError):
+            book_picture(app, LEARNER, book, False, chapter, picture)
+
+    async def no_picture(request, count):
+        return AdapterReply(data=None, failure="unavailable") if request.media else None
+
+    calls(app, monkeypatch, no_picture)
+    start_revision(app, LEARNER, book, 1, "More rain.")
+    revise(app, book, 1, "More rain.")
+    with pytest.raises(LookupError):  # the draft's new picture failed
+        book_picture(app, LEARNER, book, True, 1, None)
+    assert book_picture(app, LEARNER, book, False, 1, None)[0][:4] == b"\x89PNG"
+    for chapter, picture in ((1, "pond"), (None, None)):
+        with pytest.raises(ValueError):
+            book_picture(app, LEARNER, book, False, chapter, picture)
+    with pytest.raises(ValueError):
+        book_content(app, "../x", draft=False)
+
+
+def test_reading_is_refused_in_class(application):
+    app = application
+    book = ready_book(app)
+    app.store.active_activity_id = "class"
+    try:
+        with pytest.raises(StorageBlocked):
+            book_content(app, book, draft=False)
+        with pytest.raises(StorageBlocked):
+            book_picture(app, LEARNER, book, False, 1, None)
+    finally:
+        app.store.active_activity_id = None
+
+
+def test_a_saved_record_with_more_outline_than_chapters_reads(application):
+    app = application
+    book = ready_book(app)
+    record = saved(app, book)
+    more = record.outline.chapters[-1].model_copy(update={"title": "More"})
+    longer = record.outline.model_copy(update={"chapters": [*record.outline.chapters, more]})
+    app.files.put(
+        f"books/{book}/book.json", record.model_copy(update={"outline": longer}).model_dump_json()
+    )
+    assert len(book_content(app, book, draft=False)["chapters"]) == len(record.chapters)
+    (row,) = book_rows(app)
+    assert row["saved"]["chapters"] == len(record.chapters) and row["state"] == "ready"
+    assert book_file(app, book)[:2] == b"PK"
+
+
+def test_a_draft_picture_missing_from_disk_is_saved_as_missing(application):
+    app = application
+    book = ready_book(app)
+    revised(app, book)
+    (app.store.run / f"books/{book}/draft/pictures/chapter-2").unlink()
+    save_book(app, LEARNER, book)
+    assert app.files.read(f"books/{book}/pictures/chapter-2") is None
+    assert not any(n.startswith("OEBPS/images/c2-") for n in epub_names(app, book))
+    assert saved(app, book).pictures[2] == "failed" and not has_draft(app, book)  # can be redrawn
+
+
+def test_deleting_removes_the_whole_book(application, caplog):
+    app = application
+    book = ready_book(app)
+    revised(app, book)
+    app.job_failures[f"reading:{book}"] = "The revision:2 step failed: timeout."
+    title = saved(app, book).outline.title
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        asyncio.run(delete_book(app, book))
+    assert not app.files.path(f"books/{book}").exists() and book_rows(app) == []
+    assert f"reading:{book}" not in app.job_failures
+    assert f"book delete book={book} saved=yes draft=yes stopped=no" in caplog.text
+    assert title not in caplog.text
+
+
+def test_deleting_stops_only_its_own_running_job(application, monkeypatch, caplog):
+    app = application
+    book = confirmed(app, taken(app))
+    other = "lesson-999-2026-01-01-20260101T000000Z"  # A draft-only book on the shelf.
+    shutil.copytree(app.store.run / f"books/{book}", app.store.run / f"books/{other}")
+
+    async def block(request, count):
+        if request.context.get("number") == 2:
+            await asyncio.sleep(3600)
+        return None
+
+    async def scenario():
+        seen = calls(app, monkeypatch, block)
+        run(app, LEARNER, f"reading:{book}", lambda: write_book(app, LEARNER, book, noop))
+        while not any(r.context.get("number") == 2 for r in seen):
+            await asyncio.sleep(0.01)
+        await delete_book(app, other)
+        assert f"reading:{book}" in app.jobs  # Deleting another book leaves this one running.
+        await delete_book(app, book)
+
+    with caplog.at_level(logging.INFO, logger="project_j"):
+        asyncio.run(scenario())
+    assert f"reading:{book}" not in app.jobs and f"reading:{book}" not in app.job_failures
+    assert book_rows(app) == [] and not app.files.path(f"books/{book}").exists()
+    assert f"book delete book={book} saved=no draft=yes stopped=yes" in caplog.text
+    assert f"book delete book={other} saved=no draft=yes stopped=no" in caplog.text
+
+
+def test_deleting_an_unknown_book_or_in_class_is_refused(application):
+    app = application
+    book = ready_book(app)
+    with pytest.raises(LookupError):
+        asyncio.run(delete_book(app, "lesson-001-2026-10-28-20261120T101500Z"))
+    with pytest.raises(ValueError):  # checked here too, not only by the route
+        asyncio.run(delete_book(app, "../lessons"))
+    app.store.active_activity_id = "class"
+    try:
+        with pytest.raises(StorageBlocked):
+            asyncio.run(delete_book(app, book))
+    finally:
+        app.store.active_activity_id = None
+    assert [row["book_id"] for row in book_rows(app)] == [book]
+
+
+def test_a_class_start_does_not_keep_a_failure_of_a_deleted_book(application, monkeypatch):
+    app = application
+    book = confirmed(app, taken(app))
+
+    async def block(request, count):
+        if request.context.get("number") == 2:
+            await asyncio.sleep(3600)
+        return None
+
+    async def scenario():
+        seen = calls(app, monkeypatch, block)
+        run(app, LEARNER, f"reading:{book}", lambda: write_book(app, LEARNER, book, noop))
+        while not any(r.context.get("number") == 2 for r in seen):
+            await asyncio.sleep(0.01)
+        # Deleted from the shelf while a class starts: both wait for the same job to stop.
+        await asyncio.gather(delete_book(app, book), stop_books(app))
+
+    asyncio.run(scenario())
+    assert book_rows(app) == [] and f"reading:{book}" not in app.job_failures
+
+
+@pytest.mark.parametrize("stuck", ["book.epub", "chapter-1", "chapter-2"])
+def test_a_delete_failing_midway_leaves_the_book_on_the_shelf(application, monkeypatch, stuck):
+    app = application
+    book = ready_book(app)
+    revised(app, book)  # The draft has its own book.json and chapter-2.
+    unlink = os.unlink
+
+    def failing(path, *args, **kwargs):
+        if os.path.basename(path) == stuck:
+            raise PermissionError(stuck)
+        return unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "unlink", failing)
+    with pytest.raises(PermissionError):
+        asyncio.run(delete_book(app, book))
+    (row,) = book_rows(app)  # Still listed, so it can be deleted again.
+    assert row["book_id"] == book and row["saved"] is not None
+    monkeypatch.undo()
+    asyncio.run(delete_book(app, book))
+    assert book_rows(app) == [] and not app.files.path(f"books/{book}").exists()

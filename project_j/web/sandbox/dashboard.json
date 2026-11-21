@@ -10158,6 +10158,76 @@
   },
   "books": [
     {
+      "book_id": "lesson-001-2026-10-24-20261119T120000Z",
+      "course_ref": {
+        "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
+        "revision": 1
+      },
+      "title": "The Paper Bridge",
+      "target": "500L",
+      "words": 2094,
+      "chapters": [
+        "The Gap",
+        "Paper",
+        "The Fold",
+        "Across",
+        "Home"
+      ],
+      "planned": 5,
+      "state": "ready",
+      "revising": null,
+      "reason": null,
+      "outline": {
+        "title": "The Paper Bridge",
+        "summary": "Mia rebuilds the river bridge with Dad after a storm.",
+        "characters": [
+          {
+            "called": "Mia",
+            "look": "a small girl in a yellow raincoat"
+          }
+        ],
+        "style": "Soft watercolor, simple shapes.",
+        "chapters": [
+          {
+            "title": "The Gap",
+            "plot": "Mia tries again.",
+            "words": []
+          },
+          {
+            "title": "Paper",
+            "plot": "Mia tries again.",
+            "words": []
+          },
+          {
+            "title": "The Fold",
+            "plot": "Mia tries again.",
+            "words": []
+          },
+          {
+            "title": "Across",
+            "plot": "Mia tries again.",
+            "words": []
+          },
+          {
+            "title": "Home",
+            "plot": "Mia tries again.",
+            "words": []
+          }
+        ],
+        "pictures": []
+      },
+      "version": null,
+      "continuing": false,
+      "missing_pictures": 0,
+      "saved": {
+        "title": "The Paper Bridge",
+        "words": 2094,
+        "chapters": 5
+      },
+      "draft": false,
+      "changes": null
+    },
+    {
       "book_id": "lesson-001-2026-10-24-20261120T081500Z",
       "course_ref": {
         "object_id": "a311b98d-28a5-5fe2-8803-e1ddc9c96192",
@@ -10218,7 +10288,19 @@
       "version": 1,
       "continuing": true,
       "missing_pictures": 1,
-      "downloadable": true
+      "saved": {
+        "title": "The Bridge in the Rain",
+        "words": 3120,
+        "chapters": 4
+      },
+      "draft": true,
+      "changes": {
+        "rewritten": [
+          2
+        ],
+        "added": 0,
+        "drawn": 1
+      }
     },
     {
       "book_id": "lesson-001-2026-10-24-20261120T093000Z",
@@ -10275,7 +10357,9 @@
       "version": null,
       "continuing": false,
       "missing_pictures": 0,
-      "downloadable": false
+      "saved": null,
+      "draft": true,
+      "changes": null
     },
     {
       "book_id": "lesson-001-2026-10-24-20261120T090000Z",
@@ -10335,7 +10419,9 @@
       "version": null,
       "continuing": false,
       "missing_pictures": 0,
-      "downloadable": false
+      "saved": null,
+      "draft": true,
+      "changes": null
     },
     {
       "book_id": "lesson-001-2026-10-24-20261120T101500Z",
@@ -10388,7 +10474,9 @@
       "version": 2,
       "continuing": false,
       "missing_pictures": 0,
-      "downloadable": false
+      "saved": null,
+      "draft": true,
+      "changes": null
     }
   ],
   "book_targets": {

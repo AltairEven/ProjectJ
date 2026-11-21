@@ -35,13 +35,20 @@ const nexts: Record<string, { kind: string, subject: Record<string, unknown> }> 
 const jobs = { 'Jane is working': [{ name: 'prepare:demand', state: 'running', reason: null, progress: null }, { name: 'confirm:c:1', state: 'running', reason: null, progress: '3/9' }] } as Record<string, unknown[]>
 let chosen = new URLSearchParams(location.hash.slice(1)).get('next') ?? Object.keys(nexts)[0]
 
+// The reader's book: a fixed two-chapter one, with no pictures (the sandbox has no files).
+const book = { title: 'The Paper Bridge', chapters: [
+  { title: 'The Gap', paragraphs: ['Mia has a toy car. She wants a bridge for her car.', 'She puts two books on the table. There is a space between the books.'], pictures: [] },
+  { title: 'Paper', paragraphs: ['Mia puts a piece of paper on the books. The paper bends, and the car falls.', 'She folds a new piece of paper. This time, the car stays on the bridge.'], pictures: [] },
+] }
+
 const realFetch = window.fetch.bind(window)
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const path = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url
   if (!path.startsWith('/api/')) return realFetch(input, init)
   const body = path === '/api/dashboard' ? { ...dashboard, next: nexts[chosen] ?? nexts[Object.keys(nexts)[0]], jobs: jobs[chosen] ?? [] }
     : path === '/api/settings/models' ? { models: { simulated: ['simulated-jane'], codex: ['gpt-6.2-sol', 'gpt-6.1-sol'] } }
-    : path === '/api/settings/reference' ? { job: 'reference' } : {}
+    : path === '/api/settings/reference' ? { job: 'reference' }
+    : path.startsWith('/api/books/content') ? book : {}
   await new Promise(done => setTimeout(done, init?.method === 'POST' ? 600 : 50))
   return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } })
 }

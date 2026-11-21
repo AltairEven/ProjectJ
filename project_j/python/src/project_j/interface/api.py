@@ -35,12 +35,17 @@ from sqlalchemy.exc import SQLAlchemyError
 from project_j.application.books import (
     BOOK_PATTERN,
     JOB,
+    book_content,
     book_file,
+    book_picture,
     confirm_outline,
+    delete_book,
     discard_proposal,
     plan_outline,
     retry_book,
+    revert_book,
     revise_chapter,
+    save_book,
     start_book,
     start_drawing,
     start_outline_round,
@@ -347,8 +352,43 @@ class BookOutline(BookRetry):
     feedback: str = Field(min_length=1, max_length=2000)
 
 
+class SavedBook(Contract):
+    """The saved book a reader opens and a download gives."""
+
+    title: str
+    words: int
+    chapters: int
+
+
+class BookChanges(Contract):
+    """What the draft changed against the saved book, not saved yet."""
+
+    rewritten: list[int]
+    added: int
+    drawn: int
+
+
+class BookPlace(Contract):
+    paragraph: int  # The paragraph (from 1) the picture follows.
+    picture: str | None  # An original picture's id; None for the chapter's new one.
+
+
+class BookPage(Contract):
+    title: str
+    paragraphs: list[str]
+    pictures: list[BookPlace]
+
+
+class BookContent(Contract):
+    """A book as the reader shows it: only the chapters written (application/books.py)."""
+
+    title: str | None
+    chapters: list[BookPage]
+
+
 class BookRow(Contract):
-    """A book made from one lesson, as the course page lists it (application/books.py)."""
+    """A book on the bookshelf (application/books.py): what it is doing from its draft when there
+    is one, and its saved version."""
 
     book_id: str
     course_ref: RevisionRef
@@ -364,7 +404,9 @@ class BookRow(Contract):
     version: int | None = None  # The round of the outline under discussion.
     continuing: bool = False  # A finished book with new chapters under discussion.
     missing_pictures: int = 0
-    downloadable: bool = False  # An EPUB is on disk, whatever the book is doing.
+    saved: SavedBook | None = None  # None until the first save: then it can be read and downloaded.
+    draft: bool = False  # Edits wait in the draft until saved or discarded.
+    changes: BookChanges | None = None  # Only for a saved book with a draft.
 
 
 class Dashboard(Contract):
@@ -881,6 +923,44 @@ def create_app(
                 app_controller, learner, book, request.chapter, request.feedback, progress
             ),
         )
+
+    @app.post("/api/books/save", dependencies=[Depends(operator)])
+    async def book_save(request: BookRetry):
+        save_book(controller(), request.learner_id, request.book_id)
+        return {"book_id": request.book_id}
+
+    @app.post("/api/books/revert", dependencies=[Depends(operator)])
+    async def book_revert(request: BookRetry):
+        revert_book(controller(), request.book_id)
+        return {"book_id": request.book_id}
+
+    @app.post("/api/books/delete", dependencies=[Depends(operator)])
+    async def book_delete(request: BookRetry):
+        await delete_book(controller(), request.book_id)
+        return {"book_id": request.book_id}
+
+    @app.get("/api/books/content", dependencies=[Depends(operator)], response_model=BookContent)
+    async def book_read(book_id: Annotated[str, Query(pattern=BOOK_PATTERN)], draft: bool = False):
+        return book_content(controller(), book_id, draft)
+
+    @app.get("/api/books/picture", dependencies=[Depends(operator)])
+    async def book_picture_file(
+        book_id: Annotated[str, Query(pattern=BOOK_PATTERN)],
+        draft: bool = False,
+        chapter: Annotated[int | None, Query(ge=1, le=12)] = None,
+        picture: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
+        learner_id: Annotated[str | None, Query(pattern=LEARNER_PATTERN)] = None,
+    ):
+        app_controller = controller()
+        data, media_type = book_picture(
+            app_controller,
+            learner_id or app_controller.learner_id,
+            book_id,
+            draft,
+            chapter,
+            picture,
+        )
+        return Response(data, media_type=media_type, headers={"Cache-Control": "no-store"})
 
     @app.get("/api/books/file", dependencies=[Depends(operator)])
     async def book_download(book_id: Annotated[str, Query(pattern=BOOK_PATTERN)]):
@@ -1417,6 +1497,14 @@ def main(argv: list[str] | None = None):
     if study and simulation_only:
         parser.error("--study 不能与模拟调试选项同用：" + "、".join(sorted(simulation_only)))
     settings = Settings(**args, realm="study" if study else "simulation", onboarding=onboarding)
+    # Diagnostics go to standard error, metadata only; the app itself writes no log file. Set up
+    # before the run's files open, so their upgrade (books migration) is logged too.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s.%(msecs)03dZ %(levelname)s %(name)s %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+    logging.Formatter.converter = time.gmtime  # UTC, the clock of the sealed facts.
     coordinator = build_coordinator(settings)
     try:
         hold_run(coordinator.store.run)  # Kept open until the process ends, even on a crash.
@@ -1443,13 +1531,6 @@ def main(argv: list[str] | None = None):
                 f"调试注入：模型延迟{settings.model_delay}秒；"
                 f"一次失败{settings.fail_once or '无'}。"
             )
-    # Diagnostics go to standard error, metadata only; the app itself writes no log file.
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s.%(msecs)03dZ %(levelname)s %(name)s %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S",
-    )
-    logging.Formatter.converter = time.gmtime  # UTC, the clock of the sealed facts.
     server = uvicorn.Server(
         uvicorn.Config(
             create_app(settings, coordinator, announce),

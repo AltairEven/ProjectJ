@@ -45,6 +45,20 @@ def test_a_run_moves_to_another_computer_with_its_records_and_files(old, tmp_pat
     store.close()
 
 
+def test_an_old_run_exported_before_the_service_starts_keeps_its_books(old, tmp_path):
+    book = "lesson-001-2026-10-28-20261120T101500Z"
+    folder = old / STUDY / "me" / "readings" / book  # Upgraded, the service not yet started.
+    folder.mkdir(parents=True)
+    (folder / "book.json").write_text('{"status": "ready", "proposal": null}')
+    (folder / "book.epub").write_bytes(b"PK-epub")
+    archive = tmp_path / "me.tar.gz"
+    assert export_run(old, "me", archive) == 5
+    assert import_run(tmp_path / "new", "me", archive) == 5
+    new = tmp_path / "new" / STUDY / "me"
+    assert (new / f"books/{book}/book.epub").read_bytes() == b"PK-epub"
+    assert not (new / "readings").exists()
+
+
 def test_nothing_existing_is_overwritten(old, tmp_path):
     archive = tmp_path / "me.tar.gz"
     export_run(old, "me", archive)

@@ -149,6 +149,42 @@ export type BindingsRequest = {
 };
 
 /**
+ * BookChanges
+ *
+ * What the draft changed against the saved book, not saved yet.
+ */
+export type BookChanges = {
+    /**
+     * Rewritten
+     */
+    rewritten: Array<number>;
+    /**
+     * Added
+     */
+    added: number;
+    /**
+     * Drawn
+     */
+    drawn: number;
+};
+
+/**
+ * BookContent
+ *
+ * A book as the reader shows it: only the chapters written (application/books.py).
+ */
+export type BookContent = {
+    /**
+     * Title
+     */
+    title: string | null;
+    /**
+     * Chapters
+     */
+    chapters: Array<BookPage>;
+};
+
+/**
  * BookExpand
  */
 export type BookExpand = {
@@ -179,6 +215,38 @@ export type BookOutline = {
      * Feedback
      */
     feedback: string;
+};
+
+/**
+ * BookPage
+ */
+export type BookPage = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Paragraphs
+     */
+    paragraphs: Array<string>;
+    /**
+     * Pictures
+     */
+    pictures: Array<BookPlace>;
+};
+
+/**
+ * BookPlace
+ */
+export type BookPlace = {
+    /**
+     * Paragraph
+     */
+    paragraph: number;
+    /**
+     * Picture
+     */
+    picture: string | null;
 };
 
 /**
@@ -220,7 +288,8 @@ export type BookRevise = {
 /**
  * BookRow
  *
- * A book made from one lesson, as the course page lists it (application/books.py).
+ * A book on the bookshelf (application/books.py): what it is doing from its draft when there
+ * is one, and its saved version.
  */
 export type BookRow = {
     /**
@@ -273,10 +342,12 @@ export type BookRow = {
      * Missing Pictures
      */
     missing_pictures?: number;
+    saved?: SavedBook | null;
     /**
-     * Downloadable
+     * Draft
      */
-    downloadable?: boolean;
+    draft?: boolean;
+    changes?: BookChanges | null;
 };
 
 /**
@@ -1257,6 +1328,26 @@ export type RevisionRef = {
 };
 
 /**
+ * SavedBook
+ *
+ * The saved book a reader opens and a download gives.
+ */
+export type SavedBook = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Words
+     */
+    words: number;
+    /**
+     * Chapters
+     */
+    chapters: number;
+};
+
+/**
  * Snapshot
  */
 export type Snapshot = {
@@ -1897,6 +1988,183 @@ export type BookReviseApiBooksRevisePostResponses = {
      * Successful Response
      */
     202: unknown;
+};
+
+export type BookSaveApiBooksSavePostData = {
+    body: BookRetry;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/books/save';
+};
+
+export type BookSaveApiBooksSavePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookSaveApiBooksSavePostError = BookSaveApiBooksSavePostErrors[keyof BookSaveApiBooksSavePostErrors];
+
+export type BookSaveApiBooksSavePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type BookRevertApiBooksRevertPostData = {
+    body: BookRetry;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/books/revert';
+};
+
+export type BookRevertApiBooksRevertPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookRevertApiBooksRevertPostError = BookRevertApiBooksRevertPostErrors[keyof BookRevertApiBooksRevertPostErrors];
+
+export type BookRevertApiBooksRevertPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type BookDeleteApiBooksDeletePostData = {
+    body: BookRetry;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/books/delete';
+};
+
+export type BookDeleteApiBooksDeletePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookDeleteApiBooksDeletePostError = BookDeleteApiBooksDeletePostErrors[keyof BookDeleteApiBooksDeletePostErrors];
+
+export type BookDeleteApiBooksDeletePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type BookReadApiBooksContentGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query: {
+        /**
+         * Book Id
+         */
+        book_id: string;
+        /**
+         * Draft
+         */
+        draft?: boolean;
+    };
+    url: '/api/books/content';
+};
+
+export type BookReadApiBooksContentGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookReadApiBooksContentGetError = BookReadApiBooksContentGetErrors[keyof BookReadApiBooksContentGetErrors];
+
+export type BookReadApiBooksContentGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: BookContent;
+};
+
+export type BookReadApiBooksContentGetResponse = BookReadApiBooksContentGetResponses[keyof BookReadApiBooksContentGetResponses];
+
+export type BookPictureFileApiBooksPictureGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query: {
+        /**
+         * Book Id
+         */
+        book_id: string;
+        /**
+         * Draft
+         */
+        draft?: boolean;
+        /**
+         * Chapter
+         */
+        chapter?: number | null;
+        /**
+         * Picture
+         */
+        picture?: string | null;
+        /**
+         * Learner Id
+         */
+        learner_id?: string | null;
+    };
+    url: '/api/books/picture';
+};
+
+export type BookPictureFileApiBooksPictureGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BookPictureFileApiBooksPictureGetError = BookPictureFileApiBooksPictureGetErrors[keyof BookPictureFileApiBooksPictureGetErrors];
+
+export type BookPictureFileApiBooksPictureGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
 };
 
 export type BookDownloadApiBooksFileGetData = {

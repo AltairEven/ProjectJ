@@ -1,90 +1,41 @@
 import { useRef, useState } from 'react'
-import { api, fileUrl, saveFile, show, uid } from '../api'
-import { bookLine, booksOf, expandBlocked, levelled, outlineLine } from '../books'
-import type { BookRow, Document as Doc, RevisionRef } from '../client/types.gen'
+import { api, fileUrl, show, uid } from '../api'
+import { booksOf, expandBlocked, levelled } from '../books'
+import type { Document as Doc, RevisionRef } from '../client/types.gen'
 import { courseRows, latestFact, lessonOf, needsMaterials, previewLabels, previewOf, previewRank, resourcesOf, retakeOffered, storyLevelLine } from '../courses'
 import { CHALLENGES, challengeOption } from '../learning'
-import { jobProgress } from '../progress'
 import { discussionLines, resourceLines } from '../report'
 import { startNotice } from '../settings'
-import { JobLine, Progress, Rows, useRun, type PageProps } from '../ui'
+import { JobLine, Rows, useRun, type PageProps } from '../ui'
 
 // Resource kinds with a connected generator: voice by local synthesis, the rest by the model.
 const generatable = ['audio', 'image', 'animation']
 type Resource = { resource_id: string, kind: string, purpose: string, versions?: unknown[], adopted_version?: number | null }
 type Run = ReturnType<typeof useRun>['run']
 
-/** A taken lesson's story written out as a book for the phone (application/books.py): agree its outline with Jane round by round,
- * follow the writing, download, retry, rewrite a chapter, draw missing pictures, or agree new chapters to continue it. */
-function Expand({ token, dashboard, learner, courseRef, busy, run }: Pick<PageProps, 'token' | 'dashboard' | 'learner'>
+/** A taken lesson's story written out as a book (application/books.py): choose its difficulty and start it here;
+ * the book is then agreed, written, read and edited on the Bookshelf (ADR-0035). */
+function Expand({ token, dashboard, learner, go, courseRef, busy, run }: Pick<PageProps, 'token' | 'dashboard' | 'learner' | 'go'>
   & { courseRef: RevisionRef, busy: boolean, run: Run }) {
   const [challenge, setChallenge] = useState('same')
-  const [opened, setOpened] = useState('')
-  const [revising, setRevising] = useState<{ book: string, chapter: number } | null>(null)
-  const [feedback, setFeedback] = useState('')
-  const [extending, setExtending] = useState('')
-  const [notes, setNotes] = useState<Record<string, string>>({})
   const blocked = expandBlocked(dashboard)
-  const stop = busy || !!blocked
   const targets = dashboard.book_targets ?? {}
-  const running = (book: BookRow) => (dashboard.jobs ?? []).find(job => job.name === `reading:${book.book_id}` && job.state === 'running')
-  const download = (book: BookRow) => () => saveFile(token, `/api/books/file?${new URLSearchParams({ book_id: book.book_id })}`, `${book.book_id}.epub`)
-  const send = (route: string, book: BookRow, label: string, extra = {}) => void run(async () => {
-    await api(token, `books/${route}`, { learner_id: learner, book_id: book.book_id, ...extra })
-    setNotes(current => ({ ...current, [book.book_id]: '' }))
-    setExtending('')
-  }, label)
-  const note = (book: BookRow, label: string) => <label>{label}<textarea maxLength={2000} value={notes[book.book_id] ?? ''}
-    onChange={event => setNotes(current => ({ ...current, [book.book_id]: event.target.value }))} /></label>
-  const said = (book: BookRow) => (notes[book.book_id] ?? '').trim()
-  const books = booksOf(courseRef, dashboard.books ?? [])
+  const count = booksOf(courseRef, dashboard.books ?? []).length
+  const expand = () => {
+    const body = { learner_id: learner, course_ref: courseRef, challenge: levelled(targets) ? challenge : 'same' }
+    let book = ''
+    // Jump once the page data is refreshed, so the edit page already has the new book.
+    void run(async () => { book = (await api<{ book_id: string }>(token, 'books/expand', body)).book_id }, 'Starting the book')
+      .then(() => { if (book) go('books', `edit:${book}`) })
+  }
   return <section><h2>Expand this story</h2>
-    <p>Jane first suggests an outline of a short novel from this story, using your saved words; once you agree on it, she writes it with pictures, to read on your phone.</p>
+    <p>Jane first suggests an outline of a short novel from this story, using your saved words; you agree on it, she writes it with pictures, and you read it on the Bookshelf.</p>
     {levelled(targets) ? <fieldset><legend>Difficulty</legend>{CHALLENGES.map(([name]) => <label key={name} className="check">
       <input type="radio" name="book-challenge" checked={challenge === name} onChange={() => setChallenge(name)} />{challengeOption(name, targets[name])}</label>)}</fieldset>
       : <p className="hint">Your profile has no Lexile yet, so the book keeps the story's own level.</p>}
     {blocked && <p className="notice">{blocked}</p>}
-    <button disabled={stop} onClick={() => { const body = { learner_id: learner, course_ref: courseRef, challenge: levelled(targets) ? challenge : 'same' }
-      void run(async () => { await api(token, 'books/expand', body) }, 'Starting the book') }}>Expand</button>
-    {books.length > 0 && <><h3>Books from this story</h3><ul>{books.map(book => {
-      const job = running(book), outline = book.outline
-      // The outline still to agree: a new book's whole one, or only the new chapters of a continuation.
-      const discussed = !job && outline && (book.state === 'outlining' || book.continuing) ? outline : null
-      const first = book.continuing ? book.chapters.length : 0
-      return <li key={book.book_id}>
-        {job ? <Progress label={outlineLine(book, true) ?? bookLine(book)} {...jobProgress(job.progress)} />
-          : <p className={book.state === 'failed' ? 'notice' : undefined}>{bookLine(book)}</p>}
-        {!job && book.continuing && <p>New chapters: {outlineLine(book, false)}</p>}
-        {(book.state === 'outlining' || book.state === 'ready') && book.reason && <p className="notice">The last step failed: {book.reason}</p>}
-        {discussed && <>
-          {discussed.summary && <p>The story: {discussed.summary}</p>}
-          <ol start={first + 1}>{discussed.chapters.slice(first).map((chapter, index) => <li key={index}>{chapter.title} — {chapter.plot}</li>)}</ol>
-          {note(book, 'What should change?')}
-          <div className="row">
-            <button disabled={stop || !said(book)} onClick={() => send('outline', book, 'Revising the outline', { feedback: said(book) })}>Revise the outline</button>
-            <button disabled={stop} onClick={() => send('confirm', book, 'Writing the book')}>{book.continuing ? 'Write the new chapters' : 'Write the book from this outline'}</button>
-            {book.continuing && <button className="quiet" disabled={stop} onClick={() => send('discard', book, 'Discarding the new chapters')}>Discard</button>}
-          </div></>}
-        <div className="row">
-          {book.downloadable && <button className="quiet" disabled={busy} onClick={() => void run(download(book))}>Download EPUB</button>}
-          {book.state === 'ready' && <button className="quiet" onClick={() => setOpened(opened === book.book_id ? '' : book.book_id)}>{opened === book.book_id ? 'Hide chapters' : 'Chapters'}</button>}
-          {book.state === 'ready' && !!book.missing_pictures && <button className="quiet" disabled={stop} onClick={() => send('pictures', book, 'Drawing missing pictures')}>Draw missing pictures</button>}
-          {book.state === 'ready' && !book.continuing && <button className="quiet" disabled={stop} onClick={() => setExtending(extending === book.book_id ? '' : book.book_id)}>Continue the story</button>}
-          {book.state === 'failed' && <button disabled={stop} onClick={() => send('retry', book, 'Retrying the book')}>Retry</button>}
-        </div>
-        {book.state === 'ready' && !book.continuing && extending === book.book_id && <>
-          {note(book, 'What should happen next?')}
-          <button disabled={stop || !said(book)} onClick={() => send('outline', book, 'Planning new chapters', { feedback: said(book) })}>Plan new chapters</button></>}
-        {book.state === 'ready' && opened === book.book_id && <ol>{book.chapters.map((title, index) => {
-          const chapter = index + 1, here = revising?.book === book.book_id && revising.chapter === chapter
-          const plot = outline?.chapters[index]?.plot
-          return <li key={chapter}>{plot ? `${title} — ${plot}` : title} <button className="quiet" disabled={stop} onClick={() => { setRevising({ book: book.book_id, chapter }); setFeedback('') }}>Revise</button>
-            {here && <><label>What should change in this chapter?<textarea maxLength={2000} value={feedback} onChange={event => setFeedback(event.target.value)} /></label>
-              <button disabled={stop || !feedback.trim()} onClick={() => { const body = { learner_id: learner, book_id: book.book_id, chapter, feedback: feedback.trim() }
-                void run(async () => { await api(token, 'books/revise', body); setRevising(null); setFeedback('') }, 'Rewriting the chapter') }}>Rewrite this chapter</button></>}</li>
-        })}</ol>}
-      </li>
-    })}</ul></>}
+    <button disabled={busy || !!blocked} onClick={expand}>Expand</button>
+    {count > 0 && <p><button className="link" onClick={() => go('books')}>{count === 1 ? '1 book from this story is' : `${count} books from this story are`} on the bookshelf</button></p>}
   </section>
 }
 
@@ -159,7 +110,7 @@ function Detail({ token, dashboard, learner, go, refresh, course }: PageProps & 
         const body = { request_id: uid(), learner_id: learner, course_ref: courseRef, materials_ready: materials && ready }
         void run(async () => { await api(token, 'course/start', body) }, 'Starting') }}>{starting?.state === 'failed' ? 'Try again' : retaking ? 'Take it again' : 'Start'}</button></section>}
     {taught && fact && <section><h2>You took this lesson</h2><button className="quiet" onClick={() => go('evaluations', String(fact.body.activity_id))}>Read the evaluation</button></section>}
-    {taught && <Expand token={token} dashboard={dashboard} learner={learner} courseRef={courseRef} busy={busy} run={run} />}
+    {taught && <Expand token={token} dashboard={dashboard} learner={learner} go={go} courseRef={courseRef} busy={busy} run={run} />}
     {confirmed && preview && <section><h2>Resources</h2>
       {lesson && <p>Confirmed. The lesson folder is {String(lesson.body.folder)}.</p>}
       {remaking && <JobLine job={remaking} />}

@@ -10,9 +10,9 @@ const subjects = {
   resources: { name: 'start:c1:2', state: 'running', reason: null, progress: '2/5' },
 }
 
-test('the navigation lists the seven pages in order', () => {
-  assert.deepEqual(pages.map(([page]) => page), ['home', 'state', 'plan', 'courses', 'evaluations', 'vocabulary', 'settings'])
-  assert.deepEqual(pages.map(([, label]) => label), ['Home', 'Progress', 'Plan', 'Lessons', 'Evaluations', 'Vocabulary', 'Settings'])
+test('the navigation lists the eight pages in order', () => {
+  assert.deepEqual(pages.map(([page]) => page), ['home', 'state', 'plan', 'courses', 'evaluations', 'vocabulary', 'books', 'settings'])
+  assert.deepEqual(pages.map(([, label]) => label), ['Home', 'Progress', 'Plan', 'Lessons', 'Evaluations', 'Vocabulary', 'Bookshelf', 'Settings'])
 })
 
 test('every next step has a title and a page to go to', () => {
@@ -117,7 +117,7 @@ test('remaking broken resources reads as such (ADR-0027)', () => {
   assert.deepEqual(jobLines([{ name: 'remake:c1:2', state: 'running', progress: '1/1' }]), ['Remaking broken resources: item 1/1'])
 })
 
-test('a failed book is retried from its lesson page, not home, and its job has a name', () => {
+test('a failed book is retried from its edit page on the bookshelf, not home, and its job has a name', () => {
   assert.equal(retriedOnHome({ name: 'reading:x', state: 'failed' }), false)
   assert.deepEqual(jobLines([{ name: 'reading:lesson-001', state: 'running', reason: null, progress: '3/10' }]), ['Writing a book: item 3/10'])
 })

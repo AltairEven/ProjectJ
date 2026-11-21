@@ -821,6 +821,351 @@
         }
       }
     },
+    "/api/books/save": {
+      "post": {
+        "summary": "Book Save",
+        "operationId": "book_save_api_books_save_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookRetry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/revert": {
+      "post": {
+        "summary": "Book Revert",
+        "operationId": "book_revert_api_books_revert_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookRetry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/delete": {
+      "post": {
+        "summary": "Book Delete",
+        "operationId": "book_delete_api_books_delete_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookRetry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/content": {
+      "get": {
+        "summary": "Book Read",
+        "operationId": "book_read_api_books_content_get",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z]+-\\d{3}-\\d{4}-\\d{2}-\\d{2}-\\d{8}T\\d{6}Z$",
+              "title": "Book Id"
+            }
+          },
+          {
+            "name": "draft",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Draft"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookContent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/picture": {
+      "get": {
+        "summary": "Book Picture File",
+        "operationId": "book_picture_file_api_books_picture_get",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z]+-\\d{3}-\\d{4}-\\d{2}-\\d{2}-\\d{8}T\\d{6}Z$",
+              "title": "Book Id"
+            }
+          },
+          {
+            "name": "draft",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Draft"
+            }
+          },
+          {
+            "name": "chapter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 12,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Chapter"
+            }
+          },
+          {
+            "name": "picture",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Picture"
+            }
+          },
+          {
+            "name": "learner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{1,64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Learner Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/books/file": {
       "get": {
         "summary": "Book Download",
@@ -3279,6 +3624,64 @@
         ],
         "title": "BindingsRequest"
       },
+      "BookChanges": {
+        "properties": {
+          "rewritten": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Rewritten"
+          },
+          "added": {
+            "type": "integer",
+            "title": "Added"
+          },
+          "drawn": {
+            "type": "integer",
+            "title": "Drawn"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rewritten",
+          "added",
+          "drawn"
+        ],
+        "title": "BookChanges",
+        "description": "What the draft changed against the saved book, not saved yet."
+      },
+      "BookContent": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "chapters": {
+            "items": {
+              "$ref": "#/components/schemas/BookPage"
+            },
+            "type": "array",
+            "title": "Chapters"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "chapters"
+        ],
+        "title": "BookContent",
+        "description": "A book as the reader shows it: only the chapters written (application/books.py)."
+      },
       "BookExpand": {
         "properties": {
           "learner_id": {
@@ -3336,6 +3739,62 @@
           "feedback"
         ],
         "title": "BookOutline"
+      },
+      "BookPage": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "paragraphs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Paragraphs"
+          },
+          "pictures": {
+            "items": {
+              "$ref": "#/components/schemas/BookPlace"
+            },
+            "type": "array",
+            "title": "Pictures"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "paragraphs",
+          "pictures"
+        ],
+        "title": "BookPage"
+      },
+      "BookPlace": {
+        "properties": {
+          "paragraph": {
+            "type": "integer",
+            "title": "Paragraph"
+          },
+          "picture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Picture"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "paragraph",
+          "picture"
+        ],
+        "title": "BookPlace"
       },
       "BookRetry": {
         "properties": {
@@ -3511,10 +3970,30 @@
             "title": "Missing Pictures",
             "default": 0
           },
-          "downloadable": {
+          "saved": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SavedBook"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "draft": {
             "type": "boolean",
-            "title": "Downloadable",
+            "title": "Draft",
             "default": false
+          },
+          "changes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookChanges"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -3531,7 +4010,7 @@
           "reason"
         ],
         "title": "BookRow",
-        "description": "A book made from one lesson, as the course page lists it (application/books.py)."
+        "description": "A book on the bookshelf (application/books.py): what it is doing from its draft when there\nis one, and its saved version."
       },
       "Character": {
         "properties": {
@@ -5269,6 +5748,31 @@
           "revision"
         ],
         "title": "RevisionRef"
+      },
+      "SavedBook": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "words": {
+            "type": "integer",
+            "title": "Words"
+          },
+          "chapters": {
+            "type": "integer",
+            "title": "Chapters"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "words",
+          "chapters"
+        ],
+        "title": "SavedBook",
+        "description": "The saved book a reader opens and a download gives."
       },
       "Snapshot": {
         "properties": {

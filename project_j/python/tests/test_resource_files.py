@@ -149,28 +149,28 @@ def test_removing_drafts_keeps_the_current_course_and_lessons(tmp_path):
     store.close()
 
 
-def test_readings_tree_reads_and_lists(tmp_path):
+def test_books_tree_reads_and_lists(tmp_path):
     store = SimulationStore(tmp_path / "simulation", "run1")
     files = PrivateFiles(store)
-    assert files.folders("readings") == []
-    book = "readings/lesson-001-2026-10-28-20261120T101500Z"
+    assert files.folders("books") == []
+    book = "books/lesson-001-2026-10-28-20261120T101500Z"
     files.put(f"{book}/book.json", "{}")
     assert files.read(f"{book}/book.json") == b"{}"
-    assert files.read("readings/nope/book.json") is None
-    assert files.folders("readings") == ["lesson-001-2026-10-28-20261120T101500Z"]
+    assert files.read("books/nope/book.json") is None
+    assert files.folders("books") == ["lesson-001-2026-10-28-20261120T101500Z"]
     store.close()
 
 
-def test_readings_refuse_escape_and_class_time(tmp_path):
+def test_books_refuse_escape_and_class_time(tmp_path):
     store = SimulationStore(tmp_path / "simulation", "run1")
     files = PrivateFiles(store)
-    for bad in ("readings/../../x", "../readings/x", "readings"):
+    for bad in ("books/../../x", "../books/x", "books", "readings/b/book.json"):
         with pytest.raises(ValueError):
             files.read(bad)
     store.active_activity_id = "class"
     with pytest.raises(StorageBlocked):
-        files.put("readings/b/book.json", "{}")
+        files.put("books/b/book.json", "{}")
     with pytest.raises(StorageBlocked):
-        files.read("readings/b/book.json")
+        files.read("books/b/book.json")
     store.active_activity_id = None
     store.close()
